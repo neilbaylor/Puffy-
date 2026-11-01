@@ -144,7 +144,7 @@ export class GameScene extends Phaser.Scene {
     // ── Players ──
     const specs = this.session.players.length
       ? this.session.players
-      : [{ slot: 0, characterId: 'blaze', inputId: 'kb1' }];
+      : [{ slot: 0, characterId: 'puffy', inputId: 'kb1' }];
     specs.forEach((spec, i) => {
       const input = sourceById(spec.inputId) ?? touchSource;
       const p = new Player(

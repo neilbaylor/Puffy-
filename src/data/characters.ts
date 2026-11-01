@@ -1,6 +1,6 @@
 /**
- * The three playable characters. Names, colors and art are placeholders until
- * the real character sketches arrive; the stats give each one a distinct feel.
+ * The three playable characters. Puffy is drawn from the original sketches; Bolt and
+ * Boom are still placeholders. The stats give each one a distinct feel.
  */
 export interface CharacterDef {
   id: string;
@@ -23,17 +23,20 @@ export interface CharacterDef {
   rocketSpeed: number;
   blastRadius: number;
   damage: number;
+  /** Collision box height (px). Taller characters get a taller box. */
+  hitH?: number;
   /** 0-5 bars shown in character select. */
   bars: { speed: number; jump: number; power: number };
 }
 
 export const CHARACTERS: CharacterDef[] = [
   {
-    id: 'blaze',
-    name: 'Blaze',
-    tagline: 'All-rounder',
-    colors: { main: '#ff5a4f', shade: '#c7322b', light: '#ffa49c', accent: '#ffd23f' },
+    id: 'puffy',
+    name: 'Puffy',
+    tagline: 'The hero',
+    colors: { main: '#f2892e', shade: '#d06a1a', light: '#ffc58a', accent: '#8fc48a' },
     maxHp: 3,
+    hitH: 40,
     walkSpeed: 165,
     runSpeed: 270,
     accel: 1300,
@@ -68,7 +71,7 @@ export const CHARACTERS: CharacterDef[] = [
     id: 'boom',
     name: 'Boom',
     tagline: 'Heavy hitter',
-    colors: { main: '#ffb627', shade: '#d4860a', light: '#ffe08a', accent: '#5b3a1a' },
+    colors: { main: '#a77bf3', shade: '#7a4fd0', light: '#d6c2ff', accent: '#ffd23f' },
     maxHp: 4,
     walkSpeed: 150,
     runSpeed: 245,

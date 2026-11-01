@@ -59,7 +59,7 @@ export class Player {
     this.hp = char.maxHp;
     this.hitbox = scene.physics.add.image(x, y, '__DEFAULT').setVisible(false);
     this.body = this.hitbox.body as Phaser.Physics.Arcade.Body;
-    this.body.setSize(HIT_W, HIT_H, true);
+    this.body.setSize(HIT_W, char.hitH ?? HIT_H, true);
     this.body.setMaxVelocityY(MAX_FALL_SPEED);
     this.body.setCollideWorldBounds(true);
     this.hitbox.setData('player', this);
@@ -205,7 +205,7 @@ export class Player {
       // invulnerability flicker
       this.view.setAlpha(this.invulnerable ? (Math.floor(this.scene.time.now / 70) % 2 ? 0.35 : 1) : 1);
     }
-    this.tag.setPosition(this.view.x, this.view.y - 52 * this.view.scaleY);
+    this.tag.setPosition(this.view.x, this.view.y - 56 * this.view.scaleY);
     this.tag.setVisible(this.state === 'alive' && this.scene.players.length > 1);
   }
 
