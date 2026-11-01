@@ -74,6 +74,16 @@ function noise(dur: number, vol: number, filterFrom: number, filterTo: number, d
 
 export const sfx = {
   jump: () => tone({ type: 'square', from: 280, to: 620, dur: 0.14, vol: 0.09 }),
+  /** A boot hitting the ball (k = 0..1 loudness). */
+  kick: (k = 1) => {
+    tone({ type: 'sine', from: 160, to: 60, dur: 0.1, vol: 0.25 * k });
+    noise(0.06, 0.18 * k, 1800, 400);
+  },
+  /** Referee whistle: they've spotted you. */
+  whistle: () => {
+    tone({ type: 'square', from: 2300, to: 2500, dur: 0.12, vol: 0.05 });
+    tone({ type: 'square', from: 2500, to: 2300, dur: 0.22, vol: 0.05, delay: 0.14 });
+  },
   jump2: () => {
     tone({ type: 'square', from: 520, to: 980, dur: 0.12, vol: 0.07 });
     noise(0.12, 0.12, 3000, 900);

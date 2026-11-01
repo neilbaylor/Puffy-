@@ -8,6 +8,7 @@ import { createEnemy, type Enemy } from '../entities/enemies/Enemy';
 import { Aura, Checkpoint, Goal, RootBeer } from '../entities/Pickups';
 import { Player } from '../entities/Player';
 import { Rocket } from '../entities/Rocket';
+import { SoccerMatch } from '../entities/Soccer';
 import { soloSource, sourceById } from '../input/devices';
 import type { EnemyKind } from '../level/builder';
 import { buildLevel1 } from '../level/level1';
@@ -95,6 +96,7 @@ export class GameScene extends Phaser.Scene {
   private bg!: Background;
 
   players: Player[] = [];
+  private matches: SoccerMatch[] = [];
   private enemies: Enemy[] = [];
   private rockets: Rocket[] = [];
   private auras: Aura[] = [];
@@ -142,6 +144,7 @@ export class GameScene extends Phaser.Scene {
       themeClock.t = 0;
     }
     this.players = [];
+    this.matches = [];
     this.enemies = [];
     this.rockets = [];
     this.auras = [];
@@ -209,16 +212,11 @@ export class GameScene extends Phaser.Scene {
           break;
         case 'tree':
           break;
-        default: {
-          const kind = s.type as EnemyKind;
-          const e = createEnemy(this, kind, cx, surface(s.y) - 40);
-          // stand the body exactly on the ground, whatever the sprite's size/scale
-          e.body.updateFromGameObject();
-          e.y += surface(s.y) - e.body.bottom;
-          e.syncBody();
-          this.enemies.push(e);
-          this.gEnemies.add(e);
-        }
+        case 'soccer':
+          this.matches.push(new SoccerMatch(this, cx, surface(s.y), Number(s.opts?.w ?? 10)));
+          break;
+        default:
+          this.addEnemy(createEnemy(this, s.type as EnemyKind, cx, surface(s.y) - 40), surface(s.y));
       }
     }
 
@@ -239,6 +237,11 @@ export class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.gRockets, layer, (r) => (r as Rocket).explode());
     this.physics.add.overlap(this.gPlayers, this.gEnemies, (h, e) => this.onPlayerEnemy(h as Phaser.GameObjects.GameObject, e as Enemy));
     this.physics.add.overlap(this.gRockets, this.gEnemies, (r) => (r as Rocket).explode());
+    for (const m of this.matches)
+      this.physics.add.overlap(this.gRockets, m.ball, (r) => {
+        (r as Rocket).explode();
+        m.popBall();
+      });
     this.physics.add.overlap(this.gPlayers, this.gAuras, (h, a) => this.collectAura(this.playerOf(h), a as Aura));
     this.physics.add.overlap(this.gPlayers, this.gRootbeer, (h, r) => this.collectRootbeer(this.playerOf(h), r as RootBeer));
     for (const cp of this.checkpoints)
@@ -266,6 +269,15 @@ export class GameScene extends Phaser.Scene {
   private addAura(a: Aura) {
     this.auras.push(a);
     this.gAuras.add(a);
+  }
+
+  /** Add an enemy standing on the ground at `groundY` (whatever its sprite's size/scale). */
+  addEnemy(e: Enemy, groundY: number) {
+    e.body.updateFromGameObject();
+    e.y += groundY - e.body.bottom;
+    e.syncBody();
+    this.enemies.push(e);
+    this.gEnemies.add(e);
   }
 
   private playerOf(h: unknown): Player {
@@ -307,6 +319,7 @@ export class GameScene extends Phaser.Scene {
     this.rootbeers = this.rootbeers.filter((r) => r.tick(now));
     this.settleAura();
     this.updateWaves(dt);
+    for (const m of this.matches) m.update(dt);
 
     themeClock.t += dt;
     this.applyTheme();

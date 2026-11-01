@@ -11,7 +11,7 @@ export type Cell = 'ground' | 'rock' | 'boulder' | 'bramble' | 'cloud' | null;
 export type EnemyKind = 'puffball' | 'bigpuff' | 'giant';
 
 export interface Spawn {
-  type: EnemyKind | 'aura' | 'rootbeer' | 'checkpoint' | 'goal' | 'player' | 'tree';
+  type: EnemyKind | 'aura' | 'rootbeer' | 'checkpoint' | 'goal' | 'player' | 'tree' | 'soccer';
   x: number; // tile column (may be fractional for aura / trees)
   y: number; // tile row the thing occupies
   opts?: Record<string, number | string | boolean>;

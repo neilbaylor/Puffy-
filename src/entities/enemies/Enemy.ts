@@ -159,7 +159,7 @@ abstract class Walker extends Enemy {
   protected frameB = 'w1';
   protected animRate = 7;
 
-  tick() {
+  tick(_dt = 0) {
     const b = this.body;
     if (b.blocked.left) this.dir = 1;
     else if (b.blocked.right) this.dir = -1;

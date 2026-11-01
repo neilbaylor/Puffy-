@@ -4,6 +4,7 @@ import { CHARACTERS } from '../data/characters';
 import { TILE_COUNT } from '../level/tiles';
 import { BIGPUFF_H, BIGPUFF_W, GIANT_H, GIANT_W, PUFFBALL_H, PUFFBALL_W, drawBigPuff, drawGiant, drawPuffball } from './baddies';
 import { drawMuzzleFlash, drawRocket } from './bazooka';
+import { drawSoccerBall, drawSoccerGoal } from './soccer';
 import { ART_RES, ART_STYLE, CHAR_H, CHAR_W, POSES, canvas, drawCharacter, ellipse, type Ctx } from './draw';
 import { STYLES } from './handdrawn';
 import {
@@ -102,6 +103,8 @@ function makeBaddies(scene: Phaser.Scene) {
 function makeItems(scene: Phaser.Scene, pal: WorldPalette) {
   const st = STYLES[ART_STYLE];
   addCanvas(scene, 'aura', hires(48, 48, ART_RES, (ctx) => drawAura(ctx, 24, 25, 10.5)));
+  addCanvas(scene, 'soccerball', hires(28, 28, ART_RES, (ctx) => drawSoccerBall(ctx, 14, 14, 11)));
+  addCanvas(scene, 'soccergoal', hires(76, 56, PROP_RES, (ctx) => drawSoccerGoal(ctx, 4, 54, 58, 38)));
   // giant's ground shockwave: a curling crest of dust (faces right)
   addCanvas(
     scene,
