@@ -1,20 +1,19 @@
 /**
  * Puffy, drawn from the original pencil + crayon sketches: an orange egg seen
  * from the side, one big eye, little flappy arms, long thin legs with round
- * feet. When hurt he puffs up round and spiky (second sketch).
+ * feet. When hurt he's knocked back with a bruised, dizzy eye and his tongue out.
  *
  * Geometry lives here; HOW it is inked and colored comes from a Style, so the
  * same Puffy can be shown in every look-development option.
  */
 import type { Ctx, Pose } from './draw';
 import { drawBazooka } from './bazooka';
-import { ellipsePts, paddlePts, petalPts, type Fill, type Pt, type Style } from './handdrawn';
+import { ellipsePts, paddlePts, type Fill, type Pt, type Style } from './handdrawn';
 
 export const PUFFY = {
   body: { base: '#f28a2e', shade: '#c9611a', light: '#ffc27a' } as Fill,
   limb: { base: '#e97d24', shade: '#b8561a', light: '#ffb565' } as Fill,
   eye: { base: '#ffffff', shade: '#e6ddd0', light: '#ffffff' } as Fill,
-  spike: { base: '#8fc48a', shade: '#5d9a5a', light: '#c8ecc0' } as Fill,
   tube: { base: '#5a7d63', shade: '#3a5443', light: '#8db296' } as Fill,
   tubeDark: { base: '#3c4a40', shade: '#2a342d', light: '#5a6b5e' } as Fill,
 };
@@ -37,11 +36,7 @@ export function drawPuffyStyled(ctx: Ctx, ox: number, oy: number, pose: Pose, st
 function drawPuffyPose(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style, recoil: boolean) {
   const cx = ox + 27;
   const ground = oy + 54;
-  if (pose === 'hurt') {
-    drawPuffed(ctx, cx, ground, st);
-    return;
-  }
-
+  const hurt = pose === 'hurt';
   let legL = 0;
   let legR = 0;
   let liftL = 0;
@@ -88,11 +83,20 @@ function drawPuffyPose(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style, 
     puffed = true;
   }
 
+  if (hurt) {
+    // knocked back: knees buckle, arms fly up, body squashed and leaning back
+    [legL, legR, liftL, liftR] = [4, -3, 0, 1];
+    armBack = -2.1;
+    armFront = 1.25; // front arm hangs limp so the face stays visible
+    sx = 1.05;
+    sy = 0.93;
+  }
+
   const rx = 13 * sx;
   const ry = 16.5 * sy;
-  const hipY = ground - 15 + bob;
+  const hipY = ground - (hurt ? 13 : 15) + bob;
   const cy = hipY - ry + 3;
-  const tilt = 0.12;
+  const tilt = hurt ? -0.2 : 0.12;
   const seed = pose.length * 7 + (pose.charCodeAt(pose.length - 1) % 13); // stable per pose
 
   // back arm
@@ -118,6 +122,9 @@ function drawPuffyPose(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style, 
     st.line(ctx, [[cx - rx - 3, cy + 1], [cx - rx - 6.5, cy + 1]], seed + 42, 0.7);
   }
 
+  if (hurt) {
+    drawHurtFace(ctx, cx, cy, st, seed);
+  } else {
   // eye (seen from the side)
   st.shape(ctx, ellipsePts(cx + 4, cy - 6, 5.3, 6.9, tilt, 32), PUFFY.eye, seed + 5, { lw: 0.85, plain: st.id === 'sticker' });
   st.shape(ctx, ellipsePts(cx + 7, cy - 5.5, 1.5, 4.6, 0.05, 20), { base: st.ink, shade: st.ink, light: st.ink }, seed + 6, {
@@ -128,38 +135,50 @@ function drawPuffyPose(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style, 
   ctx.beginPath();
   ctx.ellipse(cx + 7.4, cy - 8, 0.7, 1, 0, 0, Math.PI * 2);
   ctx.fill();
+  }
 
   leg(5, legR, liftR, PUFFY.body, seed + 7);
 
   // bazooka, tucked low under the front arm (kicks back 3 units when firing)
   const by = cy + 9;
   const kick = recoil ? 3 : 0;
-  drawBazooka(ctx, st, { x0: cx - 11 - kick, x1: cx + 22 - kick, y: by, h: 6.6, loaded: !recoil, seed: seed + 8 });
+  if (hurt) {
+    // the bazooka slips and droops nose-down
+    ctx.save();
+    ctx.translate(cx + 5, by + 3);
+    ctx.rotate(0.38);
+    ctx.translate(-(cx + 5), -(by + 3));
+  }
+  drawBazooka(ctx, st, { x0: cx - 11 - kick, x1: cx + 22 - kick, y: by + (hurt ? 2 : 0), h: 6.6, loaded: !recoil && !hurt, seed: seed + 8 });
+  if (hurt) ctx.restore();
 
   // front arm flapping over it
   st.shape(ctx, paddlePts(cx + 2, cy + 6, 14, 7.5, armFront), PUFFY.body, seed + 11, { lw: 0.85 });
 }
 
-function drawPuffed(ctx: Ctx, cx: number, ground: number, st: Style) {
-  const r = 16;
-  const cy = ground - r - 4;
-  for (let i = 0; i < 9; i++) {
-    const a = -Math.PI / 2 + (i - 4) * 0.42 + (i % 2 ? 0.08 : -0.05);
-    const d = r + 1;
-    st.shape(ctx, petalPts(cx + Math.cos(a) * d, cy + Math.sin(a) * d, 11, 7, a), PUFFY.spike, 40 + i, { lw: 0.75 });
+/** Hurt face, like the other heroes: a bruised, swirly dizzy eye, mouth open, tongue out, a sweat drop. */
+function drawHurtFace(ctx: Ctx, cx: number, cy: number, st: Style, seed: number) {
+  const ex = cx + 4;
+  const ey = cy - 6;
+  // black-eye bruise around the eye
+  st.shape(ctx, ellipsePts(ex + 0.3, ey + 0.4, 7, 8.3, -0.2, 32), { base: '#5a3550', shade: '#3a2236', light: '#7a5070' }, seed + 20, { lw: 0.6, plain: true });
+  st.shape(ctx, ellipsePts(ex, ey, 5.3, 6.6, -0.2, 32), PUFFY.eye, seed + 21, { lw: 0.85, plain: true });
+  // dizzy spiral
+  const sp: Pt[] = [];
+  for (let i = 0; i <= 40; i++) {
+    const t = i / 40;
+    const a = t * Math.PI * 4.2;
+    const r = 0.4 + t * 3.8;
+    sp.push([ex + 0.4 + Math.cos(a) * r * 0.85, ey + 0.3 + Math.sin(a) * r]);
   }
-  st.shape(ctx, ellipsePts(cx - 7, ground - 3, 4.6, 3.1), PUFFY.limb, 51, { lw: 0.8 });
-  st.shape(ctx, ellipsePts(cx + 8, ground - 3, 4.6, 3.1), PUFFY.limb, 52, { lw: 0.8 });
-  st.shape(ctx, paddlePts(cx - 12, cy + 2, 11, 6, Math.PI + 0.6), PUFFY.limb, 53, { lw: 0.8 });
-  st.shape(ctx, ellipsePts(cx, cy, r, r, 0, 56), PUFFY.body, 54, { light: [cx - 6, cy - 7] });
-  for (const [dx, dy] of [[-3, 8], [4, 10], [0, 12.5]])
-    st.shape(ctx, petalPts(cx + dx, cy + dy + 2, 5, 3, -Math.PI / 2), PUFFY.spike, 60 + dx, { lw: 0.6, plain: true });
-  for (const ex of [cx - 3.5, cx + 6.5]) {
-    st.shape(ctx, ellipsePts(ex, cy - 5, 3.9, 4.5, 0, 24), PUFFY.eye, 70 + ex, { lw: 0.8, plain: true });
-    ctx.fillStyle = st.ink;
-    ctx.beginPath();
-    ctx.ellipse(ex + 0.4, cy - 4.4, 1.3, 1.7, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  st.line(ctx, [[cx - 2, cy + 3.5], [cx + 2, cy + 4.2], [cx + 6, cy + 3.6]], 80, 0.8);
+  st.line(ctx, sp, seed + 22, 0.8);
+  // open mouth at the front of the face, tongue hanging out
+  const mx = cx + 9.6;
+  const my = cy + 2.6;
+  st.shape(ctx, ellipsePts(mx, my, 2.9, 2.5, 0.3, 20), { base: '#5e1a2a', shade: '#3e1020', light: '#7e2a3a' }, seed + 23, { lw: 0.7, plain: true });
+  st.shape(ctx, ellipsePts(mx + 1.8, my + 3.1, 2.2, 3.3, -0.5, 20), { base: '#ff7d93', shade: '#e0566e', light: '#ffb3c0' }, seed + 24, { lw: 0.6, plain: true });
+  // sweat drop flying off the back of his head
+  const dx = cx - 13;
+  const dy = cy - 12;
+  st.shape(ctx, [[dx, dy - 3.4], [dx + 1.9, dy + 0.2], [dx + 1.3, dy + 1.8], [dx - 1.3, dy + 1.8], [dx - 1.9, dy + 0.2]], { base: '#bfe9ff', shade: '#7cc6ec', light: '#ffffff' }, seed + 25, { lw: 0.6, plain: true });
 }

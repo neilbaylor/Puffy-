@@ -25,7 +25,6 @@ const canFullscreen = () => {
   return !!(de.requestFullscreen || de.webkitRequestFullscreen);
 };
 const isFullscreen = () => !!(document.fullscreenElement || (document as Document & { webkitFullscreenElement?: Element }).webkitFullscreenElement);
-const isIOS = () => /iPhone|iPod/.test(navigator.userAgent);
 
 const store = {
   get(k: string) {
@@ -123,10 +122,18 @@ export class UI {
     const unlock = () => {
       unlockAudio();
       primeMusic();
-      this.goFullscreen(); // phones/tablets: full screen from the very first tap
     };
     window.addEventListener('pointerdown', unlock, { once: true });
     window.addEventListener('keydown', unlock, { once: true });
+    // phones/tablets: full screen from the very first tap. Browsers only count a
+    // touch as a "user gesture" when the finger lifts, so listen for that too.
+    const fsOnTap = () => {
+      this.goFullscreen();
+      window.removeEventListener('pointerup', fsOnTap);
+      window.removeEventListener('touchend', fsOnTap);
+    };
+    window.addEventListener('pointerup', fsOnTap);
+    window.addEventListener('touchend', fsOnTap);
   }
 
   private setScreen(el: HTMLElement | null) {
@@ -163,7 +170,6 @@ export class UI {
       <h2>Pick your player</h2>
       <div class="cards" role="radiogroup" aria-label="Pick your player"></div>
       <button class="icon-btn fs-btn" data-act="fs" aria-label="Full screen" hidden>⛶</button>
-      <p class="ios-tip" hidden>Full screen on iPhone: tap <b>Share</b> → <b>Add to Home Screen</b>, then open Puffy from your home screen.</p>
       <div class="start-foot">
         <button class="btn btn-big" data-act="play">Play</button>
         <p class="keys-hint">${isTouchDevice() ? 'Tap a hero, then Play' : '← → to choose · Enter to play'}</p>
@@ -186,6 +192,7 @@ export class UI {
       drawHeroCard(card.querySelector('canvas')!, c, 'idle0');
       card.addEventListener('click', () => {
         unlockAudio();
+        this.goFullscreen();
         if (this.selected === i) this.play();
         else this.select(i);
       });
@@ -200,7 +207,6 @@ export class UI {
       this.goFullscreen(true);
       setTimeout(syncFs, 300);
     });
-    el.querySelector<HTMLElement>('.ios-tip')!.hidden = !(isIOS() && !canFullscreen() && !isStandalone());
     this.setScreen(el);
     this.select(this.selected, true);
 

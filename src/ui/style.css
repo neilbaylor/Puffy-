@@ -295,21 +295,6 @@ body {
   right: calc(12px + var(--safe-r));
   font-size: 22px;
 }
-.ios-tip {
-  position: absolute;
-  top: calc(10px + var(--safe-t));
-  left: calc(12px + var(--safe-l));
-  max-width: 260px;
-  margin: 0;
-  padding: 8px 12px;
-  border-radius: 12px;
-  background: #3a2418d9;
-  color: #fff8ec;
-  font: 700 12px/1.35 var(--body);
-}
-.ios-tip b {
-  color: var(--gold);
-}
 /* short screens (phones in landscape): squeeze the start screen */
 @media (max-height: 460px) {
   .bars { display: none; }

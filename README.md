@@ -25,10 +25,14 @@ The repo is ready for [Railway](https://railway.com): `railway.json` tells it to
 3. **Settings → Networking → Generate Domain** to get a public `https://….up.railway.app` link.
 4. Open that link on the phone or tablet.
 
-Full screen (no address bar):
-- **Android:** tap the ⛶ button on the start screen, or Chrome menu → *Add to Home screen* / *Install app*.
-- **iPad:** tap the ⛶ button, or Share → *Add to Home Screen*.
-- **iPhone:** Safari can't hide its bars for web pages; use Share → *Add to Home Screen*, then open Puffy from the home screen icon.
+Railway redeploys automatically on every push to that branch, so each saved (pushed) change goes live
+a minute or two later.
+
+Full screen (no address bar): the game asks the browser for full screen on the first tap.
+- **Android** (Chrome etc.) and **iPad** (Safari): works in the browser itself.
+- **iPhone:** Apple doesn't let any iPhone browser make a web page full screen (only videos). The game
+  still fills the screen edge to edge in landscape; the manifest is there if anyone wants to add it to
+  their home screen, but the game doesn't ask.
 
 ## Controls
 
