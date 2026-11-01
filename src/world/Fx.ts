@@ -127,6 +127,13 @@ export class Fx {
     this.smokeE.explode(2, backX, y);
   }
 
+  /** A little ring of air under the feet for the mid-air second jump. */
+  airPuff(x: number, y: number) {
+    const ring = this.scene.add.image(x, y + 2, 'ring').setDepth(DEPTH.fx).setTint(0xffffff).setAlpha(0.85).setScale(0.12, 0.04);
+    this.scene.tweens.add({ targets: ring, scaleX: 0.42, scaleY: 0.12, y: y + 10, alpha: 0, duration: 260, ease: 'Quad.easeOut', onComplete: () => ring.destroy() });
+    this.dustE.explode(5, x, y + 2);
+  }
+
   /** Ground shockwave ring (giant slam). */
   shockwave(x: number, y: number, r: number) {
     const ring = this.scene.add.image(x, y, 'ring').setDepth(DEPTH.fx).setTint(0xffffff).setAlpha(0.9).setScale(0.1, 0.03);

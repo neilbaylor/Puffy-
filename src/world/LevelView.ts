@@ -37,11 +37,24 @@ export class LevelView {
     this.widthPx = data.width * TILE;
     this.heightPx = data.height * TILE;
 
+    const first = scene.children.list.length;
     this.drawTerrain('ground');
     this.drawTerrain('rock');
     this.placeClouds();
     this.placeBlocks();
     this.placeDecor();
+    this.scenery = scene.children.list.slice(first).filter((o): o is Phaser.GameObjects.Image => o instanceof Phaser.GameObjects.Image);
+  }
+
+  /** Terrain, clouds, blocks and decor (for the colour grade as the look drifts). */
+  private scenery: Phaser.GameObjects.Image[] = [];
+  private tint = 0xffffff;
+
+  /** Colour-grade the foreground scenery to match the current look. */
+  setTint(color: number) {
+    if (color === this.tint) return;
+    this.tint = color;
+    for (const o of this.scenery) if (o.active) o.setTint(color);
   }
 
   isSolidAt(worldX: number, worldY: number): boolean {

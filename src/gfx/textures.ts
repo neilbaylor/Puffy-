@@ -8,6 +8,7 @@ import { ART_RES, ART_STYLE, CHAR_H, CHAR_W, POSES, canvas, drawCharacter, ellip
 import { STYLES } from './handdrawn';
 import {
   DEFAULT_PALETTE,
+  PALETTES,
   drawAura,
   drawNuggie,
   drawRootBeer,
@@ -230,13 +231,17 @@ function padV(src: HTMLCanvasElement) {
   return c;
 }
 
+/** Background textures for one look, keyed `bg-<layer>:<palette id>` (the scenery drifts between looks). */
+export const bgKey = (layer: 'sky' | 'far' | 'clouds' | 'hills' | 'near', theme: string) => `bg-${layer}:${theme}`;
+
 function makeBackgrounds(scene: Phaser.Scene, pal: WorldPalette) {
-  addCanvas(scene, 'bg-sky', hires(4, 512, 1, (ctx) => drawSky(ctx, 4, 512, pal)));
+  const k = (layer: Parameters<typeof bgKey>[0]) => bgKey(layer, pal.id);
+  addCanvas(scene, k('sky'), hires(4, 512, 1, (ctx) => drawSky(ctx, 4, 512, pal)));
   const L = BG_LAYERS;
-  addCanvas(scene, 'bg-far', padV(hires(L.far.w, L.far.h, BG_RES, (ctx) => drawFarLayer(ctx, L.far.w, L.far.h, pal))));
-  addCanvas(scene, 'bg-clouds', padV(hires(L.clouds.w, L.clouds.h, BG_RES, (ctx) => drawCloudLayer(ctx, L.clouds.w, L.clouds.h, pal))));
-  addCanvas(scene, 'bg-hills', padV(hires(L.hills.w, L.hills.h, BG_RES, (ctx) => drawHillsLayer(ctx, L.hills.w, L.hills.h, pal))));
-  addCanvas(scene, 'bg-near', padV(hires(L.near.w, L.near.h, BG_RES, (ctx) => drawNearLayer(ctx, L.near.w, L.near.h, pal))));
+  addCanvas(scene, k('far'), padV(hires(L.far.w, L.far.h, BG_RES, (ctx) => drawFarLayer(ctx, L.far.w, L.far.h, pal))));
+  addCanvas(scene, k('clouds'), padV(hires(L.clouds.w, L.clouds.h, BG_RES, (ctx) => drawCloudLayer(ctx, L.clouds.w, L.clouds.h, pal))));
+  addCanvas(scene, k('hills'), padV(hires(L.hills.w, L.hills.h, BG_RES, (ctx) => drawHillsLayer(ctx, L.hills.w, L.hills.h, pal))));
+  addCanvas(scene, k('near'), padV(hires(L.near.w, L.near.h, BG_RES, (ctx) => drawNearLayer(ctx, L.near.w, L.near.h, pal))));
 }
 
 export function generateTextures(scene: Phaser.Scene, pal: WorldPalette = DEFAULT_PALETTE) {
@@ -244,5 +249,5 @@ export function generateTextures(scene: Phaser.Scene, pal: WorldPalette = DEFAUL
   makeCharacters(scene);
   makeBaddies(scene);
   makeItems(scene, pal);
-  makeBackgrounds(scene, pal);
+  for (const id of ['puff', 'meadow', 'candy', 'golden']) makeBackgrounds(scene, PALETTES[id]);
 }

@@ -15,6 +15,7 @@ import { T } from '../level/tiles';
 import { Background, type View } from '../world/Background';
 import type { HoopsData } from './HoopsScene';
 import { Fx } from '../world/Fx';
+import { mixTint, themeClock, themeMix } from '../world/theme';
 import { LevelView } from '../world/LevelView';
 
 export interface GameData {
@@ -138,6 +139,7 @@ export class GameScene extends Phaser.Scene {
       run.bestAura = 0;
       run.rootbeer = new Set();
       resetLives();
+      themeClock.t = 0;
     }
     this.players = [];
     this.enemies = [];
@@ -162,6 +164,7 @@ export class GameScene extends Phaser.Scene {
     const { widthPx, heightPx } = this.level;
     this.physics.world.setBounds(0, -400, widthPx, heightPx + 800, true, true, false, false);
     this.bg = new Background(this, heightPx - VIEW_H);
+    this.applyTheme();
     this.fx = new Fx(this);
 
     this.gPlayers = this.add.group();
@@ -305,6 +308,8 @@ export class GameScene extends Phaser.Scene {
     this.settleAura();
     this.updateWaves(dt);
 
+    themeClock.t += dt;
+    this.applyTheme();
     this.bg.update(this.view, dt);
     this.emitHud();
   }
@@ -646,6 +651,16 @@ export class GameScene extends Phaser.Scene {
         );
       },
     });
+  }
+
+  /** The look clock (exposed for testing). */
+  readonly themeClock = themeClock;
+
+  /** The scenery drifts slowly between looks while you play. */
+  private applyTheme() {
+    const m = themeMix(themeClock.t);
+    this.bg.setTheme(m);
+    this.level.setTint(mixTint(m));
   }
 
   /** Extra camera zoom for cinematic moments. */

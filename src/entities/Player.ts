@@ -8,6 +8,8 @@ import type { GameScene } from '../scenes/GameScene';
 
 const COYOTE = 0.1;
 const JUMP_BUFFER = 0.12;
+/** The mid-air second jump: a smaller hop (about half the height of a full jump). */
+const AIR_JUMP = 0.72;
 const HIT_STUN = 0.35;
 const INVULN = 1.8;
 const RESPAWN_INVULN = 1.5;
@@ -45,6 +47,8 @@ export class Player {
   private coyote = 0;
   private jumpBuffer = 0;
   private jumping = false;
+  /** Second jumps left before touching the ground again. */
+  private airJumps = 1;
   private fireCooldown = 0;
   private stun = 0;
   private invulnUntil = 0;
@@ -154,7 +158,9 @@ export class Player {
     // ── Jumping (coyote time + input buffer + variable height) ──
     this.coyote = onGround ? COYOTE : this.coyote - dt;
     this.jumpBuffer = jumpPressed ? JUMP_BUFFER : this.jumpBuffer - dt;
+    let jumpedNow = false;
     if (controllable && this.jumpBuffer > 0 && this.coyote > 0) {
+      jumpedNow = true;
       const runBoost = this.running ? 1.06 : 1; // running jumps go a little further
       b.setVelocity(vx * runBoost, -(c.jump + Math.abs(vx) * 0.1));
       this.launchSpeed = Math.abs(vx * runBoost);
@@ -164,6 +170,19 @@ export class Player {
       this.squash = { x: 0.75, y: 1.3 };
       this.scene.fx.dust(this.x, this.bottom, 5);
       sfx.jump();
+    }
+    if (onGround) {
+      this.airJumps = 1;
+    } else if (controllable && jumpPressed && !jumpedNow && this.coyote <= 0 && this.airJumps > 0 && this.state === 'alive') {
+      // second jump in mid air: a smaller hop that keeps your run speed
+      this.airJumps--;
+      b.setVelocityY(Math.min(b.velocity.y, -c.jump * AIR_JUMP));
+      this.launchSpeed = Math.max(this.launchSpeed, Math.abs(vx));
+      this.jumpBuffer = 0;
+      this.jumping = true;
+      this.squash = { x: 0.7, y: 1.35 };
+      this.scene.fx.airPuff(this.x, this.bottom);
+      sfx.jump2();
     }
     if (onGround) this.launchSpeed = Math.abs(vx);
     if (this.jumping && (!input.jump || b.velocity.y >= 0)) {
@@ -263,6 +282,7 @@ export class Player {
     const high = this.input.poll().jump;
     this.body.setVelocityY(high ? -this.char.jump : -this.char.jump * 0.62);
     this.jumping = high;
+    this.airJumps = 1; // stomping gives your second jump back
     this.squash = { x: 0.8, y: 1.25 };
   }
 

@@ -74,6 +74,10 @@ function noise(dur: number, vol: number, filterFrom: number, filterTo: number, d
 
 export const sfx = {
   jump: () => tone({ type: 'square', from: 280, to: 620, dur: 0.14, vol: 0.09 }),
+  jump2: () => {
+    tone({ type: 'square', from: 520, to: 980, dur: 0.12, vol: 0.07 });
+    noise(0.12, 0.12, 3000, 900);
+  },
   shoot: () => {
     noise(0.25, 0.35, 2400, 300);
     tone({ type: 'sawtooth', from: 180, to: 60, dur: 0.18, vol: 0.12 });
