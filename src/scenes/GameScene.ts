@@ -12,6 +12,7 @@ import type { EnemyKind } from '../level/builder';
 import { buildLevel1 } from '../level/level1';
 import { T } from '../level/tiles';
 import { Background, type View } from '../world/Background';
+import type { HoopsData } from './HoopsScene';
 import { Fx } from '../world/Fx';
 import { LevelView } from '../world/LevelView';
 
@@ -41,6 +42,8 @@ export interface ResultState {
   giants: number;
   faints: number;
   seconds: number;
+  /** Final free-throw score vs King Puff Ball, e.g. "4 – 2". */
+  hoops?: string;
 }
 
 /** Chance that each aura spot in the level actually has aura this time. */
@@ -129,6 +132,7 @@ export class GameScene extends Phaser.Scene {
     this.goal = undefined;
     this.aura = 0;
     this.ended = false;
+    this.cineZoom = 1;
     this.lastHud = '';
   }
 
@@ -290,7 +294,7 @@ export class GameScene extends Phaser.Scene {
     const cam = this.cameras.main;
     // Fit VIEW_H world px vertically, but always show at least MIN_VIEW_W across
     // (so 4:3 iPads and 16:10 Android tablets see enough of the level ahead).
-    const zoom = Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W);
+    const zoom = Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W) * this.cineZoom;
     cam.setZoom(zoom);
     const vw = this.scale.width / zoom;
     const vh = this.scale.height / zoom;
@@ -555,7 +559,7 @@ export class GameScene extends Phaser.Scene {
     sfx.goal();
     this.fx.auraSparkle(this.goal.swirl.x, this.goal.swirl.y, 30);
     for (const q of this.players) if (q.alive) q.finish();
-    for (const e of this.enemies) if (!e.dead && e.awake) e.damage(99, 'blast', null);
+    for (const e of this.enemies) if (e.active && !e.dead && e.awake) e.damage(99, 'blast', null);
     const res: ResultState = {
       charId: p.char.id,
       name: p.char.name,
@@ -567,8 +571,30 @@ export class GameScene extends Phaser.Scene {
       faints: run.faints,
       seconds: Math.round((Date.now() - run.startedAt) / 1000),
     };
-    this.time.delayedCall(1800, () => this.game.events.emit('level-complete', res));
+    // ── transition to King Puff Ball's Basketball Palace ──
+    // the world rumbles, the camera pushes in on the hero, a flash, then the palace
+    this.tweens.add({
+      targets: this,
+      cineZoom: 2.3,
+      delay: 700,
+      duration: 1300,
+      ease: 'Cubic.easeIn',
+      onStart: () => {
+        sfx.drum();
+        this.cameras.main.shake(1300, 0.006);
+      },
+      onComplete: () => {
+        this.cameras.main.flash(250, 255, 240, 200);
+        this.cameras.main.fadeOut(380, 20, 10, 38);
+        this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () =>
+          this.scene.start('Hoops', { session: this.session, charId: p.char.id, checkpoint: this.lastCheckpoint, result: res } satisfies HoopsData),
+        );
+      },
+    });
   }
+
+  /** Extra camera zoom for cinematic moments. */
+  cineZoom = 1;
 
   private emitHud(force = false) {
     const p = this.players[0];

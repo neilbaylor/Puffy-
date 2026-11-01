@@ -8,6 +8,8 @@ import { drawBazooka, drawMuzzleFlash, drawRocket } from '../gfx/bazooka';
 import { canvas, type Ctx, type Pose } from '../gfx/draw';
 import { STYLES, type Pt } from '../gfx/handdrawn';
 import { drawMusclesStyled } from '../gfx/muscles';
+import { drawNuggie, drawRootBeer } from '../gfx/collectibles';
+import { KING_FRAMES, drawArena, drawBackboard, drawBall, drawKing, drawRimBack, drawRimFront, HOOP, STAGE_OX, STAGE_OY } from '../gfx/hoops';
 import { drawPuffyStyled } from '../gfx/puffy';
 import { drawScruffyStyled } from '../gfx/scruffy';
 import {
@@ -159,9 +161,9 @@ function propSheet(c: HTMLCanvasElement, pal: WorldPalette) {
   at(ctx, 6, 18, 2.4, () => drawBazooka(ctx, ST, { x0: 6, x1: 40, y: 10, h: 7, loaded: true, seed: 3 }));
   at(ctx, 34, 70, 2, () => drawRocket(ctx, ST, 15, 8));
   at(ctx, 100, 66, 1.6, () => drawMuzzleFlash(ctx, ST, 12, 12, 12));
-  // aura
-  drawAura(ctx, 168, 40, 14);
-  drawAura(ctx, 168, 104, 10);
+  // nuggie + root beer
+  drawNuggie(ctx, 168, 40, 14);
+  drawRootBeer(ctx, 168, 132, 46);
   // checkpoint off/on
   at(ctx, 196, 18, 1.1, () => drawBloom(ctx, 32, 102, false));
   at(ctx, 246, 18, 1.1, () => drawBloom(ctx, 32, 102, true));
@@ -200,6 +202,33 @@ async function paint() {
   if (hs) heroSheet(hs);
   const bs = document.querySelector<HTMLCanvasElement>('canvas[data-sheet=baddies]');
   if (bs) baddieSheet(bs);
+  const ks = document.querySelector<HTMLCanvasElement>('canvas[data-sheet=king]');
+  if (ks) {
+    ks.width = KING_FRAMES.length * 130 * 1.4;
+    ks.height = 150 * 1.4;
+    const ctx = ks.getContext('2d')!;
+    KING_FRAMES.forEach((f, i) => at(ctx, i * 130 * 1.4, 0, 1.4, () => drawKing(ctx, 0, 0, f)));
+  }
+  const ar = document.querySelector<HTMLCanvasElement>('canvas[data-sheet=arena]');
+  if (ar) {
+    ar.width = 1280;
+    ar.height = 720;
+    const ctx = ar.getContext('2d')!;
+    ctx.translate(-STAGE_OX, -STAGE_OY);
+    drawArena(ctx);
+    ctx.translate(STAGE_OX, STAGE_OY);
+    ctx.save();
+    ctx.translate(HOOP.rimX, HOOP.rimY);
+    ctx.scale(1, 1);
+    ctx.translate(-HOOP.rimX, -HOOP.rimY);
+    drawBackboard(ctx);
+    drawRimBack(ctx);
+    drawBall(ctx, HOOP.rimX - 6, HOOP.rimY - 14, 13, 0.5);
+    drawRimFront(ctx, HOOP.rimX, HOOP.rimY, 0);
+    ctx.restore();
+    at(ctx, 360, 520, 2.6, () => drawPuffyStyled(ctx, 0, 0, 'shoot', ST));
+    at(ctx, 1010 - 66 * 1.45, 650 - 146 * 1.45, 1.45, () => drawKing(ctx, 0, 0, 'idle0'));
+  }
   const ps = document.querySelector<HTMLCanvasElement>('canvas[data-sheet=props]');
   if (ps) propSheet(ps, PALETTES.meadow);
 }

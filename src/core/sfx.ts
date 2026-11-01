@@ -86,6 +86,26 @@ export const sfx = {
     tone({ type: 'sine', from: 880, to: 1320, dur: 0.12, vol: 0.12 });
     tone({ type: 'triangle', from: 1760, to: 2200, dur: 0.18, vol: 0.06, delay: 0.05 });
   },
+  drum: () => {
+    tone({ type: 'sine', from: 140, to: 50, dur: 0.35, vol: 0.5 });
+    noise(0.2, 0.3, 900, 120);
+    tone({ type: 'sine', from: 140, to: 50, dur: 0.35, vol: 0.45, delay: 0.18 });
+  },
+  swish: () => noise(0.35, 0.25, 6000, 2500),
+  clank: () => {
+    tone({ type: 'square', from: 660, to: 590, dur: 0.18, vol: 0.08 });
+    tone({ type: 'triangle', from: 1320, to: 1250, dur: 0.25, vol: 0.06 });
+  },
+  cheer: () => {
+    noise(1.2, 0.22, 2200, 900);
+    [523, 659, 784].forEach((f, i) => tone({ type: 'triangle', from: f, dur: 0.14, vol: 0.06, delay: i * 0.08 }));
+  },
+  groan: () => tone({ type: 'sawtooth', from: 220, to: 120, dur: 0.6, vol: 0.06 }),
+  spit: () => {
+    noise(0.12, 0.3, 1800, 500);
+    tone({ type: 'sine', from: 400, to: 900, dur: 0.12, vol: 0.12 });
+  },
+  laugh: () => [0, 1, 2, 3].forEach((i) => tone({ type: 'square', from: 300 - i * 20, to: 200 - i * 20, dur: 0.12, vol: 0.08, delay: i * 0.17 })),
   chomp: () => {
     noise(0.07, 0.25, 1400, 400);
     noise(0.07, 0.22, 1200, 300, 0.12);

@@ -10,17 +10,18 @@ sk = root / 'sketches'
 
 # ── art & assets page (polished hand-drawn only) ──
 LOOKS = [
-    ('meadow', 'Meadow morning', 'Fresh blue sky, bright green hills, golden and pink puff trees.', True),
+    ('puff', 'Puff Ball Planet', 'Marshmallow earth, mint puff-moss, dandelion puffs and a ringed planet. The current look.', True),
+    ('meadow', 'Meadow morning', 'Fresh blue sky, bright green hills, golden and pink puff trees.', False),
     ('candy', 'Candy clouds', 'Pastel cloud-kingdom sky, minty hills, pink and lilac puff trees.', False),
     ('golden', 'Golden hour', 'Warm late-afternoon light, peachy sky, sun-baked hills.', False),
 ]
 SHOTS = [
-    ('shot-tablet.jpg', 'Android tablet (1280 × 800)'),
-    ('shot-ipad.jpg', 'iPad (1024 × 768)'),
-    ('shot-phone.jpg', 'Phone (iPhone, landscape)'),
-    ('shot-giant.jpg', 'A Giant guarding the checkpoint bloom'),
+    ('shot-lobby.jpg', 'Pick your player (Android tablet size)'),
+    ('shot-tablet.jpg', 'Puff Ball Planet with a floating nuggie'),
+    ('shot-giant.jpg', 'A Giant slamming down on someone sneaking under'),
+    ('shot-hoops.jpg', 'The free-throw contest (iPad size)'),
 ]
-SKETCHES = ['puffy-sketch-1.jpg', 'puffy-sketch-2.jpg', 'scruffy-sketch.jpg', 'muscles-sketch.jpg', 'muscles-hurt-sketch.jpg', 'baddie-sketch-1.jpg', 'baddie-sketch-2.jpg', 'giant-sketch.jpg']
+SKETCHES = ['puffy-sketch-1.jpg', 'puffy-sketch-2.jpg', 'scruffy-sketch.jpg', 'muscles-sketch.jpg', 'muscles-hurt-sketch.jpg', 'baddie-sketch-1.jpg', 'baddie-sketch-2.jpg', 'giant-sketch.jpg', 'king-sketch.jpg', 'meters-sketch.jpg']
 b64 = lambda f: base64.b64encode((sk / f).read_bytes()).decode()
 tpl = (sk / 'art.template.html').read_text()
 js = (root / 'dist-art/art.js').read_text()

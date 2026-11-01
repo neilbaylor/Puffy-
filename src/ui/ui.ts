@@ -82,6 +82,13 @@ export class UI {
       else this.showBanner('<small>Back to the</small>Checkpoint', 1300);
     });
     game.events.on('hud', (s: HudState) => this.renderHud(s));
+    game.events.on('hoops-start', () => {
+      this.gameScene = null;
+      this.setScreen(null);
+      this.hud.hidden = true;
+      this.banner.hidden = true;
+      this.touch.hide();
+    });
     game.events.on('level-complete', (r: ResultState) => this.showResults(r));
 
     window.addEventListener('keydown', (e) => {
@@ -237,6 +244,7 @@ export class UI {
     this.session = session;
     this.setScreen(null);
     this.game.scene.stop('Menu');
+    this.game.scene.stop('Hoops');
     this.game.scene.stop('Game');
     this.game.scene.start('Game', { session, checkpoint } satisfies GameData);
   }
@@ -312,6 +320,7 @@ export class UI {
   private quitToStart() {
     this.setScreen(null);
     stopMusic();
+    this.game.scene.stop('Hoops');
     this.game.scene.stop('Game');
     this.gameScene = null;
     this.hud.hidden = true;
@@ -333,6 +342,7 @@ export class UI {
           <dl class="stat-list">
             <dt><i class="aura-ico"></i>Aura carried</dt><dd>${r.aura}</dd>
             <dt><i class="rb-ico"></i>Root beer found</dt><dd>${r.rootbeer} <small>(${r.rootbeerTotal} saved)</small></dd>
+            ${r.hoops ? `<dt>Beat King Puff Ball</dt><dd>${r.hoops}</dd>` : ''}
             <dt>Puffballs popped</dt><dd>${r.popped}</dd>
             <dt>Giants beaten</dt><dd>${r.giants}</dd>
             <dt>Faints</dt><dd>${r.faints}</dd>

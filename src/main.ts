@@ -4,6 +4,7 @@ import { installInput } from './input/devices';
 import { BootScene } from './scenes/BootScene';
 import { GameScene } from './scenes/GameScene';
 import { MenuScene } from './scenes/MenuScene';
+import { HoopsScene } from './scenes/HoopsScene';
 import { UI } from './ui/ui';
 
 installInput();
@@ -33,7 +34,7 @@ const game = new Phaser.Game({
   input: { activePointers: 4 },
   physics: { default: 'arcade', arcade: { gravity: { x: 0, y: 1600 }, debug: false } },
   fps: { target: 60, smoothStep: true },
-  scene: [BootScene, MenuScene, GameScene],
+  scene: [BootScene, MenuScene, GameScene, HoopsScene],
 });
 
 const resize = () => {

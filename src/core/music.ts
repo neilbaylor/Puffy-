@@ -1,43 +1,80 @@
 import levelClearUrl from '../assets/level-clear.m4a';
+import hoopsUrl from '../assets/hoops.m4a';
 import { isMuted } from './sfx';
 
 /**
- * Music. Uses a plain <audio> element (streams, low memory). Mobile browsers
- * only allow audio that was started by a tap, so `primeMusic()` is called from
- * the first tap to "unlock" the element; after that the game can start it.
+ * Music tracks, as plain <audio> elements (stream, low memory). Mobile
+ * browsers only allow audio started by a tap, so `primeMusic()` runs on the
+ * first tap to "unlock" every track; after that the game can start them.
  */
-let levelClear: HTMLAudioElement | null = null;
+type Track = 'levelClear' | 'hoops';
+const urls: Record<Track, string> = { levelClear: levelClearUrl, hoops: hoopsUrl };
+const tracks: Partial<Record<Track, HTMLAudioElement>> = {};
+let primed = false;
 
-export function primeMusic() {
-  if (levelClear) return;
-  levelClear = new Audio(levelClearUrl);
-  levelClear.preload = 'auto';
-  levelClear.volume = 0.85;
-  levelClear.muted = true;
-  levelClear
-    .play()
-    .then(() => {
-      levelClear!.pause();
-      levelClear!.currentTime = 0;
-      levelClear!.muted = false;
-    })
-    .catch(() => {
-      if (levelClear) levelClear.muted = false;
-    });
+function el(t: Track) {
+  if (!tracks[t]) {
+    const a = new Audio(urls[t]);
+    a.preload = 'auto';
+    a.volume = 0.85;
+    a.loop = t === 'hoops';
+    tracks[t] = a;
+  }
+  return tracks[t]!;
 }
 
-export function playLevelClear() {
-  primeMusic();
-  const a = levelClear!;
+export function primeMusic() {
+  if (primed) return;
+  primed = true;
+  for (const t of Object.keys(urls) as Track[]) {
+    const a = el(t);
+    a.muted = true;
+    a.play()
+      .then(() => {
+        a.pause();
+        a.currentTime = 0;
+        a.muted = false;
+      })
+      .catch(() => {
+        a.muted = false;
+      });
+  }
+}
+
+function play(t: Track) {
+  stopMusic();
+  const a = el(t);
   a.muted = isMuted();
   a.currentTime = 0;
   a.play().catch(() => {});
 }
 
+export const playLevelClear = () => play('levelClear');
+export const playHoops = () => play('hoops');
+
+/** Fade the current track out over `ms`. */
+export function fadeOutMusic(ms = 600) {
+  for (const a of Object.values(tracks)) {
+    if (!a || a.paused) continue;
+    const start = a.volume;
+    const t0 = performance.now();
+    const step = () => {
+      const k = Math.min(1, (performance.now() - t0) / ms);
+      a.volume = start * (1 - k);
+      if (k < 1) requestAnimationFrame(step);
+      else {
+        a.pause();
+        a.volume = start;
+      }
+    };
+    requestAnimationFrame(step);
+  }
+}
+
 export function stopMusic() {
-  levelClear?.pause();
+  for (const a of Object.values(tracks)) a?.pause();
 }
 
 export function setMusicMuted(m: boolean) {
-  if (levelClear) levelClear.muted = m;
+  for (const a of Object.values(tracks)) if (a) a.muted = m;
 }
