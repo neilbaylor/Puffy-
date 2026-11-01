@@ -3,15 +3,15 @@ import { PALETTES, seaColor } from '../gfx/world';
 /**
  * The look of Puff Ball Planet drifts slowly while you play, like the day
  * passing: Puff Ball Planet → Meadow morning → Candy clouds → Golden hour →
- * back again. Each look holds for a while, then the next one fades in over
- * ~20 seconds. The clock keeps running through checkpoint restarts and
+ * back again. Each look holds for 35 seconds, then the next one fades in over
+ * 17 seconds. The clock keeps running through checkpoint restarts and
  * starts over on a new run.
  */
 export const THEMES = ['puff', 'meadow', 'candy', 'golden'] as const;
 export type ThemeId = (typeof THEMES)[number];
 
-const HOLD = 40;
-const BLEND = 22;
+const HOLD = 35;
+const BLEND = 17;
 
 export const themeClock = { t: 0 };
 

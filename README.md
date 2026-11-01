@@ -70,7 +70,7 @@ src/
   checkpoint, and fainting at 0 (or losing to King Puff Ball at 0) is game over: back to the start of the level.
 - **Second jump:** press jump again in mid air for a smaller hop (about half a jump). Stomping gives it back.
 - **Looks drift while you play:** Puff Ball Planet → Meadow morning → Candy clouds → Golden hour → back,
-  each held ~40 s then cross-faded over ~20 s (`src/world/theme.ts`).
+  each held 35 s then cross-faded over 17 s (`src/world/theme.ts`).
 - **Aura:** eat floating nuggies for aura; a hit with aura costs your aura instead of a life.
 - **Music:** `Level_Clear` loops during play (it keeps going through checkpoint restarts); `Hoops_Arcade` plays in the palace.
 - **Online-ready input:** every player is driven by an `InputSource` returning 5 booleans
