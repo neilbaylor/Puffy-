@@ -4,6 +4,9 @@ import { LevelBuilder, type LevelData } from './builder';
  * Level 1 — "Sunny Hills".
  * Heights are in tiles from the bottom of the level (ground is usually 3).
  * Rough tour (column numbers):
+ * Enemies: Puffballs everywhere (1 hit), a few Big Puffs (2 hits). Turrets and
+ * flying bugs are placeholders until more bad-guy sketches arrive.
+ *
  *   0-44    Start meadow: first blocks, first enemies, little hill
  *   45-47   First pit
  *   48-72   Brick wall you have to blast through with the bazooka
@@ -24,22 +27,24 @@ export function buildLevel1(): LevelData {
   L.blocks(13, 7, '?', ['coin']);
   L.blocks(18, 7, 'B?B?B', ['coin', 'heart']);
   L.blocks(20, 11, '?', ['coins']);
-  L.spawn('walker', 23, 3);
+  L.spawn('puffball', 23, 3);
+  L.spawn('puffball', 26, 3);
   L.ground(30, 36, 5);
   L.ground(32, 34, 6);
   L.coinArc(30, 7, 8, 1);
-  L.spawn('walker', 35, 5);
-  L.spawn('spiker', 41, 3);
+  L.spawn('puffball', 35, 5);
+  L.spawn('bigpuff', 41, 3);
 
   // ── First pit ───────────────────────────────────────────────
   L.coinArc(44, 5, 5, 2);
 
   // ── Brick wall ──────────────────────────────────────────────
   L.ground(48, 72, 3);
-  L.spawn('walker', 53, 3);
+  L.spawn('puffball', 53, 3);
   L.rect(60, 61, 4, 8, 'brick'); // 5 tall: too high to jump, blast it!
   L.coins(63, 3, 4);
-  L.spawn('hopper', 66, 3);
+  L.spawn('puffball', 65, 3);
+  L.spawn('puffball', 68, 3);
   L.blocks(67, 7, '???', ['coin', 'coin', 'coin']);
 
   // ── Platforms over the long pit ─────────────────────────────
@@ -57,8 +62,9 @@ export function buildLevel1(): LevelData {
   L.blocks(95, 7, 'B?B', ['heart']);
   L.rect(101, 102, 4, 5, 'stone');
   L.spawn('turret', 101, 5);
-  L.spawn('walker', 106, 3);
-  L.spawn('walker', 109, 3);
+  L.spawn('puffball', 106, 3);
+  L.spawn('puffball', 109, 3);
+  L.spawn('puffball', 112, 3);
   L.coins(104, 4, 4);
   L.spawn('checkpoint', 115, 3);
 
@@ -75,7 +81,7 @@ export function buildLevel1(): LevelData {
   L.coins(126, 3, 10);
   L.spawn('flyer', 127, 6);
   L.spawn('flyer', 133, 8);
-  L.spawn('walker', 142, 2);
+  L.spawn('puffball', 142, 2);
 
   // ── Rolling hills ───────────────────────────────────────────
   L.ground(146, 150, 3);
@@ -84,9 +90,9 @@ export function buildLevel1(): LevelData {
   L.ground(160, 163, 6);
   L.ground(164, 167, 4);
   L.ground(168, 172, 3);
-  L.spawn('hopper', 157, 5);
-  L.spawn('walker', 162, 6);
-  L.spawn('hopper', 170, 3);
+  L.spawn('puffball', 157, 5);
+  L.spawn('puffball', 162, 6);
+  L.spawn('bigpuff', 170, 3);
   L.blocks(153, 8, '?B?', ['coin', 'coins']);
   L.coinArc(160, 4, 9, 1);
   L.coinArc(173, 4, 5, 2);
@@ -97,12 +103,13 @@ export function buildLevel1(): LevelData {
   L.rect(186, 187, 4, 5, 'stone');
   L.spawn('turret', 186, 5);
   L.rect(191, 193, 4, 6, 'brick');
-  L.spawn('walker', 195, 3);
+  L.spawn('puffball', 195, 3);
   L.rect(197, 197, 4, 4, 'stone');
   L.rect(198, 199, 4, 5, 'stone');
   L.spawn('turret', 198, 5);
-  L.spawn('spiker', 202, 3);
-  L.spawn('hopper', 206, 3);
+  L.spawn('bigpuff', 202, 3);
+  L.spawn('puffball', 206, 3);
+  L.spawn('puffball', 208, 3);
   L.coins(194, 3, 4);
 
   // ── Staircase & finale ──────────────────────────────────────
@@ -112,7 +119,9 @@ export function buildLevel1(): LevelData {
   L.ground(221, 249, 3);
   L.stairs(221, 5, 3, -1);
   L.coinArc(217, 5, 12, 1);
-  L.spawn('walker', 230, 3);
+  L.spawn('puffball', 227, 3);
+  L.spawn('puffball', 230, 3);
+  L.spawn('puffball', 235, 3);
   L.coins(232, 5, 4);
   L.spawn('goal', 241, 3);
 

@@ -14,6 +14,23 @@ import {
   type StyleId,
 } from '../gfx/handdrawn';
 import { drawPuffyStyled } from '../gfx/puffy';
+import { drawBigPuff, drawPuffball, type BigPuffFrame, type PuffballFrame } from '../gfx/baddies';
+
+function puffball(ctx: Ctx, st: Style, x: number, feetY: number, scale: number, f: PuffballFrame = 'w0') {
+  ctx.save();
+  ctx.translate(x, feetY);
+  ctx.scale(scale, scale);
+  drawPuffball(ctx, -24, -46, f, st);
+  ctx.restore();
+}
+
+function bigpuff(ctx: Ctx, st: Style, x: number, feetY: number, scale: number, f: BigPuffFrame = 'w0') {
+  ctx.save();
+  ctx.translate(x, feetY);
+  ctx.scale(scale, scale);
+  drawBigPuff(ctx, -38, -86, f, st);
+  ctx.restore();
+}
 
 const U = 600; // scene units wide
 const V = 260; // scene units tall
@@ -58,8 +75,6 @@ const PAL: Record<StyleId, { sky: [string, string]; hill: Fill; hill2: Fill; gra
 const WHITE: Fill = { base: '#ffffff', shade: '#dfeef8', light: '#ffffff' };
 const GOLD: Fill = { base: '#ffc533', shade: '#d18c18', light: '#ffe58a' };
 const SUN: Fill = { base: '#ffe27a', shade: '#ffc94a', light: '#fff6c8' };
-const BEETLE: Fill = { base: '#d1495b', shade: '#9a2f3f', light: '#ff8a96' };
-const CREAM: Fill = { base: '#ffe2c4', shade: '#e7c19d', light: '#fff1e2' };
 
 function puffy(ctx: Ctx, st: Style, x: number, feetY: number, scale: number, pose: Pose, flip = false) {
   ctx.save();
@@ -94,26 +109,6 @@ function cloud(ctx: Ctx, st: Style, x: number, y: number, s: number, seed: numbe
     pts.push([x + Math.cos(a) * best * s, y + Math.min(Math.sin(a) * best, 12) * s]);
   }
   st.shape(ctx, pts, WHITE, seed, { lw: 0.8 });
-}
-
-function beetle(ctx: Ctx, st: Style, x: number, feetY: number) {
-  for (const dx of [-8, 8]) st.shape(ctx, ellipsePts(x + dx, feetY - 3, 6, 3.6), { base: '#4a3328', shade: '#2a1d16', light: '#6b4c3c' }, 90 + dx, { lw: 0.8 });
-  const dome: Pt[] = [];
-  for (let i = 0; i <= 24; i++) {
-    const a = Math.PI + (i / 24) * Math.PI;
-    dome.push([x + Math.cos(a) * 17, feetY - 7 + Math.sin(a) * 17]);
-  }
-  st.shape(ctx, dome, BEETLE, 93);
-  st.shape(ctx, ellipsePts(x - 8, feetY - 11, 8, 6.5), CREAM, 94, { lw: 0.8 });
-  for (const ex of [x - 12, x - 5]) {
-    st.shape(ctx, ellipsePts(ex, feetY - 13, 2.8, 3.5), { base: '#fff', shade: '#eee', light: '#fff' }, 95 + ex, { lw: 0.7, plain: true });
-    ctx.fillStyle = st.ink;
-    ctx.beginPath();
-    ctx.ellipse(ex - 0.8, feetY - 12.5, 1.2, 1.8, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  st.line(ctx, [[x - 15, feetY - 19], [x - 9, feetY - 17]], 97, 0.8);
-  st.line(ctx, [[x - 2, feetY - 19], [x - 8, feetY - 17]], 98, 0.8);
 }
 
 function qblock(ctx: Ctx, st: Style, x: number, y: number) {
@@ -199,10 +194,11 @@ function scene(ctx: Ctx, id: StyleId) {
 
   qblock(ctx, st, 180, 92);
   for (let i = 0; i < 4; i++) coin(ctx, st, 312 + i * 18, 128 - Math.sin((i / 3) * Math.PI) * 26, 500 + i * 3);
-  beetle(ctx, st, 470, GROUND);
+  puffball(ctx, st, 120, GROUND - 1, 1.15, 'w1');
+  puffball(ctx, st, 425, GROUND - 1, 1.15, 'w0');
+  bigpuff(ctx, st, 520, GROUND - 1, 1.15, 'w0');
 
   puffy(ctx, st, 230, GROUND - 1, 1.5, 'walk0');
-  puffy(ctx, st, 545, GROUND - 1, 1.15, 'idle0', true);
 
   if (st.paper) {
     // light paper grain over everything, so the whole scene sits on one sheet
@@ -217,10 +213,15 @@ function poseStrip(ctx: Ctx, id: StyleId, w: number, h: number) {
   ctx.fillStyle = st.paper ?? '#ffffff';
   ctx.fillRect(0, 0, w, h);
   if (st.paper) paperTexture(ctx, w, h, 11);
-  const poses: Pose[] = ['idle0', 'walk0', 'walk2', 'jump', 'fall', 'hurt'];
-  const cell = w / poses.length;
+  const poses: Pose[] = ['idle0', 'walk0', 'jump', 'hurt'];
+  const cells = poses.length + 3;
+  const cell = w / cells;
   const s = Math.min(cell / 60, h / 62);
-  poses.forEach((p, i) => puffy(ctx, st, cell * i + cell / 2, h - 6 * s, s, p));
+  const feet = h - 6 * s;
+  poses.forEach((p, i) => puffy(ctx, st, cell * i + cell / 2, feet, s, p));
+  puffball(ctx, st, cell * 4.5, feet, s * 1.05, 'w0');
+  bigpuff(ctx, st, cell * 5.5, feet, s * 0.62, 'w0');
+  bigpuff(ctx, st, cell * 6.5, feet, s * 0.62, 'm1');
 }
 
 async function paint() {

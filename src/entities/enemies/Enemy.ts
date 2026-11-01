@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { DEPTH, MAX_FALL_SPEED, TILE } from '../../config';
+import { ART_RES } from '../../gfx/draw';
 import { sfx } from '../../core/sfx';
 import type { EnemyKind } from '../../level/builder';
 import type { GameScene } from '../../scenes/GameScene';
@@ -20,6 +21,8 @@ export abstract class Enemy extends Phaser.Physics.Arcade.Sprite {
   stompable = true;
   dead = false;
   awake = false;
+  /** Brief window after being stomped where touching it doesn't hurt (multi-hit enemies). */
+  touchGraceUntil = 0;
   protected t = 0;
   private flashUntil = 0;
 
@@ -113,8 +116,8 @@ export abstract class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.gs.fx.stars(this.x, this.y, 5);
     this.gs.tweens.add({
       targets: this,
-      scaleY: 0.25,
-      scaleX: 1.3,
+      scaleY: this.scaleY * 0.25,
+      scaleX: this.scaleX * 1.3,
       y: this.y + this.displayHeight * 0.35,
       duration: 90,
       onComplete: () =>
@@ -128,6 +131,13 @@ export abstract class Enemy extends Phaser.Physics.Arcade.Sprite {
   }
 }
 
+/** Hi-res sketch art: textures are drawn at ART_RES× and shown scaled down. Sizes given in world px. */
+function hiRes(e: Phaser.Physics.Arcade.Sprite, w: number, h: number, ox: number, oy: number) {
+  const R = ART_RES;
+  e.setScale(1 / R);
+  (e.body as Phaser.Physics.Arcade.Body).setSize(w * R, h * R).setOffset(ox * R, oy * R);
+}
+
 // ─────────────────────────────────────────────────────────────
 
 /** Walks back and forth, turning at walls (and ledges if `careful`). */
@@ -136,6 +146,8 @@ export class Walker extends Enemy {
   protected speed = 55;
   protected dir = -1;
   protected careful = false;
+  protected frameA = 'w0';
+  protected frameB = 'w1';
 
   constructor(gs: GameScene, x: number, y: number, texture = 'walker') {
     super(gs, x, y, texture, 'w0');
@@ -152,13 +164,61 @@ export class Walker extends Enemy {
     }
     b.setVelocityX(this.dir * this.speed);
     this.setFlipX(this.dir > 0);
-    this.setFrame(Math.floor(this.t * 6) % 2 ? 'w1' : 'w0');
+    this.setFrame(Math.floor(this.t * this.animRate) % 2 ? this.frameB : this.frameA);
   }
+
+  protected animRate = 6;
+  /** Sketch-based enemies are drawn facing left; the placeholder beetles face left too. */
 
   protected onStompDeath() {
     this.gs.fx.stars(this.x, this.y, 5);
     this.setFrame('flat');
     this.gs.tweens.add({ targets: this, alpha: 0, delay: 400, duration: 200, onComplete: () => this.destroy() });
+  }
+}
+
+/** Puffball (from the sketches): small fluffy walker. Lots of them. One shot or one stomp. */
+export class Puffball extends Walker {
+  readonly kind: EnemyKind = 'puffball';
+  constructor(gs: GameScene, x: number, y: number) {
+    super(gs, x, y, 'puffball');
+    hiRes(this, 22, 30, 13, 16);
+    this.speed = 48;
+    this.animRate = 7;
+    this.score = 100;
+  }
+}
+
+/** Big Puff (from the sketches): tall toothy brute. Fewer of them. Two hits; gets angry and faster after the first. */
+export class BigPuff extends Walker {
+  readonly kind: EnemyKind = 'bigpuff';
+  private mad = false;
+  constructor(gs: GameScene, x: number, y: number) {
+    super(gs, x, y, 'bigpuff');
+    hiRes(this, 36, 68, 18, 18);
+    this.hp = 2;
+    this.speed = 34;
+    this.animRate = 4;
+    this.careful = true;
+    this.score = 300;
+  }
+
+  damage(n: number, how: DeathKind, by: Player | null) {
+    super.damage(n, how, by);
+    if (this.dead || this.mad) return;
+    this.mad = true;
+    this.speed = 70;
+    this.animRate = 7;
+    this.frameA = 'm0';
+    this.frameB = 'm1';
+    this.setFrame('m0');
+    if (this.body.blocked.down) this.body.setVelocityY(-260); // angry hop
+    this.gs.fx.popText(this.x, this.y - 44, '!!', '#ff5a3c', 22);
+  }
+
+  protected onStompDeath() {
+    this.gs.fx.stars(this.x, this.y, 8);
+    super.onStompDeath();
   }
 }
 
@@ -286,6 +346,10 @@ export class Turret extends Enemy {
 
 export function createEnemy(gs: GameScene, kind: EnemyKind, x: number, y: number): Enemy {
   switch (kind) {
+    case 'puffball':
+      return new Puffball(gs, x, y);
+    case 'bigpuff':
+      return new BigPuff(gs, x, y);
     case 'walker':
       return new Walker(gs, x, y);
     case 'spiker':

@@ -22,6 +22,7 @@ export interface CharacterDef {
   maxRockets: number;
   rocketSpeed: number;
   blastRadius: number;
+  /** Hits dealt per rocket. Kept at 1 for everyone so "takes 2 shots" means the same for every hero. */
   damage: number;
   /** Collision box height (px). Taller characters get a taller box. */
   hitH?: number;
@@ -46,7 +47,7 @@ export const CHARACTERS: CharacterDef[] = [
     maxRockets: 2,
     rocketSpeed: 620,
     blastRadius: 56,
-    damage: 2,
+    damage: 1,
     bars: { speed: 3, jump: 3, power: 3 },
   },
   {
@@ -82,7 +83,7 @@ export const CHARACTERS: CharacterDef[] = [
     maxRockets: 1,
     rocketSpeed: 540,
     blastRadius: 84,
-    damage: 3,
+    damage: 1,
     bars: { speed: 2, jump: 2, power: 5 },
   },
 ];

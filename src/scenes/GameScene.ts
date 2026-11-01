@@ -133,7 +133,11 @@ export class GameScene extends Phaser.Scene {
           const ex = kind === 'turret' ? (s.x + 1) * TILE : cx;
           const e = createEnemy(this, kind, ex, 0);
           if (kind === 'flyer') e.y = s.y * TILE + TILE / 2;
-          else e.y = surface(s.y) - (e.body.offset.y + e.body.height) + e.displayHeight / 2;
+          else {
+            // stand the body exactly on the ground, whatever the sprite's size/scale
+            e.body.reset(e.x, e.y);
+            e.y += surface(s.y) - e.body.bottom;
+          }
           e.body.reset(e.x, e.y);
           this.enemies.push(e);
           this.gEnemies.add(e);
@@ -441,7 +445,7 @@ export class GameScene extends Phaser.Scene {
 
   private onPlayerEnemy(hitbox: Phaser.GameObjects.GameObject, e: Enemy) {
     const p = this.playerOf(hitbox);
-    if (!p.alive || e.dead) return;
+    if (!p.alive || e.dead || this.time.now < e.touchGraceUntil) return;
     const pb = p.body;
     const eb = e.body;
     const prevBottom = pb.prev.y + pb.height;
@@ -449,6 +453,7 @@ export class GameScene extends Phaser.Scene {
     if (fromAbove) {
       if (e.stompable) {
         e.damage(1, 'stomp', p);
+        e.touchGraceUntil = this.time.now + 250;
         p.bounce();
         pb.y = eb.top - pb.height; // don't sink into the enemy
       } else {

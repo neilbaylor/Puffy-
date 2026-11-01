@@ -2,7 +2,9 @@ import Phaser from 'phaser';
 import { TILE } from '../config';
 import { CHARACTERS } from '../data/characters';
 import { TILE_COUNT, TILESET_COLS, T } from '../level/tiles';
-import { ART_RES, CHAR_H, CHAR_W, POSES, canvas, drawCharacter, ellipse, rng, roundRect, type Ctx } from './draw';
+import { BIGPUFF_H, BIGPUFF_W, PUFFBALL_H, PUFFBALL_W, drawBigPuff, drawPuffball } from './baddies';
+import { STYLES } from './handdrawn';
+import { ART_RES, ART_STYLE, CHAR_H, CHAR_W, POSES, canvas, drawCharacter, ellipse, rng, roundRect, type Ctx } from './draw';
 
 /**
  * Generates every placeholder texture at boot. When real art arrives, each
@@ -929,7 +931,30 @@ function makeBackgrounds(scene: Phaser.Scene) {
   }
 }
 
+// ─────────────────────────────────────────────────────────────
+// Bad guys from the sketches (hi-res, same hand-drawn style as the heroes)
+// ─────────────────────────────────────────────────────────────
+
+function makeBaddies(scene: Phaser.Scene) {
+  const R = ART_RES;
+  const st = STYLES[ART_STYLE];
+  const sheet = <F extends string>(key: string, w: number, h: number, frames: F[], draw: (ctx: Ctx, f: F) => void) => {
+    const { c, ctx } = canvas(w * frames.length * R, h * R);
+    ctx.scale(R, R);
+    frames.forEach((f, i) => {
+      ctx.save();
+      ctx.translate(i * w, 0);
+      draw(ctx, f);
+      ctx.restore();
+    });
+    addCanvas(scene, key, c, (t) => frames.forEach((f, i) => t.add(f, 0, i * w * R, 0, w * R, h * R)));
+  };
+  sheet('puffball', PUFFBALL_W, PUFFBALL_H, ['w0', 'w1', 'flat'] as const, (ctx, f) => drawPuffball(ctx, 0, 0, f, st));
+  sheet('bigpuff', BIGPUFF_W, BIGPUFF_H, ['w0', 'w1', 'm0', 'm1'] as const, (ctx, f) => drawBigPuff(ctx, 0, 0, f, st));
+}
+
 export function generateTextures(scene: Phaser.Scene) {
+  makeBaddies(scene);
   makeTileset(scene);
   makeCharacters(scene);
   makeEnemies(scene);
