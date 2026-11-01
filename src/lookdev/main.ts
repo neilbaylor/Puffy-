@@ -15,6 +15,7 @@ import {
 } from '../gfx/handdrawn';
 import { drawPuffyStyled } from '../gfx/puffy';
 import { drawScruffyStyled } from '../gfx/scruffy';
+import { drawMusclesStyled } from '../gfx/muscles';
 import { drawBigPuff, drawMegaPuff, drawPuffball, type BigPuffFrame, type PuffballFrame } from '../gfx/baddies';
 
 function puffball(ctx: Ctx, st: Style, x: number, feetY: number, scale: number, f: PuffballFrame = 'w0') {
@@ -90,6 +91,14 @@ function scruffy(ctx: Ctx, st: Style, x: number, feetY: number, scale: number, p
   ctx.translate(x, feetY);
   ctx.scale(flip ? -scale : scale, scale);
   drawScruffyStyled(ctx, -26, -54, pose, st);
+  ctx.restore();
+}
+
+function muscles(ctx: Ctx, st: Style, x: number, feetY: number, scale: number, pose: Pose, flip = false) {
+  ctx.save();
+  ctx.translate(x, feetY);
+  ctx.scale(flip ? -scale : scale, scale);
+  drawMusclesStyled(ctx, -27, -54, pose, st);
   ctx.restore();
 }
 
@@ -189,6 +198,7 @@ function giantScene(ctx: Ctx, id: StyleId, w: number, h: number) {
   // Puffy: "WOW"
   puffy(ctx, st, 120, gy - 1, 1.35, 'jump');
   scruffy(ctx, st, 62, gy - 30, 1.35, 'jump');
+  muscles(ctx, st, 205, gy - 1, 1.35, 'idle0');
   st.shape(ctx, ellipsePts(152, 96, 34, 20, 0, 40), { base: '#ffffff', shade: '#eeeeee', light: '#ffffff' }, 630, { lw: 0.9, plain: true });
   st.shape(ctx, [[134, 110], [148, 113], [126, 134]], { base: '#ffffff', shade: '#ffffff', light: '#ffffff' }, 631, { lw: 0.9, plain: true });
   ctx.font = '400 20px "Lilita One", "Arial Black", sans-serif';
@@ -237,7 +247,8 @@ function scene(ctx: Ctx, id: StyleId) {
 
   qblock(ctx, st, 180, 92);
   for (let i = 0; i < 4; i++) coin(ctx, st, 312 + i * 18, 128 - Math.sin((i / 3) * Math.PI) * 26, 500 + i * 3);
-  puffball(ctx, st, 120, GROUND - 1, 1.15, 'w1');
+  puffball(ctx, st, 104, GROUND - 1, 1.15, 'w1');
+  muscles(ctx, st, 162, GROUND - 1, 1.5, 'idle0');
   puffball(ctx, st, 425, GROUND - 1, 1.15, 'w0');
   bigpuff(ctx, st, 520, GROUND - 1, 1.15, 'w0');
 
@@ -264,10 +275,11 @@ function strip(ctx: Ctx, id: StyleId, w: number, h: number, items: ((x: number, 
 
 function heroStrip(ctx: Ctx, id: StyleId, w: number, h: number) {
   const st = STYLES[id];
-  const poses: Pose[] = ['idle0', 'walk0', 'jump', 'hurt'];
+  const poses: Pose[] = ['idle0', 'walk0', 'hurt'];
   strip(ctx, id, w, h, [
     ...poses.map((p) => (x: number, f: number, s: number) => puffy(ctx, st, x, f, s, p)),
-    ...poses.map((p) => (x: number, f: number, s: number) => scruffy(ctx, st, x, f, s * 1.1, p)),
+    ...poses.map((p) => (x: number, f: number, s: number) => scruffy(ctx, st, x, f, s, p)),
+    ...poses.map((p) => (x: number, f: number, s: number) => muscles(ctx, st, x, f, s, p)),
   ]);
 }
 

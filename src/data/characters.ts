@@ -1,12 +1,12 @@
 /**
- * The three playable characters. Puffy and Scruffy are drawn from the original
- * sketches; Boom is still a placeholder. The stats give each one a distinct feel.
+ * The three playable heroes, all drawn from the original sketches:
+ * Puffy (all-rounder), Scruffy (small & speedy), Big Muscles (heavy hitter).
  */
 export interface CharacterDef {
   id: string;
   name: string;
   tagline: string;
-  /** Placeholder body colors (main, shade, highlight). */
+  /** Body colors (main, shade, highlight, accent), used for menus and HUD. */
   colors: { main: string; shade: string; light: string; accent: string };
   maxHp: number;
   walkSpeed: number;
@@ -75,16 +75,19 @@ export const CHARACTERS: CharacterDef[] = [
     bars: { speed: 5, jump: 4, power: 2 },
   },
   {
-    id: 'boom',
-    name: 'Boom',
+    id: 'muscles',
+    name: 'Big Muscles',
     tagline: 'Heavy hitter',
-    colors: { main: '#a77bf3', shade: '#7a4fd0', light: '#d6c2ff', accent: '#ffd23f' },
+    colors: { main: '#ec7b2b', shade: '#c0561a', light: '#ffb06a', accent: '#fffaf0' },
     maxHp: 4,
+    hitW: 24,
+    hitH: 44,
+    muzzleY: 19,
     walkSpeed: 150,
     runSpeed: 245,
     accel: 1100,
     airAccel: 800,
-    jump: 570,
+    jump: 580,
     fireRate: 0.65,
     maxRockets: 1,
     rocketSpeed: 540,
