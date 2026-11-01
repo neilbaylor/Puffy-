@@ -14,6 +14,7 @@ import {
   type StyleId,
 } from '../gfx/handdrawn';
 import { drawPuffyStyled } from '../gfx/puffy';
+import { drawScruffyStyled } from '../gfx/scruffy';
 import { drawBigPuff, drawMegaPuff, drawPuffball, type BigPuffFrame, type PuffballFrame } from '../gfx/baddies';
 
 function puffball(ctx: Ctx, st: Style, x: number, feetY: number, scale: number, f: PuffballFrame = 'w0') {
@@ -81,6 +82,14 @@ function puffy(ctx: Ctx, st: Style, x: number, feetY: number, scale: number, pos
   ctx.translate(x, feetY);
   ctx.scale(flip ? -scale : scale, scale);
   drawPuffyStyled(ctx, -27, -54, pose, st);
+  ctx.restore();
+}
+
+function scruffy(ctx: Ctx, st: Style, x: number, feetY: number, scale: number, pose: Pose, flip = false) {
+  ctx.save();
+  ctx.translate(x, feetY);
+  ctx.scale(flip ? -scale : scale, scale);
+  drawScruffyStyled(ctx, -26, -54, pose, st);
   ctx.restore();
 }
 
@@ -179,6 +188,7 @@ function giantScene(ctx: Ctx, id: StyleId, w: number, h: number) {
   [[330, 0.8, 'w0'], [362, 0.85, 'w1'], [520, 0.8, 'w0'], [552, 0.75, 'w1']].forEach(([x, sc, f]) => puffball(ctx, st, x as number, gy - 1, sc as number, f as PuffballFrame));
   // Puffy: "WOW"
   puffy(ctx, st, 120, gy - 1, 1.35, 'jump');
+  scruffy(ctx, st, 62, gy - 30, 1.35, 'jump');
   st.shape(ctx, ellipsePts(152, 96, 34, 20, 0, 40), { base: '#ffffff', shade: '#eeeeee', light: '#ffffff' }, 630, { lw: 0.9, plain: true });
   st.shape(ctx, [[134, 110], [148, 113], [126, 134]], { base: '#ffffff', shade: '#ffffff', light: '#ffffff' }, 631, { lw: 0.9, plain: true });
   ctx.font = '400 20px "Lilita One", "Arial Black", sans-serif';
@@ -232,6 +242,7 @@ function scene(ctx: Ctx, id: StyleId) {
   bigpuff(ctx, st, 520, GROUND - 1, 1.15, 'w0');
 
   puffy(ctx, st, 230, GROUND - 1, 1.5, 'walk0');
+  scruffy(ctx, st, 330, GROUND - 46, 1.5, 'jump');
 
   if (st.paper) {
     // light paper grain over everything, so the whole scene sits on one sheet
@@ -241,20 +252,35 @@ function scene(ctx: Ctx, id: StyleId) {
   }
 }
 
-function poseStrip(ctx: Ctx, id: StyleId, w: number, h: number) {
+function strip(ctx: Ctx, id: StyleId, w: number, h: number, items: ((x: number, feet: number, s: number) => void)[]) {
   const st = STYLES[id];
   ctx.fillStyle = st.paper ?? '#ffffff';
   ctx.fillRect(0, 0, w, h);
   if (st.paper) paperTexture(ctx, w, h, 11);
-  const poses: Pose[] = ['idle0', 'walk0', 'jump', 'hurt'];
-  const cells = poses.length + 3;
-  const cell = w / cells;
+  const cell = w / items.length;
   const s = Math.min(cell / 60, h / 62);
-  const feet = h - 6 * s;
-  poses.forEach((p, i) => puffy(ctx, st, cell * i + cell / 2, feet, s, p));
-  puffball(ctx, st, cell * 4.5, feet, s * 1.05, 'w0');
-  bigpuff(ctx, st, cell * 5.5, feet, s * 0.62, 'w0');
-  bigpuff(ctx, st, cell * 6.5, feet, s * 0.62, 'm1');
+  items.forEach((f, i) => f(cell * i + cell / 2, h - 6 * s, s));
+}
+
+function heroStrip(ctx: Ctx, id: StyleId, w: number, h: number) {
+  const st = STYLES[id];
+  const poses: Pose[] = ['idle0', 'walk0', 'jump', 'hurt'];
+  strip(ctx, id, w, h, [
+    ...poses.map((p) => (x: number, f: number, s: number) => puffy(ctx, st, x, f, s, p)),
+    ...poses.map((p) => (x: number, f: number, s: number) => scruffy(ctx, st, x, f, s * 1.1, p)),
+  ]);
+}
+
+function baddieStrip(ctx: Ctx, id: StyleId, w: number, h: number) {
+  const st = STYLES[id];
+  strip(ctx, id, w, h, [
+    // one shared scale, so sizes compare honestly (Big Puff is ~2x a Puffball)
+    (x, f) => puffball(ctx, st, x, f, (h - 14) / 88, 'w0'),
+    (x, f) => puffball(ctx, st, x, f, (h - 14) / 88, 'w1'),
+    (x, f) => puffball(ctx, st, x, f, (h - 14) / 88, 'flat'),
+    (x, f) => bigpuff(ctx, st, x, f, (h - 14) / 88, 'w0'),
+    (x, f) => bigpuff(ctx, st, x, f, (h - 14) / 88, 'm1'),
+  ]);
 }
 
 async function paint() {
@@ -279,11 +305,15 @@ async function paint() {
     ctx.scale(2, 2);
     giantScene(ctx, id, 600, 260);
   });
-  document.querySelectorAll<HTMLCanvasElement>('canvas[data-poses]').forEach((c) => {
-    const id = c.dataset.poses as StyleId;
+  document.querySelectorAll<HTMLCanvasElement>('canvas[data-heroes]').forEach((c) => {
     c.width = 1200;
-    c.height = 220;
-    poseStrip(c.getContext('2d')!, id, c.width, c.height);
+    c.height = 200;
+    heroStrip(c.getContext('2d')!, c.dataset.heroes as StyleId, c.width, c.height);
+  });
+  document.querySelectorAll<HTMLCanvasElement>('canvas[data-baddies]').forEach((c) => {
+    c.width = 1200;
+    c.height = 200;
+    baddieStrip(c.getContext('2d')!, c.dataset.baddies as StyleId, c.width, c.height);
   });
 }
 void paint();

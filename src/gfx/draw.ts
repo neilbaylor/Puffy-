@@ -5,6 +5,7 @@
 import type { CharacterDef } from '../data/characters';
 import { STYLES } from './handdrawn';
 import { drawPuffyStyled } from './puffy';
+import { drawScruffyStyled } from './scruffy';
 
 /** Which hand-drawn look the game renders Puffy with (see the look-development page). */
 export const ART_STYLE = 'polished' as const;
@@ -75,6 +76,10 @@ export function drawCharacter(ctx: Ctx, ox: number, oy: number, ch: CharacterDef
     drawPuffyStyled(ctx, ox, oy, pose, STYLES[ART_STYLE]);
     return;
   }
+  if (ch.id === 'scruffy') {
+    drawScruffyStyled(ctx, ox, oy, pose, STYLES[ART_STYLE]);
+    return;
+  }
   const { main, shade, light, accent } = ch.colors;
   const big = ch.id === 'boom' ? 1.08 : 1;
   const cx = ox + 26;
@@ -128,24 +133,6 @@ export function drawCharacter(ctx: Ctx, ox: number, oy: number, ch: CharacterDef
   foot(-6 + footL, footLift[0], shade);
 
   // Character-specific back detail
-  if (ch.id === 'bolt') {
-    // two pointy ears
-    for (const s of [-1, 1]) {
-      ctx.fillStyle = OUTLINE;
-      ctx.beginPath();
-      ctx.moveTo(cx + s * 3 - 6, cy - bodyRy + 6);
-      ctx.lineTo(cx + s * 7 - 2 + (s > 0 ? 4 : -4), cy - bodyRy - 13);
-      ctx.lineTo(cx + s * 9 + 2, cy - bodyRy + 6);
-      ctx.fill();
-      ctx.fillStyle = shade;
-      ctx.beginPath();
-      ctx.moveTo(cx + s * 3 - 4, cy - bodyRy + 6);
-      ctx.lineTo(cx + s * 7 - 2 + (s > 0 ? 4 : -4), cy - bodyRy - 9);
-      ctx.lineTo(cx + s * 9, cy - bodyRy + 6);
-      ctx.fill();
-    }
-  }
-
   // Body
   ellipse(ctx, cx, cy, bodyRx + 2, bodyRy + 2, OUTLINE);
   ellipse(ctx, cx, cy, bodyRx, bodyRy, main);
@@ -172,19 +159,6 @@ export function drawCharacter(ctx: Ctx, ox: number, oy: number, ch: CharacterDef
     ctx.fillStyle = '#8d9c6f';
     ctx.fillRect(cx - bodyRx, cy - bodyRy * 0.55, bodyRx * 2, 2.5);
     ctx.restore();
-  }
-  if (ch.id === 'bolt') {
-    // lightning stripe
-    ctx.fillStyle = accent;
-    ctx.beginPath();
-    ctx.moveTo(cx - 9, cy + 3);
-    ctx.lineTo(cx - 3, cy - 1);
-    ctx.lineTo(cx - 4, cy + 3);
-    ctx.lineTo(cx + 1, cy + 1);
-    ctx.lineTo(cx - 6, cy + 8);
-    ctx.lineTo(cx - 5, cy + 4);
-    ctx.closePath();
-    ctx.fill();
   }
 
   // Face

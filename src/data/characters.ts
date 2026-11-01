@@ -1,6 +1,6 @@
 /**
- * The three playable characters. Puffy is drawn from the original sketches; Bolt and
- * Boom are still placeholders. The stats give each one a distinct feel.
+ * The three playable characters. Puffy and Scruffy are drawn from the original
+ * sketches; Boom is still a placeholder. The stats give each one a distinct feel.
  */
 export interface CharacterDef {
   id: string;
@@ -24,8 +24,11 @@ export interface CharacterDef {
   blastRadius: number;
   /** Hits dealt per rocket. Kept at 1 for everyone so "takes 2 shots" means the same for every hero. */
   damage: number;
-  /** Collision box height (px). Taller characters get a taller box. */
+  /** Collision box size (px). Defaults 22 × 34. */
+  hitW?: number;
   hitH?: number;
+  /** Height of the bazooka muzzle above the feet (px). Default 18. */
+  muzzleY?: number;
   /** 0-5 bars shown in character select. */
   bars: { speed: number; jump: number; power: number };
 }
@@ -51,11 +54,14 @@ export const CHARACTERS: CharacterDef[] = [
     bars: { speed: 3, jump: 3, power: 3 },
   },
   {
-    id: 'bolt',
-    name: 'Bolt',
-    tagline: 'Fast & floaty',
-    colors: { main: '#3fa7ff', shade: '#1f6fc4', light: '#9fd3ff', accent: '#f1f5ff' },
+    id: 'scruffy',
+    name: 'Scruffy',
+    tagline: 'Small & speedy',
+    colors: { main: '#f7953a', shade: '#cf6b1c', light: '#ffc98a', accent: '#fff3e2' },
     maxHp: 3,
+    hitW: 20,
+    hitH: 28,
+    muzzleY: 11,
     walkSpeed: 180,
     runSpeed: 305,
     accel: 1600,

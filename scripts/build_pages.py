@@ -51,7 +51,8 @@ for i, (sid, name, blurb, pro, con) in enumerate(LOOKS):
     lcards.append(f'''    <article class="opt" id="{sid}">
       <div class="frame"><canvas data-scene="{sid}" width="1200" height="520" aria-label="Sunny Hills with Puffy in the {name} style"></canvas></div>
       <div class="frame"><canvas data-giant="{sid}" width="1200" height="520" aria-label="{name} style: Puffy says WOW at a giant Mega Puff surrounded by Puffballs"></canvas></div>
-      <div class="strip"><canvas data-poses="{sid}" width="1200" height="220" aria-label="{name} style: Puffy idle, running, jumping, puffed up; a Puffball; Big Puff calm and angry"></canvas></div>
+      <div class="strip"><canvas data-heroes="{sid}" width="1200" height="200" aria-label="{name} style heroes: Puffy and Scruffy idle, running, jumping, hurt"></canvas></div>
+      <div class="strip"><canvas data-baddies="{sid}" width="1200" height="200" aria-label="{name} style bad guys: Puffball walking and squashed, Big Puff calm and angry"></canvas></div>
       <div class="meta">
         <div><h2><span class="letter">{'ABCD'[i]}</span>{name}{tag}</h2><p class="blurb">{blurb}</p></div>
         <dl class="pc"><dt>Good</dt><dd>{pro}</dd><dt>Watch out</dt><dd>{con}</dd></dl>
@@ -60,7 +61,7 @@ for i, (sid, name, blurb, pro, con) in enumerate(LOOKS):
 b64 = lambda f: base64.b64encode((sk / f).read_bytes()).decode()
 (sk / 'look-development.html').write_text(
     ltpl.replace('__CARDS__', '\n'.join(lcards)).replace('__SKETCH1__', b64('puffy-sketch-1.jpg')).replace('__SKETCH2__', b64('puffy-sketch-2.jpg'))
-    .replace('__SKETCH3__', b64('baddie-sketch-1.jpg')).replace('__SKETCH4__', b64('baddie-sketch-2.jpg')).replace('__SKETCH5__', b64('giant-sketch.jpg'))
+    .replace('__SKETCH3__', b64('baddie-sketch-1.jpg')).replace('__SKETCH4__', b64('baddie-sketch-2.jpg')).replace('__SKETCH5__', b64('giant-sketch.jpg')).replace('__SKETCH6__', b64('scruffy-sketch.jpg'))
     .replace('__JS__', ljs.replace('</script', '<\\/script')))
 
 # ── single-page game ──

@@ -1,0 +1,135 @@
+/**
+ * Scruffy, drawn from the original sketch: Puffy's small sidekick. A little
+ * round orange ball with two eyes, a pale muzzle patch, one ear on top,
+ * tiny arms and short legs with round feet. Same hand-drawn styles as Puffy.
+ */
+import type { Ctx, Pose } from './draw';
+import { ellipsePts, paddlePts, roundRectPts, type Fill, type Pt, type Style } from './handdrawn';
+import { PUFFY } from './puffy';
+
+export const SCRUFFY = {
+  body: { base: '#f7953a', shade: '#cf6b1c', light: '#ffc98a' } as Fill,
+  limb: { base: '#ec8628', shade: '#bd5c16', light: '#ffb76a' } as Fill,
+  muzzle: { base: '#fff3e2', shade: '#efd9bd', light: '#ffffff' } as Fill,
+  eye: { base: '#ffffff', shade: '#e6ddd0', light: '#ffffff' } as Fill,
+};
+
+/** Frame is 56×56 units, feet on y = 54 (same frame as Puffy, he's just smaller inside it). */
+export function drawScruffyStyled(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style) {
+  const cx = ox + 26;
+  const ground = oy + 54;
+
+  let legL = 0;
+  let legR = 0;
+  let liftL = 0;
+  let liftR = 0;
+  let bob = 0;
+  let armBack = 0.5;
+  let armFront = -0.2;
+  let earRot = -1.1;
+  let sx = 1;
+  let sy = 1;
+  const hurt = pose === 'hurt';
+  if (pose === 'idle1') {
+    sx = 1.04;
+    sy = 0.96;
+    earRot = -1.0;
+  }
+  if (pose.startsWith('walk')) {
+    const f = +pose.slice(4);
+    [legL, legR, liftL, liftR] = [
+      [5, -4, 0, 2],
+      [2, -1, 0, 0],
+      [-4, 5, 2, 0],
+      [-1, 2, 0, 0],
+    ][f];
+    bob = f % 2 ? -1.5 : 0;
+    armBack = f < 2 ? 0.9 : 0.1;
+    armFront = f < 2 ? -0.6 : 0.3;
+    earRot = f < 2 ? -1.25 : -0.95;
+  }
+  if (pose === 'jump') {
+    [legL, legR, liftL, liftR] = [-2, 4, 4, 2];
+    armBack = -0.6;
+    armFront = -1.1;
+    earRot = -1.5;
+    sx = 0.94;
+    sy = 1.06;
+  }
+  if (pose === 'fall') {
+    [legL, legR, liftL, liftR] = [-3, 4, 2, 4];
+    armBack = -1.1;
+    armFront = -1.4;
+    earRot = -0.7;
+  }
+  if (hurt) {
+    armBack = -1.4;
+    armFront = -1.7;
+    earRot = -0.4;
+    sx = 1.08;
+    sy = 1.08;
+  }
+
+  const r = 11.5;
+  const rx = r * sx;
+  const ry = r * sy;
+  const hipY = ground - 10 + bob;
+  const cy = hipY - ry + 2;
+  const seed = pose.length * 5 + (pose.charCodeAt(pose.length - 1) % 11) + 900;
+
+  // back arm
+  st.shape(ctx, paddlePts(cx - rx + 3, cy + 3, 9, 5, Math.PI - armBack), SCRUFFY.limb, seed + 1, { lw: 0.8 });
+
+  const leg = (hx: number, dx: number, lift: number, fill: Fill, s: number) => {
+    const fx = cx + hx + dx;
+    const fy = ground - 3.6 - lift;
+    const top: Pt = [cx + hx, hipY - 3];
+    st.line(ctx, [top, [fx, fy]], s, 2.2);
+    st.line(ctx, [top, [fx, fy]], s, 1.05, fill.base);
+    st.shape(ctx, ellipsePts(fx + 1.2, fy, 4.4, 3.4), fill, s + 3, { lw: 0.8 });
+  };
+  leg(-4, legL, liftL, SCRUFFY.limb, seed + 2);
+
+  // ear on top
+  st.shape(ctx, paddlePts(cx + 3, cy - ry + 3, 9, 6, earRot), SCRUFFY.limb, seed + 3, { lw: 0.8 });
+
+  // round body
+  st.shape(ctx, ellipsePts(cx, cy, rx, ry, 0, 44), SCRUFFY.body, seed + 4, { light: [cx - 4, cy - 5] });
+
+  // muzzle patch (the pale oval from the sketch)
+  st.shape(ctx, ellipsePts(cx + 5.5, cy + 3, 5, hurt ? 5 : 4.2, -0.2, 28), SCRUFFY.muzzle, seed + 5, { lw: 0.75, plain: true });
+  if (hurt) {
+    ctx.fillStyle = st.ink;
+    ctx.beginPath();
+    ctx.ellipse(cx + 6, cy + 3.5, 1.8, 2.3, 0, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    st.line(ctx, [[cx + 4, cy + 4], [cx + 6.5, cy + 5.1], [cx + 9, cy + 3.7]], seed + 6, 0.6);
+  }
+
+  // two eyes looking up and forward
+  for (const [ex, ey, s] of [
+    [cx + 0.5, cy - 3.2, 1],
+    [cx + 7, cy - 4, 2],
+  ] as const) {
+    const er = hurt ? 3.4 : 2.9;
+    st.shape(ctx, ellipsePts(ex, ey, er, er * 1.2, 0, 20), SCRUFFY.eye, seed + 10 + s, { lw: 0.7, plain: true });
+    ctx.fillStyle = st.ink;
+    ctx.beginPath();
+    ctx.ellipse(ex + 0.8, ey - (hurt ? 0 : 0.8), hurt ? 0.9 : 1.2, hurt ? 0.9 : 1.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  leg(4, legR, liftR, SCRUFFY.body, seed + 7);
+
+  // a smaller bazooka, held low
+  const by = cy + ry - 1.5;
+  const bx0 = cx - 8;
+  const bx1 = cx + 17;
+  st.shape(ctx, roundRectPts(bx0, by - 2.6, bx1 - bx0, 5.2, 2.4), PUFFY.tube, seed + 8, { lw: 0.8 });
+  st.shape(ctx, roundRectPts(bx1 - 2.5, by - 3.8, 4.2, 7.6, 1.5), PUFFY.tubeDark, seed + 9, { lw: 0.8, plain: true });
+  st.shape(ctx, roundRectPts(bx0 - 2, by - 3.8, 3.4, 7.6, 1.3), PUFFY.tubeDark, seed + 20, { lw: 0.8, plain: true });
+
+  // front arm over the tube
+  st.shape(ctx, paddlePts(cx - 3, by - 2.5, 8.5, 5, armFront + 0.25), SCRUFFY.body, seed + 11, { lw: 0.8 });
+}

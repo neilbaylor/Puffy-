@@ -62,7 +62,7 @@ export class Player {
     this.hp = char.maxHp;
     this.hitbox = scene.physics.add.image(x, y, '__DEFAULT').setVisible(false);
     this.body = this.hitbox.body as Phaser.Physics.Arcade.Body;
-    this.body.setSize(HIT_W, char.hitH ?? HIT_H, true);
+    this.body.setSize(char.hitW ?? HIT_W, char.hitH ?? HIT_H, true);
     this.body.setMaxVelocityY(MAX_FALL_SPEED);
     this.body.setCollideWorldBounds(true);
     this.hitbox.setData('player', this);

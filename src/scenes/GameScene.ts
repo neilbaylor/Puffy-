@@ -474,7 +474,7 @@ export class GameScene extends Phaser.Scene {
 
   fireRocket(p: Player) {
     const x = p.x + p.facing * 24;
-    const y = p.bottom - 18;
+    const y = p.bottom - (p.char.muzzleY ?? 18);
     sfx.shoot();
     this.fx.dust(x, y, 3);
     this.fx.sparkle(x, y, 3);
