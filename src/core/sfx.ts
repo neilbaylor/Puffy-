@@ -90,6 +90,14 @@ export const sfx = {
     tone({ type: 'square', from: 420, to: 120, dur: 0.12, vol: 0.14 });
     noise(0.08, 0.15, 900, 200);
   },
+  thud: () => {
+    tone({ type: 'sine', from: 90, to: 30, dur: 0.5, vol: 0.5 });
+    noise(0.35, 0.35, 600, 60);
+  },
+  roar: () => {
+    tone({ type: 'sawtooth', from: 140, to: 70, dur: 0.6, vol: 0.12 });
+    noise(0.5, 0.15, 900, 200);
+  },
   bump: () => tone({ type: 'triangle', from: 160, to: 90, dur: 0.1, vol: 0.25 }),
   brick: () => noise(0.3, 0.4, 3000, 200),
   hurt: () => {

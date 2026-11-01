@@ -21,6 +21,8 @@ export abstract class Enemy extends Phaser.Physics.Arcade.Sprite {
   stompable = true;
   dead = false;
   awake = false;
+  /** Landing on top just bounces you off (no damage either way). For enemies too big to stomp. */
+  bouncyTop = false;
   /** Brief window after being stomped where touching it doesn't hurt (multi-hit enemies). */
   touchGraceUntil = 0;
   protected t = 0;
@@ -41,11 +43,22 @@ export abstract class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.body.moves = false;
   }
 
+  /**
+   * Snap the physics body to the sprite and forget any previous motion.
+   * (Body.reset() mis-places scaled sprites, and without syncing prev/prevFrame
+   * Arcade would "move" the sprite by the distance since the body was created.)
+   */
+  syncBody() {
+    const b = this.body;
+    b.updateFromGameObject();
+    b.prev.set(b.x, b.y);
+    b.prevFrame.set(b.x, b.y);
+    b.velocity.set(0, 0);
+  }
+
   wake() {
     this.awake = true;
-    // reset() also syncs the body's previous-frame position; without it Arcade
-    // would "move" the sprite by the distance since the body was created.
-    this.body.reset(this.x, this.y);
+    this.syncBody();
     this.body.moves = true;
   }
 
@@ -222,6 +235,103 @@ export class BigPuff extends Walker {
   }
 }
 
+/**
+ * Mega Puff (from the sketches): a giant. Too big to jump over and can't be
+ * stomped. Five shots kill him, or run underneath while he's in the air.
+ * He crouches before every jump so players can time the dash.
+ */
+export class MegaPuff extends Enemy {
+  readonly kind: EnemyKind = 'megapuff';
+  private dir = -1;
+  private mode: 'walk' | 'crouch' | 'air' = 'walk';
+  private timer = 1.2;
+  private pips: Phaser.GameObjects.Graphics;
+  private readonly maxHp = 5;
+
+  constructor(gs: GameScene, x: number, y: number) {
+    super(gs, x, y, 'megapuff', 'w0');
+    hiRes(this, 104, 176, 36, 24);
+    this.hp = this.maxHp;
+    this.stompable = false;
+    this.bouncyTop = true;
+    this.score = 2000;
+    this.setDepth(DEPTH.enemies + 1);
+    this.pips = gs.add.graphics().setDepth(DEPTH.text);
+  }
+
+  wake() {
+    super.wake();
+    sfx.roar();
+  }
+
+  tick(dt: number) {
+    const b = this.body;
+    const target = this.gs.nearestPlayer(this.x, this.y);
+    this.timer -= dt;
+    const onGround = b.blocked.down;
+
+    if (this.mode === 'walk') {
+      if (target && Math.abs(target.x - this.x) > 20) this.dir = Math.sign(target.x - this.x);
+      const aheadX = this.dir > 0 ? b.right + 4 : b.left - 4;
+      const groundAhead = this.gs.level.isSolidAt(aheadX, b.bottom + 6);
+      b.setVelocityX(groundAhead && !(this.dir < 0 ? b.blocked.left : b.blocked.right) ? this.dir * 32 : 0);
+      this.setFrame(Math.floor(this.t * 3) % 2 ? 'w1' : 'w0');
+      if (this.timer <= 0 && onGround) {
+        this.mode = 'crouch';
+        this.timer = 0.45;
+        b.setVelocityX(0);
+      }
+    } else if (this.mode === 'crouch') {
+      this.setFrame('crouch');
+      if (this.timer <= 0) {
+        this.mode = 'air';
+        b.setVelocity(0, -860); // straight up, so the gap underneath is fair
+        this.timer = 0.2;
+      }
+    } else {
+      this.setFrame('air');
+      if (onGround && this.timer <= 0) {
+        this.mode = 'walk';
+        this.timer = 1.6 + Math.random() * 0.9;
+        b.setVelocityX(0);
+        this.gs.cameras.main.shake(220, 0.012);
+        this.gs.fx.dust(b.left + 10, b.bottom, 8);
+        this.gs.fx.dust(b.right - 10, b.bottom, 8);
+        sfx.thud();
+      }
+    }
+    this.setFlipX(this.dir > 0);
+    this.drawPips();
+  }
+
+  private drawPips() {
+    const g = this.pips;
+    g.clear();
+    const w = 12;
+    const x0 = this.x - (this.maxHp * w) / 2;
+    const y = this.body.top - 16;
+    for (let i = 0; i < this.maxHp; i++) {
+      g.fillStyle(0x2a1e2e, 1).fillRoundedRect(x0 + i * w, y, w - 3, 7, 2);
+      g.fillStyle(i < this.hp ? 0xff4d6d : 0x6b5a70, 1).fillRoundedRect(x0 + i * w + 1, y + 1, w - 5, 5, 1.5);
+    }
+  }
+
+  damage(n: number, how: DeathKind, by: Player | null) {
+    super.damage(n, how, by);
+    if (!this.dead) this.drawPips();
+  }
+
+  kill(how: DeathKind) {
+    this.pips.destroy();
+    if (!this.dead && how !== 'fall') {
+      this.gs.fx.explosion(this.x, this.y, 90);
+      this.gs.fx.stars(this.x, this.y - 40, 16);
+      this.gs.cameras.main.shake(300, 0.015);
+    }
+    super.kill(how === 'stomp' ? 'blast' : how);
+  }
+}
+
 /** Spiky shell: hurts if you jump on it. Use the bazooka. */
 export class Spiker extends Walker {
   readonly kind: EnemyKind = 'spiker';
@@ -350,6 +460,8 @@ export function createEnemy(gs: GameScene, kind: EnemyKind, x: number, y: number
       return new Puffball(gs, x, y);
     case 'bigpuff':
       return new BigPuff(gs, x, y);
+    case 'megapuff':
+      return new MegaPuff(gs, x, y);
     case 'walker':
       return new Walker(gs, x, y);
     case 'spiker':

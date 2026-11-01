@@ -4,7 +4,8 @@ import { LevelBuilder, type LevelData } from './builder';
  * Level 1 — "Sunny Hills".
  * Heights are in tiles from the bottom of the level (ground is usually 3).
  * Rough tour (column numbers):
- * Enemies: Puffballs everywhere (1 hit), a few Big Puffs (2 hits). Turrets and
+ * Enemies: Puffballs everywhere (1 hit), a few Big Puffs (2 hits), two giant
+ * Mega Puffs (5 hits, or run under them when they jump). Turrets and
  * flying bugs are placeholders until more bad-guy sketches arrive.
  *
  *   0-44    Start meadow: first blocks, first enemies, little hill
@@ -61,10 +62,10 @@ export function buildLevel1(): LevelData {
   L.ground(90, 118, 3);
   L.blocks(95, 7, 'B?B', ['heart']);
   L.rect(101, 102, 4, 5, 'stone');
-  L.spawn('turret', 101, 5);
-  L.spawn('puffball', 106, 3);
-  L.spawn('puffball', 109, 3);
-  L.spawn('puffball', 112, 3);
+  // a giant with puffballs crowding round his feet (the stone block is a safe spot)
+  L.spawn('megapuff', 110, 3);
+  L.spawn('puffball', 105, 3);
+  L.spawn('puffball', 107, 3);
   L.coins(104, 4, 4);
   L.spawn('checkpoint', 115, 3);
 
@@ -119,9 +120,10 @@ export function buildLevel1(): LevelData {
   L.ground(221, 249, 3);
   L.stairs(221, 5, 3, -1);
   L.coinArc(217, 5, 12, 1);
-  L.spawn('puffball', 227, 3);
-  L.spawn('puffball', 230, 3);
-  L.spawn('puffball', 235, 3);
+  // final giant guarding the goal
+  L.spawn('puffball', 228, 3);
+  L.spawn('puffball', 231, 3);
+  L.spawn('megapuff', 236, 3);
   L.coins(232, 5, 4);
   L.spawn('goal', 241, 3);
 

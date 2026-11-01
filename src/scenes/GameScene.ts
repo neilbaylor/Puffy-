@@ -135,10 +135,10 @@ export class GameScene extends Phaser.Scene {
           if (kind === 'flyer') e.y = s.y * TILE + TILE / 2;
           else {
             // stand the body exactly on the ground, whatever the sprite's size/scale
-            e.body.reset(e.x, e.y);
+            e.body.updateFromGameObject();
             e.y += surface(s.y) - e.body.bottom;
           }
-          e.body.reset(e.x, e.y);
+          e.syncBody();
           this.enemies.push(e);
           this.gEnemies.add(e);
         }
@@ -243,7 +243,7 @@ export class GameScene extends Phaser.Scene {
     const wakeL = this.view.left - 48;
     this.enemies = this.enemies.filter((e) => e.active);
     for (const e of this.enemies) {
-      if (!e.awake && !e.dead && e.x < wakeR && e.x > wakeL) e.wake();
+      if (!e.awake && !e.dead && e.body.left < wakeR && e.body.right > wakeL) e.wake();
       e.update(dt);
     }
 
@@ -450,6 +450,11 @@ export class GameScene extends Phaser.Scene {
     const eb = e.body;
     const prevBottom = pb.prev.y + pb.height;
     const fromAbove = pb.velocity.y > 0 && prevBottom <= eb.top + 8;
+    if (fromAbove && e.bouncyTop) {
+      p.bounce();
+      pb.y = eb.top - pb.height;
+      return;
+    }
     if (fromAbove) {
       if (e.stompable) {
         e.damage(1, 'stomp', p);

@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { TILE } from '../config';
 import { CHARACTERS } from '../data/characters';
 import { TILE_COUNT, TILESET_COLS, T } from '../level/tiles';
-import { BIGPUFF_H, BIGPUFF_W, PUFFBALL_H, PUFFBALL_W, drawBigPuff, drawPuffball } from './baddies';
+import { BIGPUFF_H, BIGPUFF_W, MEGAPUFF_H, MEGAPUFF_W, PUFFBALL_H, PUFFBALL_W, drawBigPuff, drawMegaPuff, drawPuffball } from './baddies';
 import { STYLES } from './handdrawn';
 import { ART_RES, ART_STYLE, CHAR_H, CHAR_W, POSES, canvas, drawCharacter, ellipse, rng, roundRect, type Ctx } from './draw';
 
@@ -951,6 +951,7 @@ function makeBaddies(scene: Phaser.Scene) {
   };
   sheet('puffball', PUFFBALL_W, PUFFBALL_H, ['w0', 'w1', 'flat'] as const, (ctx, f) => drawPuffball(ctx, 0, 0, f, st));
   sheet('bigpuff', BIGPUFF_W, BIGPUFF_H, ['w0', 'w1', 'm0', 'm1'] as const, (ctx, f) => drawBigPuff(ctx, 0, 0, f, st));
+  sheet('megapuff', MEGAPUFF_W, MEGAPUFF_H, ['w0', 'w1', 'crouch', 'air'] as const, (ctx, f) => drawMegaPuff(ctx, 0, 0, f, st));
 }
 
 export function generateTextures(scene: Phaser.Scene) {

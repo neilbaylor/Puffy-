@@ -12,7 +12,7 @@ import { T } from './tiles';
 
 export type Cell = 'ground' | 'brick' | 'q' | 'stone' | 'plat' | 'spike' | null;
 
-export type EnemyKind = 'puffball' | 'bigpuff' | 'walker' | 'spiker' | 'hopper' | 'flyer' | 'turret';
+export type EnemyKind = 'puffball' | 'bigpuff' | 'megapuff' | 'walker' | 'spiker' | 'hopper' | 'flyer' | 'turret';
 
 export interface Spawn {
   type: EnemyKind | 'coin' | 'checkpoint' | 'goal' | 'player' | 'decor';

@@ -14,7 +14,7 @@ import {
   type StyleId,
 } from '../gfx/handdrawn';
 import { drawPuffyStyled } from '../gfx/puffy';
-import { drawBigPuff, drawPuffball, type BigPuffFrame, type PuffballFrame } from '../gfx/baddies';
+import { drawBigPuff, drawMegaPuff, drawPuffball, type BigPuffFrame, type PuffballFrame } from '../gfx/baddies';
 
 function puffball(ctx: Ctx, st: Style, x: number, feetY: number, scale: number, f: PuffballFrame = 'w0') {
   ctx.save();
@@ -137,6 +137,62 @@ function flower(ctx: Ctx, st: Style, x: number, y: number, col: string, seed: nu
   st.shape(ctx, ellipsePts(x, y - 16, 2.4, 2.4, 0, 12), { base: '#fff3b0', shade: '#ffe08a', light: '#fff' }, seed + 9, { lw: 0.5, plain: true });
 }
 
+function groundRun(ctx: Ctx, st: Style, pal: (typeof PAL)[StyleId], x0: number, x1: number, gy: number, h = V) {
+  ctx.save();
+  st.shape(ctx, roundRectPts(x0, gy, x1 - x0, h - gy + 20, 6), pal.dirtA, 240 + x0, { plain: true });
+  ctx.beginPath();
+  ctx.rect(x0 + 2, gy, x1 - x0 - 4, h);
+  ctx.clip();
+  const r = rng(x0 + 7);
+  for (let y = gy + 10; y < h; y += 16)
+    for (let x = x0; x < x1; x += 16)
+      if ((Math.floor((x - x0) / 16) + Math.floor((y - gy) / 16)) % 2)
+        st.shape(ctx, roundRectPts(x + r() * 0.8, y + r() * 0.8, 16, 16, 1.5), pal.dirtB, 300 + x + y, { noLine: true });
+  ctx.restore();
+  const cap: Pt[] = [[x0 - 2, gy - 3], [x1 + 2, gy - 3]];
+  for (let x = x1 + 2; x >= x0 - 2; x -= 4) cap.push([x, gy + 9 + Math.sin((x - x0) * 0.4) * 2.5]);
+  st.shape(ctx, cap, pal.grass, 260 + x0, { lw: 0.9 });
+}
+
+/** The "WOW" moment from the drawing: Puffy meets a giant, puffballs at its feet. */
+function giantScene(ctx: Ctx, id: StyleId, w: number, h: number) {
+  const st = STYLES[id];
+  const pal = PAL[id];
+  const gy = h - 34;
+  const g = ctx.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, pal.sky[0]);
+  g.addColorStop(1, pal.sky[1]);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+  if (st.paper) paperTexture(ctx, w, h, 13);
+  for (const [x, rw, rh, sd] of [[90, 140, 70, 1], [520, 170, 110, 2]] as const)
+    st.shape(ctx, ellipsePts(x, gy + 10, rw, rh, 0, 60), pal.hill2, 610 + sd, { lw: 0.8 });
+  cloud(ctx, st, 120, 40, 0.8, 620);
+  groundRun(ctx, st, pal, -10, w + 10, gy, h);
+  // giant
+  ctx.save();
+  ctx.translate(430, gy);
+  ctx.scale(0.95, 0.95);
+  drawMegaPuff(ctx, -88, -200, 'w0', st);
+  ctx.restore();
+  // puffball crowd round his feet
+  [[330, 0.8, 'w0'], [362, 0.85, 'w1'], [520, 0.8, 'w0'], [552, 0.75, 'w1']].forEach(([x, sc, f]) => puffball(ctx, st, x as number, gy - 1, sc as number, f as PuffballFrame));
+  // Puffy: "WOW"
+  puffy(ctx, st, 120, gy - 1, 1.35, 'jump');
+  st.shape(ctx, ellipsePts(152, 96, 34, 20, 0, 40), { base: '#ffffff', shade: '#eeeeee', light: '#ffffff' }, 630, { lw: 0.9, plain: true });
+  st.shape(ctx, [[134, 110], [148, 113], [126, 134]], { base: '#ffffff', shade: '#ffffff', light: '#ffffff' }, 631, { lw: 0.9, plain: true });
+  ctx.font = '400 20px "Lilita One", "Arial Black", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = st.ink;
+  ctx.fillText('WOW', 152, 97);
+  if (st.paper) {
+    ctx.globalAlpha = 0.5;
+    paperTexture(ctx, w, h, 14);
+    ctx.globalAlpha = 1;
+  }
+}
+
 function scene(ctx: Ctx, id: StyleId) {
   const st = STYLES[id];
   const pal = PAL[id];
@@ -162,30 +218,7 @@ function scene(ctx: Ctx, id: StyleId) {
     st.shape(ctx, ellipsePts(68 + dx, GROUND - r * 0.6, r, r, 0, 30), pal.hill, 230 + dx, { lw: 0.85 });
 
   // ground: checker dirt + grass cap, with a pit
-  const runs: [number, number][] = [
-    [-10, 300],
-    [372, 610],
-  ];
-  for (const [x0, x1] of runs) {
-    ctx.save();
-    const body = roundRectPts(x0, GROUND, x1 - x0, V - GROUND + 20, 6);
-    st.shape(ctx, body, pal.dirtA, 240 + x0, { plain: true });
-    ctx.beginPath();
-    ctx.rect(x0 + 2, GROUND, x1 - x0 - 4, V);
-    ctx.clip();
-    const r = rng(x0 + 7);
-    for (let y = GROUND + 10; y < V; y += 16)
-      for (let x = x0; x < x1; x += 16)
-        if ((Math.floor((x - x0) / 16) + Math.floor((y - GROUND) / 16)) % 2)
-          st.shape(ctx, roundRectPts(x + r() * 0.8, y + r() * 0.8, 16, 16, 1.5), pal.dirtB, 300 + x + y, { noLine: true });
-    ctx.restore();
-    // grass cap with scalloped bottom edge
-    const cap: Pt[] = [];
-    cap.push([x0 - 2, GROUND - 3]);
-    cap.push([x1 + 2, GROUND - 3]);
-    for (let x = x1 + 2; x >= x0 - 2; x -= 4) cap.push([x, GROUND + 9 + Math.sin((x - x0) * 0.4) * 2.5]);
-    st.shape(ctx, cap, pal.grass, 260 + x0, { lw: 0.9 });
-  }
+  for (const [x0, x1] of [[-10, 300], [372, 610]] as const) groundRun(ctx, st, pal, x0, x1, GROUND);
 
   // flowers
   [[30, '#ff6fa3'], [118, '#ffd23f'], [262, '#ff6fa3'], [420, '#ffd23f'], [585, '#ff6fa3']].forEach(([x, c], i) =>
@@ -237,6 +270,14 @@ async function paint() {
     const ctx = c.getContext('2d')!;
     ctx.scale(K, K);
     scene(ctx, id);
+  });
+  document.querySelectorAll<HTMLCanvasElement>('canvas[data-giant]').forEach((c) => {
+    const id = c.dataset.giant as StyleId;
+    c.width = 1200;
+    c.height = 520;
+    const ctx = c.getContext('2d')!;
+    ctx.scale(2, 2);
+    giantScene(ctx, id, 600, 260);
   });
   document.querySelectorAll<HTMLCanvasElement>('canvas[data-poses]').forEach((c) => {
     const id = c.dataset.poses as StyleId;
