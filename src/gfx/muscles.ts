@@ -5,7 +5,7 @@
  * He flexes one arm and carries the bazooka with the other.
  */
 import type { Ctx, Pose } from './draw';
-import { ellipsePts, roundRectPts, type Fill, type Pt, type Style } from './handdrawn';
+import { ellipsePts, petalPts, roundRectPts, type Fill, type Pt, type Style } from './handdrawn';
 import { PUFFY } from './puffy';
 
 export const MUSCLES = {
@@ -74,10 +74,10 @@ export function drawMusclesStyled(ctx: Ctx, ox: number, oy: number, pose: Pose, 
   const cy = hipY - ry + 3;
   const seed = pose.length * 3 + (pose.charCodeAt(pose.length - 1) % 17) + 1300;
 
-  // flexing back arm: shoulder → forearm up → fist
+  // back arm: flexing (shoulder → forearm up → fist), or drooping when hurt
   const shoulder: Pt = [cx - rx + 1, cy + 2];
-  const elbow: Pt = [cx - rx - 5.5, cy - 1 - flex * 3];
-  const fist: Pt = [cx - rx - 5 + flex * 1.5, cy - 8.5 - flex * 4];
+  const elbow: Pt = hurt ? [cx - rx - 3.5, cy + 8] : [cx - rx - 5.5, cy - 1 - flex * 3];
+  const fist: Pt = hurt ? [cx - rx - 2.5, cy + 15] : [cx - rx - 5 + flex * 1.5, cy - 8.5 - flex * 4];
   arm(ctx, st, [shoulder, elbow, fist], [4.2, 4.6, 3.6], MUSCLES.limb, seed + 1);
 
   // long thick legs with curled feet
@@ -91,6 +91,8 @@ export function drawMusclesStyled(ctx: Ctx, ox: number, oy: number, pose: Pose, 
     st.shape(ctx, ellipsePts(fx + 2.5, fy + 0.4, 6, 3.8, -0.15, 24), fill, s + 3, { lw: 0.85 });
   };
   leg(-5, legL, liftL, MUSCLES.limb, seed + 2);
+  // both legs sit behind the body so the face (and the hurt grimace) is never covered
+  leg(5, legR, liftR, MUSCLES.body, seed + 10);
 
   // body
   st.shape(ctx, ellipsePts(cx, cy, rx, ry, 0, 48), MUSCLES.body, seed + 4, { light: [cx - 4, cy - 6] });
@@ -98,25 +100,45 @@ export function drawMusclesStyled(ctx: Ctx, ox: number, oy: number, pose: Pose, 
   // little tuft of hair (the arc on top of his head)
   st.line(ctx, [[cx - 7, cy - ry + 1], [cx - 1, cy - ry - 3.5], [cx + 6, cy - ry - 1.5]], seed + 5, 0.9);
 
-  // big round eyes
-  for (const [ex, ey, s] of [
-    [cx + 0.5, cy - 4, 1],
-    [cx + 8.5, cy - 4.5, 2],
-  ] as const) {
-    const er = hurt ? 4.2 : 3.8;
-    st.shape(ctx, ellipsePts(ex, ey, er, er * 1.1, 0, 24), MUSCLES.eye, seed + 6 + s, { lw: 0.75, plain: true });
+  if (hurt) {
+    // from the "hurt Big Muscles" sketch: one huge stunned eye with a dark
+    // black-eye ring, the other eye an X
+    const ex = cx + 0.5;
+    const ey = cy - 4;
+    st.shape(ctx, ellipsePts(ex, ey, 6, 6.6, 0, 28), { base: '#3a2a3a', shade: '#241a24', light: '#5a465a' }, seed + 6, { lw: 0.7, plain: true });
+    st.shape(ctx, ellipsePts(ex, ey, 4.2, 4.7, 0, 24), MUSCLES.eye, seed + 7, { lw: 0.6, plain: true });
     ctx.fillStyle = st.ink;
     ctx.beginPath();
-    ctx.ellipse(ex + 1, ey + 0.4, hurt ? 0.8 : 1.2, hurt ? 0.8 : 1.4, 0, 0, Math.PI * 2);
+    ctx.ellipse(ex + 0.3, ey + 0.3, 0.9, 1.1, 0, 0, Math.PI * 2);
     ctx.fill();
+    const xx = cx + 10;
+    const xy = cy - 5;
+    st.line(ctx, [[xx - 2.8, xy - 2.8], [xx + 2.8, xy + 2.8]], seed + 8, 0.95);
+    st.line(ctx, [[xx + 2.8, xy - 2.8], [xx - 2.8, xy + 2.8]], seed + 18, 0.95);
+  } else {
+    // big round eyes
+    for (const [ex, ey, s] of [
+      [cx + 0.5, cy - 4, 1],
+      [cx + 8.5, cy - 4.5, 2],
+    ] as const) {
+      st.shape(ctx, ellipsePts(ex, ey, 3.8, 4.2, 0, 24), MUSCLES.eye, seed + 6 + s, { lw: 0.75, plain: true });
+      ctx.fillStyle = st.ink;
+      ctx.beginPath();
+      ctx.ellipse(ex + 1, ey + 0.4, 1.2, 1.4, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   // huge open grin (a "D" turned on its side), or an "O" when hurt
   const mx = cx + 3.5;
   const my = cy + 4;
   let mouth: Pt[];
-  if (hurt) mouth = ellipsePts(mx, my + 1, 3.6, 4.2, 0, 24);
-  else {
+  if (hurt) {
+    // wobbly open grimace
+    mouth = [];
+    for (let i = 0; i <= 8; i++) mouth.push([mx - 5 + i * 1.25, my + 1 + (i % 2 ? -0.9 : 0.6)]);
+    for (let i = 8; i >= 0; i--) mouth.push([mx - 5 + i * 1.25, my + 5.5 + Math.sin((i / 8) * Math.PI) * 1.2]);
+  } else {
     mouth = [[mx - 6, my - 1.2]];
     for (let i = 0; i <= 14; i++) {
       const a = (i / 14) * Math.PI;
@@ -125,7 +147,10 @@ export function drawMusclesStyled(ctx: Ctx, ox: number, oy: number, pose: Pose, 
     mouth.push([mx + 6, my - 1.2]);
   }
   st.shape(ctx, mouth, MUSCLES.mouth, seed + 9, { lw: 0.85, plain: true });
-  if (!hurt) {
+  if (hurt) {
+    // tongue hanging out
+    st.shape(ctx, roundRectPts(mx - 1.6, my + 4.6, 3.6, 6.5, 1.8), { base: '#ef6f86', shade: '#c94a62', light: '#ffa3b4' }, seed + 15, { lw: 0.7 });
+  } else {
     // tongue peeking at the bottom of the grin
     ctx.save();
     ctx.beginPath();
@@ -135,7 +160,16 @@ export function drawMusclesStyled(ctx: Ctx, ox: number, oy: number, pose: Pose, 
     ctx.restore();
   }
 
-  leg(5, legR, liftR, MUSCLES.body, seed + 10);
+  if (hurt) {
+    // front arm flung out, bazooka dropped for a moment
+    const arm1: [Pt, Pt, Pt] = [[cx + rx - 0.5, cy + 6], [cx + rx + 5.5, cy + 4], [cx + rx + 10.5, cy + 2]];
+    arm(ctx, st, arm1, [3.8, 4.2, 3.3], MUSCLES.body, seed + 14);
+    // red ouch marks on the arm and leg, like the drawing
+    const ouch: Fill = { base: '#e8463f', shade: '#b8302b', light: '#ff8a80' };
+    for (const [x, y, l] of [[cx + rx + 4.5, cy + 6, 4.5], [cx + rx + 8, cy + 4.5, 3.5], [cx + 6.5, ground - 10, 4]] as const)
+      st.shape(ctx, petalPts(x, y, l, 2.4, Math.PI / 2), ouch, seed + 30 + x, { lw: 0.5, plain: true });
+    return;
+  }
 
   // the big bazooka (heavy hitter)
   const by = cy + ry - 1;

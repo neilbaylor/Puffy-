@@ -61,7 +61,7 @@ for i, (sid, name, blurb, pro, con) in enumerate(LOOKS):
 b64 = lambda f: base64.b64encode((sk / f).read_bytes()).decode()
 (sk / 'look-development.html').write_text(
     ltpl.replace('__CARDS__', '\n'.join(lcards)).replace('__SKETCH1__', b64('puffy-sketch-1.jpg')).replace('__SKETCH2__', b64('puffy-sketch-2.jpg'))
-    .replace('__SKETCH3__', b64('baddie-sketch-1.jpg')).replace('__SKETCH4__', b64('baddie-sketch-2.jpg')).replace('__SKETCH5__', b64('giant-sketch.jpg')).replace('__SKETCH6__', b64('scruffy-sketch.jpg')).replace('__SKETCH7__', b64('muscles-sketch.jpg'))
+    .replace('__SKETCH3__', b64('baddie-sketch-1.jpg')).replace('__SKETCH4__', b64('baddie-sketch-2.jpg')).replace('__SKETCH5__', b64('giant-sketch.jpg')).replace('__SKETCH6__', b64('scruffy-sketch.jpg')).replace('__SKETCH7__', b64('muscles-sketch.jpg')).replace('__SKETCH8__', b64('muscles-hurt-sketch.jpg'))
     .replace('__JS__', ljs.replace('</script', '<\\/script')))
 
 # ── single-page game ──
