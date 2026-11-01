@@ -1,0 +1,52 @@
+# Puffy (working title)
+
+A 2D side-scrolling platformer for the browser, designed mainly for phones (landscape).
+Pick one of 3 heroes, run right, jump, and blast enemies with a bazooka. 1 to 3 players.
+
+Built with [Phaser 3](https://phaser.io) (WebGL with Canvas fallback) + TypeScript + Vite.
+All art and sound are generated in code as placeholders until the real character sketches arrive.
+
+## Run it
+
+```bash
+npm install
+npm run dev          # http://localhost:5173 (also on your LAN, so you can open it on a phone)
+npm run build        # production build -> dist/
+npm run build:single # one self-contained HTML file -> dist-single/index.html
+```
+
+## Controls
+
+| | Phone (touch) | Keyboard A | Keyboard B | Keyboard C | Gamepad |
+|---|---|---|---|---|---|
+| Walk | Drag left thumb | A / D | ← / → | J / L | Stick / D-pad |
+| Run | Drag left thumb far | Shift | . | U | B / RT / full tilt |
+| Jump | JUMP button | W / Space | ↑ | I | A |
+| Fire | FIRE button (hold for auto-fire) | F | / | O | X |
+
+Pause: pause button, Esc or P.
+
+## Project layout
+
+```
+src/
+  config.ts              global tuning (tile size, view height, gravity, lives)
+  data/characters.ts     the 3 heroes and their stats
+  level/builder.ts       tiny level-authoring DSL (ground, pits, blocks, enemies...)
+  level/level1.ts        Level 1 "Sunny Hills"
+  gfx/draw.ts            placeholder hero drawing (shared by game + menus)
+  gfx/textures.ts        all placeholder textures + the world THEME colors
+  entities/              Player, Rocket, enemies, pickups
+  world/                 tilemap view, parallax background, particle FX
+  scenes/                Boot -> Menu (title/lobby backdrop) -> Game
+  input/                 keyboard / gamepad / touch sources (InputSource interface)
+  ui/                    DOM menus, HUD, touch controls, styles
+  sketches/              world concept sketches page
+```
+
+## Design notes
+
+- **Co-op camera:** the camera frames the whole group; screen edges hold players together.
+- **Lives:** a shared team pool. Fallen players respawn next to a living teammate, or at the last checkpoint.
+- **Online-ready input:** every player is driven by an `InputSource` returning 5 booleans
+  (`packInput` squeezes that into one byte), so network players can plug in later.

@@ -1,0 +1,111 @@
+/**
+ * Tiny WebAudio synth for placeholder sound effects — no audio files needed.
+ * Browsers only allow audio after a user gesture, so `unlockAudio()` is called
+ * from the first tap/click/key.
+ */
+let ctx: AudioContext | null = null;
+let master: GainNode | null = null;
+let muted = false;
+
+export function unlockAudio() {
+  if (!ctx) {
+    const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!AC) return;
+    ctx = new AC();
+    master = ctx.createGain();
+    master.gain.value = 0.5;
+    master.connect(ctx.destination);
+  }
+  if (ctx.state === 'suspended') void ctx.resume();
+}
+
+export function setMuted(m: boolean) {
+  muted = m;
+  if (master) master.gain.value = m ? 0 : 0.5;
+}
+export const isMuted = () => muted;
+
+interface ToneOpts {
+  type?: OscillatorType;
+  from: number;
+  to?: number;
+  dur: number;
+  vol?: number;
+  delay?: number;
+}
+
+function tone({ type = 'square', from, to = from, dur, vol = 0.2, delay = 0 }: ToneOpts) {
+  if (!ctx || !master || muted) return;
+  const t0 = ctx.currentTime + delay;
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(from, t0);
+  o.frequency.exponentialRampToValueAtTime(Math.max(1, to), t0 + dur);
+  g.gain.setValueAtTime(vol, t0);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g).connect(master);
+  o.start(t0);
+  o.stop(t0 + dur + 0.02);
+}
+
+let noiseBuf: AudioBuffer | null = null;
+function noise(dur: number, vol: number, filterFrom: number, filterTo: number, delay = 0) {
+  if (!ctx || !master || muted) return;
+  if (!noiseBuf) {
+    noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  const t0 = ctx.currentTime + delay;
+  const src = ctx.createBufferSource();
+  src.buffer = noiseBuf;
+  const f = ctx.createBiquadFilter();
+  f.type = 'lowpass';
+  f.frequency.setValueAtTime(filterFrom, t0);
+  f.frequency.exponentialRampToValueAtTime(filterTo, t0 + dur);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(vol, t0);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  src.connect(f).connect(g).connect(master);
+  src.start(t0);
+  src.stop(t0 + dur + 0.02);
+}
+
+export const sfx = {
+  jump: () => tone({ type: 'square', from: 280, to: 620, dur: 0.14, vol: 0.09 }),
+  shoot: () => {
+    noise(0.25, 0.35, 2400, 300);
+    tone({ type: 'sawtooth', from: 180, to: 60, dur: 0.18, vol: 0.12 });
+  },
+  explode: () => {
+    noise(0.6, 0.6, 1800, 80);
+    tone({ type: 'sine', from: 120, to: 35, dur: 0.45, vol: 0.4 });
+  },
+  coin: () => {
+    tone({ type: 'square', from: 988, dur: 0.07, vol: 0.07 });
+    tone({ type: 'square', from: 1319, dur: 0.22, vol: 0.07, delay: 0.07 });
+  },
+  stomp: () => {
+    tone({ type: 'square', from: 420, to: 120, dur: 0.12, vol: 0.14 });
+    noise(0.08, 0.15, 900, 200);
+  },
+  bump: () => tone({ type: 'triangle', from: 160, to: 90, dur: 0.1, vol: 0.25 }),
+  brick: () => noise(0.3, 0.4, 3000, 200),
+  hurt: () => {
+    tone({ type: 'square', from: 520, to: 140, dur: 0.3, vol: 0.12 });
+  },
+  die: () => {
+    tone({ type: 'square', from: 660, to: 330, dur: 0.15, vol: 0.1 });
+    tone({ type: 'square', from: 330, to: 80, dur: 0.5, vol: 0.1, delay: 0.15 });
+  },
+  powerup: () => [523, 659, 784, 1047].forEach((f, i) => tone({ type: 'square', from: f, dur: 0.09, vol: 0.07, delay: i * 0.07 })),
+  enemyShot: () => tone({ type: 'sawtooth', from: 300, to: 120, dur: 0.15, vol: 0.08 }),
+  checkpoint: () => [659, 784, 988].forEach((f, i) => tone({ type: 'triangle', from: f, dur: 0.14, vol: 0.18, delay: i * 0.09 })),
+  goal: () =>
+    [523, 659, 784, 1047, 784, 1047].forEach((f, i) =>
+      tone({ type: 'square', from: f, dur: 0.16, vol: 0.08, delay: i * 0.12 }),
+    ),
+  select: () => tone({ type: 'square', from: 660, to: 880, dur: 0.08, vol: 0.08 }),
+  back: () => tone({ type: 'square', from: 440, to: 300, dur: 0.08, vol: 0.08 }),
+};

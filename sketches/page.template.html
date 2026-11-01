@@ -1,0 +1,66 @@
+<title>Puffy World Sketches</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;800;900&display=swap">
+<style>
+/* Layout: one column of wide "postcards", each world a full-bleed sketch with notes underneath. Committed dark single theme, like the game's menus. */
+:root {
+  --ink: #1f1624;
+  --panel: #2a1e2e;
+  --line: #43334a;
+  --fg: #fff8ec;
+  --muted: #c9b9cf;
+  --gold: #ffc533;
+  --display: 'Lilita One', 'Arial Black', system-ui, sans-serif;
+  --body: 'Nunito', system-ui, -apple-system, sans-serif;
+  color-scheme: dark;
+}
+body { background: var(--ink); color: var(--fg); font-family: var(--body); font-size: 16px; line-height: 1.5; }
+.wrap { max-width: 1080px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 32px 64px; display: grid; gap: 40px; }
+header { display: grid; gap: 10px; }
+.eyebrow { font-weight: 900; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold); }
+h1 { margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(40px, 7vw, 72px); line-height: 0.95; text-wrap: balance; }
+h1 span { color: var(--gold); }
+.lede { margin: 0; max-width: 62ch; color: var(--muted); font-weight: 600; }
+figure { margin: 0; display: grid; gap: 14px; }
+.frame { border: 3px solid #000; border-radius: 18px; overflow: hidden; box-shadow: 0 8px 0 #000; background: #3fb4ff; }
+.frame img, .frame canvas { display: block; width: 100%; height: auto; max-width: 100%; }
+.now { display: grid; gap: 14px; padding: 18px; border-radius: 22px; background: var(--panel); border: 2px solid var(--line); }
+.now h2, .world h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(26px, 4vw, 36px); line-height: 1; }
+.tag { display: inline-block; vertical-align: middle; margin-left: 10px; padding: 3px 10px 2px; border-radius: 999px; font: 900 11px/1.4 var(--body); letter-spacing: 0.08em; text-transform: uppercase; background: var(--gold); color: var(--ink); }
+.worlds { display: grid; gap: 48px; }
+.world { display: grid; gap: 16px; }
+.meta { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.meta > * { min-width: 0; }
+.mood { margin: 6px 0 12px; color: var(--muted); font-weight: 600; }
+.swatches { display: flex; gap: 6px; }
+.swatches i { width: 28px; height: 28px; border-radius: 8px; border: 2px solid #000; }
+.facts { display: grid; gap: 10px; margin: 0; }
+.facts dt { font-weight: 900; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold); }
+.facts dd { margin: 0; color: var(--fg); font-weight: 600; }
+.facts ul { margin: 0; padding-left: 18px; }
+.num { font-family: var(--display); color: var(--muted); font-size: 18px; margin-right: 8px; }
+footer { padding: 20px; border-radius: 18px; border: 2px dashed var(--line); color: var(--muted); font-weight: 600; }
+footer b { color: var(--fg); }
+@media (max-width: 680px) { .meta { grid-template-columns: 1fr; gap: 14px; } .wrap { gap: 32px; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Puffy · concept pass 1</div>
+    <h1>World <span>sketches</span></h1>
+    <p class="lede">Five directions for the game's worlds, drawn with the three placeholder heroes. Each sketch is one slice of a level, showing the ground style, backdrop, hazards and enemy types. Sunny Hills is already playable as level 1.</p>
+  </header>
+
+  <section class="now">
+    <h2>Sunny Hills, in the game now <span class="tag">Playable</span></h2>
+    <figure class="frame"><img alt="Gameplay: two heroes in Sunny Hills, one blasting a brick wall with a bazooka" src="data:image/jpeg;base64,__INGAME__"></figure>
+  </section>
+
+  <div class="worlds">
+__WORLDS__
+  </div>
+
+  <footer><b>How to pick:</b> tell me which worlds you like (or mix them, e.g. "Frosty Peaks look with Cloud Kingdom platforms"). The game draws every tile, background and color from one theme table, so re-skinning a level is quick. These sketches use placeholder heroes until your character sketches arrive.</footer>
+</div>
+<script>__JS__</script>
