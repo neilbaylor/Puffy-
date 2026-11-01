@@ -32,6 +32,35 @@ for i, (wid, name, mood, pal, mech, en) in enumerate(worlds):
 html = tpl.replace('__WORLDS__', '\n'.join(cards)).replace('__INGAME__', img).replace('__JS__', js.replace('</script', '<\\/script'))
 (sk / 'world-sketches.html').write_text(html)
 
+# ── look development ──
+LOOKS = [
+    ('storybook', 'Crayon storybook', 'Closest to the original drawings: graphite pencil lines and crayon-colored fills with the paper showing through.',
+     'Feels like the drawings came to life', 'Busier texture; small details can get noisy on a phone'),
+    ('polished', 'Polished hand-drawn', 'Cleaner, rounder shapes with soft shading and a shine, but the lines still wobble and a fine crayon grain stays in the color.',
+     'Reads well at small sizes and still feels hand-made', 'Less of the original crayon charm'),
+    ('watercolor', 'Ink & watercolor', 'Loose brush-ink lines that swell and break, with watercolor washes bleeding a little past the lines.',
+     'Most artistic and distinctive', 'Softer edges; enemies and platforms can be harder to spot'),
+    ('sticker', 'Bold sticker', 'Chunky outlines and bright flat color with one hard shadow and a shine.',
+     'Most readable and punchy on a phone', 'Least hand-drawn; closer to a typical mobile game'),
+]
+ltpl = (sk / 'lookdev.template.html').read_text()
+ljs = (root / 'dist-lookdev/lookdev.js').read_text()
+lcards = []
+for i, (sid, name, blurb, pro, con) in enumerate(LOOKS):
+    tag = ' <span class="tag">In game now</span>' if sid == 'polished' else ''
+    lcards.append(f'''    <article class="opt" id="{sid}">
+      <div class="frame"><canvas data-scene="{sid}" width="1200" height="520" aria-label="Sunny Hills with Puffy in the {name} style"></canvas></div>
+      <div class="strip"><canvas data-poses="{sid}" width="1200" height="220" aria-label="Puffy poses in the {name} style: idle, run, run, jump, fall, puffed up"></canvas></div>
+      <div class="meta">
+        <div><h2><span class="letter">{'ABCD'[i]}</span>{name}{tag}</h2><p class="blurb">{blurb}</p></div>
+        <dl class="pc"><dt>Good</dt><dd>{pro}</dd><dt>Watch out</dt><dd>{con}</dd></dl>
+      </div>
+    </article>''')
+b64 = lambda f: base64.b64encode((sk / f).read_bytes()).decode()
+(sk / 'look-development.html').write_text(
+    ltpl.replace('__CARDS__', '\n'.join(lcards)).replace('__SKETCH1__', b64('puffy-sketch-1.jpg')).replace('__SKETCH2__', b64('puffy-sketch-2.jpg'))
+    .replace('__JS__', ljs.replace('</script', '<\\/script')))
+
 # ── single-page game ──
 s = (root / 'dist-single/index.html').read_text()
 head = s[s.index('<head>') + 6:s.rindex('</head>')]

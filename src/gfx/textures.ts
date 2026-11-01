@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { TILE } from '../config';
 import { CHARACTERS } from '../data/characters';
 import { TILE_COUNT, TILESET_COLS, T } from '../level/tiles';
-import { CHAR_H, CHAR_W, POSES, canvas, drawCharacter, ellipse, rng, roundRect, type Ctx } from './draw';
+import { ART_RES, CHAR_H, CHAR_W, POSES, canvas, drawCharacter, ellipse, rng, roundRect, type Ctx } from './draw';
 
 /**
  * Generates every placeholder texture at boot. When real art arrives, each
@@ -277,10 +277,12 @@ function makeTileset(scene: Phaser.Scene) {
 
 function makeCharacters(scene: Phaser.Scene) {
   for (const ch of CHARACTERS) {
-    const { c, ctx } = canvas(CHAR_W * POSES.length, CHAR_H);
+    const R = ART_RES;
+    const { c, ctx } = canvas(CHAR_W * POSES.length * R, CHAR_H * R);
+    ctx.scale(R, R);
     POSES.forEach((p, i) => drawCharacter(ctx, i * CHAR_W, 0, ch, p));
     addCanvas(scene, `char-${ch.id}`, c, (tex) =>
-      POSES.forEach((p, i) => tex.add(p, 0, i * CHAR_W, 0, CHAR_W, CHAR_H)),
+      POSES.forEach((p, i) => tex.add(p, 0, i * CHAR_W * R, 0, CHAR_W * R, CHAR_H * R)),
     );
   }
 }

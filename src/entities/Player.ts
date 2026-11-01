@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { DEPTH, MAX_FALL_SPEED } from '../config';
 import type { CharacterDef } from '../data/characters';
+import { ART_RES } from '../gfx/draw';
 import { sfx } from '../core/sfx';
 import { emptyInput, type InputSource, type InputState } from '../input/types';
 import type { GameScene } from '../scenes/GameScene';
@@ -12,6 +13,8 @@ const INVULN = 1.6;
 const RESPAWN_INVULN = 2.4;
 
 const HIT_W = 22;
+/** Character textures are hi-res; this maps them back to world size. */
+const S = 1 / ART_RES;
 const HIT_H = 34;
 
 export type PlayerState = 'alive' | 'dead' | 'waiting' | 'finished';
@@ -64,7 +67,7 @@ export class Player {
     this.body.setCollideWorldBounds(true);
     this.hitbox.setData('player', this);
 
-    this.view = scene.add.sprite(x, y, `char-${char.id}`, 'idle0').setOrigin(0.5, 1).setDepth(DEPTH.players + slot);
+    this.view = scene.add.sprite(x, y, `char-${char.id}`, 'idle0').setOrigin(0.5, 1).setScale(S).setDepth(DEPTH.players + slot);
     this.tag = scene.add
       .text(x, y, `P${slot + 1}`, {
         fontFamily: '"Lilita One", "Arial Black", sans-serif',
@@ -185,7 +188,7 @@ export class Player {
       const targetTilt = this.onGround ? (b.velocity.x / this.char.runSpeed) * 0.12 : (b.velocity.x / this.char.runSpeed) * 0.06;
       this.tilt += (targetTilt - this.tilt) * Math.min(1, dt * 12);
       this.view.setRotation(this.tilt);
-      this.view.setScale(this.squash.x, this.squash.y);
+      this.view.setScale(this.squash.x * S, this.squash.y * S);
 
       // frame selection
       let frame: string;
@@ -205,7 +208,7 @@ export class Player {
       // invulnerability flicker
       this.view.setAlpha(this.invulnerable ? (Math.floor(this.scene.time.now / 70) % 2 ? 0.35 : 1) : 1);
     }
-    this.tag.setPosition(this.view.x, this.view.y - 56 * this.view.scaleY);
+    this.tag.setPosition(this.view.x, this.view.y - 56 * this.view.scaleY * ART_RES);
     this.tag.setVisible(this.state === 'alive' && this.scene.players.length > 1);
   }
 
@@ -246,7 +249,7 @@ export class Player {
     this.body.setVelocity(0, 0);
     this.body.enable = false;
     sfx.die();
-    this.view.setFrame('hurt').setAlpha(1).setRotation(0).setScale(1);
+    this.view.setFrame('hurt').setAlpha(1).setRotation(0).setScale(S);
     if (!fell) {
       // classic hop-and-fall-off-screen
       this.view.setDepth(DEPTH.fx + 5);

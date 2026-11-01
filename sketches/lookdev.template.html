@@ -1,0 +1,69 @@
+<title>Puffy Look Development</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;800;900&display=swap">
+<style>
+/* Layout: four stacked style options, each = world scene + Puffy pose strip + notes. Committed dark single theme, matching the game menus. */
+:root {
+  --ink: #1f1624;
+  --panel: #2a1e2e;
+  --line: #43334a;
+  --fg: #fff8ec;
+  --muted: #c9b9cf;
+  --gold: #ffc533;
+  --display: 'Lilita One', 'Arial Black', system-ui, sans-serif;
+  --body: 'Nunito', system-ui, -apple-system, sans-serif;
+  color-scheme: dark;
+}
+body { background: var(--ink); color: var(--fg); font-family: var(--body); font-size: 16px; line-height: 1.5; }
+.wrap { max-width: 1080px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 32px 64px; display: grid; gap: 40px; }
+header { display: grid; gap: 10px; }
+.eyebrow { font-weight: 900; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold); }
+h1 { margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(40px, 7vw, 72px); line-height: 0.95; text-wrap: balance; }
+h1 span { color: var(--gold); }
+.lede { margin: 0; max-width: 64ch; color: var(--muted); font-weight: 600; }
+.sources { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.sources img { height: 120px; width: auto; border-radius: 10px; border: 2px solid var(--line); transform: rotate(-2deg); }
+.sources img + img { transform: rotate(2deg); }
+.sources p { margin: 0; flex: 1 1 220px; min-width: 0; color: var(--muted); font-weight: 600; font-size: 14px; }
+.options { display: grid; gap: 56px; }
+.opt { display: grid; gap: 12px; }
+.frame { border: 3px solid #000; border-radius: 18px; overflow: hidden; box-shadow: 0 8px 0 #000; }
+.frame canvas { display: block; width: 100%; height: auto; max-width: 100%; }
+.strip { border-radius: 12px; overflow: hidden; border: 2px solid var(--line); }
+.strip canvas { display: block; width: 100%; height: auto; }
+.meta { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.meta > * { min-width: 0; }
+h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(26px, 4vw, 36px); line-height: 1.05; }
+.letter { display: inline-grid; place-items: center; width: 1.25em; height: 1.25em; margin-right: 10px; border-radius: 10px; background: var(--gold); color: var(--ink); font-size: 0.8em; vertical-align: 0.08em; }
+.tag { display: inline-block; vertical-align: middle; margin-left: 8px; padding: 3px 10px 2px; border-radius: 999px; font: 900 11px/1.4 var(--body); letter-spacing: 0.08em; text-transform: uppercase; background: #3ddc84; color: var(--ink); }
+.blurb { margin: 8px 0 0; color: var(--muted); font-weight: 600; }
+.pc dt { font-weight: 900; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold); }
+.pc dd { margin: 2px 0 10px; font-weight: 600; }
+footer { padding: 20px; border-radius: 18px; border: 2px dashed var(--line); color: var(--muted); font-weight: 600; display: grid; gap: 8px; }
+footer b { color: var(--fg); }
+@media (max-width: 680px) { .meta { grid-template-columns: 1fr; gap: 10px; } .sources img { height: 90px; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Puffy · look development 1</div>
+    <h1>How should <span>Puffy</span> look?</h1>
+    <p class="lede">Four ways to draw Puffy and his world, all hand-drawn but with different amounts of polish. Every option uses the same drawing of Puffy from your sketches, only the line and color treatment changes, and the world beside him is drawn the same way.</p>
+  </header>
+  <div class="sources">
+    <img alt="Original sketch: Puffy running" src="data:image/jpeg;base64,__SKETCH1__">
+    <img alt="Original sketch: Puffy puffed up" src="data:image/jpeg;base64,__SKETCH2__">
+    <p>Drawn from these two sketches: the orange egg with one big eye, flappy arms and long legs, and the round, spiky puffed-up form (shown in the last pose of each strip, used when he gets hit).</p>
+  </div>
+
+  <div class="options">
+__CARDS__
+  </div>
+
+  <footer>
+    <div><b>How to pick:</b> tell me a letter, or mix them (for example "A's crayon color with B's shading"). The choice applies to everything: the three heroes, enemies, tiles, backgrounds and menus.</div>
+    <div><b>In the game right now:</b> option B, drawn at 3× resolution so it stays sharp on phone screens.</div>
+  </footer>
+</div>
+<script>__JS__</script>

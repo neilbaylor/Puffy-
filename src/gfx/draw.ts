@@ -3,6 +3,13 @@
  * so the same functions draw portraits in the DOM menus.
  */
 import type { CharacterDef } from '../data/characters';
+import { STYLES } from './handdrawn';
+import { drawPuffyStyled } from './puffy';
+
+/** Which hand-drawn look the game renders Puffy with (see the look-development page). */
+export const ART_STYLE = 'polished' as const;
+/** Character textures are drawn at this multiple of their in-world size, so they stay crisp when the camera zooms in. */
+export const ART_RES = 3;
 
 export type Ctx = CanvasRenderingContext2D;
 
@@ -65,7 +72,7 @@ export const CHAR_H = 56;
  */
 export function drawCharacter(ctx: Ctx, ox: number, oy: number, ch: CharacterDef, pose: Pose) {
   if (ch.id === 'puffy') {
-    drawPuffy(ctx, ox, oy, ch, pose);
+    drawPuffyStyled(ctx, ox, oy, pose, STYLES[ART_STYLE]);
     return;
   }
   const { main, shade, light, accent } = ch.colors;
@@ -232,230 +239,6 @@ export function drawCharacter(ctx: Ctx, ox: number, oy: number, ch: CharacterDef
   // grip + hand
   ellipse(ctx, cx + 4, by + 5, 4.2, 3.6, OUTLINE);
   ellipse(ctx, cx + 4, by + 4.6, 3.2, 2.7, light);
-}
-
-// ─────────────────────────────────────────────────────────────
-// Puffy — redrawn from the original pencil + crayon sketches:
-// an orange egg seen from the side, one big eye, little flappy arms,
-// thin legs with round feet. When hurt he puffs up round and spiky.
-// ─────────────────────────────────────────────────────────────
-
-const PENCIL = '#2f2a2e';
-
-/** Diagonal crayon strokes inside the current clip, like the coloring in the sketch. */
-function crayon(ctx: Ctx, x: number, y: number, w: number, h: number, seed: number, cols: string[]) {
-  const r = rng(seed);
-  ctx.lineCap = 'round';
-  for (let i = 0; i < 44; i++) {
-    const sx = x + r() * w;
-    const sy = y + r() * h;
-    ctx.strokeStyle = cols[Math.floor(r() * cols.length)];
-    ctx.lineWidth = 0.7 + r() * 1.1;
-    ctx.beginPath();
-    ctx.moveTo(sx - 3, sy + 7);
-    ctx.lineTo(sx + 4, sy - 8);
-    ctx.stroke();
-  }
-}
-
-function pencilEllipse(ctx: Ctx, x: number, y: number, rx: number, ry: number, rot: number, fill: string, lw = 1.8) {
-  ctx.beginPath();
-  ctx.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2);
-  ctx.fillStyle = fill;
-  ctx.fill();
-  ctx.strokeStyle = PENCIL;
-  ctx.lineWidth = lw;
-  ctx.stroke();
-}
-
-function puffyArm(ctx: Ctx, x: number, y: number, rot: number, fill: string) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(rot);
-  pencilEllipse(ctx, 6, 0, 7, 3.4, 0, fill, 1.6);
-  ctx.restore();
-}
-
-function drawPuffy(ctx: Ctx, ox: number, oy: number, ch: CharacterDef, pose: Pose) {
-  const { main, shade, light } = ch.colors;
-  const cx = ox + 27;
-  const ground = oy + CHAR_H - 2;
-
-  if (pose === 'hurt') {
-    drawPuffyPuffed(ctx, cx, ground, ch);
-    return;
-  }
-
-  // pose parameters
-  let legL = 0; // horizontal foot offsets
-  let legR = 0;
-  let liftL = 0;
-  let liftR = 0;
-  let bob = 0;
-  let armBack = -0.7; // arm rotations (radians), negative = raised
-  let armFront = 0.5;
-  let squashX = 1;
-  let squashY = 1;
-  if (pose === 'idle1') {
-    squashX = 1.03;
-    squashY = 0.97;
-    armBack = -0.55;
-    armFront = 0.62;
-  }
-  if (pose.startsWith('walk')) {
-    const f = +pose.slice(4);
-    const cyc = [
-      [7, -6, 0, 3],
-      [3, -2, 0, 0],
-      [-6, 7, 3, 0],
-      [-2, 3, 0, 0],
-    ][f];
-    [legL, legR, liftL, liftR] = cyc;
-    bob = f % 2 ? -1.5 : 0;
-    armBack = f < 2 ? -1.1 : -0.3;
-    armFront = f < 2 ? 0.1 : 0.8;
-  }
-  if (pose === 'jump') {
-    legL = -3;
-    legR = 5;
-    liftL = 6;
-    liftR = 3;
-    armBack = -1.5;
-    armFront = -0.7;
-    squashX = 0.95;
-    squashY = 1.05;
-  }
-  if (pose === 'fall') {
-    legL = -4;
-    legR = 6;
-    liftL = 3;
-    liftR = 6;
-    armBack = -1.9;
-    armFront = -1.2;
-  }
-
-  const rx = 13 * squashX;
-  const ry = 16.5 * squashY;
-  const hipY = ground - 15 + bob;
-  const cy = hipY - ry + 3;
-  const tilt = 0.12; // leaning forward, like he's on the move
-
-  // back arm (behind the body)
-  puffyArm(ctx, cx - 9, cy + 3, Math.PI + 0.2 - armBack, shade);
-
-  // legs: thin orange sticks with round feet
-  const leg = (hx: number, dx: number, lift: number, col: string) => {
-    const fx = cx + hx + dx;
-    const fy = ground - 4 - lift;
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = PENCIL;
-    ctx.lineWidth = 5;
-    ctx.beginPath();
-    ctx.moveTo(cx + hx, hipY - 2);
-    ctx.lineTo(fx, fy);
-    ctx.stroke();
-    ctx.strokeStyle = col;
-    ctx.lineWidth = 2.6;
-    ctx.beginPath();
-    ctx.moveTo(cx + hx, hipY - 2);
-    ctx.lineTo(fx, fy);
-    ctx.stroke();
-    pencilEllipse(ctx, fx + 1.5, fy, 5.5, 4.4, 0, col, 1.6);
-  };
-  leg(-5, legL, liftL, shade);
-
-  // body: crayon-shaded egg
-  ctx.save();
-  ctx.beginPath();
-  ctx.ellipse(cx, cy, rx, ry, tilt, 0, Math.PI * 2);
-  ctx.fillStyle = main;
-  ctx.fill();
-  ctx.clip();
-  crayon(ctx, cx - rx, cy - ry, rx * 2, ry * 2, 7, [shade + '77', light + '77', main]);
-  ellipse(ctx, cx - 5, cy - 9, 4, 2.5, '#ffffff55');
-  ctx.restore();
-  ctx.strokeStyle = PENCIL;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.ellipse(cx, cy, rx, ry, tilt, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // the big eye, seen from the side
-  pencilEllipse(ctx, cx + 4, cy - 6, 5.2, 6.8, tilt, '#ffffff', 1.7);
-  ellipse(ctx, cx + 7, cy - 5.5, 1.4, 4.6, PENCIL);
-
-  leg(5, legR, liftR, main);
-
-  // bazooka tucked under the front arm, low on the body so the egg + eye stay readable
-  const by = cy + 9;
-  const bx0 = cx - 11;
-  const bx1 = cx + 24;
-  roundRect(ctx, bx0 - 1, by - 4, bx1 - bx0 + 2, 8, 3, OUTLINE);
-  roundRect(ctx, bx0, by - 3, bx1 - bx0, 6, 2, '#4d6b55');
-  ctx.fillStyle = '#6f9479';
-  ctx.fillRect(bx0 + 2, by - 2.5, bx1 - bx0 - 4, 1.5);
-  roundRect(ctx, bx1 - 4, by - 5, 6, 10, 2, OUTLINE);
-  roundRect(ctx, bx1 - 3, by - 4, 4, 8, 1.5, '#39463d');
-  roundRect(ctx, bx0 - 3, by - 5, 4, 10, 2, OUTLINE);
-
-  // front arm, flapping over the bazooka
-  puffyArm(ctx, cx + 3, cy + 6, armFront, main);
-}
-
-/** Puffed-up Puffy: round, wide-eyed, with green spikes popping out (from the second sketch). */
-function drawPuffyPuffed(ctx: Ctx, cx: number, ground: number, ch: CharacterDef) {
-  const { main, shade, light, accent } = ch.colors;
-  const r = 16;
-  const cy = ground - r - 4;
-  // spikes (green teardrops pointing outwards)
-  for (let i = 0; i < 9; i++) {
-    const a = -Math.PI / 2 + (i - 4) * 0.42 + (i % 2 ? 0.08 : -0.05);
-    const d = r + 6;
-    ctx.save();
-    ctx.translate(cx + Math.cos(a) * d, cy + Math.sin(a) * d);
-    ctx.rotate(a + Math.PI / 2);
-    ctx.beginPath();
-    ctx.moveTo(0, -6);
-    ctx.quadraticCurveTo(4.5, 2, 0, 4);
-    ctx.quadraticCurveTo(-4.5, 2, 0, -6);
-    ctx.fillStyle = accent;
-    ctx.fill();
-    ctx.strokeStyle = PENCIL;
-    ctx.lineWidth = 1.4;
-    ctx.stroke();
-    ctx.restore();
-  }
-  // stubby feet + arms
-  pencilEllipse(ctx, cx - 7, ground - 3, 4.5, 3, 0, shade, 1.5);
-  pencilEllipse(ctx, cx + 8, ground - 3, 4.5, 3, 0, shade, 1.5);
-  puffyArm(ctx, cx - 14, cy, Math.PI + 0.6, shade);
-  // round body
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fillStyle = main;
-  ctx.fill();
-  ctx.clip();
-  crayon(ctx, cx - r, cy - r, r * 2, r * 2, 11, [shade + '77', light + '77', main]);
-  // a few spikes poking through the belly
-  for (const [dx, dy] of [[-2, 7], [5, 9], [1, 12]]) ellipse(ctx, cx + dx, cy + dy, 1.8, 3, accent);
-  ctx.restore();
-  ctx.strokeStyle = PENCIL;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.stroke();
-  // wide startled eyes + mouth
-  for (const ex of [cx - 3, cx + 7]) {
-    pencilEllipse(ctx, ex, cy - 5, 3.8, 4.4, 0, '#ffffff', 1.5);
-    ellipse(ctx, ex + 0.5, cy - 4.5, 1.2, 1.6, PENCIL);
-  }
-  ctx.strokeStyle = PENCIL;
-  ctx.lineWidth = 1.6;
-  ctx.beginPath();
-  ctx.moveTo(cx - 2, cy + 4);
-  ctx.lineTo(cx + 6, cy + 4);
-  ctx.stroke();
 }
 
 /** A portrait for menus. */
