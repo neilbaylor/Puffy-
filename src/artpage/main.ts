@@ -9,7 +9,7 @@ import { canvas, type Ctx, type Pose } from '../gfx/draw';
 import { STYLES, type Pt } from '../gfx/handdrawn';
 import { drawMusclesStyled } from '../gfx/muscles';
 import { drawNuggie, drawRootBeer } from '../gfx/collectibles';
-import { KING_FRAMES, drawArena, drawBackboard, drawBall, drawKing, drawRimBack, drawRimFront, HOOP, STAGE_OX, STAGE_OY } from '../gfx/hoops';
+import { KING_FRAMES, drawArena, drawArenaFront, drawCrowd, drawBackboard, drawBall, drawKing, drawRimBack, drawRimFront, HOOP, STAGE_OX, STAGE_OY } from '../gfx/hoops';
 import { drawPuffyStyled } from '../gfx/puffy';
 import { drawScruffyStyled } from '../gfx/scruffy';
 import {
@@ -216,6 +216,8 @@ async function paint() {
     const ctx = ar.getContext('2d')!;
     ctx.translate(-STAGE_OX, -STAGE_OY);
     drawArena(ctx);
+    drawCrowd(ctx);
+    drawArenaFront(ctx);
     ctx.translate(STAGE_OX, STAGE_OY);
     ctx.save();
     ctx.translate(HOOP.rimX, HOOP.rimY);

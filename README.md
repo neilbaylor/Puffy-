@@ -45,7 +45,7 @@ Pause: pause button, Esc or P.
 
 ```
 src/
-  config.ts              global tuning (tile size, view height, gravity, lives)
+  config.ts              global tuning (tile size, view height, gravity)
   data/characters.ts     the 3 heroes and their stats
   level/builder.ts       tiny level-authoring DSL (ground, pits, blocks, enemies...)
   level/level1.ts        Level 1 "Sunny Hills"
@@ -62,6 +62,9 @@ src/
 ## Design notes
 
 - **Co-op camera:** the camera frames the whole group; screen edges hold players together.
-- **Lives:** a shared team pool. Fallen players respawn next to a living teammate, or at the last checkpoint.
+- **Lives:** 4 tries per run. The HUD heart counts the spare ones (3 → 0); fainting restarts at the last
+  checkpoint, and fainting at 0 (or losing to King Puff Ball at 0) is game over: back to the start of the level.
+- **Aura:** eat floating nuggies for aura; a hit with aura costs your aura instead of a life.
+- **Music:** `Level_Clear` loops during play (it keeps going through checkpoint restarts); `Hoops_Arcade` plays in the palace.
 - **Online-ready input:** every player is driven by an `InputSource` returning 5 booleans
   (`packInput` squeezes that into one byte), so network players can plug in later.

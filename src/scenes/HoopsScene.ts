@@ -7,6 +7,8 @@ import { ART_RES, canvas } from '../gfx/draw';
 import {
   ARENA_H,
   ARENA_W,
+  CROWD_H,
+  FRONT_H,
   HOOP,
   KING_FRAMES,
   KING_H,
@@ -15,7 +17,9 @@ import {
   STAGE_OX,
   STAGE_OY,
   drawArena,
+  drawArenaFront,
   drawBackboard,
+  drawCameraFlash,
   drawBall,
   drawCrowd,
   drawKing,
@@ -26,7 +30,8 @@ import {
 import { addCanvas, hires } from '../gfx/textures';
 import { gamepadSources } from '../input/gamepad';
 import { isKeyDown } from '../input/keyboard';
-import type { GameData, ResultState } from './GameScene';
+import type { GameData, GameOverState, ResultState } from './GameScene';
+import { loseLife } from '../core/lives';
 
 export interface HoopsData {
   session: Session;
@@ -78,6 +83,12 @@ export class HoopsScene extends Phaser.Scene {
   private baseZoom = 1;
   private crowd!: Phaser.GameObjects.Image;
   private camFocus = { x: 800, y: 450, zoom: 1 };
+  private heroRefl!: Phaser.GameObjects.Sprite;
+  private kingRefl!: Phaser.GameObjects.Sprite;
+  /** Countdown (ms) to the next camera flash in the crowd. */
+  private flashIn = 300;
+  /** The crowd is on its feet until this clock time. */
+  private excitedUntil = 0;
 
   constructor() {
     super('Hoops');
@@ -109,7 +120,10 @@ export class HoopsScene extends Phaser.Scene {
       });
       addCanvas(this, 'king', c, (t) => KING_FRAMES.forEach((f, i) => t.add(f, 0, Math.round(i * KING_W * KING_RES), 0, Math.round(KING_W * KING_RES), Math.round(KING_H * KING_RES))));
     }
-    if (!this.textures.exists('crowd')) addCanvas(this, 'crowd', hires(ARENA_W, 420, ARENA_RES, (ctx) => drawCrowd(ctx)));
+    if (!this.textures.exists('crowd')) addCanvas(this, 'crowd', hires(ARENA_W, CROWD_H, ARENA_RES, (ctx) => drawCrowd(ctx, false)));
+    if (!this.textures.exists('crowd2')) addCanvas(this, 'crowd2', hires(ARENA_W, CROWD_H, ARENA_RES, (ctx) => drawCrowd(ctx, true)));
+    if (!this.textures.exists('arenafront')) addCanvas(this, 'arenafront', hires(ARENA_W, FRONT_H, ARENA_RES, (ctx) => drawArenaFront(ctx)));
+    if (!this.textures.exists('camflash')) addCanvas(this, 'camflash', hires(48, 48, 1, (ctx) => drawCameraFlash(ctx, 24)));
     if (!this.textures.exists('hball')) addCanvas(this, 'hball', hires(52, 52, 3, (ctx) => drawBall(ctx, 26, 26, 24)));
     if (!this.textures.exists('backboard')) {
       // drawn in stage coordinates around the hoop, then cropped
@@ -139,8 +153,11 @@ export class HoopsScene extends Phaser.Scene {
 
     this.add.image(0, 0, 'arena').setOrigin(0, 0).setScale(1 / ARENA_RES).setDepth(0);
     this.crowd = this.add.image(0, 0, 'crowd').setOrigin(0, 0).setScale(1 / ARENA_RES).setDepth(1);
+    this.add.image(0, 0, 'arenafront').setOrigin(0, 0).setScale(1 / ARENA_RES).setDepth(2);
     // the crowd sways a little all the time
-    this.tweens.add({ targets: this.crowd, y: 2, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.tweens.add({ targets: this.crowd, y: 1.2, duration: 800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.flashIn = 300;
+    this.excitedUntil = 0;
 
     const bb = A(HOOP.rimX, HOOP.rimY);
     this.add.image(bb.x, bb.y, 'backboard').setOrigin(0.5, 220 / 420).setScale(0.5).setDepth(5);
@@ -148,7 +165,7 @@ export class HoopsScene extends Phaser.Scene {
     // spotlights
     for (const sp of [SPOTS.hero, SPOTS.king]) {
       const p = A(sp.x, sp.y);
-      const l = this.add.image(p.x, p.y + 20, 'spot').setOrigin(0.5, 1).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.55).setDepth(3);
+      const l = this.add.image(p.x, p.y + 20, 'spot').setOrigin(0.5, 1).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.45).setDepth(3);
       this.tweens.add({ targets: l, angle: { from: -4, to: 4 }, yoyo: true, repeat: -1, duration: 2200, ease: 'Sine.easeInOut' });
     }
 
@@ -160,11 +177,14 @@ export class HoopsScene extends Phaser.Scene {
     this.heroScale = (2.6 / ART_RES) * ch.scale;
     this.hero = this.add.sprite(hp.x, hp.y + 4, `char-${ch.id}`, 'idle0').setOrigin(0.5, 1).setScale(this.heroScale).setDepth(8);
     this.king = this.add.sprite(kp.x, kp.y + 6, 'king', 'idle0').setOrigin(0.5, 1).setScale(1.45 / KING_RES).setDepth(8);
+    // faint mirror images in the glossy floor
+    this.heroRefl = this.add.sprite(0, 0, `char-${ch.id}`, 'idle0').setOrigin(0.5, 1).setFlipY(true).setAlpha(0.16).setDepth(4);
+    this.kingRefl = this.add.sprite(0, 0, 'king', 'idle0').setOrigin(0.5, 1).setFlipY(true).setAlpha(0.16).setDepth(4);
 
     // ball + its shadow on the floor
     this.ballShadow = this.add.ellipse(0, 0, 40, 10, 0x000000, 0.28).setDepth(6).setVisible(false);
     this.ball = this.add.image(0, 0, 'hball').setScale(1 / 3).setDepth(9).setVisible(false);
-    this.net = this.add.image(bb.x, bb.y, 'netf', 'n0').setOrigin(0.25, 16 / 100).setScale(0.5).setDepth(10);
+    this.net = this.add.image(bb.x, bb.y, 'netf', 'n0').setOrigin(0.5, 16 / 100).setScale(0.5).setDepth(10);
 
     this.dom = document.createElement('div');
     this.dom.className = 'hoops';
@@ -274,6 +294,18 @@ export class HoopsScene extends Phaser.Scene {
     this.king.setFrame(k.frames[Math.floor((this.clock / 1000) * k.fps) % k.frames.length]);
     const h = this.heroAnim;
     this.hero.setFrame(h.frames[Math.floor((this.clock / 1000) * h.fps) % h.frames.length]);
+    this.mirror(this.heroRefl, this.hero);
+    this.mirror(this.kingRefl, this.king);
+
+    // the crowd: on its feet after a basket, and camera flashes popping all the time
+    const excited = this.clock < this.excitedUntil;
+    const want = excited && Math.floor(this.clock / 170) % 3 !== 2 ? 'crowd2' : 'crowd';
+    if (this.crowd.texture.key !== want) this.crowd.setTexture(want);
+    this.flashIn -= dt;
+    if (this.flashIn <= 0) {
+      this.flashIn = excited ? 25 + Math.random() * 60 : 140 + Math.random() * 420;
+      this.cameraFlash();
+    }
 
     // meters
     if (this.meter) {
@@ -567,10 +599,35 @@ export class HoopsScene extends Phaser.Scene {
     this.ballShadow.setVisible(false);
   }
 
+  /** Keep a floor reflection in step with its sprite. */
+  private mirror(r: Phaser.GameObjects.Sprite, src: Phaser.GameObjects.Sprite) {
+    r.setVisible(src.visible);
+    r.setFrame(src.frame.name);
+    r.setScale(src.scaleX, src.scaleY * 0.8);
+    r.setFlipX(src.flipX);
+    r.setPosition(src.x, src.y - 2);
+    r.setOrigin(0.5, 0);
+    r.setRotation(-src.rotation);
+  }
+
+  /** A camera flash somewhere in the stands. */
+  private cameraFlash() {
+    const lower = Math.random() < 0.55;
+    const x = Math.random() * ARENA_W;
+    const y = lower ? 250 + Math.random() * 130 : 50 + Math.random() * 150;
+    const f = this.add
+      .image(x, y, 'camflash')
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setScale((lower ? 0.55 : 0.32) * (0.7 + Math.random() * 0.6))
+      .setDepth(1.5);
+    this.tweens.add({ targets: f, alpha: 0, duration: 110 + Math.random() * 90, ease: 'Quad.easeIn', onComplete: () => f.destroy() });
+  }
+
   private cheer(k = 1) {
     sfx.cheer();
+    this.excitedUntil = this.clock + 1700 * k;
     // the whole crowd jumps
-    this.tweens.add({ targets: this.crowd, y: -9 * k, duration: 140, yoyo: true, repeat: Math.round(3 * k), ease: 'Quad.easeOut' });
+    this.tweens.add({ targets: this.crowd, y: -4 * k, duration: 150, yoyo: true, repeat: Math.round(3 * k), ease: 'Quad.easeOut' });
     const cam = this.cameras.main;
     cam.shake(150 * k, 0.003 * k);
     // confetti
@@ -617,10 +674,17 @@ export class HoopsScene extends Phaser.Scene {
     await this.callout('“HA HA HA HA!”', 'speech', 1600);
     sfx.laugh();
     this.camFocus = { x: 800, y: 450, zoom: 1 };
-    await this.callout(`KING PUFF BALL WINS<small>${this.total('king')} – ${this.total('you')} · back to your last checkpoint</small>`, 'title bad', 2400);
+    const hadLife = loseLife();
+    const next = hadLife ? 'back to your last checkpoint' : 'no lives left';
+    await this.callout(`KING PUFF BALL WINS<small>${this.total('king')} – ${this.total('you')} · ${next}</small>`, 'title bad', 2400);
     fadeOutMusic(500);
+    if (!hadLife) {
+      const ch = characterById(this.hd.charId);
+      this.game.events.emit('game-over', { charId: ch.id, name: ch.name, checkpoint: this.hd.checkpoint } satisfies GameOverState);
+      return;
+    }
     this.cameras.main.fadeOut(400, 20, 10, 38);
     await this.wait(450);
-    this.scene.start('Game', { session: this.hd.session, checkpoint: this.hd.checkpoint } satisfies GameData);
+    this.scene.start('Game', { session: this.hd.session, checkpoint: this.hd.checkpoint, retry: true } satisfies GameData);
   }
 }

@@ -4,8 +4,8 @@
  * Palace drawn in a pseudo-3D perspective. Bolder, glossier and darker than
  * the platforming world so the finale feels like a different place.
  */
-import { rng, type Ctx } from './draw';
-import { STYLES, ellipsePts, paddlePts, roundRectPts, trace, type Fill, type Pt } from './handdrawn';
+import { canvas, rng, type Ctx } from './draw';
+import { STYLES, ellipsePts, paddlePts, trace, type Fill, type Pt } from './handdrawn';
 import { fluffPts } from './baddies';
 
 const st = () => STYLES.polished;
@@ -152,6 +152,87 @@ export function drawBall(ctx: Ctx, cx: number, cy: number, r: number, spin = 0) 
   }
   ctx.restore();
 }
+// ───────────────────────────── shared helpers ──
+
+function poly(ctx: Ctx, pts: Pt[]) {
+  ctx.beginPath();
+  pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+  ctx.closePath();
+}
+
+function seg(ctx: Ctx, a: Pt, b: Pt) {
+  ctx.beginPath();
+  ctx.moveTo(a[0], a[1]);
+  ctx.lineTo(b[0], b[1]);
+  ctx.stroke();
+}
+
+function hexRgb(h: string): [number, number, number] {
+  const n = parseInt(h.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+/** A colour under arena lighting: k = 1 is fully lit, lower sinks toward the dark of the stands. */
+function lit(h: string, k: number, a = 1, desat = 0) {
+  let [r, g, b] = hexRgb(h);
+  if (desat) {
+    const l = r * 0.3 + g * 0.59 + b * 0.11;
+    r += (l - r) * desat;
+    g += (l - g) * desat;
+    b += (l - b) * desat;
+  }
+  const m = (c: number, t: number) => Math.max(0, Math.min(255, Math.round(t + (c - t) * k)));
+  return `rgba(${m(r, 9)},${m(g, 6)},${m(b, 20)},${a})`;
+}
+
+const DISPLAY_FONT = '"Lilita One", "Arial Black", sans-serif';
+
+// ───────────────────────────── camera + court geometry ──
+
+/** Floor horizon (where the court meets the courtside boards) and vanishing point, stage coordinates. */
+const HORIZON = 330;
+const VPX = 860;
+const VPY = 120;
+/** A pinhole camera over the court (feet): projection scale, height term and distance from the baseline. */
+const CAM_F = 595;
+const CAM_H = 9913;
+const CAM_D = 39.65;
+/** Court point (u = feet across, 0 under the hoop; v = feet out from the baseline) → stage. */
+function P(u: number, v: number): Pt {
+  const z = CAM_D - v;
+  return [VPX + (u * CAM_F) / z, VPY + CAM_H / z];
+}
+
+type UV = [number, number];
+
+/** A painted court line `w` feet wide along floor points, in true perspective. */
+function courtLine(ctx: Ctx, pts: UV[], w = 0.2) {
+  const left: Pt[] = [];
+  const right: Pt[] = [];
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[Math.max(0, i - 1)];
+    const b = pts[Math.min(pts.length - 1, i + 1)];
+    let du = b[0] - a[0];
+    let dv = b[1] - a[1];
+    const l = Math.hypot(du, dv) || 1;
+    du /= l;
+    dv /= l;
+    const [u, v] = pts[i];
+    left.push(P(u - (dv * w) / 2, v + (du * w) / 2));
+    right.push(P(u + (dv * w) / 2, v - (du * w) / 2));
+  }
+  poly(ctx, [...left, ...right.reverse()]);
+  ctx.fill();
+}
+
+function arcUV(cu: number, cv: number, r: number, a0: number, a1: number, n = 48): UV[] {
+  const out: UV[] = [];
+  for (let i = 0; i <= n; i++) {
+    const a = a0 + ((a1 - a0) * i) / n;
+    out.push([cu + Math.cos(a) * r, cv + Math.sin(a) * r]);
+  }
+  return out;
+}
 
 // ───────────────────────────── hoop ──
 
@@ -161,19 +242,16 @@ export const HOOP = {
   rimY: 250,
   rimRX: 44,
   rimRY: 11,
-  /** Where the pole meets the floor. */
+  /** Where the ball lands on the floor under the hoop. */
   baseY: 420,
   /** Backboard scale. */
   k: 1.3,
 };
 
-/** Backboard + pole (drawn behind everything at the hoop). */
+/** Stanchion + glass backboard + shot clock (drawn behind everything at the hoop). */
 export function drawBackboard(ctx: Ctx) {
-  const S = st();
-  const { rimX: x, rimY: y, baseY } = HOOP;
-  // pole (unscaled), then the board scaled around the rim
-  S.shape(ctx, roundRectPts(x - 7, y, 14, baseY - y, 4), { base: '#2c2c3a', shade: '#16161f', light: '#5a5a70' }, 1700, { lw: 1 });
-  S.shape(ctx, ellipsePts(x, baseY, 32, 9, 0, 24), { base: '#3a3a4c', shade: '#22222e', light: '#5a5a70' }, 1701, { lw: 1 });
+  const { rimX: x, rimY: y } = HOOP;
+  drawStanchion(ctx, x);
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(HOOP.k, HOOP.k);
@@ -182,83 +260,223 @@ export function drawBackboard(ctx: Ctx) {
   ctx.restore();
 }
 
-function drawBoard(ctx: Ctx, x: number, y: number) {
-  const S = st();
-  // the red rounded backboard (like the sketch): flat bottom, dome top
-  const bb: Pt[] = [];
-  const w = 78;
-  const top = y - 118;
-  const bottom = y - 10;
-  bb.push([x - w, bottom]);
-  for (let i = 0; i <= 20; i++) {
-    const a = Math.PI + (i / 20) * Math.PI;
-    bb.push([x + Math.cos(a) * w, top + 40 + Math.sin(a) * 52]);
-  }
-  bb.push([x + w, bottom]);
-  S.shape(ctx, bb, { base: '#e8463f', shade: '#a82a26', light: '#ff8f84' }, 1702, { lw: 1.6, light: [x - 30, top + 20] });
-  // black target square over the rim (the scribbled black patch in the sketch)
-  S.shape(ctx, roundRectPts(x - 26, y - 64, 52, 50, 6), { base: '#1d1d26', shade: '#0d0d12', light: '#3a3a4a' }, 1703, { lw: 1.2 });
-  S.shape(ctx, roundRectPts(x - 20, y - 58, 40, 38, 4), { base: '#e8463f', shade: '#a82a26', light: '#ff8f84' }, 1704, { lw: 0.9, plain: true });
+/** The padded stanchion base behind the baseline, and its post up to the board. */
+function drawStanchion(ctx: Ctx, x: number) {
+  const [, fy] = P(0, -1.5); // front edge on the floor
+  const [, by] = P(0, -8); // back edge
+  const fw = 3 * (CAM_F / (CAM_D + 1.5));
+  const bw = 3 * (CAM_F / (CAM_D + 8));
+  const fh = 3.6 * (CAM_F / (CAM_D + 1.5));
+  const bh = 3.6 * (CAM_F / (CAM_D + 8));
+  // contact shadow
+  const sh = ctx.createRadialGradient(x, fy, 4, x, fy, fw * 1.6);
+  sh.addColorStop(0, 'rgba(0,0,0,0.45)');
+  sh.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.save();
+  ctx.translate(0, fy);
+  ctx.scale(1, 0.18);
+  ctx.fillStyle = sh;
+  ctx.fillRect(x - fw * 1.7, -fw * 1.7, fw * 3.4, fw * 3.4);
+  ctx.restore();
+  // post (mostly hidden behind the board)
+  const post = ctx.createLinearGradient(x - 11, 0, x + 11, 0);
+  post.addColorStop(0, '#4a4658');
+  post.addColorStop(0.35, '#2a2734');
+  post.addColorStop(1, '#141219');
+  ctx.fillStyle = post;
+  ctx.fillRect(x - 11, HOOP.rimY - 10, 22, by - bh - (HOOP.rimY - 10) + 14);
+  // padded box: top face then front face
+  const top = ctx.createLinearGradient(0, by - bh, 0, fy - fh);
+  top.addColorStop(0, '#2a2440');
+  top.addColorStop(1, '#3b3358');
+  ctx.fillStyle = top;
+  poly(ctx, [
+    [x - bw, by - bh],
+    [x + bw, by - bh],
+    [x + fw, fy - fh],
+    [x - fw, fy - fh],
+  ]);
+  ctx.fill();
+  const front = ctx.createLinearGradient(0, fy - fh, 0, fy);
+  front.addColorStop(0, '#24203a');
+  front.addColorStop(1, '#0f0d1a');
+  ctx.fillStyle = front;
+  ctx.beginPath();
+  ctx.roundRect(x - fw, fy - fh, fw * 2, fh, [3, 3, 1, 1]);
+  ctx.fill();
+  // stitched padding seams + top edge highlight
+  ctx.strokeStyle = 'rgba(255,255,255,0.13)';
+  ctx.lineWidth = 1;
+  seg(ctx, [x - fw + 2, fy - fh + 1], [x + fw - 2, fy - fh + 1]);
+  ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+  for (const dx of [-fw / 3, fw / 3]) seg(ctx, [x + dx, fy - fh + 3], [x + dx, fy - 2]);
+  // gold crown logo on the pad
+  ctx.fillStyle = '#e8b931';
+  const cy = fy - fh * 0.5;
+  poly(ctx, [
+    [x - 13, cy + 7],
+    [x - 14, cy - 6],
+    [x - 6, cy],
+    [x, cy - 10],
+    [x + 6, cy],
+    [x + 14, cy - 6],
+    [x + 13, cy + 7],
+  ]);
+  ctx.fill();
 }
+
+/** Glass backboard, unscaled units (the caller scales it by HOOP.k around the rim). */
+function drawBoard(ctx: Ctx, x: number, y: number) {
+  const W = 78;
+  const top = y - 85;
+  const bottom = y + 6;
+  // shot clock on top
+  ctx.fillStyle = '#1c1a24';
+  ctx.fillRect(x - 3, top - 6, 6, 6);
+  ctx.fillStyle = '#0c0b11';
+  ctx.beginPath();
+  ctx.roundRect(x - 22, top - 24, 44, 19, 3);
+  ctx.fill();
+  ctx.strokeStyle = '#34313f';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.save();
+  ctx.font = `400 15px ${DISPLAY_FONT}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = '#ff2020';
+  ctx.shadowBlur = 6;
+  ctx.fillStyle = '#ff3b2f';
+  ctx.fillText('24', x, top - 14);
+  ctx.restore();
+  // the glass (the crowd shows through it)
+  const glass = ctx.createLinearGradient(0, top, 0, bottom);
+  glass.addColorStop(0, 'rgba(205,228,255,0.20)');
+  glass.addColorStop(1, 'rgba(160,200,240,0.10)');
+  ctx.fillStyle = glass;
+  ctx.fillRect(x - W, top, W * 2, bottom - top);
+  // reflections across the glass
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x - W, top, W * 2, bottom - top);
+  ctx.clip();
+  ctx.fillStyle = 'rgba(255,255,255,0.16)';
+  poly(ctx, [
+    [x - W + 10, bottom],
+    [x - W + 36, bottom],
+    [x - W + 92, top],
+    [x - W + 66, top],
+  ]);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  poly(ctx, [
+    [x - W + 44, bottom],
+    [x - W + 52, bottom],
+    [x - W + 108, top],
+    [x - W + 100, top],
+  ]);
+  ctx.fill();
+  ctx.restore();
+  // frame: thin dark edge, white border
+  ctx.strokeStyle = '#121118';
+  ctx.lineWidth = 4.6;
+  ctx.strokeRect(x - W, top, W * 2, bottom - top);
+  ctx.strokeStyle = '#f7f7f4';
+  ctx.lineWidth = 2.6;
+  ctx.strokeRect(x - W + 0.8, top + 0.8, W * 2 - 1.6, bottom - top - 1.6);
+  // shooter's square
+  ctx.lineWidth = 2.2;
+  ctx.strokeRect(x - 26, y - 21, 52, 21);
+  // padding along the bottom and lower sides
+  ctx.fillStyle = '#16131f';
+  ctx.fillRect(x - W - 2.5, bottom - 1, W * 2 + 5, 5.5);
+  ctx.fillRect(x - W - 2.5, bottom - 24, 4.5, 24);
+  ctx.fillRect(x + W - 2, bottom - 24, 4.5, 24);
+  ctx.fillStyle = 'rgba(255,255,255,0.12)';
+  ctx.fillRect(x - W - 2.5, bottom - 1, W * 2 + 5, 1);
+  // rim mount
+  const mount = ctx.createLinearGradient(x - 9, 0, x + 9, 0);
+  mount.addColorStop(0, '#c9ccd4');
+  mount.addColorStop(1, '#6d717c');
+  ctx.fillStyle = mount;
+  ctx.fillRect(x - 9, y - 9, 18, 11);
+}
+
+const RIM = '#e2531f';
+const RIM_DARK = '#7a2a10';
+const RIM_LIGHT = '#ffb48c';
 
 /** Back half of the rim (behind the ball). */
 export function drawRimBack(ctx: Ctx) {
   const { rimX: x, rimY: y, rimRX: rx, rimRY: ry } = HOOP;
-  ctx.strokeStyle = '#3a2418';
-  ctx.lineWidth = 6;
+  ctx.strokeStyle = RIM_DARK;
+  ctx.lineWidth = 5.2;
   ctx.beginPath();
   ctx.ellipse(x, y, rx, ry, 0, Math.PI, Math.PI * 2);
   ctx.stroke();
-  ctx.strokeStyle = '#ff7a2e';
-  ctx.lineWidth = 3.4;
+  ctx.strokeStyle = RIM;
+  ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.ellipse(x, y, rx, ry, 0, Math.PI, Math.PI * 2);
+  ctx.ellipse(x, y - 0.6, rx, ry, 0, Math.PI, Math.PI * 2);
   ctx.stroke();
 }
 
 /** Front half of the rim + the net, drawn into a canvas whose origin is the rim centre. `stretch` 0..1 swishes the net. */
 export function drawRimFront(ctx: Ctx, ox: number, oy: number, stretch = 0) {
   const { rimRX: rx, rimRY: ry } = HOOP;
-  // net
-  const depth = 42 + stretch * 16;
-  const bottomR = rx * (0.55 - stretch * 0.12);
-  ctx.strokeStyle = '#ffffffdd';
-  ctx.lineWidth = 1.6;
-  const n = 9;
-  for (let i = 0; i <= n; i++) {
-    const t = i / n;
-    const a = Math.PI * t;
-    const x0 = ox + Math.cos(a) * rx;
-    const y0 = oy + Math.sin(a) * ry;
-    const x1 = ox + Math.cos(a) * bottomR + (t - 0.5) * 4;
-    const y1 = oy + depth + Math.sin(a) * ry * 0.5;
-    ctx.beginPath();
-    ctx.moveTo(x0, y0);
-    ctx.quadraticCurveTo((x0 + x1) / 2 + (t - 0.5) * 6, (y0 + y1) / 2 + 4, x1, y1);
-    ctx.stroke();
-  }
-  for (let k = 1; k <= 3; k++) {
-    const yk = oy + (depth * k) / 3.4;
-    const rk = rx - (rx - bottomR) * (k / 3.4);
-    ctx.beginPath();
-    ctx.ellipse(ox, yk, rk, ry * (1 - k * 0.15), 0, 0, Math.PI);
-    ctx.stroke();
-  }
-  // rim front
-  ctx.strokeStyle = '#3a2418';
-  ctx.lineWidth = 6;
+  const depth = 40 + stretch * 16;
+  const bottomR = rx * (0.56 - stretch * 0.12);
+  const ROWS = 5;
+  const N = 16;
+  const ring = (k: number, i: number): Pt => {
+    const t = k / ROWS;
+    const r = rx + (bottomR - rx) * Math.pow(t, 0.85);
+    const a = ((i + (k % 2) * 0.5) / N) * Math.PI * 2;
+    const sway = stretch * Math.sin(a * 2) * 2;
+    return [ox + Math.cos(a) * r + sway, oy + depth * t + Math.sin(a) * ry * (1 - 0.4 * t)];
+  };
+  ctx.lineCap = 'round';
+  const strands = (front: boolean) => {
+    for (let k = 0; k < ROWS; k++) {
+      for (let i = 0; i < N; i++) {
+        const a = ring(k, i);
+        const nb = k % 2 ? [i, i + 1] : [i - 1, i];
+        for (const j of nb) {
+          const b = ring(k + 1, (j + N) % N);
+          const isFront = (a[1] - oy - (depth * k) / ROWS + (b[1] - oy - (depth * (k + 1)) / ROWS)) > 0;
+          if (isFront !== front) continue;
+          seg(ctx, a, b);
+        }
+      }
+    }
+  };
+  // back of the net, seen through the front
+  ctx.strokeStyle = 'rgba(200,200,205,0.55)';
+  ctx.lineWidth = 1.1;
+  strands(false);
+  // front of the net: soft shadow then white cord
+  ctx.strokeStyle = 'rgba(60,60,70,0.35)';
+  ctx.lineWidth = 2.2;
+  strands(true);
+  ctx.strokeStyle = '#fbfbf8';
+  ctx.lineWidth = 1.4;
+  strands(true);
+  // rim front: dark underside, orange steel, highlight
+  ctx.lineCap = 'butt';
+  ctx.strokeStyle = RIM_DARK;
+  ctx.lineWidth = 5.4;
   ctx.beginPath();
-  ctx.ellipse(ox, oy, rx, ry, 0, 0, Math.PI);
+  ctx.ellipse(ox, oy + 0.6, rx, ry, 0, 0, Math.PI);
   ctx.stroke();
-  ctx.strokeStyle = '#ff7a2e';
-  ctx.lineWidth = 3.4;
+  ctx.strokeStyle = RIM;
+  ctx.lineWidth = 3.2;
   ctx.beginPath();
-  ctx.ellipse(ox, oy, rx, ry, 0, 0, Math.PI);
+  ctx.ellipse(ox, oy - 0.4, rx, ry, 0, 0, Math.PI);
   ctx.stroke();
-  ctx.strokeStyle = '#ffc08a';
-  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = RIM_LIGHT;
+  ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.ellipse(ox, oy - 1, rx - 2, ry - 2, 0, 0.3, Math.PI - 0.3);
+  ctx.ellipse(ox, oy - 1.4, rx - 1, ry - 1, 0, 0.35, Math.PI - 0.35);
   ctx.stroke();
 }
 
@@ -268,10 +486,14 @@ export const ARENA_W = 1600;
 export const ARENA_H = 900;
 export const STAGE_OX = 160;
 export const STAGE_OY = 90;
-/** Floor horizon and vanishing point (stage coordinates). */
-const HORIZON = 330;
-const VPX = 860;
-const VPY = 120;
+/** The crowd + front layers cover the top of the arena down to just below the courtside boards. */
+export const CROWD_H = 420;
+export const FRONT_H = 432;
+
+const L = -STAGE_OX;
+const R = 1280 + STAGE_OX;
+const T = -STAGE_OY;
+const B = 720 + STAGE_OY;
 
 /** Shooting spots on the floor (stage coordinates, feet). */
 export const SPOTS = {
@@ -279,259 +501,704 @@ export const SPOTS = {
   king: { x: 1010, y: 650 },
 };
 
+// LED advertising (all made-up Puff Ball Planet brands)
+interface Ad {
+  text: string;
+  bg: string;
+  fg: string;
+}
+const ADS: Ad[] = [
+  { text: 'PUFF COLA', bg: '#c8102e', fg: '#ffffff' },
+  { text: 'NUGGIE KING', bg: '#ffc629', fg: '#4a1f05' },
+  { text: 'KING PUFF BALL PALACE', bg: '#3d1478', fg: '#ffd23f' },
+  { text: 'ROOT BEER · ICE COLD', bg: '#5a2a10', fg: '#ffe2b0' },
+  { text: 'PUFF BALL PLANET', bg: '#0b7c78', fg: '#eafffb' },
+];
+interface AdSeg {
+  x0: number;
+  x1: number;
+  ad: Ad;
+}
+function adSegments(w: number, start: number): AdSeg[] {
+  const out: AdSeg[] = [];
+  let i = start;
+  for (let x = L; x < R; x += w) out.push({ x0: x, x1: x + w, ad: ADS[i++ % ADS.length] });
+  return out;
+}
+/** Courtside LED boards along the baseline (also reflected in the floor). */
+const BOARD_Y0 = 297;
+const BOARD_Y1 = HORIZON + 1;
+const BOARD_SEGS = adSegments(262, 0);
+/** The LED ribbon between the upper and lower decks. */
+const RIBBON_Y0 = 114;
+const RIBBON_Y1 = 131;
+const RIBBON_SEGS = adSegments(318, 2);
+
+function ledBoard(ctx: Ctx, y0: number, y1: number, segs: AdSeg[], fontPx: number) {
+  ctx.fillStyle = '#060509';
+  ctx.fillRect(L, y0 - 3, R - L, y1 - y0 + 6);
+  for (const s of segs) {
+    // glow spilling past the board
+    ctx.save();
+    ctx.shadowColor = s.ad.bg;
+    ctx.shadowBlur = 16;
+    ctx.fillStyle = s.ad.bg;
+    ctx.fillRect(s.x0 + 1.5, y0, s.x1 - s.x0 - 3, y1 - y0);
+    ctx.restore();
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(s.x0 + 1.5, y0, s.x1 - s.x0 - 3, y1 - y0);
+    ctx.clip();
+    const sheen = ctx.createLinearGradient(0, y0, 0, y1);
+    sheen.addColorStop(0, 'rgba(255,255,255,0.22)');
+    sheen.addColorStop(0.5, 'rgba(255,255,255,0)');
+    sheen.addColorStop(1, 'rgba(0,0,0,0.18)');
+    ctx.fillStyle = sheen;
+    ctx.fillRect(s.x0, y0, s.x1 - s.x0, y1 - y0);
+    ctx.font = `400 ${fontPx}px ${DISPLAY_FONT}`;
+    const tw = ctx.measureText(s.ad.text).width;
+    const fit = Math.min(1, (s.x1 - s.x0 - 18) / tw);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.translate((s.x0 + s.x1) / 2, (y0 + y1) / 2 + 1);
+    ctx.scale(fit, 1);
+    ctx.shadowColor = s.ad.fg;
+    ctx.shadowBlur = 5;
+    ctx.fillStyle = s.ad.fg;
+    ctx.fillText(s.ad.text, 0, 0);
+    ctx.restore();
+    // LED pixel grid
+    ctx.fillStyle = 'rgba(0,0,0,0.17)';
+    for (let x = s.x0 + 1.5; x < s.x1 - 1.5; x += 2.6) ctx.fillRect(x, y0, 0.7, y1 - y0);
+    for (let y = y0; y < y1; y += 2.6) ctx.fillRect(s.x0 + 1.5, y, s.x1 - s.x0 - 3, 0.7);
+  }
+  ctx.fillStyle = 'rgba(255,255,255,0.10)';
+  ctx.fillRect(L, y0 - 3, R - L, 1);
+}
+
+/**
+ * The back of the arena: dark rafters with lights, empty tiers (the crowd is
+ * its own layer), and the hardwood court in true perspective.
+ */
 export function drawArena(ctx: Ctx) {
-  const S = st();
   ctx.save();
   ctx.translate(STAGE_OX, STAGE_OY);
-  const L = -STAGE_OX;
-  const R = 1280 + STAGE_OX;
-  const T = -STAGE_OY;
-  const B = 720 + STAGE_OY;
 
-  // back wall: deep royal purple with gold trim
-  const wall = ctx.createLinearGradient(0, T, 0, HORIZON);
-  wall.addColorStop(0, '#1c0f3a');
-  wall.addColorStop(0.6, '#3b1d6e');
-  wall.addColorStop(1, '#5a2b8f');
-  ctx.fillStyle = wall;
+  // the bowl: almost black up in the rafters, warmer toward the court
+  const bowl = ctx.createLinearGradient(0, T, 0, HORIZON);
+  bowl.addColorStop(0, '#030207');
+  bowl.addColorStop(0.3, '#0a0613');
+  bowl.addColorStop(0.65, '#170c27');
+  bowl.addColorStop(1, '#241238');
+  ctx.fillStyle = bowl;
   ctx.fillRect(L, T, R - L, HORIZON - T + 2);
 
-  // stands: tiered seating (the crowd itself is drawn separately so it can jump)
-  for (let row = 0; row < 6; row++) {
-    const y = 108 + row * 38;
-    ctx.fillStyle = row % 2 ? '#26124c' : '#2f1860';
-    ctx.fillRect(L, y, R - L, 38);
-    ctx.fillStyle = '#ffd23f33';
-    ctx.fillRect(L, y, R - L, 2);
+  // roof trusses
+  ctx.strokeStyle = 'rgba(80,72,104,0.35)';
+  ctx.lineWidth = 1.3;
+  for (const yy of [T + 6, T + 26]) seg(ctx, [L, yy], [R, yy]);
+  ctx.lineWidth = 0.9;
+  for (let x = L; x < R; x += 28) {
+    seg(ctx, [x, T + 6], [x + 14, T + 26]);
+    seg(ctx, [x + 14, T + 26], [x + 28, T + 6]);
   }
-
-  // banner: KING PUFF BALL PALACE with a crown
-  const bx = 460;
-  const by = 40;
-  S.shape(ctx, roundRectPts(bx - 230, by - 30, 460, 62, 14), { base: '#ffd23f', shade: '#d9a316', light: '#fff2a8' }, 1801, { lw: 1.8 });
-  S.shape(ctx, roundRectPts(bx - 220, by - 22, 440, 46, 10), { base: '#7a2ec2', shade: '#55208a', light: '#a46ae0' }, 1802, { lw: 1, plain: true });
-  ctx.font = '400 30px "Lilita One", "Arial Black", sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.lineWidth = 6;
-  ctx.strokeStyle = '#3a2418';
-  ctx.strokeText('KING PUFF BALL PALACE', bx, by + 2);
-  ctx.fillStyle = '#ffd23f';
-  ctx.fillText('KING PUFF BALL PALACE', bx, by + 2);
-  // hanging pennants
-  for (let i = 0; i < 14; i++) {
-    const px = L + 40 + i * 110;
-    const col = i % 2 ? '#ffd23f' : '#ff5a8a';
-    S.shape(ctx, [[px - 14, T + 2], [px + 14, T + 2], [px, T + 46]], { base: col, shade: col, light: '#ffffff' }, 1810 + i, { lw: 0.9, plain: true });
+  // arena lights hanging in the rafters
+  for (let x = L + 50; x < R; x += 165) {
+    const g = ctx.createRadialGradient(x, T + 30, 2, x, T + 30, 70);
+    g.addColorStop(0, 'rgba(255,246,222,0.55)');
+    g.addColorStop(0.25, 'rgba(255,240,210,0.16)');
+    g.addColorStop(1, 'rgba(255,240,210,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(x - 70, T - 40, 140, 140);
+    ctx.fillStyle = '#fffbea';
+    ctx.beginPath();
+    ctx.roundRect(x - 10, T + 26, 20, 7, 2);
+    ctx.fill();
   }
-  ctx.strokeStyle = '#ffd23f';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(L, T + 3);
-  ctx.lineTo(R, T + 3);
-  ctx.stroke();
+  // seating tiers behind the crowd
+  ctx.fillStyle = '#140a20';
+  ctx.fillRect(L, -58, R - L, 176);
+  ctx.fillStyle = '#21112f';
+  ctx.fillRect(L, 140, R - L, 160);
 
-  // floor: polished wood in perspective
+  drawFloor(ctx);
+  ctx.restore();
+}
+
+function drawFloor(ctx: Ctx) {
+  const r = rng(9031);
+  const VB = -8.2; // just behind the courtside boards
+  const VF = 26; // past the bottom of the screen
   ctx.save();
   ctx.beginPath();
   ctx.rect(L, HORIZON, R - L, B - HORIZON);
   ctx.clip();
-  const floor = ctx.createLinearGradient(0, HORIZON, 0, B);
-  floor.addColorStop(0, '#b8743c');
-  floor.addColorStop(1, '#e8a860');
-  ctx.fillStyle = floor;
+  ctx.fillStyle = '#c08347';
   ctx.fillRect(L, HORIZON, R - L, B - HORIZON);
-  // planks converging on the vanishing point
-  ctx.strokeStyle = '#8a4f22';
-  ctx.globalAlpha = 0.45;
-  ctx.lineWidth = 1.5;
-  for (let i = -30; i <= 30; i++) {
-    const bxp = VPX + i * 70;
-    ctx.beginPath();
-    ctx.moveTo(VPX + (bxp - VPX) * ((HORIZON - VPY) / (B - VPY)), HORIZON);
-    ctx.lineTo(bxp, B);
-    ctx.stroke();
-  }
-  // cross seams, spaced so they get denser toward the back
-  for (let k = 1; k < 18; k++) {
-    const t = Math.pow(k / 18, 1.9);
-    const y = HORIZON + (B - HORIZON) * t;
-    ctx.globalAlpha = 0.18;
-    ctx.beginPath();
-    ctx.moveTo(L, y);
-    ctx.lineTo(R, y);
-    ctx.stroke();
-  }
-  ctx.globalAlpha = 1;
-  // the key (paint) under the hoop in perspective, purple
-  const key: Pt[] = [
-    [VPX - 120, HORIZON + 40],
-    [VPX + 120, HORIZON + 40],
-    [VPX + 330, 600],
-    [VPX - 330, 600],
-  ];
-  ctx.fillStyle = '#7a2ec2cc';
-  ctx.beginPath();
-  key.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = '#fff8ec';
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.moveTo(key[0][0], key[0][1]);
-  ctx.lineTo(key[1][0], key[1][1]);
-  ctx.lineTo(key[2][0], key[2][1]);
-  ctx.lineTo(key[3][0], key[3][1]);
-  ctx.closePath();
-  ctx.stroke();
-  // free-throw circle
-  ctx.beginPath();
-  ctx.ellipse(VPX, 600, 330, 46, 0, 0, Math.PI * 2);
-  ctx.stroke();
-  // crown logo at centre court
-  ctx.globalAlpha = 0.35;
-  ctx.fillStyle = '#ffd23f';
-  ctx.beginPath();
-  ctx.moveTo(VPX - 70, 470);
-  ctx.lineTo(VPX - 64, 438);
-  ctx.lineTo(VPX - 30, 456);
-  ctx.lineTo(VPX, 430);
-  ctx.lineTo(VPX + 30, 456);
-  ctx.lineTo(VPX + 64, 438);
-  ctx.lineTo(VPX + 70, 470);
-  ctx.closePath();
-  ctx.fill();
-  ctx.globalAlpha = 1;
-  // floor shine
-  const shine = ctx.createRadialGradient(VPX, 560, 10, VPX, 560, 520);
-  shine.addColorStop(0, '#ffffff38');
-  shine.addColorStop(1, '#ffffff00');
-  ctx.fillStyle = shine;
-  ctx.fillRect(L, HORIZON, R - L, B - HORIZON);
-  ctx.restore();
 
-  // wall-floor edge
-  ctx.strokeStyle = '#ffd23f';
-  ctx.lineWidth = 5;
-  ctx.beginPath();
-  ctx.moveTo(L, HORIZON);
-  ctx.lineTo(R, HORIZON);
-  ctx.stroke();
-
-  // shooting spots
-  for (const sp of [SPOTS.hero, SPOTS.king]) {
-    ctx.fillStyle = '#ffffff55';
-    ctx.beginPath();
-    ctx.ellipse(sp.x, sp.y + 4, 70, 14, 0, 0, Math.PI * 2);
+  // maple planks running toward the hoop, each made of boards of slightly different tone
+  const tones = ['#c98c50', '#d19659', '#be8047', '#d7a165', '#c4874c', '#cc9256', '#b97b43', '#d39b5e'];
+  const PW = 0.75;
+  for (let u = -84; u < 48; u += PW) {
+    ctx.fillStyle = tones[Math.floor(r() * tones.length)];
+    poly(ctx, [P(u, VB), P(u + PW, VB), P(u + PW, VF), P(u, VF)]);
     ctx.fill();
-    ctx.strokeStyle = '#fff8ec';
-    ctx.lineWidth = 3;
-    ctx.stroke();
+    let v = VB - r() * 10;
+    while (v < VF) {
+      const len = 6 + r() * 10;
+      const a = Math.max(v, VB);
+      const b = Math.min(v + len, VF);
+      const dark = r() < 0.5;
+      const al = 0.04 + r() * 0.09;
+      if (b > a) {
+        ctx.fillStyle = dark ? `rgba(90,45,15,${al})` : `rgba(255,232,190,${al})`;
+        poly(ctx, [P(u, a), P(u + PW, a), P(u + PW, b), P(u, b)]);
+        ctx.fill();
+      }
+      if (v + len > VB && v + len < VF) {
+        ctx.strokeStyle = 'rgba(80,40,14,0.35)';
+        ctx.lineWidth = 0.7;
+        seg(ctx, P(u, v + len), P(u + PW, v + len));
+      }
+      v += len;
+    }
+    for (let g = 0; g < 2; g++) {
+      const gu = u + 0.12 + r() * (PW - 0.24);
+      const v0 = VB + r() * 28;
+      const v1 = Math.min(VF, v0 + 2 + r() * 8);
+      ctx.strokeStyle = `rgba(110,60,20,${0.07 + r() * 0.07})`;
+      ctx.lineWidth = 0.6;
+      seg(ctx, P(gu, v0), P(gu, v1));
+    }
   }
+  ctx.strokeStyle = 'rgba(85,42,14,0.3)';
+  ctx.lineWidth = 0.7;
+  for (let u = -84; u <= 48; u += PW) seg(ctx, P(u, VB), P(u, VF));
+
+  // out of bounds: royal purple paint over the wood (the grain still shows)
+  ctx.fillStyle = 'rgba(46,18,86,0.86)';
+  ctx.beginPath();
+  ctx.rect(L, HORIZON, R - L, B - HORIZON);
+  const court: Pt[] = [P(-25, 0), P(25, 0), P(25, VF), P(-25, VF)];
+  court.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+  ctx.closePath();
+  ctx.fill('evenodd');
+  // the lane
+  ctx.fillStyle = 'rgba(78,30,150,0.9)';
+  poly(ctx, [P(-8, 0), P(8, 0), P(8, 19), P(-8, 19)]);
+  ctx.fill();
+  // painted words behind the baseline, laid flat on the floor
+  const word = (text: string, u: number) => {
+    const [px, py] = P(u, -3.7);
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.scale(1, CAM_H / (CAM_F * (CAM_D + 3.7)));
+    ctx.font = `400 34px ${DISPLAY_FONT}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(255,210,63,0.85)';
+    ctx.fillText(text, 0, 0);
+    ctx.restore();
+  };
+  word('KING PUFF BALL', -15);
+  word('PALACE', 13);
+
+  // court lines
+  ctx.fillStyle = '#f5f0e4';
+  courtLine(ctx, [[-25, 0], [25, 0]]);
+  courtLine(ctx, [[-25, 0], [-25, VF]]);
+  courtLine(ctx, [[25, 0], [25, VF]]);
+  courtLine(ctx, [[-8, 0], [-8, 19]]);
+  courtLine(ctx, [[8, 0], [8, 19]]);
+  courtLine(ctx, [[-8, 19], [8, 19]]);
+  courtLine(ctx, arcUV(0, 19, 6, 0, Math.PI));
+  for (let d = 0; d < 9; d++) {
+    const a0 = Math.PI + (d / 9) * Math.PI;
+    courtLine(ctx, arcUV(0, 19, 6, a0, a0 + (Math.PI / 9) * 0.55, 6));
+  }
+  courtLine(ctx, [[-4, 4] as UV, ...arcUV(0, 5.25, 4, Math.PI, 0, 32), [4, 4] as UV]);
+  const a3 = Math.acos(22 / 23.75);
+  courtLine(ctx, [[-22, 0], [-22, 5.25 + 23.75 * Math.sin(a3)]]);
+  courtLine(ctx, [[22, 0], [22, 5.25 + 23.75 * Math.sin(a3)]]);
+  courtLine(ctx, arcUV(0, 5.25, 23.75, a3, Math.PI - a3, 80));
+  // lane hash marks and the block
+  for (const sgn of [-1, 1]) {
+    poly(ctx, [P(sgn * 8, 7), P(sgn * 8.7, 7), P(sgn * 8.7, 7.7), P(sgn * 8, 7.7)]);
+    ctx.fill();
+    for (const hv of [11, 14, 17]) courtLine(ctx, [[sgn * 8, hv], [sgn * 8.6, hv]], 0.17);
+  }
+
+  // depth: darker toward the back, lit pool in the middle
+  const depth = ctx.createLinearGradient(0, HORIZON, 0, B);
+  depth.addColorStop(0, 'rgba(25,10,3,0.38)');
+  depth.addColorStop(0.45, 'rgba(25,10,3,0)');
+  ctx.fillStyle = depth;
+  ctx.fillRect(L, HORIZON, R - L, B - HORIZON);
+
+  // glossy finish: reflections of the LED boards and the arena lights
+  ctx.globalCompositeOperation = 'lighter';
+  for (const s of BOARD_SEGS) {
+    const [cr, cg, cb] = hexRgb(s.ad.bg);
+    for (const [grow, al, len] of [
+      [-14, 0.1, 90],
+      [0, 0.07, 130],
+      [16, 0.05, 180],
+      [34, 0.03, 220],
+    ] as const) {
+      const g = ctx.createLinearGradient(0, HORIZON, 0, HORIZON + len);
+      g.addColorStop(0, `rgba(${cr},${cg},${cb},${al})`);
+      g.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
+      ctx.fillStyle = g;
+      ctx.fillRect(s.x0 + 6 - grow, HORIZON, s.x1 - s.x0 - 12 + grow * 2, len);
+    }
+  }
+  for (const lx of [40, 300, 590, 1130, 1390]) {
+    ctx.save();
+    ctx.translate(lx, 500);
+    ctx.scale(1, 5);
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 34);
+    g.addColorStop(0, 'rgba(255,240,215,0.16)');
+    g.addColorStop(1, 'rgba(255,240,215,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(-40, -40, 80, 80);
+    ctx.restore();
+  }
+  ctx.globalCompositeOperation = 'source-over';
+  const pool = ctx.createRadialGradient(720, 640, 40, 720, 640, 720);
+  pool.addColorStop(0, 'rgba(255,238,205,0.14)');
+  pool.addColorStop(1, 'rgba(255,238,205,0)');
+  ctx.fillStyle = pool;
+  ctx.fillRect(L, HORIZON, R - L, B - HORIZON);
+  const vig = ctx.createRadialGradient(700, 560, 320, 700, 560, 1050);
+  vig.addColorStop(0, 'rgba(8,4,2,0)');
+  vig.addColorStop(1, 'rgba(8,4,2,0.55)');
+  ctx.fillStyle = vig;
+  ctx.fillRect(L, HORIZON, R - L, B - HORIZON);
   ctx.restore();
+}
+
+// ───────────────────────────── crowd ──
+
+interface Tier {
+  y0: number;
+  y1: number;
+  rows: number;
+  s0: number;
+  s1: number;
+  /** Pixels per stage pixel when rendered (lower = softer, like depth of field). */
+  q: number;
+  light0: number;
+  light1: number;
+  aisles: number[];
+  aisleW: number;
+  seat: string;
+  near: boolean;
+}
+
+const UPPER: Tier = { y0: -46, y1: 118, rows: 17, s0: 3.6, s1: 4.7, q: 0.6, light0: 0.2, light1: 0.38, aisles: [-40, 340, 1120, 1390], aisleW: 15, seat: '#4a1f3e', near: false };
+const LOWER: Tier = { y0: 166, y1: 302, rows: 8, s0: 6.6, s1: 9.6, q: 0.8, light0: 0.36, light1: 0.64, aisles: [90, 470, 1270], aisleW: 26, seat: '#6a2440', near: true };
+
+const SKINS = ['#f2a65a', '#f7c690', '#ffb3c6', '#e8a46c', '#f08a3c', '#ffd4a8', '#a8e6d4', '#f5b78a', '#d98c55'];
+const SHIRTS = ['#4b1d8f', '#4b1d8f', '#5a2aa6', '#ffc629', '#ffc629', '#f4f1ea', '#f4f1ea', '#1b1b22', '#c8102e', '#2f6fd6', '#8a8f9c', '#0b7c78'];
+const SIGNS = ['GO KING!', 'PUFF!', '#1 FAN', 'KING ME', 'D-FENSE'];
+
+/**
+ * The crowd: thousands of little puffball fans in the King's purple and gold,
+ * packed into an upper deck and a lower bowl with stair aisles, lit by the
+ * court lights (dimmer the higher they sit) and drawn softer with distance.
+ * `excited` stands them up with arms in the air (the scene flips between the
+ * two when someone scores).
+ */
+export function drawCrowd(ctx: Ctx, excited = false) {
+  ctx.save();
+  ctx.translate(STAGE_OX, STAGE_OY);
+  drawTier(ctx, UPPER, rng(4242), excited);
+  drawTier(ctx, LOWER, rng(5151), excited);
+  ctx.restore();
+}
+
+function drawTier(dst: Ctx, tier: Tier, r: () => number, excited: boolean) {
+  const top = tier.y0 - 40;
+  const bottom = tier.y1 + 24;
+  const { c, ctx } = canvas(Math.ceil((R - L) * tier.q), Math.ceil((bottom - top) * tier.q));
+  ctx.scale(tier.q, tier.q);
+  ctx.translate(-L, -top);
+  const inAisle = (x: number) => tier.aisles.some((a) => Math.abs(x - a) < tier.aisleW / 2 + 2);
+
+  for (let row = 0; row < tier.rows; row++) {
+    const t = row / (tier.rows - 1);
+    const s = tier.s0 + (tier.s1 - tier.s0) * t;
+    const y = tier.y0 + (tier.y1 - tier.y0) * t;
+    const light = tier.light0 + (tier.light1 - tier.light0) * t;
+    // the row of seat backs (shows where seats are empty)
+    ctx.fillStyle = lit(tier.seat, light * 0.85);
+    ctx.fillRect(L, y - s * 0.55, R - L, s * 1.5);
+    ctx.fillStyle = lit('#ffffff', light * 0.25, 0.25);
+    ctx.fillRect(L, y - s * 0.55, R - L, Math.max(0.6, s * 0.12));
+    // stair aisles
+    for (const ax of tier.aisles) {
+      ctx.fillStyle = lit('#5b5468', light);
+      ctx.fillRect(ax - tier.aisleW / 2, y - s * 0.9, tier.aisleW, s * 2.4);
+      ctx.fillStyle = lit('#c9c3d6', light, 0.5);
+      ctx.fillRect(ax - tier.aisleW / 2, y - s * 0.9, tier.aisleW, Math.max(0.7, s * 0.14));
+      ctx.fillStyle = lit('#ffd23f', light, 0.8);
+      ctx.fillRect(ax - tier.aisleW / 2 + 1, y - s * 0.86, 2, Math.max(0.6, s * 0.1));
+      ctx.fillRect(ax + tier.aisleW / 2 - 3, y - s * 0.86, 2, Math.max(0.6, s * 0.1));
+    }
+    let x = L - r() * s * 2;
+    while (x < R + s * 2) {
+      const step = s * 1.78 + r() * s * 0.38;
+      const v = { skin: r(), shirt: r(), hat: r(), empty: r(), arms: r(), prop: r(), jit: r(), stand: r(), lean: r(), hue: r(), size: r() };
+      x += step;
+      if (inAisle(x) || v.empty < 0.06) continue;
+      const ps = s * (0.86 + v.size * 0.28);
+      fan(ctx, x, y + (v.size - 0.5) * s * 0.5, ps, light, v, tier.near && ps > 7.4, excited);
+    }
+  }
+  dst.imageSmoothingEnabled = true;
+  dst.imageSmoothingQuality = 'high';
+  dst.drawImage(c, L, top, R - L, bottom - top);
+}
+
+function fan(
+  ctx: Ctx,
+  x: number,
+  y: number,
+  s: number,
+  light: number,
+  v: { skin: number; shirt: number; hat: number; arms: number; prop: number; jit: number; stand: number; lean: number; hue: number; size: number },
+  near: boolean,
+  excited: boolean,
+) {
+  const standing = excited && v.stand < 0.75;
+  const yy = y - (standing ? s * 0.45 : 0) + (v.jit - 0.5) * s * 0.3;
+  const skin = SKINS[Math.floor(v.skin * SKINS.length)];
+  const shirt = SHIRTS[Math.floor(v.shirt * SHIRTS.length)];
+  const k = light * (0.9 + v.hue * 0.2);
+  const hx = x + (v.lean - 0.5) * s * 0.35;
+  const hy = yy - s * 1.55;
+  const armsUp = excited ? v.arms < 0.72 : v.arms < 0.1;
+  const oneArm = armsUp && v.arms > (excited ? 0.55 : 0.07);
+
+  // arms raised behind the head
+  if (armsUp) {
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = lit(shirt, k * 0.85, 1, 0.22);
+    ctx.lineWidth = s * 0.42;
+    for (const sg of oneArm ? [v.lean < 0.5 ? -1 : 1] : [-1, 1]) {
+      const ex = x + sg * s * (1.05 + v.jit * 0.3);
+      const ey = yy - s * (2.5 + v.hue * 0.4);
+      seg(ctx, [x + sg * s * 0.7, yy - s * 0.6], [ex, ey]);
+      ctx.fillStyle = lit(skin, k);
+      ctx.beginPath();
+      ctx.arc(ex, ey, s * 0.27, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  // shoulders + body
+  ctx.fillStyle = lit(shirt, k, 1, 0.22);
+  ctx.beginPath();
+  ctx.moveTo(x - s * 0.95, yy + s * 1.3);
+  ctx.lineTo(x - s * 0.95, yy - s * 0.45);
+  ctx.quadraticCurveTo(x - s * 0.92, yy - s * 1.02, x - s * 0.3, yy - s * 1.02);
+  ctx.lineTo(x + s * 0.3, yy - s * 1.02);
+  ctx.quadraticCurveTo(x + s * 0.92, yy - s * 1.02, x + s * 0.95, yy - s * 0.45);
+  ctx.lineTo(x + s * 0.95, yy + s * 1.3);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.fillRect(x + s * 0.25, yy - s * 0.7, s * 0.7, s * 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  ctx.fillRect(x - s * 0.8, yy - s * 0.95, s * 1.2, s * 0.3);
+  // fluffy puffball head, lit from above
+  const hr = s * 0.62;
+  const hg = ctx.createRadialGradient(hx - hr * 0.35, hy - hr * 0.45, hr * 0.1, hx, hy, hr * 1.25);
+  hg.addColorStop(0, lit(skin, Math.min(1.25, k * 1.18), 1, 0.15));
+  hg.addColorStop(1, lit(skin, k * 0.62, 1, 0.15));
+  ctx.fillStyle = hg;
+  ctx.beginPath();
+  ctx.arc(hx, hy, hr, 0, Math.PI * 2);
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 + v.hue * 2;
+    ctx.moveTo(hx + Math.cos(a) * hr * 0.92 + hr * 0.3, hy + Math.sin(a) * hr * 0.92);
+    ctx.arc(hx + Math.cos(a) * hr * 0.92, hy + Math.sin(a) * hr * 0.92, hr * 0.3, 0, Math.PI * 2);
+  }
+  ctx.fill();
+  // hats: team caps and paper crowns for the King's biggest fans
+  if (v.hat < 0.14) {
+    ctx.fillStyle = lit(v.hat < 0.07 ? '#4b1d8f' : '#ffc629', k);
+    ctx.beginPath();
+    ctx.arc(hx, hy - hr * 0.15, hr * 0.95, Math.PI, 0);
+    ctx.fill();
+    ctx.fillRect(hx - hr * (v.lean < 0.5 ? 1.5 : -0.2), hy - hr * 0.25, hr * 1.3, hr * 0.28);
+  } else if (v.hat < 0.2) {
+    ctx.fillStyle = lit('#ffd23f', k * 1.1);
+    poly(ctx, [
+      [hx - hr * 0.8, hy - hr * 0.55],
+      [hx - hr * 0.85, hy - hr * 1.45],
+      [hx - hr * 0.35, hy - hr * 0.95],
+      [hx, hy - hr * 1.6],
+      [hx + hr * 0.35, hy - hr * 0.95],
+      [hx + hr * 0.85, hy - hr * 1.45],
+      [hx + hr * 0.8, hy - hr * 0.55],
+    ]);
+    ctx.fill();
+  }
+  // faces in the lower bowl
+  if (near) {
+    const look = (VPX - hx) / 2400;
+    ctx.fillStyle = 'rgba(20,14,26,0.85)';
+    for (const ex of [-0.3, 0.28]) {
+      ctx.beginPath();
+      ctx.ellipse(hx + ex * hr * 1.6 + look * hr * 2, hy - hr * 0.02, hr * 0.13, hr * 0.17, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (excited || v.prop > 0.9) {
+      ctx.fillStyle = '#4a1222';
+      ctx.beginPath();
+      ctx.ellipse(hx, hy + hr * 0.5, hr * 0.26, hr * (excited ? 0.24 : 0.12), 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  // props
+  if (near && v.prop < 0.025) {
+    // foam finger
+    const fx = x + s * 1.1;
+    const fy = yy - s * 3.1;
+    ctx.fillStyle = lit('#ffc629', k);
+    ctx.beginPath();
+    ctx.roundRect(fx - s * 0.5, fy + s * 0.8, s * 1.0, s * 1.4, s * 0.25);
+    ctx.roundRect(fx - s * 0.2, fy - s * 0.4, s * 0.42, s * 1.4, s * 0.2);
+    ctx.fill();
+  } else if (near && v.prop < 0.05) {
+    // hand-made sign
+    const w = s * 5;
+    const h = s * 1.9;
+    const sx = x - w / 2;
+    const sy = yy - s * 3.6 - (excited ? s * 0.5 : 0);
+    ctx.fillStyle = lit('#fbf8f0', k);
+    ctx.fillRect(sx, sy, w, h);
+    ctx.fillStyle = v.hue < 0.5 ? '#5a2aa6' : '#c8102e';
+    ctx.font = `400 ${s * 1.15}px ${DISPLAY_FONT}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(SIGNS[Math.floor(v.hue * SIGNS.length)], x, sy + h / 2 + s * 0.05, w - s * 0.4);
+  } else if (!near && v.prop < (excited ? 0.06 : 0.025)) {
+    // phone screen up in the cheap seats
+    ctx.fillStyle = '#e4f3ff';
+    ctx.shadowColor = '#bfe2ff';
+    ctx.shadowBlur = 3;
+    ctx.fillRect(hx + s * 0.6, hy - s * 1.1, s * 0.5, s * 0.75);
+    ctx.shadowBlur = 0;
+  }
 }
 
 /**
- * The crowd: rows of little puffball fans in team colours, smaller and darker
- * toward the back, some cheering with arms up, foam fingers and signs. Drawn
- * into a transparent canvas the size of the arena so it can bounce on cheers.
+ * The arena furniture in front of the crowd: jumbotron, championship banners,
+ * the LED ribbon between the decks, the lower-bowl wall and the courtside LED
+ * boards along the baseline.
  */
-export function drawCrowd(ctx: Ctx) {
-  const S = st();
-  const r = rng(4242);
+export function drawArenaFront(ctx: Ctx) {
   ctx.save();
   ctx.translate(STAGE_OX, STAGE_OY);
-  const L = -STAGE_OX;
-  const R = 1280 + STAGE_OX;
-  const heads = [
-    { base: '#f0c58f', shade: '#cf9a5f', light: '#ffe6c4' },
-    { base: '#f28a2e', shade: '#c55a16', light: '#ffc07a' },
-    { base: '#ffb0c8', shade: '#e27c9c', light: '#ffe0ea' },
-    { base: '#e3ad72', shade: '#b8814a', light: '#f7d2a2' },
-    { base: '#a8ecda', shade: '#62c4aa', light: '#e0fff6' },
-  ];
-  const shirts = ['#7a2ec2', '#ffd23f', '#e8463f', '#3fa7ff', '#ffffff'];
-  const ROWS = 6;
-  for (let row = 0; row < ROWS; row++) {
-    const depth = row / (ROWS - 1); // 0 = back, 1 = front
-    const sz = 8 + depth * 9;
-    const baseY = 108 + row * 38 + 30;
-    for (let x = L + r() * 10; x < R; x += sz * 2.15 + r() * sz * 0.6) {
-      if (Math.abs(x - 860) < 95 && row < 4) continue; // behind the backboard
-      const head = heads[Math.floor(r() * heads.length)];
-      const shirt = shirts[Math.floor(r() * shirts.length)];
-      const cheer = r();
-      const hx = x + (r() - 0.5) * 3;
-      const hy = baseY - sz * 1.4 + (r() - 0.5) * 3;
-      // arms up for the excited ones
-      if (cheer < 0.35) {
-        for (const sgn of [-1, 1]) S.line(ctx, [[hx + sgn * sz * 0.6, baseY - sz * 0.6], [hx + sgn * sz * 1.0, hy - sz * 0.9]], 3000 + x, 0.55 + depth * 0.3, head.base);
-      }
-      // shirt / shoulders
-      ctx.fillStyle = shirt;
-      ctx.beginPath();
-      ctx.ellipse(hx, baseY, sz * 1.05, sz * 0.75, 0, Math.PI, 0);
-      ctx.lineTo(hx + sz * 1.05, baseY + sz * 0.4);
-      ctx.lineTo(hx - sz * 1.05, baseY + sz * 0.4);
-      ctx.closePath();
-      ctx.fill();
-      ctx.strokeStyle = S.ink;
-      ctx.lineWidth = 0.6 + depth * 0.8;
-      ctx.stroke();
-      // fluffy puffball head
-      S.shape(ctx, fluffPts(hx, hy, sz, sz * 0.95, 6, 0.08, r() * 3), head, 3100 + Math.round(x), { lw: 0.45 + depth * 0.45, plain: depth < 0.5 });
-      // eyes watching the court
-      const look = (860 - hx) / 1400;
-      for (const ex of [-0.35, 0.3]) {
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.ellipse(hx + ex * sz, hy - sz * 0.1, sz * 0.27, sz * 0.32, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#1d1d26';
-        ctx.beginPath();
-        ctx.arc(hx + ex * sz + look * sz * 0.6, hy - sz * 0.05, sz * 0.13, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      if (cheer < 0.35 && depth > 0.3) {
-        // open cheering mouth
-        ctx.fillStyle = '#5e1a2a';
-        ctx.beginPath();
-        ctx.ellipse(hx, hy + sz * 0.42, sz * 0.22, sz * 0.18, 0, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      // props: foam fingers and signs in the front rows
-      if (depth > 0.55 && cheer > 0.93) {
-        S.shape(ctx, roundRectPts(hx + sz * 0.8, hy - sz * 2.6, sz * 0.9, sz * 2.4, sz * 0.3), { base: '#ffd23f', shade: '#d9a316', light: '#fff2a8' }, 3200 + x, { lw: 0.8, plain: true });
-      } else if (depth > 0.45 && cheer > 0.86 && cheer <= 0.93) {
-        const w = sz * 4.4;
-        S.shape(ctx, roundRectPts(hx - w / 2, hy - sz * 3.2, w, sz * 1.7, 3), { base: '#fff8ec', shade: '#e8dcc6', light: '#ffffff' }, 3300 + x, { lw: 0.8, plain: true });
-        ctx.fillStyle = r() < 0.5 ? '#7a2ec2' : '#e8463f';
-        ctx.font = `400 ${sz * 1.05}px "Lilita One", "Arial Black", sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(r() < 0.5 ? 'GO KING!' : 'PUFF!', hx, hy - sz * 2.35);
-      }
-    }
-    // atmospheric darkening toward the back rows
-    if (depth < 1) {
-      ctx.fillStyle = `rgba(28, 15, 58, ${0.45 * (1 - depth)})`;
-      ctx.fillRect(L, 108 + row * 38 - 40, R - L, 78);
-    }
-  }
+  drawJumbotron(ctx);
+  drawBanners(ctx);
+  // upper-deck fascia + ribbon board
+  ctx.fillStyle = '#0b0912';
+  ctx.fillRect(L, RIBBON_Y0 - 6, R - L, 6);
+  ledBoard(ctx, RIBBON_Y0, RIBBON_Y1, RIBBON_SEGS, 12);
+  const fascia = ctx.createLinearGradient(0, RIBBON_Y1 + 3, 0, RIBBON_Y1 + 16);
+  fascia.addColorStop(0, '#1b1028');
+  fascia.addColorStop(1, '#0c0814');
+  ctx.fillStyle = fascia;
+  ctx.fillRect(L, RIBBON_Y1 + 3, R - L, 13);
+  // lower-bowl front wall + glass rail just above the courtside boards
+  ctx.fillStyle = '#120a1c';
+  ctx.fillRect(L, BOARD_Y0 - 12, R - L, 10);
+  ctx.fillStyle = 'rgba(190,215,255,0.10)';
+  ctx.fillRect(L, BOARD_Y0 - 22, R - L, 10);
+  ctx.fillStyle = 'rgba(255,255,255,0.18)';
+  ctx.fillRect(L, BOARD_Y0 - 22, R - L, 1);
+  ledBoard(ctx, BOARD_Y0, BOARD_Y1, BOARD_SEGS, 19);
   ctx.restore();
 }
 
-/** A soft spotlight cone, for additive blending. Width w at the bottom, height h. */
-export function drawSpotlight(ctx: Ctx, w: number, h: number) {
-  const g = ctx.createLinearGradient(0, 0, 0, h);
-  g.addColorStop(0, '#fff6d0aa');
-  g.addColorStop(1, '#fff6d000');
-  ctx.fillStyle = g;
+function drawJumbotron(ctx: Ctx) {
+  const x0 = 150;
+  const x1 = 590;
+  const y0 = -80;
+  const y1 = 44;
+  ctx.strokeStyle = '#2b2835';
+  ctx.lineWidth = 2;
+  for (const cx of [x0 + 50, x1 - 50]) seg(ctx, [cx, T], [cx, y0]);
+  ctx.save();
+  ctx.shadowColor = 'rgba(110,80,255,0.55)';
+  ctx.shadowBlur = 40;
+  ctx.fillStyle = '#0b0a10';
   ctx.beginPath();
-  ctx.moveTo(w / 2 - 12, 0);
-  ctx.lineTo(w / 2 + 12, 0);
-  ctx.lineTo(w, h);
-  ctx.lineTo(0, h);
-  ctx.closePath();
+  ctx.roundRect(x0, y0, x1 - x0, y1 - y0, 6);
   ctx.fill();
+  ctx.restore();
+  ctx.strokeStyle = '#34303f';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  const sx0 = x0 + 8;
+  const sx1 = x1 - 8;
+  const sy0 = y0 + 8;
+  const sy1 = y1 - 8;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(sx0, sy0, sx1 - sx0, sy1 - sy0);
+  ctx.clip();
+  const scr = ctx.createLinearGradient(sx0, sy0, sx1, sy1);
+  scr.addColorStop(0, '#101548');
+  scr.addColorStop(1, '#2a0c4a');
+  ctx.fillStyle = scr;
+  ctx.fillRect(sx0, sy0, sx1 - sx0, sy1 - sy0);
+  // light rays behind the crown
+  const cx = sx0 + 62;
+  const cy = sy0 + 42;
+  ctx.fillStyle = 'rgba(255,210,63,0.10)';
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    poly(ctx, [
+      [cx, cy],
+      [cx + Math.cos(a) * 120, cy + Math.sin(a) * 120],
+      [cx + Math.cos(a + 0.2) * 120, cy + Math.sin(a + 0.2) * 120],
+    ]);
+    ctx.fill();
+  }
+  // crown
+  ctx.shadowColor = '#ffd23f';
+  ctx.shadowBlur = 12;
+  ctx.fillStyle = '#ffd23f';
+  poly(ctx, [
+    [cx - 34, cy + 20],
+    [cx - 38, cy - 18],
+    [cx - 17, cy - 2],
+    [cx, cy - 26],
+    [cx + 17, cy - 2],
+    [cx + 38, cy - 18],
+    [cx + 34, cy + 20],
+  ]);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#e8463f';
+  for (const [jx, jy] of [
+    [-17, 8],
+    [0, 4],
+    [17, 8],
+  ])
+    ctx.fillRect(cx + jx - 3.5, cy + jy - 3.5, 7, 7);
+  // titles
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.font = `400 31px ${DISPLAY_FONT}`;
+  ctx.shadowColor = '#ffd23f';
+  ctx.shadowBlur = 10;
+  ctx.fillStyle = '#ffe58a';
+  ctx.fillText('KING PUFF BALL', sx0 + 120, sy0 + 30);
+  ctx.shadowBlur = 0;
+  ctx.font = `800 13px Nunito, "Arial Black", sans-serif`;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText('B A S K E T B A L L   P A L A C E', sx0 + 122, sy0 + 58);
+  // ticker
+  ctx.fillStyle = '#b3001b';
+  ctx.fillRect(sx0, sy1 - 20, sx1 - sx0, 20);
+  ctx.font = `400 13px ${DISPLAY_FONT}`;
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.fillText('FREE THROW SHOWDOWN  ★  5 SHOTS EACH  ★  SUDDEN DEATH', (sx0 + sx1) / 2, sy1 - 9.5);
+  // LED pixels + glass glare
+  ctx.fillStyle = 'rgba(0,0,0,0.16)';
+  for (let x = sx0; x < sx1; x += 2.6) ctx.fillRect(x, sy0, 0.7, sy1 - sy0);
+  for (let y = sy0; y < sy1; y += 2.6) ctx.fillRect(sx0, y, sx1 - sx0, 0.7);
+  const glare = ctx.createLinearGradient(sx0, sy0, sx0 + 160, sy1);
+  glare.addColorStop(0, 'rgba(255,255,255,0.12)');
+  glare.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = glare;
+  ctx.fillRect(sx0, sy0, sx1 - sx0, sy1 - sy0);
+  ctx.restore();
+}
+
+function drawBanners(ctx: Ctx) {
+  const lines = [
+    ['WORLD 1', 'CHAMPS'],
+    ['PUFF', 'CUP'],
+    ['KING', 'OF HOOPS'],
+  ];
+  ctx.strokeStyle = '#2b2835';
+  ctx.lineWidth = 2;
+  seg(ctx, [1090, T + 8], [1420, T + 8]);
+  lines.forEach((ls, i) => {
+    const bx = 1110 + i * 105;
+    const by = T + 10;
+    const w = 72;
+    const h = 104;
+    const g = ctx.createLinearGradient(0, by, 0, by + h);
+    g.addColorStop(0, '#2a1052');
+    g.addColorStop(1, '#3e1878');
+    ctx.fillStyle = g;
+    poly(ctx, [
+      [bx, by],
+      [bx + w, by],
+      [bx + w, by + h],
+      [bx + w / 2, by + h - 12],
+      [bx, by + h],
+    ]);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(232,185,49,0.85)';
+    ctx.lineWidth = 2;
+    poly(ctx, [
+      [bx + 5, by + 4],
+      [bx + w - 5, by + 4],
+      [bx + w - 5, by + h - 8],
+      [bx + w / 2, by + h - 18],
+      [bx + 5, by + h - 8],
+    ]);
+    ctx.stroke();
+    ctx.fillStyle = '#e8b931';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `400 15px ${DISPLAY_FONT}`;
+    ctx.fillText(ls[0], bx + w / 2, by + 30, w - 12);
+    ctx.font = `400 12px ${DISPLAY_FONT}`;
+    ctx.fillText(ls[1], bx + w / 2, by + 50, w - 12);
+    ctx.fillText('★ ★ ★', bx + w / 2, by + 70, w - 12);
+  });
+  // they hang up in the dark
+  ctx.fillStyle = 'rgba(5,3,12,0.3)';
+  ctx.fillRect(1100, T, 330, 130);
+}
+
+/** A soft beam of light (for additive blending). Width w at the bottom, height h. */
+export function drawSpotlight(ctx: Ctx, w: number, h: number) {
+  for (let i = 0; i < 6; i++) {
+    const f = 1 - i * 0.15;
+    const g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, 'rgba(255,246,214,0.11)');
+    g.addColorStop(1, 'rgba(255,246,214,0)');
+    ctx.fillStyle = g;
+    poly(ctx, [
+      [w / 2 - 8 * f, 0],
+      [w / 2 + 8 * f, 0],
+      [w / 2 + (w / 2) * f, h],
+      [w / 2 - (w / 2) * f, h],
+    ]);
+    ctx.fill();
+  }
+}
+
+/** A camera flash in the crowd (for additive blending). */
+export function drawCameraFlash(ctx: Ctx, r: number) {
+  const g = ctx.createRadialGradient(r, r, 0, r, r, r);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.12, 'rgba(240,248,255,0.9)');
+  g.addColorStop(0.35, 'rgba(200,225,255,0.25)');
+  g.addColorStop(1, 'rgba(200,225,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, r * 2, r * 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.fillRect(r - r * 0.9, r - 0.6, r * 1.8, 1.2);
+  ctx.fillRect(r - 0.6, r - r * 0.9, 1.2, r * 1.8);
 }

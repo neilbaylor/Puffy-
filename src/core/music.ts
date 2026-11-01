@@ -17,7 +17,7 @@ function el(t: Track) {
     const a = new Audio(urls[t]);
     a.preload = 'auto';
     a.volume = 0.85;
-    a.loop = t === 'hoops';
+    a.loop = true;
     tracks[t] = a;
   }
   return tracks[t]!;
@@ -50,6 +50,17 @@ function play(t: Track) {
 }
 
 export const playLevelClear = () => play('levelClear');
+
+/** The level track: loops during play. Keeps going (no restart) if it's already on. */
+export function playLevelMusic() {
+  const a = el('levelClear');
+  const hoops = tracks.hoops;
+  if (hoops && !hoops.paused) hoops.pause();
+  a.muted = isMuted();
+  if (!a.paused) return;
+  a.volume = 0.85;
+  a.play().catch(() => {});
+}
 export const playHoops = () => play('hoops');
 
 /** Fade the current track out over `ms`. */

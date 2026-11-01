@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { GRAVITY, MIN_VIEW_W, TILE, VIEW_H } from '../config';
 import { characterById } from '../data/characters';
 import type { Session } from '../core/session';
+import { lives, loseLife, resetLives } from '../core/lives';
 import { sfx } from '../core/sfx';
 import { createEnemy, type Enemy } from '../entities/enemies/Enemy';
 import { Aura, Checkpoint, Goal, RootBeer } from '../entities/Pickups';
@@ -20,6 +21,8 @@ export interface GameData {
   session: Session;
   /** Index of the checkpoint to start from (-1 / undefined = level start). */
   checkpoint?: number;
+  /** Restarting after a faint (keeps lives and run stats); otherwise it's a brand-new run. */
+  retry?: boolean;
 }
 
 export interface HudState {
@@ -30,6 +33,14 @@ export interface HudState {
   stamina: number;
   exhausted: boolean;
   running: boolean;
+  /** Spare lives left (3 → 0). */
+  lives: number;
+}
+
+export interface GameOverState {
+  charId: string;
+  name: string;
+  checkpoint: number;
 }
 
 export interface ResultState {
@@ -41,6 +52,7 @@ export interface ResultState {
   popped: number;
   giants: number;
   faints: number;
+  lives: number;
   seconds: number;
   /** Final free-throw score vs King Puff Ball, e.g. "4 – 2". */
   hoops?: string;
@@ -99,6 +111,7 @@ export class GameScene extends Phaser.Scene {
 
   aura = 0;
   private startCheckpoint = -1;
+  private retry = false;
   private lastCheckpoint = -1;
   private ended = false;
   private lastHud = '';
@@ -116,13 +129,15 @@ export class GameScene extends Phaser.Scene {
     this.session = data.session;
     this.startCheckpoint = data.checkpoint ?? -1;
     this.lastCheckpoint = this.startCheckpoint;
-    if (this.startCheckpoint < 0) {
+    this.retry = !!data.retry;
+    if (!this.retry) {
       run.startedAt = Date.now();
       run.faints = 0;
       run.popped = 0;
       run.giants = 0;
       run.bestAura = 0;
       run.rootbeer = new Set();
+      resetLives();
     }
     this.players = [];
     this.enemies = [];
@@ -238,10 +253,10 @@ export class GameScene extends Phaser.Scene {
     this.camX = start.x;
     this.camTop = heightPx - VIEW_H;
     this.updateCamera(0, true);
-    this.cameras.main.fadeIn(this.startCheckpoint < 0 ? 400 : 250, 255, 248, 236);
+    this.cameras.main.fadeIn(this.retry ? 250 : 400, 255, 248, 236);
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.players.forEach((p) => p.destroy()));
-    this.game.events.emit('game-start', this, { fresh: this.startCheckpoint < 0, level: data.name, world: data.world });
+    this.game.events.emit('game-start', this, { fresh: !this.retry, atStart: this.startCheckpoint < 0, level: data.name, world: data.world });
     this.emitHud(true);
   }
 
@@ -575,10 +590,18 @@ export class GameScene extends Phaser.Scene {
     run.faints++;
     this.aura = 0;
     const fell = !p.view.visible;
+    const hadLife = loseLife();
+    this.emitHud(true);
     this.time.delayedCall(fell ? 700 : 1500, () => {
+      if (!hadLife) {
+        // out of lives: game over
+        this.ended = true;
+        this.game.events.emit('game-over', { charId: p.char.id, name: p.char.name, checkpoint: this.lastCheckpoint } satisfies GameOverState);
+        return;
+      }
       this.cameras.main.fadeOut(300, 255, 248, 236);
       this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () =>
-        this.scene.restart({ session: this.session, checkpoint: this.lastCheckpoint } satisfies GameData),
+        this.scene.restart({ session: this.session, checkpoint: this.lastCheckpoint, retry: true } satisfies GameData),
       );
     });
   }
@@ -600,6 +623,7 @@ export class GameScene extends Phaser.Scene {
       popped: run.popped,
       giants: run.giants,
       faints: run.faints,
+      lives: lives.left,
       seconds: Math.round((Date.now() - run.startedAt) / 1000),
     };
     // ── transition to King Puff Ball's Basketball Palace ──
@@ -638,8 +662,9 @@ export class GameScene extends Phaser.Scene {
       stamina: Math.round(p.stamina * 100) / 100,
       exhausted: p.exhausted,
       running: p.running,
+      lives: lives.left,
     };
-    const key = `${s.aura}|${s.rootbeer}|${s.stamina}|${s.exhausted}|${s.running}`;
+    const key = `${s.lives}|${s.aura}|${s.rootbeer}|${s.stamina}|${s.exhausted}|${s.running}`;
     if (!force && key === this.lastHud) return;
     this.lastHud = key;
     this.game.events.emit('hud', s);

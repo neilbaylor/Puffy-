@@ -513,6 +513,40 @@ body {
   color: #ffd2a8;
   font-variant-numeric: tabular-nums;
 }
+.hud-lives {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--display);
+  font-size: clamp(16px, 3.2vmin, 23px);
+  line-height: 1;
+  color: #ffb3c4;
+  font-variant-numeric: tabular-nums;
+}
+.hud-lives.last span {
+  color: #ff6b6b;
+}
+.hud-lives.last .life-ico {
+  animation: life-beat 0.9s ease-in-out infinite;
+}
+@keyframes life-beat {
+  50% { transform: scale(1.25); }
+}
+.hud-lives.bump {
+  animation: rb-bump 0.4s ease-out;
+}
+.life-ico {
+  display: inline-block;
+  width: 1em;
+  height: 0.92em;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 22'%3E%3Cpath d='M12 20.5C6 16 1.5 12.2 1.5 7.4 1.5 4.2 4 1.6 7.1 1.6c2 0 3.8 1.1 4.9 2.8 1.1-1.7 2.9-2.8 4.9-2.8 3.1 0 5.6 2.6 5.6 5.8 0 4.8-4.5 8.6-10.5 13.1z' fill='%23ff5d7a' stroke='%232b1a12' stroke-width='2.2' stroke-linejoin='round'/%3E%3Cpath d='M6 5.5c-1.2.6-1.8 1.8-1.7 3' fill='none' stroke='%23fff' stroke-opacity='.7' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.gameover-note {
+  margin: 4px 0 14px;
+  max-width: 28ch;
+  color: #6b4a36;
+  font-weight: 700;
+}
 .hud-rb.bump {
   animation: rb-bump 0.4s ease-out;
 }
@@ -989,4 +1023,7 @@ body {
   letter-spacing: 0.15em;
   color: #fff;
   margin-bottom: 8px;
+}
+.gameover h2 {
+  color: #e8463f;
 }

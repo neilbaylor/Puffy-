@@ -1,13 +1,13 @@
 import Phaser from 'phaser';
 import { CHARACTERS, characterById } from '../data/characters';
 import type { Session } from '../core/session';
-import { playLevelClear, primeMusic, setMusicMuted, stopMusic } from '../core/music';
+import { fadeOutMusic, playLevelClear, playLevelMusic, primeMusic, setMusicMuted, stopMusic } from '../core/music';
 import { isMuted, setMuted, sfx, unlockAudio } from '../core/sfx';
 import { drawHeroCard, drawPortrait } from '../gfx/draw';
 import { gamepadSources } from '../input/gamepad';
 import { isKeyDown } from '../input/keyboard';
 import { isTouchDevice } from '../input/touch';
-import type { GameData, GameScene, HudState, ResultState } from '../scenes/GameScene';
+import type { GameData, GameOverState, GameScene, HudState, ResultState } from '../scenes/GameScene';
 import { TouchControls } from './touchControls';
 
 const h = (html: string) => {
@@ -69,6 +69,7 @@ export class UI {
             <div class="hud-row">
               <div class="hud-aura" title="Aura (eat nuggies!)"><i class="aura-ico"></i><span>0</span></div>
               <div class="hud-rb" title="Root beer"><i class="rb-ico"></i><span>0</span></div>
+              <div class="hud-lives" title="Lives left"><i class="life-ico"></i><span>3</span></div>
             </div>
             <div class="hud-stamina" title="Stamina"><b>STAMINA</b><div class="bar"><i></i></div></div>
           </div>
@@ -85,12 +86,15 @@ export class UI {
     this.selected = Math.max(0, CHARACTERS.findIndex((c) => c.id === store.get('puffy.hero')));
 
     game.events.on('menu', () => this.showStart());
-    game.events.on('game-start', (s: GameScene, info: { fresh: boolean; level: string; world: string }) => {
+    game.events.on('game-start', (s: GameScene, info: { fresh: boolean; atStart: boolean; level: string; world: string }) => {
       this.gameScene = s;
       this.setScreen(null);
       this.showHud();
+      // a new run starts the song from the top; restarts after a faint keep it going
+      if (info.fresh) playLevelClear();
+      else playLevelMusic();
       if (info.fresh) this.showBanner(`<small>${info.world}</small>${info.level}`, 2600);
-      else this.showBanner('<small>Back to the</small>Checkpoint', 1300);
+      else this.showBanner(info.atStart ? '<small>Back to the</small>Start' : '<small>Back to the</small>Checkpoint', 1300);
     });
     game.events.on('hud', (s: HudState) => this.renderHud(s));
     game.events.on('hoops-start', () => {
@@ -101,6 +105,7 @@ export class UI {
       this.touch.hide();
     });
     game.events.on('level-complete', (r: ResultState) => this.showResults(r));
+    game.events.on('game-over', (g: GameOverState) => this.showGameOver(g));
 
     window.addEventListener('keydown', (e) => {
       if ((e.code === 'Escape' || e.code === 'KeyP') && this.gameScene && !this.screen) this.pause();
@@ -118,6 +123,7 @@ export class UI {
     const unlock = () => {
       unlockAudio();
       primeMusic();
+      this.goFullscreen(); // phones/tablets: full screen from the very first tap
     };
     window.addEventListener('pointerdown', unlock, { once: true });
     window.addEventListener('keydown', unlock, { once: true });
@@ -264,7 +270,6 @@ export class UI {
 
   private startGame(session: Session, checkpoint = -1) {
     sfx.select();
-    stopMusic();
     this.session = session;
     this.setScreen(null);
     this.game.scene.stop('Menu');
@@ -290,6 +295,15 @@ export class UI {
     if (rb.textContent !== String(s.rootbeer)) {
       rb.textContent = String(s.rootbeer);
       const box = this.hud.querySelector('.hud-rb')!;
+      box.classList.remove('bump');
+      void (box as HTMLElement).offsetWidth;
+      box.classList.add('bump');
+    }
+    const lv = this.hud.querySelector('.hud-lives span')!;
+    if (lv.textContent !== String(s.lives)) {
+      lv.textContent = String(s.lives);
+      const box = this.hud.querySelector('.hud-lives')!;
+      box.classList.toggle('last', s.lives === 0);
       box.classList.remove('bump');
       void (box as HTMLElement).offsetWidth;
       box.classList.add('bump');
@@ -352,6 +366,45 @@ export class UI {
     this.game.scene.start('Menu');
   }
 
+  private showGameOver(g: GameOverState) {
+    this.touch.hide();
+    this.hud.hidden = true;
+    this.banner.hidden = true;
+    this.gameScene = null;
+    fadeOutMusic(800);
+    sfx.groan();
+    const el = h(`<div class="screen modal">
+      <div class="panel results gameover">
+        <div class="results-hero"><canvas width="160" height="160"></canvas></div>
+        <div class="results-body">
+          <p class="eyebrow">World 1 · Puff Ball Planet</p>
+          <h2>Out of lives!</h2>
+          <p class="gameover-note">${g.name} fainted one too many times. Start the level again with 3 spare lives.</p>
+          <div class="row">
+            <button class="btn" data-act="again">Try again</button>
+            <button class="btn btn-alt" data-act="hero">Pick player</button>
+          </div>
+        </div>
+      </div>
+    </div>`);
+    drawPortrait(el.querySelector('canvas')!, characterById(g.charId), 'hurt');
+    const again = () => {
+      stopMusic();
+      this.startGame(this.session);
+    };
+    el.querySelector('[data-act=again]')!.addEventListener('click', again);
+    el.querySelector('[data-act=hero]')!.addEventListener('click', () => this.quitToStart());
+    this.setScreen(el);
+    const onKey = (e: KeyboardEvent) => {
+      if (this.screen !== el) return window.removeEventListener('keydown', onKey);
+      if (e.code === 'Enter') {
+        window.removeEventListener('keydown', onKey);
+        again();
+      }
+    };
+    setTimeout(() => window.addEventListener('keydown', onKey), 600);
+  }
+
   private showResults(r: ResultState) {
     this.touch.hide();
     playLevelClear();
@@ -370,6 +423,7 @@ export class UI {
             <dt>Puffballs popped</dt><dd>${r.popped}</dd>
             <dt>Giants beaten</dt><dd>${r.giants}</dd>
             <dt>Faints</dt><dd>${r.faints}</dd>
+            <dt><i class="life-ico"></i>Lives left</dt><dd>${r.lives}</dd>
             <dt>Time</dt><dd>${mins}:${secs}</dd>
           </dl>
           <div class="row">
