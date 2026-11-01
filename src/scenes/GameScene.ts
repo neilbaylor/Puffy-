@@ -48,6 +48,7 @@ export interface ResultState {
 
 /** Chance that each aura spot in the level actually has aura this time. */
 const AURA_CHANCE = 0.6;
+const DEPTH_WAVE = 12;
 /** Max wisps that scatter when you get hit while carrying aura. */
 const SCATTER_MAX = 10;
 
@@ -86,6 +87,7 @@ export class GameScene extends Phaser.Scene {
   private auras: Aura[] = [];
   private rootbeers: RootBeer[] = [];
   private pendingAura: { at: number; p: Player }[] = [];
+  private waves: { img: Phaser.GameObjects.Image; dir: number; speed: number; life: number; y: number }[] = [];
   private gRootbeer!: Group;
   private checkpoints: Checkpoint[] = [];
   private goal?: Goal;
@@ -128,6 +130,7 @@ export class GameScene extends Phaser.Scene {
     this.auras = [];
     this.rootbeers = [];
     this.pendingAura = [];
+    this.waves = [];
     this.checkpoints = [];
     this.goal = undefined;
     this.aura = 0;
@@ -285,6 +288,7 @@ export class GameScene extends Phaser.Scene {
     this.auras = this.auras.filter((a) => a.tick(now, dt));
     this.rootbeers = this.rootbeers.filter((r) => r.tick(now));
     this.settleAura();
+    this.updateWaves(dt);
 
     this.bg.update(this.view, dt);
     this.emitHud();
@@ -377,6 +381,33 @@ export class GameScene extends Phaser.Scene {
         p.eat();
         this.pendingAura.push({ at: this.time.now + 330, p });
       },
+    });
+  }
+
+  /** A giant's landing shockwave: rolls along the ground; jump over it. */
+  spawnShockwave(x: number, groundY: number, dir: number, speed: number) {
+    const img = this.add.image(x, groundY + 2, 'wave').setOrigin(0.5, 1).setScale(0.12, 1 / 3).setFlipX(dir < 0).setDepth(DEPTH_WAVE);
+    this.tweens.add({ targets: img, scaleX: 1 / 3, duration: 120 });
+    this.waves.push({ img, dir, speed, life: 1.5, y: groundY });
+  }
+
+  private updateWaves(dt: number) {
+    this.waves = this.waves.filter((w) => {
+      w.life -= dt;
+      w.img.x += w.dir * w.speed * dt;
+      const front = w.img.x + w.dir * 20;
+      const groundAhead = this.level.isSolidAt(front, w.y + 6) && !this.level.isSolidAt(front, w.y - 8);
+      if (Math.random() < 0.4) this.fx.dust(w.img.x, w.y, 1);
+      if (w.life <= 0 || !groundAhead) {
+        this.tweens.add({ targets: w.img, alpha: 0, scaleY: 0.05, duration: 160, onComplete: () => w.img.destroy() });
+        return false;
+      }
+      for (const p of this.players) {
+        if (!p.alive || p.invulnerable) continue;
+        const onWaveLevel = p.bottom > w.y - 18 && p.bottom < w.y + 6;
+        if (onWaveLevel && Math.abs(p.x - w.img.x) < 16 + p.body.width / 2) this.hitPlayer(p, w.img.x - w.dir * 30);
+      }
+      return true;
     });
   }
 

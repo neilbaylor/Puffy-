@@ -15,6 +15,21 @@ npm run build        # production build -> dist/
 npm run build:single # one self-contained HTML file -> dist-single/index.html
 ```
 
+## Play it on your phone or tablet (Railway)
+
+The repo is ready for [Railway](https://railway.com): `railway.json` tells it to run
+`npm run build` and then `npm start` (a tiny built-in web server, `server.mjs`).
+
+1. In Railway, open the service that uses this repo.
+2. **Settings → Source**: set the branch to `claude/game-base` (or whichever branch you merge into).
+3. **Settings → Networking → Generate Domain** to get a public `https://….up.railway.app` link.
+4. Open that link on the phone or tablet.
+
+Full screen (no address bar):
+- **Android:** tap the ⛶ button on the start screen, or Chrome menu → *Add to Home screen* / *Install app*.
+- **iPad:** tap the ⛶ button, or Share → *Add to Home Screen*.
+- **iPhone:** Safari can't hide its bars for web pages; use Share → *Add to Home Screen*, then open Puffy from the home screen icon.
+
 ## Controls
 
 | | Phone (touch) | Keyboard A | Keyboard B | Keyboard C | Gamepad |

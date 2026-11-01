@@ -17,6 +17,7 @@ import {
   drawArena,
   drawBackboard,
   drawBall,
+  drawCrowd,
   drawKing,
   drawRimBack,
   drawRimFront,
@@ -75,6 +76,7 @@ export class HoopsScene extends Phaser.Scene {
   private tapped = false;
   private score = { you: [] as boolean[], king: [] as boolean[] };
   private baseZoom = 1;
+  private crowd!: Phaser.GameObjects.Image;
   private camFocus = { x: 800, y: 450, zoom: 1 };
 
   constructor() {
@@ -107,6 +109,7 @@ export class HoopsScene extends Phaser.Scene {
       });
       addCanvas(this, 'king', c, (t) => KING_FRAMES.forEach((f, i) => t.add(f, 0, Math.round(i * KING_W * KING_RES), 0, Math.round(KING_W * KING_RES), Math.round(KING_H * KING_RES))));
     }
+    if (!this.textures.exists('crowd')) addCanvas(this, 'crowd', hires(ARENA_W, 420, ARENA_RES, (ctx) => drawCrowd(ctx)));
     if (!this.textures.exists('hball')) addCanvas(this, 'hball', hires(52, 52, 3, (ctx) => drawBall(ctx, 26, 26, 24)));
     if (!this.textures.exists('backboard')) {
       // drawn in stage coordinates around the hoop, then cropped
@@ -135,6 +138,9 @@ export class HoopsScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor('#140a26');
 
     this.add.image(0, 0, 'arena').setOrigin(0, 0).setScale(1 / ARENA_RES).setDepth(0);
+    this.crowd = this.add.image(0, 0, 'crowd').setOrigin(0, 0).setScale(1 / ARENA_RES).setDepth(1);
+    // the crowd sways a little all the time
+    this.tweens.add({ targets: this.crowd, y: 2, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
 
     const bb = A(HOOP.rimX, HOOP.rimY);
     this.add.image(bb.x, bb.y, 'backboard').setOrigin(0.5, 220 / 420).setScale(0.5).setDepth(5);
@@ -563,6 +569,8 @@ export class HoopsScene extends Phaser.Scene {
 
   private cheer(k = 1) {
     sfx.cheer();
+    // the whole crowd jumps
+    this.tweens.add({ targets: this.crowd, y: -9 * k, duration: 140, yoyo: true, repeat: Math.round(3 * k), ease: 'Quad.easeOut' });
     const cam = this.cameras.main;
     cam.shake(150 * k, 0.003 * k);
     // confetti

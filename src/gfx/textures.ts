@@ -101,6 +101,22 @@ function makeBaddies(scene: Phaser.Scene) {
 function makeItems(scene: Phaser.Scene, pal: WorldPalette) {
   const st = STYLES[ART_STYLE];
   addCanvas(scene, 'aura', hires(48, 48, ART_RES, (ctx) => drawAura(ctx, 24, 25, 10.5)));
+  // giant's ground shockwave: a curling crest of dust (faces right)
+  addCanvas(
+    scene,
+    'wave',
+    hires(56, 34, ART_RES, (ctx) => {
+      const crest: [number, number][] = [];
+      for (let i = 0; i <= 24; i++) {
+        const t = i / 24;
+        crest.push([4 + t * 48, 32 - Math.sin(t * Math.PI) ** 0.7 * 24 - (t > 0.55 ? (t - 0.55) * 14 : 0)]);
+      }
+      crest.push([52, 32]);
+      st.shape(ctx, crest, { base: '#fff4e2', shade: '#e3c9a8', light: '#ffffff' }, 2101, { lw: 1, light: [20, 12] });
+      st.line(ctx, [[14, 26], [24, 16], [34, 14]], 2102, 0.6, '#c9a27e');
+      st.line(ctx, [[26, 28], [36, 20], [44, 19]], 2103, 0.6, '#c9a27e');
+    }),
+  );
   addCanvas(scene, 'nuggie', hires(40, 34, ART_RES, (ctx) => drawNuggie(ctx, 20, 17, 11)));
   addCanvas(scene, 'rootbeer', hires(30, 40, ART_RES, (ctx) => drawRootBeer(ctx, 15, 38, 34)));
   addCanvas(scene, 'rocket', hires(30, 16, ART_RES, (ctx) => drawRocket(ctx, st, 15, 8)));

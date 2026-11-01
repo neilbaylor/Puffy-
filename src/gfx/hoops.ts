@@ -281,7 +281,6 @@ export const SPOTS = {
 
 export function drawArena(ctx: Ctx) {
   const S = st();
-  const r = rng(808);
   ctx.save();
   ctx.translate(STAGE_OX, STAGE_OY);
   const L = -STAGE_OX;
@@ -297,32 +296,13 @@ export function drawArena(ctx: Ctx) {
   ctx.fillStyle = wall;
   ctx.fillRect(L, T, R - L, HORIZON - T + 2);
 
-  // crowd stands: tiers of puffball fans, receding toward the vanishing point
-  for (let row = 0; row < 5; row++) {
-    const y = 120 + row * 40;
-    const sz = 9 + row * 3;
-    ctx.fillStyle = row % 2 ? '#2a1452' : '#331a63';
-    ctx.fillRect(L, y + sz * 0.6, R - L, 40);
-    for (let x = L + (row % 2) * 14; x < R; x += sz * 2.3 + r() * 6) {
-      if (Math.abs(x - VPX) < 120 && row < 3) continue; // leave room behind the hoop
-      const tint = [['#f0c58f', '#cf9a5f'], ['#f28a2e', '#c55a16'], ['#ffb0c8', '#e27c9c'], ['#e3ad72', '#b8814a']][Math.floor(r() * 4)];
-      ctx.fillStyle = tint[1];
-      ctx.beginPath();
-      ctx.arc(x, y + 1.5, sz + 1.2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = tint[0];
-      ctx.beginPath();
-      ctx.arc(x, y, sz, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(x - sz * 0.3, y - sz * 0.15, sz * 0.32, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#1d1d26';
-      ctx.beginPath();
-      ctx.arc(x - sz * 0.38, y - sz * 0.1, sz * 0.14, 0, Math.PI * 2);
-      ctx.fill();
-    }
+  // stands: tiered seating (the crowd itself is drawn separately so it can jump)
+  for (let row = 0; row < 6; row++) {
+    const y = 108 + row * 38;
+    ctx.fillStyle = row % 2 ? '#26124c' : '#2f1860';
+    ctx.fillRect(L, y, R - L, 38);
+    ctx.fillStyle = '#ffd23f33';
+    ctx.fillRect(L, y, R - L, 2);
   }
 
   // banner: KING PUFF BALL PALACE with a crown
@@ -447,6 +427,96 @@ export function drawArena(ctx: Ctx) {
     ctx.strokeStyle = '#fff8ec';
     ctx.lineWidth = 3;
     ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/**
+ * The crowd: rows of little puffball fans in team colours, smaller and darker
+ * toward the back, some cheering with arms up, foam fingers and signs. Drawn
+ * into a transparent canvas the size of the arena so it can bounce on cheers.
+ */
+export function drawCrowd(ctx: Ctx) {
+  const S = st();
+  const r = rng(4242);
+  ctx.save();
+  ctx.translate(STAGE_OX, STAGE_OY);
+  const L = -STAGE_OX;
+  const R = 1280 + STAGE_OX;
+  const heads = [
+    { base: '#f0c58f', shade: '#cf9a5f', light: '#ffe6c4' },
+    { base: '#f28a2e', shade: '#c55a16', light: '#ffc07a' },
+    { base: '#ffb0c8', shade: '#e27c9c', light: '#ffe0ea' },
+    { base: '#e3ad72', shade: '#b8814a', light: '#f7d2a2' },
+    { base: '#a8ecda', shade: '#62c4aa', light: '#e0fff6' },
+  ];
+  const shirts = ['#7a2ec2', '#ffd23f', '#e8463f', '#3fa7ff', '#ffffff'];
+  const ROWS = 6;
+  for (let row = 0; row < ROWS; row++) {
+    const depth = row / (ROWS - 1); // 0 = back, 1 = front
+    const sz = 8 + depth * 9;
+    const baseY = 108 + row * 38 + 30;
+    for (let x = L + r() * 10; x < R; x += sz * 2.15 + r() * sz * 0.6) {
+      if (Math.abs(x - 860) < 95 && row < 4) continue; // behind the backboard
+      const head = heads[Math.floor(r() * heads.length)];
+      const shirt = shirts[Math.floor(r() * shirts.length)];
+      const cheer = r();
+      const hx = x + (r() - 0.5) * 3;
+      const hy = baseY - sz * 1.4 + (r() - 0.5) * 3;
+      // arms up for the excited ones
+      if (cheer < 0.35) {
+        for (const sgn of [-1, 1]) S.line(ctx, [[hx + sgn * sz * 0.6, baseY - sz * 0.6], [hx + sgn * sz * 1.0, hy - sz * 0.9]], 3000 + x, 0.55 + depth * 0.3, head.base);
+      }
+      // shirt / shoulders
+      ctx.fillStyle = shirt;
+      ctx.beginPath();
+      ctx.ellipse(hx, baseY, sz * 1.05, sz * 0.75, 0, Math.PI, 0);
+      ctx.lineTo(hx + sz * 1.05, baseY + sz * 0.4);
+      ctx.lineTo(hx - sz * 1.05, baseY + sz * 0.4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = S.ink;
+      ctx.lineWidth = 0.6 + depth * 0.8;
+      ctx.stroke();
+      // fluffy puffball head
+      S.shape(ctx, fluffPts(hx, hy, sz, sz * 0.95, 6, 0.08, r() * 3), head, 3100 + Math.round(x), { lw: 0.45 + depth * 0.45, plain: depth < 0.5 });
+      // eyes watching the court
+      const look = (860 - hx) / 1400;
+      for (const ex of [-0.35, 0.3]) {
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.ellipse(hx + ex * sz, hy - sz * 0.1, sz * 0.27, sz * 0.32, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#1d1d26';
+        ctx.beginPath();
+        ctx.arc(hx + ex * sz + look * sz * 0.6, hy - sz * 0.05, sz * 0.13, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      if (cheer < 0.35 && depth > 0.3) {
+        // open cheering mouth
+        ctx.fillStyle = '#5e1a2a';
+        ctx.beginPath();
+        ctx.ellipse(hx, hy + sz * 0.42, sz * 0.22, sz * 0.18, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // props: foam fingers and signs in the front rows
+      if (depth > 0.55 && cheer > 0.93) {
+        S.shape(ctx, roundRectPts(hx + sz * 0.8, hy - sz * 2.6, sz * 0.9, sz * 2.4, sz * 0.3), { base: '#ffd23f', shade: '#d9a316', light: '#fff2a8' }, 3200 + x, { lw: 0.8, plain: true });
+      } else if (depth > 0.45 && cheer > 0.86 && cheer <= 0.93) {
+        const w = sz * 4.4;
+        S.shape(ctx, roundRectPts(hx - w / 2, hy - sz * 3.2, w, sz * 1.7, 3), { base: '#fff8ec', shade: '#e8dcc6', light: '#ffffff' }, 3300 + x, { lw: 0.8, plain: true });
+        ctx.fillStyle = r() < 0.5 ? '#7a2ec2' : '#e8463f';
+        ctx.font = `400 ${sz * 1.05}px "Lilita One", "Arial Black", sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(r() < 0.5 ? 'GO KING!' : 'PUFF!', hx, hy - sz * 2.35);
+      }
+    }
+    // atmospheric darkening toward the back rows
+    if (depth < 1) {
+      ctx.fillStyle = `rgba(28, 15, 58, ${0.45 * (1 - depth)})`;
+      ctx.fillRect(L, 108 + row * 38 - 40, R - L, 78);
+    }
   }
   ctx.restore();
 }

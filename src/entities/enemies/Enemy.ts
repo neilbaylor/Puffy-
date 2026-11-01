@@ -217,17 +217,20 @@ export class BigPuff extends Walker {
 
 /**
  * Giant: a boss who guards each checkpoint. Too big to jump over and can't be
- * stomped. Five shots to defeat. He hops every couple of seconds (crouching
- * first as a warning). Running underneath works only with a perfectly timed
- * full-speed dash: if anyone is still under him after his reaction time, he
- * SLAMS straight down.
+ * stomped. Five shots to defeat. He stomps toward you, hops often (crouching
+ * first as a warning), and every landing sends a shockwave rolling along the
+ * ground — jump over it. Get close and he roars and CHARGES. Running
+ * underneath works only with a perfectly timed full-speed dash while he's in
+ * the air: if anyone is still under him after his reaction time, he SLAMS
+ * straight down.
  */
 export class Giant extends Enemy {
   readonly kind: EnemyKind = 'giant';
   static readonly REACTION = 0.27;
   private dir = -1;
-  private mode: 'walk' | 'crouch' | 'air' | 'slamWindup' | 'slam' = 'walk';
-  private timer = 1.4;
+  private mode: 'walk' | 'crouch' | 'air' | 'slamWindup' | 'slam' | 'chargeWindup' | 'charge' = 'walk';
+  private timer = 1.0;
+  private chargeCooldown = 1.2;
   private underFor = 0;
   private pips: Phaser.GameObjects.Graphics;
   private readonly maxHp = 5;
@@ -251,6 +254,7 @@ export class Giant extends Enemy {
     const b = this.body;
     const target = this.gs.nearestPlayer(this.x, this.y);
     this.timer -= dt;
+    this.chargeCooldown -= dt;
     const onGround = b.blocked.down;
 
     switch (this.mode) {
@@ -258,12 +262,44 @@ export class Giant extends Enemy {
         if (target && Math.abs(target.x - this.x) > 20) this.dir = Math.sign(target.x - this.x);
         const aheadX = this.dir > 0 ? b.right + 4 : b.left - 4;
         const groundAhead = this.gs.level.isSolidAt(aheadX, b.bottom + 6);
-        b.setVelocityX(groundAhead && !(this.dir < 0 ? b.blocked.left : b.blocked.right) ? this.dir * 30 : 0);
-        this.setFrame(Math.floor(this.t * 3) % 2 ? 'w1' : 'w0');
-        if (this.timer <= 0 && onGround) {
+        b.setVelocityX(groundAhead && !(this.dir < 0 ? b.blocked.left : b.blocked.right) ? this.dir * 72 : 0);
+        this.setFrame(Math.floor(this.t * 5) % 2 ? 'w1' : 'w0');
+        const dx = target ? Math.abs(target.x - this.x) : Infinity;
+        const sameLevel = target ? Math.abs(target.bottom - b.bottom) < 48 : false;
+        if (target && onGround && this.chargeCooldown <= 0 && dx < 300 && dx > 70 && sameLevel) {
+          // wind up, then charge!
+          this.mode = 'chargeWindup';
+          this.timer = 0.45;
+          b.setVelocityX(-this.dir * 40);
+          sfx.roar();
+          this.gs.fx.popText(this.x, b.top - 26, '!!', '#ff5a3c', 26);
+        } else if (this.timer <= 0 && onGround) {
           this.mode = 'crouch';
-          this.timer = 0.5;
+          this.timer = 0.38;
           b.setVelocityX(0);
+        }
+        break;
+      }
+      case 'chargeWindup':
+        this.setFrame('crouch');
+        this.setX(this.x + Math.sin(this.t * 80) * 0.8);
+        if (this.timer <= 0) {
+          this.mode = 'charge';
+          this.timer = 0.85;
+        }
+        break;
+      case 'charge': {
+        const aheadX = this.dir > 0 ? b.right + 6 : b.left - 6;
+        const stop = !this.gs.level.isSolidAt(aheadX, b.bottom + 6) || (this.dir < 0 ? b.blocked.left : b.blocked.right);
+        b.setVelocityX(stop ? 0 : this.dir * 310);
+        this.setFrame(Math.floor(this.t * 12) % 2 ? 'w1' : 'w0');
+        if (Math.random() < 0.5) this.gs.fx.dust(this.dir > 0 ? b.left + 8 : b.right - 8, b.bottom, 1);
+        if (this.timer <= 0 || stop) {
+          this.mode = 'walk';
+          this.timer = 0.6;
+          this.chargeCooldown = 3.2 + Math.random() * 1.5;
+          b.setVelocityX(0);
+          this.gs.cameras.main.shake(140, 0.006);
         }
         break;
       }
@@ -272,7 +308,10 @@ export class Giant extends Enemy {
         if (this.timer <= 0) {
           this.mode = 'air';
           this.underFor = 0;
-          b.setVelocity(0, -560); // a short hop: just enough of a gap to dash under
+          // a hop: straight up when you're close (fair to dash under), a lunge toward you from afar
+          const tgt = this.gs.nearestPlayer(this.x, this.y);
+          const far = tgt ? Math.abs(tgt.x - this.x) > 260 : false;
+          b.setVelocity(far ? this.dir * 150 : 0, far ? -620 : -600);
           this.timer = 0.15;
         }
         break;
@@ -313,12 +352,15 @@ export class Giant extends Enemy {
   private land(slam: boolean) {
     const b = this.body;
     this.mode = 'walk';
-    this.timer = 1.7 + Math.random() * 0.9;
+    this.timer = 0.9 + Math.random() * 0.7;
     b.setVelocityX(0);
     this.gs.cameras.main.shake(slam ? 320 : 200, slam ? 0.02 : 0.01);
     this.gs.fx.dust(b.left + 10, b.bottom, slam ? 14 : 8);
     this.gs.fx.dust(b.right - 10, b.bottom, slam ? 14 : 8);
     if (slam) this.gs.fx.shockwave(this.x, b.bottom, 70);
+    // every landing sends a shockwave rolling along the ground both ways: jump it!
+    this.gs.spawnShockwave(b.left + 6, b.bottom, -1, slam ? 300 : 240);
+    this.gs.spawnShockwave(b.right - 6, b.bottom, 1, slam ? 300 : 240);
     sfx.thud();
   }
 

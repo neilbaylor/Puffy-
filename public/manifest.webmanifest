@@ -1,0 +1,15 @@
+{
+  "name": "Puffy",
+  "short_name": "Puffy",
+  "description": "Puffy, Scruffy and Big Muscles on Puff Ball Planet.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#5fc4ff",
+  "theme_color": "#5fc4ff",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

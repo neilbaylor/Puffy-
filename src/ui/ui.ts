@@ -16,6 +16,17 @@ const h = (html: string) => {
   return t.content.firstElementChild as HTMLElement;
 };
 
+const isStandalone = () =>
+  window.matchMedia?.('(display-mode: fullscreen)').matches ||
+  window.matchMedia?.('(display-mode: standalone)').matches ||
+  (navigator as Navigator & { standalone?: boolean }).standalone === true;
+const canFullscreen = () => {
+  const de = document.documentElement as HTMLElement & { webkitRequestFullscreen?: unknown };
+  return !!(de.requestFullscreen || de.webkitRequestFullscreen);
+};
+const isFullscreen = () => !!(document.fullscreenElement || (document as Document & { webkitFullscreenElement?: Element }).webkitFullscreenElement);
+const isIOS = () => /iPhone|iPod/.test(navigator.userAgent);
+
 const store = {
   get(k: string) {
     try {
@@ -145,6 +156,8 @@ export class UI {
       </header>
       <h2>Pick your player</h2>
       <div class="cards" role="radiogroup" aria-label="Pick your player"></div>
+      <button class="icon-btn fs-btn" data-act="fs" aria-label="Full screen" hidden>⛶</button>
+      <p class="ios-tip" hidden>Full screen on iPhone: tap <b>Share</b> → <b>Add to Home Screen</b>, then open Puffy from your home screen.</p>
       <div class="start-foot">
         <button class="btn btn-big" data-act="play">Play</button>
         <p class="keys-hint">${isTouchDevice() ? 'Tap a hero, then Play' : '← → to choose · Enter to play'}</p>
@@ -173,6 +186,15 @@ export class UI {
       cards.appendChild(card);
     });
     el.querySelector('[data-act=play]')!.addEventListener('click', () => this.play());
+    const fsBtn = el.querySelector<HTMLButtonElement>('[data-act=fs]')!;
+    const syncFs = () => (fsBtn.hidden = !canFullscreen() || isFullscreen() || isStandalone());
+    syncFs();
+    document.addEventListener('fullscreenchange', syncFs);
+    fsBtn.addEventListener('click', () => {
+      this.goFullscreen(true);
+      setTimeout(syncFs, 300);
+    });
+    el.querySelector<HTMLElement>('.ios-tip')!.hidden = !(isIOS() && !canFullscreen() && !isStandalone());
     this.setScreen(el);
     this.select(this.selected, true);
 
@@ -216,8 +238,10 @@ export class UI {
     if (!quiet) sfx.select();
   }
 
-  private goFullscreen() {
-    if (!isTouchDevice()) return;
+  /** Hide the browser's address bar etc. (Android, iPad, desktop). iPhone needs "Add to Home Screen". */
+  private goFullscreen(always = false) {
+    if (!always && !isTouchDevice()) return;
+    if (isFullscreen() || isStandalone()) return;
     const de = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => void };
     try {
       const p = de.requestFullscreen?.({ navigationUI: 'hide' }) ?? de.webkitRequestFullscreen?.();

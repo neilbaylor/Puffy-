@@ -15,7 +15,7 @@
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-l: env(safe-area-inset-left, 0px);
   /* touch control sizes scale with the screen: small on phones, roomy on tablets */
-  --stick: clamp(96px, 20vmin, 150px);
+  --stick: clamp(140px, 30vmin, 210px);
   --jump: clamp(70px, 15vmin, 118px);
   --fire: clamp(58px, 12.5vmin, 98px);
   color-scheme: light;
@@ -288,6 +288,27 @@ body {
   font-weight: 800;
   color: #fff;
   text-shadow: 0 1px 2px var(--ink);
+}
+.fs-btn {
+  position: absolute;
+  top: calc(10px + var(--safe-t));
+  right: calc(12px + var(--safe-r));
+  font-size: 22px;
+}
+.ios-tip {
+  position: absolute;
+  top: calc(10px + var(--safe-t));
+  left: calc(12px + var(--safe-l));
+  max-width: 260px;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: #3a2418d9;
+  color: #fff8ec;
+  font: 700 12px/1.35 var(--body);
+}
+.ios-tip b {
+  color: var(--gold);
 }
 /* short screens (phones in landscape): squeeze the start screen */
 @media (max-height: 460px) {
@@ -568,13 +589,13 @@ body {
 /* the stick zone is the lower-left corner only, so it stays clear of the hero */
 .touch-left {
   left: 0;
-  width: 42%;
-  height: 62%;
+  width: 46%;
+  height: 72%;
 }
 .touch-right {
   right: 0;
-  width: 40%;
-  height: 62%;
+  width: 50%;
+  height: 72%;
 }
 .stick-ghost {
   position: absolute;
@@ -610,23 +631,40 @@ body {
 .stick-active .stick-base {
   opacity: 1;
 }
-/* outer ring = the run zone */
+/* the walk zone is the big inner circle; the outer ring band is the run zone */
 .stick-run-ring {
   position: absolute;
-  inset: 12%;
+  inset: 7%;
   border-radius: 50%;
-  border: 2px dashed #ffffff44;
+  border: 2px dashed #ffffff66;
+}
+.stick-base::before {
+  content: 'RUN';
+  position: absolute;
+  top: -1.4em;
+  left: 50%;
+  transform: translateX(-50%);
+  font: 400 13px/1 var(--display);
+  color: #ffffffaa;
+  -webkit-text-stroke: 3px #3a2418;
+  paint-order: stroke fill;
+}
+.running .stick-base {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 6px #ffc53366;
+}
+.running .stick-base::before {
+  color: var(--gold);
 }
 .running .stick-run-ring {
-  border: 3px solid var(--gold);
-  inset: -3px;
+  border-color: var(--gold);
 }
 .stick-knob {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 44%;
-  height: 44%;
+  width: 34%;
+  height: 34%;
   border-radius: 50%;
   transform: translate(-50%, -50%);
   background: #ffffffe6;

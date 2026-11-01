@@ -4,14 +4,17 @@ import { touchState } from '../input/touch';
  * On-screen controls for phones and tablets.
  *
  *   Left thumb:  a stick that appears where you touch (bottom-left area).
- *                It stays put — it never slides after your thumb. A small push
- *                walks; pushing to the outer ring (a short push, ~50px) runs.
- *   Right thumb: JUMP (big) and FIRE. You can slide between them.
+ *                It stays put — it never slides after your thumb. Most of the
+ *                circle walks; only the outer ring runs (you feel a buzz).
+ *   Right thumb: JUMP (big) and FIRE. Near-misses still count: a tap lands on
+ *                whichever button is closest.
  *
  * Sizes scale with the screen so they suit both phones and tablets.
  */
-const WALK_AT = 0.2; // fraction of the stick radius
-const RUN_AT = 0.72;
+// Fractions of the stick radius. Walking covers a wide band (0.14 → 0.86);
+// you only run when you push the knob out into the outer ring.
+const WALK_AT = 0.14;
+const RUN_AT = 0.86;
 
 export class TouchControls {
   readonly root: HTMLDivElement;
@@ -113,8 +116,10 @@ export class TouchControls {
     const fx = dx / R; // horizontal push as a fraction of the radius (can exceed 1)
     touchState.left = fx < -WALK_AT;
     touchState.right = fx > WALK_AT;
-    touchState.run = Math.abs(fx) >= RUN_AT;
-    this.root.classList.toggle('running', touchState.run);
+    const run = Math.abs(fx) >= RUN_AT;
+    if (run && !touchState.run) navigator.vibrate?.(12);
+    touchState.run = run;
+    this.root.classList.toggle('running', run);
   }
 
   private updateButtons(pressed: boolean) {
@@ -129,7 +134,7 @@ export class TouchControls {
     for (const p of this.buttonPointers.values()) {
       const dj = Math.hypot(p.x - j.x, p.y - j.y) / j.r;
       const df = Math.hypot(p.x - f.x, p.y - f.y) / f.r;
-      if (Math.min(dj, df) > 1.45) continue;
+      if (Math.min(dj, df) > 2.1) continue; // generous: near-misses still press the closest button
       if (dj <= df) jump = true;
       else fire = true;
     }
