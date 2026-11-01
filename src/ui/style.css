@@ -218,7 +218,7 @@ body {
 }
 .card canvas {
   width: auto;
-  height: clamp(44px, 20vmin, 170px);
+  height: clamp(96px, 34vmin, 270px);
   max-width: 100%;
   min-height: 0;
   flex-shrink: 1;
@@ -292,7 +292,9 @@ body {
 /* short screens (phones in landscape): squeeze the start screen */
 @media (max-height: 460px) {
   .bars { display: none; }
+  .card-tag { display: none; }
   .start h2 { display: none; }
+  .card canvas { height: 42vmin; }
   .logo { font-size: clamp(32px, 11vmin, 56px); }
 }
 
@@ -475,6 +477,40 @@ body {
   box-shadow: 0 0 10px #9ffbe8aa;
   transform: rotate(8deg);
 }
+.hud-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.hud-rb {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--display);
+  font-size: clamp(16px, 3.2vmin, 23px);
+  line-height: 1;
+  color: #ffd2a8;
+  font-variant-numeric: tabular-nums;
+}
+.hud-rb.bump {
+  animation: rb-bump 0.4s ease-out;
+}
+@keyframes rb-bump {
+  40% { transform: scale(1.35); }
+}
+.rb-ico {
+  display: inline-block;
+  width: 0.5em;
+  height: 1em;
+  border-radius: 30% 30% 22% 22% / 18% 18% 12% 12%;
+  background: linear-gradient(180deg, #e8463f 0 14%, #7a3e1c 14% 40%, #fff1d6 40% 64%, #7a3e1c 64%);
+  border: 2px solid var(--ink);
+}
+.stat-list dd small {
+  font-family: var(--body);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
 .hud-stamina {
   display: flex;
   align-items: center;
@@ -482,13 +518,13 @@ body {
   --v: 1;
 }
 .hud-stamina b {
-  font: 900 9px/1 var(--body);
+  font: 900 10px/1 var(--body);
   letter-spacing: 0.1em;
   color: #fff8ecb0;
 }
 .hud-stamina .bar {
-  width: clamp(70px, 15vmin, 120px);
-  height: 9px;
+  width: clamp(90px, 19vmin, 160px);
+  height: 12px;
   border-radius: 6px;
   background: #00000055;
   border: 1.5px solid #fff8ec88;

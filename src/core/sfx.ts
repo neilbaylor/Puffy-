@@ -86,6 +86,16 @@ export const sfx = {
     tone({ type: 'sine', from: 880, to: 1320, dur: 0.12, vol: 0.12 });
     tone({ type: 'triangle', from: 1760, to: 2200, dur: 0.18, vol: 0.06, delay: 0.05 });
   },
+  chomp: () => {
+    noise(0.07, 0.25, 1400, 400);
+    noise(0.07, 0.22, 1200, 300, 0.12);
+    tone({ type: 'triangle', from: 300, to: 180, dur: 0.06, vol: 0.12, delay: 0.24 });
+  },
+  rootbeer: () => {
+    tone({ type: 'sine', from: 520, to: 880, dur: 0.1, vol: 0.12 });
+    noise(0.18, 0.12, 4000, 1500, 0.08);
+    tone({ type: 'triangle', from: 1320, dur: 0.16, vol: 0.08, delay: 0.12 });
+  },
   stomp: () => {
     tone({ type: 'square', from: 420, to: 120, dur: 0.12, vol: 0.14 });
     noise(0.08, 0.15, 900, 200);

@@ -11,7 +11,7 @@ export type Cell = 'ground' | 'rock' | 'boulder' | 'bramble' | 'cloud' | null;
 export type EnemyKind = 'puffball' | 'bigpuff' | 'giant';
 
 export interface Spawn {
-  type: EnemyKind | 'aura' | 'checkpoint' | 'goal' | 'player' | 'tree';
+  type: EnemyKind | 'aura' | 'rootbeer' | 'checkpoint' | 'goal' | 'player' | 'tree';
   x: number; // tile column (may be fractional for aura / trees)
   y: number; // tile row the thing occupies
   opts?: Record<string, number | string | boolean>;
@@ -104,6 +104,12 @@ export class LevelBuilder {
   /** A possible aura spot floating at height h (each play, only some spots get aura). */
   aura(x: number, h: number) {
     this.spawns.push({ type: 'aura', x, y: this.top(h) });
+    return this;
+  }
+
+  /** A (rare) root beer bottle floating at height h. */
+  rootbeer(x: number, h: number) {
+    this.spawns.push({ type: 'rootbeer', x, y: this.top(h) });
     return this;
   }
 

@@ -9,6 +9,8 @@ import { STYLES } from './handdrawn';
 import {
   DEFAULT_PALETTE,
   drawAura,
+  drawNuggie,
+  drawRootBeer,
   drawBloom,
   drawBoulder,
   drawBramble,
@@ -99,6 +101,8 @@ function makeBaddies(scene: Phaser.Scene) {
 function makeItems(scene: Phaser.Scene, pal: WorldPalette) {
   const st = STYLES[ART_STYLE];
   addCanvas(scene, 'aura', hires(48, 48, ART_RES, (ctx) => drawAura(ctx, 24, 25, 10.5)));
+  addCanvas(scene, 'nuggie', hires(40, 34, ART_RES, (ctx) => drawNuggie(ctx, 20, 17, 11)));
+  addCanvas(scene, 'rootbeer', hires(30, 40, ART_RES, (ctx) => drawRootBeer(ctx, 15, 38, 34)));
   addCanvas(scene, 'rocket', hires(30, 16, ART_RES, (ctx) => drawRocket(ctx, st, 15, 8)));
   addCanvas(scene, 'flash', hires(40, 32, ART_RES, (ctx) => drawMuzzleFlash(ctx, st, 20, 16, 12)));
   addCanvas(scene, 'boulder', hires(36, 36, PROP_RES, (ctx) => drawBoulder(ctx, 2, 2, pal, 7)));

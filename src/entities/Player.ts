@@ -18,7 +18,7 @@ const RECOIL_TIME = 0.16;
 const HIT_W = 22;
 const HIT_H = 34;
 /** Character textures are hi-res; this maps them back to world size. */
-const S = 1 / ART_RES;
+const BASE_S = 1 / ART_RES;
 
 export type PlayerState = 'alive' | 'fainted' | 'finished';
 
@@ -56,6 +56,10 @@ export class Player {
   private recoilShift = 0;
   /** Horizontal speed when we left the ground (so run-jumps keep their speed). */
   private launchSpeed = 0;
+  /** Sprite scale for this hero. */
+  private S: number;
+  /** Eating a nuggie: seconds left of the munch animation. */
+  private eating = 0;
 
   constructor(
     private scene: GameScene,
@@ -64,6 +68,7 @@ export class Player {
     x: number,
     y: number,
   ) {
+    this.S = BASE_S * char.scale;
     this.hitbox = scene.physics.add.image(x, y, '__DEFAULT').setVisible(false);
     this.body = this.hitbox.body as Phaser.Physics.Arcade.Body;
     this.body.setSize(char.hitW ?? HIT_W, char.hitH ?? HIT_H, true);
@@ -71,7 +76,7 @@ export class Player {
     this.body.setCollideWorldBounds(true);
     this.hitbox.setData('player', this);
 
-    this.view = scene.add.sprite(x, y, `char-${char.id}`, 'idle0').setOrigin(0.5, 1).setScale(S).setDepth(DEPTH.players);
+    this.view = scene.add.sprite(x, y, `char-${char.id}`, 'idle0').setOrigin(0.5, 1).setScale(this.S).setDepth(DEPTH.players);
     this.meter = scene.add.graphics().setDepth(DEPTH.text);
   }
 
@@ -194,6 +199,7 @@ export class Player {
     this.squash.x += (1 - this.squash.x) * k;
     this.squash.y += (1 - this.squash.y) * k;
     this.recoilShift += (0 - this.recoilShift) * Math.min(1, dt * 14);
+    this.eating = Math.max(0, this.eating - dt);
 
     if (this.state !== 'fainted') {
       this.view.setPosition(b.center.x - this.facing * this.recoilShift, b.bottom + 2);
@@ -202,11 +208,12 @@ export class Player {
       const targetTilt = (b.velocity.x / this.char.runSpeed) * (this.onGround ? 0.14 : 0.06);
       this.tilt += (targetTilt - this.tilt) * Math.min(1, dt * 12);
       this.view.setRotation(this.tilt);
-      this.view.setScale(this.squash.x * S, this.squash.y * S);
+      this.view.setScale(this.squash.x * this.S, this.squash.y * this.S);
 
       let frame: string;
       if (this.stun > 0) frame = 'hurt';
       else if (this.recoil > 0) frame = 'shoot';
+      else if (this.eating > 0) frame = this.eating > 0.32 ? 'eat0' : Math.floor(this.eating * 12) % 2 ? 'eat1' : 'idle0';
       else if (!this.onGround) frame = b.velocity.y < 0 ? 'jump' : 'fall';
       else if (speed > 15) {
         this.animTime += dt * (4 + speed / 22);
@@ -237,6 +244,18 @@ export class Player {
       .beginPath()
       .arc(x, y, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * this.stamina)
       .strokePath();
+  }
+
+  /** Start the munch animation (nuggie pickup). */
+  eat() {
+    this.eating = 0.62;
+    this.squash = { x: 1.12, y: 0.9 };
+  }
+
+  /** Where the hero's mouth is in the world (for the nuggie fly-in). */
+  get mouth() {
+    const h = (this.char.hitH ?? HIT_H);
+    return { x: this.view.x + this.facing * 8 * this.char.scale, y: this.bottom - h * 0.62 };
   }
 
   /** Bounce off something you stomped. Holding jump bounces higher. */

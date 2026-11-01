@@ -3,7 +3,7 @@ import { CHARACTERS, characterById } from '../data/characters';
 import type { Session } from '../core/session';
 import { playLevelClear, primeMusic, setMusicMuted, stopMusic } from '../core/music';
 import { isMuted, setMuted, sfx, unlockAudio } from '../core/sfx';
-import { drawPortrait } from '../gfx/draw';
+import { drawHeroCard, drawPortrait } from '../gfx/draw';
 import { gamepadSources } from '../input/gamepad';
 import { isKeyDown } from '../input/keyboard';
 import { isTouchDevice } from '../input/touch';
@@ -55,7 +55,10 @@ export class UI {
         <div class="hud-hero">
           <canvas width="72" height="72"></canvas>
           <div class="hud-stats">
-            <div class="hud-aura" title="Aura"><i class="aura-ico"></i><span>0</span></div>
+            <div class="hud-row">
+              <div class="hud-aura" title="Aura (eat nuggies!)"><i class="aura-ico"></i><span>0</span></div>
+              <div class="hud-rb" title="Root beer"><i class="rb-ico"></i><span>0</span></div>
+            </div>
             <div class="hud-stamina" title="Stamina"><b>STAMINA</b><div class="bar"><i></i></div></div>
           </div>
         </div>
@@ -144,7 +147,7 @@ export class UI {
     CHARACTERS.forEach((c, i) => {
       const bar = (n: number) => `<i style="--n:${n}"></i>`;
       const card = h(`<button class="card" role="radio" data-i="${i}" style="--c:${c.colors.main};--cs:${c.colors.shade}">
-        <canvas width="200" height="200"></canvas>
+        <canvas width="320" height="320"></canvas>
         <div class="card-name">${c.name}</div>
         <div class="card-tag">${c.tagline}</div>
         <dl class="bars">
@@ -154,7 +157,7 @@ export class UI {
           <dt>Blast</dt><dd>${bar(c.bars.blast)}</dd>
         </dl>
       </button>`);
-      drawPortrait(card.querySelector('canvas')!, c, 'idle0');
+      drawHeroCard(card.querySelector('canvas')!, c, 'idle0');
       card.addEventListener('click', () => {
         unlockAudio();
         if (this.selected === i) this.play();
@@ -251,6 +254,14 @@ export class UI {
   private renderHud(s: HudState) {
     this.hud.querySelector('.hud-aura span')!.textContent = String(s.aura);
     this.hud.querySelector('.hud-aura')!.classList.toggle('has', s.aura > 0);
+    const rb = this.hud.querySelector('.hud-rb span')!;
+    if (rb.textContent !== String(s.rootbeer)) {
+      rb.textContent = String(s.rootbeer);
+      const box = this.hud.querySelector('.hud-rb')!;
+      box.classList.remove('bump');
+      void (box as HTMLElement).offsetWidth;
+      box.classList.add('bump');
+    }
     const bar = this.hud.querySelector<HTMLElement>('.hud-stamina')!;
     bar.style.setProperty('--v', String(s.stamina));
     bar.classList.toggle('low', s.stamina < 0.35 && !s.exhausted);
@@ -321,6 +332,7 @@ export class UI {
           <h2>Level clear!</h2>
           <dl class="stat-list">
             <dt><i class="aura-ico"></i>Aura carried</dt><dd>${r.aura}</dd>
+            <dt><i class="rb-ico"></i>Root beer found</dt><dd>${r.rootbeer} <small>(${r.rootbeerTotal} saved)</small></dd>
             <dt>Puffballs popped</dt><dd>${r.popped}</dd>
             <dt>Giants beaten</dt><dd>${r.giants}</dd>
             <dt>Faints</dt><dd>${r.faints}</dd>

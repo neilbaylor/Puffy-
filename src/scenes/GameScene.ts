@@ -4,7 +4,7 @@ import { characterById } from '../data/characters';
 import type { Session } from '../core/session';
 import { sfx } from '../core/sfx';
 import { createEnemy, type Enemy } from '../entities/enemies/Enemy';
-import { Aura, Checkpoint, Goal } from '../entities/Pickups';
+import { Aura, Checkpoint, Goal, RootBeer } from '../entities/Pickups';
 import { Player } from '../entities/Player';
 import { Rocket } from '../entities/Rocket';
 import { soloSource, sourceById } from '../input/devices';
@@ -25,6 +25,7 @@ export interface HudState {
   charId: string;
   name: string;
   aura: number;
+  rootbeer: number;
   stamina: number;
   exhausted: boolean;
   running: boolean;
@@ -34,6 +35,8 @@ export interface ResultState {
   charId: string;
   name: string;
   aura: number;
+  rootbeer: number;
+  rootbeerTotal: number;
   popped: number;
   giants: number;
   faints: number;
@@ -41,12 +44,30 @@ export interface ResultState {
 }
 
 /** Chance that each aura spot in the level actually has aura this time. */
-const AURA_CHANCE = 0.65;
+const AURA_CHANCE = 0.6;
 /** Max wisps that scatter when you get hit while carrying aura. */
 const SCATTER_MAX = 10;
 
 /** Stats that survive restarting at a checkpoint (reset when a new run starts). */
-const run = { startedAt: 0, faints: 0, popped: 0, giants: 0, bestAura: 0 };
+const run = { startedAt: 0, faints: 0, popped: 0, giants: 0, bestAura: 0, rootbeer: new Set<string>() };
+
+/** Root beer is banked across plays (it'll buy things later). */
+export const bank = {
+  get rootbeer() {
+    try {
+      return Number(localStorage.getItem('puffy.rootbeer') ?? 0) || 0;
+    } catch {
+      return 0;
+    }
+  },
+  addRootbeer(n = 1) {
+    try {
+      localStorage.setItem('puffy.rootbeer', String(this.rootbeer + n));
+    } catch {
+      /* private mode */
+    }
+  },
+};
 
 type Group = Phaser.GameObjects.Group;
 
@@ -60,6 +81,9 @@ export class GameScene extends Phaser.Scene {
   private enemies: Enemy[] = [];
   private rockets: Rocket[] = [];
   private auras: Aura[] = [];
+  private rootbeers: RootBeer[] = [];
+  private pendingAura: { at: number; p: Player }[] = [];
+  private gRootbeer!: Group;
   private checkpoints: Checkpoint[] = [];
   private goal?: Goal;
 
@@ -93,11 +117,14 @@ export class GameScene extends Phaser.Scene {
       run.popped = 0;
       run.giants = 0;
       run.bestAura = 0;
+      run.rootbeer = new Set();
     }
     this.players = [];
     this.enemies = [];
     this.rockets = [];
     this.auras = [];
+    this.rootbeers = [];
+    this.pendingAura = [];
     this.checkpoints = [];
     this.goal = undefined;
     this.aura = 0;
@@ -119,6 +146,7 @@ export class GameScene extends Phaser.Scene {
     this.gEnemies = this.add.group();
     this.gRockets = this.add.group();
     this.gAuras = this.add.group();
+    this.gRootbeer = this.add.group();
 
     // ── Spawns ──
     const surface = (row: number) => (row + 1) * TILE; // ground top under something standing in `row`
@@ -133,6 +161,14 @@ export class GameScene extends Phaser.Scene {
         case 'aura':
           if (Math.random() < AURA_CHANCE) this.addAura(new Aura(this, cx, s.y * TILE + TILE / 2));
           break;
+        case 'rootbeer': {
+          const id = `${s.x},${s.y}`;
+          if (run.rootbeer.has(id)) break; // already grabbed this run
+          const rb = new RootBeer(this, cx, s.y * TILE + TILE / 2, id);
+          this.rootbeers.push(rb);
+          this.gRootbeer.add(rb);
+          break;
+        }
         case 'checkpoint': {
           const idx = cps.indexOf(s);
           const cp = new Checkpoint(this, cx, surface(s.y), idx);
@@ -179,6 +215,7 @@ export class GameScene extends Phaser.Scene {
     this.physics.add.overlap(this.gPlayers, this.gEnemies, (h, e) => this.onPlayerEnemy(h as Phaser.GameObjects.GameObject, e as Enemy));
     this.physics.add.overlap(this.gRockets, this.gEnemies, (r) => (r as Rocket).explode());
     this.physics.add.overlap(this.gPlayers, this.gAuras, (h, a) => this.collectAura(this.playerOf(h), a as Aura));
+    this.physics.add.overlap(this.gPlayers, this.gRootbeer, (h, r) => this.collectRootbeer(this.playerOf(h), r as RootBeer));
     for (const cp of this.checkpoints)
       this.physics.add.overlap(this.gPlayers, cp.zone, () => {
         if (cp.reached) return;
@@ -242,6 +279,8 @@ export class GameScene extends Phaser.Scene {
 
     const now = this.time.now;
     this.auras = this.auras.filter((a) => a.tick(now, dt));
+    this.rootbeers = this.rootbeers.filter((r) => r.tick(now));
+    this.settleAura();
 
     this.bg.update(this.view, dt);
     this.emitHud();
@@ -305,7 +344,7 @@ export class GameScene extends Phaser.Scene {
     if (!p.alive || p.invulnerable) return;
     if (this.aura > 0) {
       const n = Math.min(this.aura, SCATTER_MAX);
-      for (let i = 0; i < n; i++) this.addAura(new Aura(this, p.x, p.y - 10, true));
+      for (let i = 0; i < n; i++) this.addAura(new Aura(this, p.x, p.y - 10, true)); // nuggies scatter (grab some back!)
       this.aura = 0;
       p.knockBack(fromX);
       this.fx.auraSparkle(p.x, p.y, 14);
@@ -314,15 +353,56 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /** Grab a nuggie: it flies into the hero's mouth, they munch it, then aura goes up. */
   private collectAura(p: Player, a: Aura) {
     if (!p.alive || a.taken) return;
-    // freshly scattered wisps can't be grabbed for a split second
+    // freshly scattered nuggies can't be grabbed for a split second
     if (this.time.now < a.collectableAt) return;
-    this.aura++;
-    run.bestAura = Math.max(run.bestAura, this.aura);
-    this.fx.auraSparkle(a.x, a.y, 8);
-    sfx.aura();
+    const nug = this.add.image(a.x, a.y, 'nuggie').setScale(1 / 3).setDepth(p.view.depth + 1);
     a.vanish();
+    sfx.chomp();
+    this.tweens.add({
+      targets: nug,
+      x: { getEnd: () => p.mouth.x },
+      y: { getEnd: () => p.mouth.y },
+      scale: 0.18,
+      duration: 160,
+      ease: 'Quad.easeIn',
+      onComplete: () => {
+        nug.destroy();
+        p.eat();
+        this.pendingAura.push({ at: this.time.now + 330, p });
+      },
+    });
+  }
+
+  /** Aura goes up once the munch animation has played. */
+  private settleAura() {
+    const now = this.time.now;
+    this.pendingAura = this.pendingAura.filter(({ at, p }) => {
+      if (now < at) return true;
+      if (p.state === 'fainted') return false;
+      this.aura++;
+      run.bestAura = Math.max(run.bestAura, this.aura);
+      this.fx.auraSparkle(p.x, p.y - 6, 12);
+      this.fx.popText(p.x, p.body.top - 18, '+1 AURA', '#6ff0d8', 15);
+      sfx.aura();
+      return false;
+    });
+  }
+
+  private collectRootbeer(p: Player, r: RootBeer) {
+    if (!p.alive || r.taken) return;
+    run.rootbeer.add(r.id);
+    bank.addRootbeer(1);
+    this.fx.sparkle(r.x, r.y, 10);
+    this.fx.popText(r.x, r.y - 18, '+1 ROOT BEER', '#ffc58a', 14);
+    sfx.rootbeer();
+    // fly up to the HUD counter
+    const fly = this.add.image(r.x, r.y, 'rootbeer').setScale(1 / 3).setDepth(1000);
+    r.vanish();
+    this.tweens.add({ targets: fly, y: fly.y - 60, alpha: 0, scale: 0.5, duration: 420, ease: 'Quad.easeOut', onComplete: () => fly.destroy() });
+    this.lastHud = '';
   }
 
   private onPlayerEnemy(hitbox: Phaser.GameObjects.GameObject, e: Enemy) {
@@ -357,7 +437,7 @@ export class GameScene extends Phaser.Scene {
   // ─────────────────────────────────────────── bazooka ──
 
   fireRocket(p: Player) {
-    const x = p.x + p.facing * 24;
+    const x = p.x + p.facing * 24 * p.char.scale;
     const y = p.bottom - (p.char.muzzleY ?? 18);
     sfx.shoot();
     this.fx.muzzle(x, y, p.facing, p.x - p.facing * 18);
@@ -480,6 +560,8 @@ export class GameScene extends Phaser.Scene {
       charId: p.char.id,
       name: p.char.name,
       aura: this.aura,
+      rootbeer: run.rootbeer.size,
+      rootbeerTotal: bank.rootbeer,
       popped: run.popped,
       giants: run.giants,
       faints: run.faints,
@@ -495,11 +577,12 @@ export class GameScene extends Phaser.Scene {
       charId: p.char.id,
       name: p.char.name,
       aura: this.aura,
+      rootbeer: bank.rootbeer,
       stamina: Math.round(p.stamina * 100) / 100,
       exhausted: p.exhausted,
       running: p.running,
     };
-    const key = `${s.aura}|${s.stamina}|${s.exhausted}|${s.running}`;
+    const key = `${s.aura}|${s.rootbeer}|${s.stamina}|${s.exhausted}|${s.running}`;
     if (!force && key === this.lastHud) return;
     this.lastHud = key;
     this.game.events.emit('hud', s);

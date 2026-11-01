@@ -121,7 +121,34 @@ export const PALETTES: Record<string, WorldPalette> = {
   },
 };
 
-export const DEFAULT_PALETTE = PALETTES.meadow;
+PALETTES.puff = {
+  id: 'puff',
+  name: 'Puff Ball Planet',
+  blurb: 'Marshmallow earth topped with fluffy puff-moss, dandelion puffs, a ringed planet in a candy-blue sky.',
+  sky: ['#5fc4ff', '#b9e4ff', '#ffe6f2'],
+  sun: '#fff1c8',
+  far: { base: '#cfc2f2', shade: '#b2a3e3', light: '#ece6ff' },
+  farInk: '#9486c8',
+  cloud: { base: '#ffffff', shade: '#e3dcf7', light: '#ffffff' },
+  hill: { base: '#8fdcc4', shade: '#5fbfa4', light: '#c6f4e6' },
+  hill2: { base: '#c3c8f2', shade: '#a3a8de', light: '#e2e5ff' },
+  near: { base: '#6cc8ae', shade: '#4aa58c', light: '#a6ead6' },
+  soilTop: '#f7c6a8',
+  soilDeep: '#c98ca8',
+  strata: '#b07892',
+  grass: { base: '#7fe3c2', shade: '#3fb595', light: '#d4fff1' },
+  rock: { base: '#b7aee3', shade: '#8a80c2', light: '#e8e3ff' },
+  canopies: [
+    { base: '#ffcf6e', shade: '#e3a03a', light: '#fff0b8' },
+    { base: '#ffa8c8', shade: '#e2759c', light: '#ffe0ec' },
+    { base: '#a8ecda', shade: '#62c4aa', light: '#e0fff6' },
+  ],
+  trunk: { base: '#b98872', shade: '#8a5e4c', light: '#e2b8a4' },
+  bramble: { base: '#7a4a9a', shade: '#55306f', light: '#b28bd0' },
+  flowers: ['#ffffff', '#ffb3d1', '#ffe17a', '#b9a8ff'],
+};
+
+export const DEFAULT_PALETTE = PALETTES.puff;
 
 /** A style variant with a lighter ink, for far-away scenery. */
 const inked = (ink: string): Style => ({ ...ST, ink, shape: ST.shape, line: ST.line });
@@ -334,30 +361,29 @@ export function drawTerrainPiece(ctx: Ctx, o: TerrainPieceOpts) {
 
   const area = (x1 - x0) * (y1 - y0);
   if (o.kind === 'ground') {
-    // soft wavy strata
-    ctx.globalAlpha = 0.22;
-    for (let y = y0 + 34; y < y1; y += 30 + r() * 16) {
-      ctx.strokeStyle = pal.strata;
-      ctx.lineWidth = 3;
+    // soft wavy marshmallow bands
+    for (let y = y0 + 30, k = 0; y < y1 + 40; y += 26 + r() * 12, k++) {
+      ctx.fillStyle = k % 2 ? '#ffffff1f' : pal.strata + '26';
       ctx.beginPath();
-      for (let x = x0 - 10; x <= x1 + 10; x += 12) {
-        const yy = y + Math.sin(x * 0.03 + y) * 4;
-        if (x === x0 - 10) ctx.moveTo(x, yy);
-        else ctx.lineTo(x, yy);
-      }
-      ctx.stroke();
+      ctx.moveTo(x0 - 10, y1 + 50);
+      for (let x = x0 - 10; x <= x1 + 10; x += 10) ctx.lineTo(x, y + Math.sin(x * 0.028 + k * 1.7) * 5);
+      ctx.lineTo(x1 + 10, y1 + 50);
+      ctx.fill();
     }
-    ctx.globalAlpha = 1;
-    // pebbles
-    const pebbles = Math.round(area / 2600);
-    for (let i = 0; i < pebbles; i++) {
+    // puff fossils: little curled spirals and sleeping puff seeds in the earth
+    const fossils = Math.round(area / 3400);
+    for (let i = 0; i < fossils; i++) {
       const px = x0 + r() * (x1 - x0);
-      const py = y0 + 22 + r() * (y1 - y0 - 22);
-      const s = 2.4 + r() * 3.2;
-      ST.shape(ctx, ellipsePts(px, py, s * 1.3, s, r() * 3, 14), { base: '#c4a184', shade: '#9a7a62', light: '#e8cdb6' }, seed + i, {
-        lw: 0.55,
-        plain: true,
-      });
+      const py = y0 + 30 + r() * Math.max(1, y1 - y0 - 30);
+      if (r() < 0.55) {
+        const sp: Pt[] = [];
+        const rr = 3 + r() * 3;
+        for (let t = 0; t < 1; t += 0.06) sp.push([px + Math.cos(t * 11) * rr * t, py + Math.sin(t * 11) * rr * t]);
+        ST.line(ctx, sp, seed + i, 0.55, pal.strata);
+      } else {
+        const rr = 2.6 + r() * 2.4;
+        ST.shape(ctx, fluffPts(px, py, rr, rr, 6, 0.12, r() * 3), { base: '#fff4ea', shade: '#efd2d6', light: '#ffffff' }, seed + i, { lw: 0.45, plain: true });
+      }
     }
     // fine crayon grain
     ctx.lineCap = 'round';
@@ -373,17 +399,28 @@ export function drawTerrainPiece(ctx: Ctx, o: TerrainPieceOpts) {
     }
     // darker band + hanging roots under floating undersides
     for (const run of bottoms) strokeRun(ctx, run, 22, pal.soilDeep);
-    // grass: a thick band inside the top edge, with a soft scalloped underside
+    // puff-moss: a fluffy band of overlapping cotton puffs along every top edge
     for (const run of tops) {
-      strokeRun(ctx, run, 30, pal.grass.shade);
-      strokeRun(ctx, run, 24, pal.grass.base);
-      ctx.fillStyle = pal.grass.base;
-      for (const { p, dx, dy } of along(run, 9, 4)) {
+      strokeRun(ctx, run, 26, pal.grass.shade);
+      strokeRun(ctx, run, 20, pal.grass.base);
+      for (const { p, dx, dy } of along(run, 8, 3)) {
+        const rr = 5 + r() * 2.5;
+        const ox = p[0] - dy * (9 + r() * 3);
+        const oy = p[1] + dx * (9 + r() * 3);
+        ctx.fillStyle = pal.grass.shade;
         ctx.beginPath();
-        ctx.arc(p[0] - dy * 11.5, p[1] + dx * 11.5, 5.2, 0, Math.PI * 2);
+        ctx.arc(ox, oy + 1.2, rr + 0.8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = pal.grass.base;
+        ctx.beginPath();
+        ctx.arc(ox, oy, rr, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = pal.grass.light + 'aa';
+        ctx.beginPath();
+        ctx.arc(ox - rr * 0.3, oy - rr * 0.35, rr * 0.35, 0, Math.PI * 2);
         ctx.fill();
       }
-      strokeRun(ctx, run, 6, pal.grass.light);
+      strokeRun(ctx, run, 4, pal.grass.light);
     }
   } else {
     // rock: cracks + facets
@@ -422,18 +459,33 @@ export function drawTerrainPiece(ctx: Ctx, o: TerrainPieceOpts) {
         if (r() < 0.3) ST.shape(ctx, ellipsePts(p[0] + sway, p[1] + len + 2, 2.4, 2.4, 0, 10), pal.grass, seed + p[0] + 1, { lw: 0.5, plain: true });
       }
     }
-    // grass blades poking above the top edge
+    // fluffy bumps cresting the top edge, and the odd dandelion-puff stalk
     for (const run of tops) {
-      for (const { p } of along(run, 7 + r() * 5, r() * 6)) {
-        if (r() < 0.45) continue;
-        const h = 3.5 + r() * 5;
-        const lean = (r() - 0.5) * 4;
-        ctx.fillStyle = r() > 0.5 ? pal.grass.base : pal.grass.shade;
-        ctx.beginPath();
-        ctx.moveTo(p[0] - 2, p[1] + 2);
-        ctx.quadraticCurveTo(p[0] + lean * 0.3, p[1] - h * 0.6, p[0] + lean, p[1] - h);
-        ctx.quadraticCurveTo(p[0] + lean * 0.4 + 1, p[1] - h * 0.4, p[0] + 2, p[1] + 2);
-        ctx.fill();
+      for (const { p } of along(run, 11 + r() * 6, r() * 6)) {
+        const roll = r();
+        if (roll < 0.5) {
+          const rr = 3.2 + r() * 2.6;
+          ST.shape(ctx, ellipsePts(p[0], p[1] - rr * 0.35, rr * 1.2, rr, 0, 16), pal.grass, seed + p[0], { lw: 0.6, plain: true });
+        } else if (roll < 0.58) {
+          const h = 9 + r() * 7;
+          const lean = (r() - 0.5) * 5;
+          ST.line(ctx, [[p[0], p[1]], [p[0] + lean * 0.4, p[1] - h * 0.5], [p[0] + lean, p[1] - h]], seed + p[0] + 2, 0.55, pal.grass.shade);
+          const hx = p[0] + lean;
+          const hy = p[1] - h - 3;
+          ctx.fillStyle = '#ffffffdd';
+          ctx.beginPath();
+          ctx.arc(hx, hy, 3.6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 0.7;
+          for (let k = 0; k < 8; k++) {
+            const a = (k / 8) * Math.PI * 2;
+            ctx.beginPath();
+            ctx.moveTo(hx, hy);
+            ctx.lineTo(hx + Math.cos(a) * 5.4, hy + Math.sin(a) * 5.4);
+            ctx.stroke();
+          }
+        }
       }
     }
   }
@@ -659,6 +711,26 @@ export function drawSky(ctx: Ctx, w: number, h: number, pal: WorldPalette) {
 export function drawFarLayer(ctx: Ctx, W: number, H: number, pal: WorldPalette) {
   const far = inked(pal.farInk);
   const r = rng(41);
+  // a big ringed planet and a little moon hanging in the sky
+  wrapX(W, (dx) => {
+    const px = 700 + dx;
+    const py = 52;
+    ctx.save();
+    ctx.globalAlpha = 0.85;
+    ctx.strokeStyle = pal.far.light;
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    ctx.ellipse(px, py, 66, 15, -0.25, Math.PI * 0.95, Math.PI * 2.05);
+    ctx.stroke();
+    far.shape(ctx, fluffPts(px, py, 38, 38, 9, 0.05), { base: '#ffd2b8', shade: '#f0a8a8', light: '#fff0e2' }, 30, { lw: 0.8, light: [px - 14, py - 16] });
+    ctx.strokeStyle = pal.far.light;
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    ctx.ellipse(px, py, 66, 15, -0.25, Math.PI * 0.05, Math.PI * 0.95);
+    ctx.stroke();
+    ctx.restore();
+    far.shape(ctx, ellipsePts(160 + dx, 28, 11, 11, 0, 24), { base: '#f6f0ff', shade: '#d8cff0', light: '#ffffff' }, 31, { lw: 0.7 });
+  });
   // distant puffy domes along the bottom
   for (let x = 0; x < W; x += 120 + r() * 70) {
     const w = 90 + r() * 60;
@@ -774,3 +846,5 @@ export function drawNearLayer(ctx: Ctx, W: number, H: number, pal: WorldPalette)
 
 /** Colour under the cloud sea (fills the bottom of the screen). */
 export const seaColor = (pal: WorldPalette) => pal.cloud.shade;
+
+export { drawNuggie, drawRootBeer } from './collectibles';

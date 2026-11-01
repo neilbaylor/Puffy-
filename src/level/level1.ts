@@ -17,7 +17,8 @@ import { LevelBuilder, type LevelData } from './builder';
  *   170-200 Boulder wall, then GIANT #3 guarding checkpoint 3
  *   201-239 Final run: hills, a running-jump gap, the Puff Gate
  *
- * Aura spots: each play only some of them have aura floating there.
+ * Nuggie spots (each one gives +1 aura): only some have a nuggie each play.
+ * Root beer: 7 rare bottles, mostly in tricky spots. They're banked for a future shop.
  */
 export function buildLevel1(): LevelData {
   const L = new LevelBuilder('Puff Ball Planet', 'World 1', 240, 16);
@@ -27,7 +28,7 @@ export function buildLevel1(): LevelData {
   L.spawn('player', 4, 3);
   L.spawn('tree', 1.5, 3, { h: 64 });
   L.spawn('tree', 9, 3, { h: 52 });
-  L.auraArc(12, 4, 6, 1);
+  L.auraArc(12, 2, 6, 0);
   L.spawn('puffball', 18, 3);
   L.spawn('puffball', 21, 3);
   L.ground(24, 31, 4);
@@ -40,7 +41,7 @@ export function buildLevel1(): LevelData {
   L.ground(38, 62, 3);
   L.cloud(38, 2, 6);
   L.island(41, 46, 8);
-  L.auraArc(41.5, 4, 10, 0.6);
+  L.auraArc(42.5, 2, 10, 0);
   L.spawn('puffball', 44, 8);
   L.spawn('tree', 49, 3, { h: 60 });
   L.spawn('bigpuff', 51, 3);
@@ -60,7 +61,7 @@ export function buildLevel1(): LevelData {
   L.pit(83, 101);
   L.cloud(84, 3, 5);
   L.cloud(89, 3, 7);
-  L.auraArc(88.5, 3, 9.5, 0.5);
+  L.aura(89.7, 9.5);
   L.island(93, 96, 6);
   L.spawn('puffball', 95, 6);
   L.cloud(98, 3, 7);
@@ -74,7 +75,7 @@ export function buildLevel1(): LevelData {
   L.rock(113, 114, 4, 5);
   L.brambles(115, 4, 3);
   L.cloud(115, 3, 8);
-  L.auraArc(115.3, 3, 10, 0.4);
+  L.aura(116.3, 10);
   L.spawn('puffball', 122, 3);
   L.spawn('puffball', 125, 3);
   L.spawn('tree', 128, 3, { h: 66 });
@@ -92,7 +93,7 @@ export function buildLevel1(): LevelData {
   L.aura(153.5, 7);
   L.island(158, 161, 7);
   L.spawn('puffball', 160, 7);
-  L.auraArc(158.5, 3, 9.5, 0.5);
+  L.aura(159.5, 9.5);
   L.island(164, 167, 6);
   L.spawn('puffball', 165, 6);
   L.cloud(161, 3, 10);
@@ -116,7 +117,7 @@ export function buildLevel1(): LevelData {
   L.ground(208, 210, 5);
   L.spawn('puffball', 211, 4);
   L.aura(209, 8);
-  L.auraArc(214.5, 4, 6, 2); // over the gap: needs a running jump
+  L.auraArc(215, 2, 7, 0); // over the gap: needs a running jump
   L.ground(219, 239, 3);
   L.spawn('puffball', 222, 3);
   L.spawn('puffball', 225, 3);
@@ -124,6 +125,15 @@ export function buildLevel1(): LevelData {
   L.spawn('tree', 231, 3, { h: 62 });
   L.spawn('goal', 235, 3);
   L.spawn('tree', 238.5, 3, { h: 72 });
+
+  // ── Root beer (rare, often tucked away) ───────────────────
+  L.rootbeer(28, 9); // on top of the meadow hill, needs a jump
+  L.rootbeer(44.5, 11.2); // floating island
+  L.rootbeer(57.5, 4); // behind the boulder wall
+  L.rootbeer(95, 9); // over the cloud crossing island
+  L.rootbeer(116, 12.4); // the risky high cloud over the brambles
+  L.rootbeer(162, 13.2); // top of the floating isles
+  L.rootbeer(209, 9.6); // final hill
 
   return L.build();
 }

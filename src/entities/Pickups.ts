@@ -4,9 +4,9 @@ import { ART_RES } from '../gfx/draw';
 import { PROP_RES } from '../gfx/textures';
 
 /**
- * Aura: glowing wisps that float around the level. Carrying aura protects you:
- * get hit and you lose your aura instead of fainting (it scatters, and you can
- * snatch some back for a moment).
+ * Nuggies: floating chicken nuggets. Eating one gives you +1 aura. Carrying
+ * aura protects you: get hit and you lose your aura instead of fainting (your
+ * nuggies scatter, and you can snatch some back for a moment).
  */
 export class Aura extends Phaser.Physics.Arcade.Image {
   declare body: Phaser.Physics.Arcade.Body;
@@ -21,12 +21,12 @@ export class Aura extends Phaser.Physics.Arcade.Image {
   readonly collectableAt: number;
 
   constructor(scene: Phaser.Scene, x: number, y: number, scattered = false) {
-    super(scene, x, y, 'aura');
+    super(scene, x, y, 'nuggie');
     scene.add.existing(this);
     scene.physics.add.existing(this);
     this.setScale(1 / ART_RES).setDepth(DEPTH.pickups);
-    this.body.setSize(24 * ART_RES, 28 * ART_RES, true);
-    this.glow = scene.add.image(x, y, 'glow').setTint(0x9ffbe8).setAlpha(0.6).setScale(1.05).setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.pickups - 1);
+    this.body.setSize(26 * ART_RES, 24 * ART_RES, true);
+    this.glow = scene.add.image(x, y, 'glow').setTint(0xffe08a).setAlpha(0.55).setScale(1.0).setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.pickups - 1);
     this.baseX = x;
     this.baseY = y;
     this.phase = Math.random() * 10;
@@ -57,7 +57,7 @@ export class Aura extends Phaser.Physics.Arcade.Image {
       this.setPosition(this.baseX + Math.sin(t * 0.9) * 4, this.baseY + Math.sin(t * 2.1) * 5);
     }
     this.setRotation(Math.sin(t * 2.6) * 0.15);
-    this.glow.setPosition(this.x, this.y).setScale(1 + Math.sin(t * 4) * 0.1);
+    this.glow.setPosition(this.x, this.y).setScale(0.95 + Math.sin(t * 4) * 0.1);
     return true;
   }
 
@@ -68,6 +68,43 @@ export class Aura extends Phaser.Physics.Arcade.Image {
   vanish() {
     this.taken = true;
     this.glow.destroy();
+    this.destroy();
+  }
+}
+
+/** Root beer bottle: rare, floats and glints. Collected bottles are banked for a future shop. */
+export class RootBeer extends Phaser.Physics.Arcade.Image {
+  declare body: Phaser.Physics.Arcade.Body;
+  taken = false;
+  private baseY: number;
+  private phase = Math.random() * 10;
+  private glint: Phaser.GameObjects.Image;
+  constructor(
+    scene: Phaser.Scene,
+    x: number,
+    y: number,
+    readonly id: string,
+  ) {
+    super(scene, x, y, 'rootbeer');
+    scene.add.existing(this);
+    scene.physics.add.existing(this);
+    this.setScale(1 / ART_RES).setDepth(DEPTH.pickups);
+    this.body.setAllowGravity(false);
+    this.body.setSize(18 * ART_RES, 32 * ART_RES, true);
+    this.baseY = y;
+    this.glint = scene.add.image(x, y, 'glow').setTint(0xffc58a).setAlpha(0.5).setScale(1.1).setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.pickups - 1);
+  }
+  tick(time: number) {
+    if (this.taken) return false;
+    const t = time / 1000 + this.phase;
+    this.y = this.baseY + Math.sin(t * 1.8) * 4;
+    this.setRotation(Math.sin(t * 1.3) * 0.12);
+    this.glint.setPosition(this.x, this.y).setAlpha(0.35 + Math.max(0, Math.sin(t * 3)) * 0.35);
+    return true;
+  }
+  vanish() {
+    this.taken = true;
+    this.glint.destroy();
     this.destroy();
   }
 }
