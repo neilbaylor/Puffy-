@@ -4,8 +4,8 @@
  * tiny arms and short legs with round feet. Same hand-drawn styles as Puffy.
  */
 import type { Ctx, Pose } from './draw';
-import { ellipsePts, paddlePts, roundRectPts, type Fill, type Pt, type Style } from './handdrawn';
-import { PUFFY } from './puffy';
+import { ellipsePts, paddlePts, type Fill, type Pt, type Style } from './handdrawn';
+import { drawBazooka } from './bazooka';
 
 export const SCRUFFY = {
   body: { base: '#f7953a', shade: '#cf6b1c', light: '#ffc98a' } as Fill,
@@ -16,6 +16,20 @@ export const SCRUFFY = {
 
 /** Frame is 56×56 units, feet on y = 54 (same frame as Puffy, he's just smaller inside it). */
 export function drawScruffyStyled(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style) {
+  if (pose === 'shoot') {
+    // recoil: rock back on the heels, tube kicks back
+    ctx.save();
+    ctx.translate(ox + 26, oy + 54);
+    ctx.rotate(-0.13);
+    ctx.translate(-(ox + 26), -(oy + 54));
+    drawScruffyPose(ctx, ox, oy, 'idle0', st, true);
+    ctx.restore();
+    return;
+  }
+  drawScruffyPose(ctx, ox, oy, pose, st, false);
+}
+
+function drawScruffyPose(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style, recoil: boolean) {
   const cx = ox + 26;
   const ground = oy + 54;
 
@@ -124,11 +138,8 @@ export function drawScruffyStyled(ctx: Ctx, ox: number, oy: number, pose: Pose, 
 
   // a smaller bazooka, held low
   const by = cy + ry - 1.5;
-  const bx0 = cx - 8;
-  const bx1 = cx + 17;
-  st.shape(ctx, roundRectPts(bx0, by - 2.6, bx1 - bx0, 5.2, 2.4), PUFFY.tube, seed + 8, { lw: 0.8 });
-  st.shape(ctx, roundRectPts(bx1 - 2.5, by - 3.8, 4.2, 7.6, 1.5), PUFFY.tubeDark, seed + 9, { lw: 0.8, plain: true });
-  st.shape(ctx, roundRectPts(bx0 - 2, by - 3.8, 3.4, 7.6, 1.3), PUFFY.tubeDark, seed + 20, { lw: 0.8, plain: true });
+  const kick = recoil ? 2.5 : 0;
+  drawBazooka(ctx, st, { x0: cx - 8 - kick, x1: cx + 17 - kick, y: by, h: 5.4, loaded: !recoil, seed: seed + 8 });
 
   // front arm over the tube
   st.shape(ctx, paddlePts(cx - 3, by - 2.5, 8.5, 5, armFront + 0.25), SCRUFFY.body, seed + 11, { lw: 0.8 });

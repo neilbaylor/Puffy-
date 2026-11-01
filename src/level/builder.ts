@@ -1,51 +1,46 @@
 import { T } from './tiles';
 
 /**
- * A tiny level-authoring DSL. Coordinates are in tiles; `y` counts rows from
- * the TOP of the level (row 0) like the tilemap does, but most helpers take a
- * ground height measured from the bottom because that's how you think about
- * platformer terrain.
- *
- * Later this can be swapped for levels exported from the Tiled editor
- * without touching the game code: the output is just a grid + spawn list.
+ * A tiny level-authoring DSL. Coordinates are in tiles; heights are counted
+ * from the bottom of the level (h = 3 means the top 3 rows of ground).
+ * Output is a collision grid + the logical cells (for drawing) + spawns.
  */
 
-export type Cell = 'ground' | 'brick' | 'q' | 'stone' | 'plat' | 'spike' | null;
+export type Cell = 'ground' | 'rock' | 'boulder' | 'bramble' | 'cloud' | null;
 
-export type EnemyKind = 'puffball' | 'bigpuff' | 'megapuff' | 'walker' | 'spiker' | 'hopper' | 'flyer' | 'turret';
+export type EnemyKind = 'puffball' | 'bigpuff' | 'giant';
 
 export interface Spawn {
-  type: EnemyKind | 'coin' | 'checkpoint' | 'goal' | 'player' | 'decor';
-  x: number; // tile column
-  y: number; // tile row (the tile the thing stands in)
+  type: EnemyKind | 'aura' | 'checkpoint' | 'goal' | 'player' | 'tree';
+  x: number; // tile column (may be fractional for aura / trees)
+  y: number; // tile row the thing occupies
   opts?: Record<string, number | string | boolean>;
 }
 
-export type QContent = 'coin' | 'heart' | 'coins';
-
 export interface LevelData {
   name: string;
+  world: string;
   width: number;
   height: number;
   tiles: number[][];
+  cells: Cell[][];
   spawns: Spawn[];
-  qContents: Map<string, QContent>;
 }
 
 export class LevelBuilder {
   readonly cells: Cell[][];
   readonly spawns: Spawn[] = [];
-  readonly qContents = new Map<string, QContent>();
 
   constructor(
     readonly name: string,
+    readonly world: string,
     readonly width: number,
     readonly height: number,
   ) {
     this.cells = Array.from({ length: height }, () => Array<Cell>(width).fill(null));
   }
 
-  /** Row index of the top surface for a given ground height (in tiles from the bottom). */
+  /** Row index of the top surface for ground height h. */
   top(h: number) {
     return this.height - h;
   }
@@ -56,141 +51,87 @@ export class LevelBuilder {
     return this;
   }
 
-  get(x: number, y: number): Cell {
-    if (x < 0 || y < 0 || x >= this.width || y >= this.height) return null;
-    return this.cells[y][x];
-  }
-
-  /** Solid ground from column x0 to x1 (inclusive), `h` tiles tall. */
+  /** Solid ground from column x0 to x1 (inclusive), h tiles tall. */
   ground(x0: number, x1: number, h: number) {
-    for (let x = x0; x <= x1; x++)
-      for (let y = this.top(h); y < this.height; y++) this.set(x, y, 'ground');
+    for (let x = x0; x <= x1; x++) for (let y = this.top(h); y < this.height; y++) this.set(x, y, 'ground');
     return this;
   }
 
-  /** Clear a pit (removes everything in those columns). */
+  /** Clear whole columns (a bottomless pit). */
   pit(x0: number, x1: number) {
     for (let x = x0; x <= x1; x++) for (let y = 0; y < this.height; y++) this.set(x, y, null);
     return this;
   }
 
-  /** A run of cells at height `h` above the bottom (h = row's distance from bottom, 1 = bottom row). */
-  row(x0: number, len: number, h: number, c: Cell) {
-    for (let i = 0; i < len; i++) this.set(x0 + i, this.top(h), c);
+  /** Floating grassy island: top surface at height h, `thick` tiles deep. */
+  island(x0: number, x1: number, h: number, thick = 2) {
+    for (let x = x0; x <= x1; x++) for (let k = 0; k < thick; k++) this.set(x, this.top(h) + k, 'ground');
+    // a rounder belly: one extra row under the middle
+    if (x1 - x0 >= 3) for (let x = x0 + 1; x <= x1 - 1; x++) this.set(x, this.top(h) + thick, 'ground');
     return this;
   }
 
-  /** Blocks pattern string, e.g. "B?B?B" where B=brick, ?=question, S=stone, -=gap. */
-  blocks(x0: number, h: number, pattern: string, contents: QContent[] = []) {
-    let qi = 0;
-    [...pattern].forEach((ch, i) => {
-      const x = x0 + i;
-      const y = this.top(h);
-      if (ch === 'B') this.set(x, y, 'brick');
-      else if (ch === 'S') this.set(x, y, 'stone');
-      else if (ch === '?') {
-        this.set(x, y, 'q');
-        this.qContents.set(`${x},${y}`, contents[qi++] ?? 'coin');
-      }
-    });
+  /** Rock (ledge / pillar) from height h0 to h1 inclusive. */
+  rock(x0: number, x1: number, h0: number, h1: number) {
+    for (let x = x0; x <= x1; x++) for (let h = h0; h <= h1; h++) this.set(x, this.top(h), 'rock');
     return this;
   }
 
-  /** One-way platform `len` tiles wide, at height `h`. */
-  platform(x0: number, len: number, h: number) {
-    return this.row(x0, len, h, 'plat');
-  }
-
-  /** Solid rectangle of a given cell type. x0..x1 inclusive, from height h0 to h1 inclusive. */
-  rect(x0: number, x1: number, h0: number, h1: number, c: Cell) {
-    for (let x = x0; x <= x1; x++) for (let h = h0; h <= h1; h++) this.set(x, this.top(h), c);
+  /** Wall of blastable puff boulders. */
+  boulders(x0: number, x1: number, h0: number, h1: number) {
+    for (let x = x0; x <= x1; x++) for (let h = h0; h <= h1; h++) this.set(x, this.top(h), 'boulder');
     return this;
   }
 
-  /** Staircase of stone going up (dir=1) or down (dir=-1). */
-  stairs(x0: number, steps: number, baseH: number, dir: 1 | -1 = 1) {
-    for (let i = 0; i < steps; i++) {
-      const x = x0 + i;
-      const hgt = dir === 1 ? i + 1 : steps - i;
-      this.rect(x, x, baseH + 1, baseH + hgt, 'stone');
-    }
+  /** Thorny brambles sitting on ground of height h. */
+  brambles(x0: number, len: number, h: number) {
+    for (let i = 0; i < len; i++) this.set(x0 + i, this.top(h + 1), 'bramble');
     return this;
   }
 
-  /** Spikes on top of ground of height h. */
-  spikes(x0: number, len: number, h: number) {
-    return this.row(x0, len, h + 1, 'spike');
-  }
-
-  /** Line of coins at height h (the coin sits in that row). */
-  coins(x0: number, len: number, h: number, step = 1) {
-    for (let i = 0; i < len; i += step) this.spawns.push({ type: 'coin', x: x0 + i, y: this.top(h) });
+  /** Jump-through cloud platform `len` tiles wide at height h. */
+  cloud(x0: number, len: number, h: number) {
+    for (let i = 0; i < len; i++) this.set(x0 + i, this.top(h), 'cloud');
     return this;
   }
 
-  /** Arc of coins, nice over gaps. */
-  coinArc(x0: number, len: number, h: number, rise = 2) {
-    for (let i = 0; i < len; i++) {
-      const t = len === 1 ? 0.5 : i / (len - 1);
-      const lift = Math.round(Math.sin(t * Math.PI) * rise);
-      this.spawns.push({ type: 'coin', x: x0 + i, y: this.top(h + lift) });
-    }
-    return this;
-  }
-
-  /** Enemy (or other entity) standing on ground of height h. */
+  /** Something standing on ground of height h. */
   spawn(type: Spawn['type'], x: number, h: number, opts?: Spawn['opts']) {
     this.spawns.push({ type, x, y: this.top(h + 1), opts });
     return this;
   }
 
-  /** Convert logical cells into auto-tiled tileset indices. */
+  /** A possible aura spot floating at height h (each play, only some spots get aura). */
+  aura(x: number, h: number) {
+    this.spawns.push({ type: 'aura', x, y: this.top(h) });
+    return this;
+  }
+
+  /** A gentle arc of aura spots. */
+  auraArc(x0: number, n: number, h: number, rise = 2) {
+    for (let i = 0; i < n; i++) {
+      const t = n === 1 ? 0.5 : i / (n - 1);
+      this.aura(x0 + i * 1.2, h + Math.sin(t * Math.PI) * rise);
+    }
+    return this;
+  }
+
   build(): LevelData {
-    const solidish = (c: Cell) => c === 'ground';
-    const tiles: number[][] = this.cells.map((row, y) =>
-      row.map((c, x) => {
-        switch (c) {
-          case null:
-            return T.EMPTY;
-          case 'brick':
-            return T.BRICK;
-          case 'q':
-            return T.QBLOCK;
-          case 'stone':
-            return T.STONE;
-          case 'spike':
-            return T.SPIKES;
-          case 'plat': {
-            const l = this.get(x - 1, y) === 'plat';
-            const r = this.get(x + 1, y) === 'plat';
-            return !l ? T.PLAT_L : !r ? T.PLAT_R : T.PLAT_M;
-          }
-          case 'ground': {
-            const above = this.get(x, y - 1);
-            const exposedTop = !solidish(above);
-            const openL = !solidish(this.get(x - 1, y)) && x > 0;
-            const openR = !solidish(this.get(x + 1, y)) && x < this.width - 1;
-            if (exposedTop) {
-              if (openL && openR) return T.GRASS_LR;
-              if (openL) return T.GRASS_L;
-              if (openR) return T.GRASS_R;
-              return T.GRASS;
-            }
-            if (openL && openR) return T.DIRT_LR;
-            if (openL) return T.DIRT_L;
-            if (openR) return T.DIRT_R;
-            return T.DIRT;
-          }
-        }
-      }),
-    );
+    const idx: Record<Exclude<Cell, null>, number> = {
+      ground: T.GROUND,
+      rock: T.ROCK,
+      boulder: T.BOULDER,
+      bramble: T.BRAMBLE,
+      cloud: T.CLOUD,
+    };
     return {
       name: this.name,
+      world: this.world,
       width: this.width,
       height: this.height,
-      tiles,
+      tiles: this.cells.map((row) => row.map((c) => (c ? idx[c] : T.EMPTY))),
+      cells: this.cells.map((r) => [...r]),
       spawns: this.spawns,
-      qContents: this.qContents,
     };
   }
 }

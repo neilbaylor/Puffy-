@@ -6,7 +6,7 @@
  */
 import type { Ctx, Pose } from './draw';
 import { ellipsePts, petalPts, roundRectPts, type Fill, type Pt, type Style } from './handdrawn';
-import { PUFFY } from './puffy';
+import { drawBazooka } from './bazooka';
 
 export const MUSCLES = {
   body: { base: '#ec7b2b', shade: '#c0561a', light: '#ffb06a' } as Fill,
@@ -28,6 +28,20 @@ function arm(ctx: Ctx, st: Style, pts: [Pt, Pt, Pt], sizes: [number, number, num
 
 /** Frame is 56×56 units, feet on y = 54. */
 export function drawMusclesStyled(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style) {
+  if (pose === 'shoot') {
+    // recoil: rock back on the heels, tube kicks back
+    ctx.save();
+    ctx.translate(ox + 27, oy + 54);
+    ctx.rotate(-0.13);
+    ctx.translate(-(ox + 27), -(oy + 54));
+    drawMusclesPose(ctx, ox, oy, 'idle0', st, true);
+    ctx.restore();
+    return;
+  }
+  drawMusclesPose(ctx, ox, oy, pose, st, false);
+}
+
+function drawMusclesPose(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style, recoil: boolean) {
   const cx = ox + 27;
   const ground = oy + 54;
 
@@ -173,11 +187,8 @@ export function drawMusclesStyled(ctx: Ctx, ox: number, oy: number, pose: Pose, 
 
   // the big bazooka (heavy hitter)
   const by = cy + ry - 1;
-  const bx0 = cx - 12;
-  const bx1 = cx + 25;
-  st.shape(ctx, roundRectPts(bx0, by - 4, bx1 - bx0, 8, 3.5), PUFFY.tube, seed + 11, { lw: 0.85 });
-  st.shape(ctx, roundRectPts(bx1 - 3.5, by - 5.4, 5.5, 10.8, 2), PUFFY.tubeDark, seed + 12, { lw: 0.85, plain: true });
-  st.shape(ctx, roundRectPts(bx0 - 3, by - 5.4, 4.5, 10.8, 1.8), PUFFY.tubeDark, seed + 13, { lw: 0.85, plain: true });
+  const kick = recoil ? 3.5 : 0;
+  drawBazooka(ctx, st, { x0: cx - 12 - kick, x1: cx + 25 - kick, y: by, h: 8, loaded: !recoil, seed: seed + 11 });
 
   // front arm: bicep bulging over the tube, fist on the grip
   // (kept to the far edge of the body so the big grin stays visible)

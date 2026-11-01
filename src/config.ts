@@ -4,12 +4,13 @@ export const TILE = 32;
 
 /** How many world pixels are visible vertically. Width adapts to the screen's aspect ratio. */
 export const VIEW_H = 416;
+/** ...but always show at least this much world horizontally (4:3 iPads, 16:10 Android tablets). */
+export const MIN_VIEW_W = 680;
 
 export const GRAVITY = 1600;
 export const MAX_FALL_SPEED = 900;
 
 export const MAX_PLAYERS = 3;
-export const TEAM_LIVES = 5;
 
 /** Render ordering. */
 export const DEPTH = {

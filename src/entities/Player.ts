@@ -1,41 +1,45 @@
 import Phaser from 'phaser';
 import { DEPTH, MAX_FALL_SPEED } from '../config';
 import type { CharacterDef } from '../data/characters';
-import { ART_RES } from '../gfx/draw';
 import { sfx } from '../core/sfx';
+import { ART_RES } from '../gfx/draw';
 import { emptyInput, type InputSource, type InputState } from '../input/types';
 import type { GameScene } from '../scenes/GameScene';
 
 const COYOTE = 0.1;
 const JUMP_BUFFER = 0.12;
-const HURT_STUN = 0.35;
-const INVULN = 1.6;
-const RESPAWN_INVULN = 2.4;
+const HIT_STUN = 0.35;
+const INVULN = 1.8;
+const RESPAWN_INVULN = 1.5;
+/** After running the meter dry you have to let it refill this much before running again. */
+const EXHAUSTED_UNTIL = 0.3;
+const RECOIL_TIME = 0.16;
 
 const HIT_W = 22;
+const HIT_H = 34;
 /** Character textures are hi-res; this maps them back to world size. */
 const S = 1 / ART_RES;
-const HIT_H = 34;
 
-export type PlayerState = 'alive' | 'dead' | 'waiting' | 'finished';
+export type PlayerState = 'alive' | 'fainted' | 'finished';
 
 /**
- * A player is an invisible physics hitbox plus a separate visual sprite.
- * Keeping them separate lets the visual squash/stretch/tilt freely without
- * ever changing the collision box.
+ * The hero: an invisible physics hitbox plus a separate visual sprite (so the
+ * picture can squash, stretch, tilt and recoil without changing collisions).
  */
 export class Player {
   readonly hitbox: Phaser.Physics.Arcade.Image;
   readonly body: Phaser.Physics.Arcade.Body;
   readonly view: Phaser.GameObjects.Sprite;
-  private tag: Phaser.GameObjects.Text;
+  private meter: Phaser.GameObjects.Graphics;
 
   state: PlayerState = 'alive';
-  hp: number;
   facing: 1 | -1 = 1;
   rocketsInFlight = 0;
 
-  stats = { coins: 0, kills: 0, score: 0, deaths: 0 };
+  /** 0..1 */
+  stamina = 1;
+  exhausted = false;
+  running = false;
 
   private prev: InputState = emptyInput();
   private coyote = 0;
@@ -48,18 +52,18 @@ export class Player {
   private animTime = 0;
   private squash = { x: 1, y: 1 };
   private tilt = 0;
-  bumpedThisFrame = false;
+  private recoil = 0;
+  private recoilShift = 0;
+  /** Horizontal speed when we left the ground (so run-jumps keep their speed). */
+  private launchSpeed = 0;
 
   constructor(
     private scene: GameScene,
-    readonly slot: number,
     readonly char: CharacterDef,
     readonly input: InputSource,
     x: number,
     y: number,
-    tagColor: string,
   ) {
-    this.hp = char.maxHp;
     this.hitbox = scene.physics.add.image(x, y, '__DEFAULT').setVisible(false);
     this.body = this.hitbox.body as Phaser.Physics.Arcade.Body;
     this.body.setSize(char.hitW ?? HIT_W, char.hitH ?? HIT_H, true);
@@ -67,17 +71,8 @@ export class Player {
     this.body.setCollideWorldBounds(true);
     this.hitbox.setData('player', this);
 
-    this.view = scene.add.sprite(x, y, `char-${char.id}`, 'idle0').setOrigin(0.5, 1).setScale(S).setDepth(DEPTH.players + slot);
-    this.tag = scene.add
-      .text(x, y, `P${slot + 1}`, {
-        fontFamily: '"Lilita One", "Arial Black", sans-serif',
-        fontSize: '13px',
-        color: tagColor,
-        stroke: '#2a1e2e',
-        strokeThickness: 4,
-      })
-      .setOrigin(0.5, 1)
-      .setDepth(DEPTH.text);
+    this.view = scene.add.sprite(x, y, `char-${char.id}`, 'idle0').setOrigin(0.5, 1).setScale(S).setDepth(DEPTH.players);
+    this.meter = scene.add.graphics().setDepth(DEPTH.text);
   }
 
   get x() {
@@ -99,18 +94,13 @@ export class Player {
     return this.body.blocked.down || this.body.touching.down;
   }
 
-  /** Called once per frame before physics resolves (from GameScene.update). */
+  /** Called once per frame (from GameScene.update). */
   update(dt: number) {
-    this.bumpedThisFrame = false;
-    const input = this.state === 'alive' || this.state === 'finished' ? this.input.poll() : emptyInput();
+    if (this.state === 'fainted') return;
+    let input = this.input.poll();
     if (this.state === 'finished') {
-      // auto-celebrate: stop and hop
-      input.left = input.right = input.fire = input.run = false;
-      input.jump = this.onGround && Math.random() < 0.03;
-    }
-    if (this.state !== 'alive' && this.state !== 'finished') {
-      this.prev = input;
-      return;
+      input = emptyInput();
+      input.jump = this.onGround && Math.random() < 0.03; // happy hops at the goal
     }
 
     const c = this.char;
@@ -119,30 +109,50 @@ export class Player {
     const jumpPressed = input.jump && !this.prev.jump;
     this.stun = Math.max(0, this.stun - dt);
     const controllable = this.stun <= 0;
+    const dir = controllable ? (input.right ? 1 : 0) - (input.left ? 1 : 0) : 0;
+
+    // ── Stamina: running drains it fast; it refills as soon as you stop ──
+    const wantsRun = input.run && dir !== 0;
+    this.running = wantsRun && !this.exhausted && this.stamina > 0;
+    if (this.running && onGround) {
+      this.stamina -= dt / c.staminaSecs;
+      if (this.stamina <= 0) {
+        this.stamina = 0;
+        this.exhausted = true;
+        this.running = false;
+        this.scene.fx.dust(this.x, this.bottom, 6);
+      }
+    } else if (!this.running) {
+      this.stamina = Math.min(1, this.stamina + dt / c.refillSecs);
+      if (this.exhausted && this.stamina >= EXHAUSTED_UNTIL) this.exhausted = false;
+    }
 
     // ── Horizontal movement ──
-    const dir = controllable ? (input.right ? 1 : 0) - (input.left ? 1 : 0) : 0;
-    const maxSpeed = input.run ? c.runSpeed : c.walkSpeed;
+    let maxSpeed = this.running ? c.runSpeed : c.walkSpeed;
+    if (!onGround) maxSpeed = Math.max(maxSpeed, Math.min(this.launchSpeed, c.runSpeed)); // keep run-jump momentum
     let vx = b.velocity.x;
     if (dir !== 0) {
       let accel = onGround ? c.accel : c.airAccel;
+      if (this.running) accel *= 1.25;
       if (Math.sign(vx) !== dir && Math.abs(vx) > 20) {
-        accel *= onGround ? 2.2 : 1.4; // skid turn
-        if (onGround && Math.abs(vx) > 120 && Math.random() < 0.4) this.scene.fx.dust(this.x, this.bottom, 1);
+        accel *= onGround ? 2.4 : 1.4; // skid turn
+        if (onGround && Math.abs(vx) > 140 && Math.random() < 0.4) this.scene.fx.dust(this.x, this.bottom, 1);
       }
-      if (Math.abs(vx) > maxSpeed && Math.sign(vx) === dir) accel = c.accel * 0.4; // ease down from run speed
+      if (Math.abs(vx) > maxSpeed && Math.sign(vx) === dir) accel = c.accel * 0.5; // ease down from run speed
       vx = approach(vx, dir * maxSpeed, accel * dt);
       this.facing = dir as 1 | -1;
     } else if (controllable) {
-      vx = approach(vx, 0, (onGround ? c.accel * 1.3 : c.airAccel * 0.35) * dt);
+      vx = approach(vx, 0, (onGround ? c.accel * 1.4 : c.airAccel * 0.3) * dt);
     }
     b.setVelocityX(vx);
 
-    // ── Jumping (coyote time + input buffering + variable height) ──
+    // ── Jumping (coyote time + input buffer + variable height) ──
     this.coyote = onGround ? COYOTE : this.coyote - dt;
     this.jumpBuffer = jumpPressed ? JUMP_BUFFER : this.jumpBuffer - dt;
     if (controllable && this.jumpBuffer > 0 && this.coyote > 0) {
-      b.setVelocityY(-(c.jump + Math.abs(vx) * 0.12));
+      const runBoost = this.running ? 1.06 : 1; // running jumps go a little further
+      b.setVelocity(vx * runBoost, -(c.jump + Math.abs(vx) * 0.1));
+      this.launchSpeed = Math.abs(vx * runBoost);
       this.jumpBuffer = 0;
       this.coyote = 0;
       this.jumping = true;
@@ -150,6 +160,7 @@ export class Player {
       this.scene.fx.dust(this.x, this.bottom, 5);
       sfx.jump();
     }
+    if (onGround) this.launchSpeed = Math.abs(vx);
     if (this.jumping && (!input.jump || b.velocity.y >= 0)) {
       if (b.velocity.y < 0) b.setVelocityY(b.velocity.y * 0.45);
       this.jumping = false;
@@ -157,12 +168,15 @@ export class Player {
 
     // ── Bazooka ──
     this.fireCooldown -= dt;
-    if (controllable && input.fire && this.fireCooldown <= 0 && this.rocketsInFlight < c.maxRockets) {
+    if (this.state === 'alive' && controllable && input.fire && this.fireCooldown <= 0 && this.rocketsInFlight < c.maxRockets) {
       this.fireCooldown = c.fireRate;
       this.scene.fireRocket(this);
-      b.setVelocityX(b.velocity.x - this.facing * 70); // recoil
-      this.squash = { x: 1.15, y: 0.9 };
+      b.setVelocityX(b.velocity.x - this.facing * 80); // recoil push
+      this.recoil = RECOIL_TIME;
+      this.recoilShift = 5;
+      this.squash = { x: 1.12, y: 0.92 };
     }
+    this.recoil = Math.max(0, this.recoil - dt);
 
     // ── Landing feedback ──
     if (onGround && !this.wasOnGround) {
@@ -173,120 +187,105 @@ export class Player {
     this.prev = input;
   }
 
-  /** Called after physics so the visual matches the resolved position. */
+  /** Called after physics so the picture matches the resolved position. */
   sync(dt: number) {
     const b = this.body;
-    // ease squash back to 1
     const k = 1 - Math.pow(0.0005, dt);
     this.squash.x += (1 - this.squash.x) * k;
     this.squash.y += (1 - this.squash.y) * k;
+    this.recoilShift += (0 - this.recoilShift) * Math.min(1, dt * 14);
 
-    if (this.state === 'alive' || this.state === 'finished') {
-      this.view.setPosition(b.center.x, b.bottom + 2);
+    if (this.state !== 'fainted') {
+      this.view.setPosition(b.center.x - this.facing * this.recoilShift, b.bottom + 2);
       this.view.setFlipX(this.facing < 0);
       const speed = Math.abs(b.velocity.x);
-      const targetTilt = this.onGround ? (b.velocity.x / this.char.runSpeed) * 0.12 : (b.velocity.x / this.char.runSpeed) * 0.06;
+      const targetTilt = (b.velocity.x / this.char.runSpeed) * (this.onGround ? 0.14 : 0.06);
       this.tilt += (targetTilt - this.tilt) * Math.min(1, dt * 12);
       this.view.setRotation(this.tilt);
       this.view.setScale(this.squash.x * S, this.squash.y * S);
 
-      // frame selection
       let frame: string;
       if (this.stun > 0) frame = 'hurt';
+      else if (this.recoil > 0) frame = 'shoot';
       else if (!this.onGround) frame = b.velocity.y < 0 ? 'jump' : 'fall';
       else if (speed > 15) {
         this.animTime += dt * (4 + speed / 22);
         frame = `walk${Math.floor(this.animTime) % 4}`;
-        if (speed > this.char.walkSpeed + 20 && Math.floor(this.animTime * 2) % 4 === 0 && Math.random() < 0.3)
-          this.scene.fx.dust(this.x - this.facing * 8, this.bottom, 1);
+        if (this.running && Math.random() < 0.25) this.scene.fx.dust(this.x - this.facing * 8, this.bottom, 1);
       } else {
         this.animTime += dt * 1.6;
         frame = `idle${Math.floor(this.animTime) % 2}`;
       }
       this.view.setFrame(frame);
-
-      // invulnerability flicker
-      this.view.setAlpha(this.invulnerable ? (Math.floor(this.scene.time.now / 70) % 2 ? 0.35 : 1) : 1);
+      this.view.setAlpha(this.invulnerable ? (Math.floor(this.scene.time.now / 70) % 2 ? 0.4 : 1) : 1);
     }
-    this.tag.setPosition(this.view.x, this.view.y - 56 * this.view.scaleY * ART_RES);
-    this.tag.setVisible(this.state === 'alive' && this.scene.players.length > 1);
+    this.drawMeter();
   }
 
-  /** Bounce off an enemy you stomped. Holding jump bounces higher. */
+  /** Small stamina ring over the hero's head, only while it isn't full. */
+  private drawMeter() {
+    const g = this.meter;
+    g.clear();
+    if (this.state !== 'alive' || this.stamina >= 0.999) return;
+    const x = this.view.x;
+    const y = this.body.top - 14;
+    const r = 6.5;
+    const col = this.exhausted ? (Math.floor(this.scene.time.now / 120) % 2 ? 0xff5a4f : 0xffb3a8) : this.stamina < 0.35 ? 0xffb627 : 0x6fe07a;
+    g.fillStyle(0x2a1e2e, 0.55).fillCircle(x, y, r + 2);
+    g.lineStyle(3, 0xffffff, 0.25).beginPath().arc(x, y, r, 0, Math.PI * 2).strokePath();
+    g.lineStyle(3, col, 1)
+      .beginPath()
+      .arc(x, y, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * this.stamina)
+      .strokePath();
+  }
+
+  /** Bounce off something you stomped. Holding jump bounces higher. */
   bounce() {
     const high = this.input.poll().jump;
-    this.body.setVelocityY(high ? -this.char.jump * 1.0 : -this.char.jump * 0.62);
+    this.body.setVelocityY(high ? -this.char.jump : -this.char.jump * 0.62);
     this.jumping = high;
     this.squash = { x: 0.8, y: 1.25 };
   }
 
-  hurt(fromX: number) {
-    if (this.state !== 'alive' || this.invulnerable) return;
-    this.hp -= 1;
-    if (this.hp <= 0) {
-      this.die(false);
-      return;
-    }
+  /** Hit while carrying aura: knocked back, briefly invulnerable, keeps going. */
+  knockBack(fromX: number) {
     sfx.hurt();
     this.invulnUntil = this.scene.time.now + INVULN * 1000;
-    this.stun = HURT_STUN;
+    this.stun = HIT_STUN;
     const away = Math.sign(this.x - fromX) || -this.facing;
     this.body.setVelocity(away * 240, -360);
     this.scene.cameras.main.shake(120, 0.004);
-    this.scene.onPlayerHurt(this);
   }
 
-  heal(n = 1) {
-    this.hp = Math.min(this.char.maxHp, this.hp + n);
-  }
-
-  /** @param fell true when the player fell into a pit (no hop animation). */
-  die(fell: boolean) {
+  /** Out of aura and hit (or fell): faint, then the level restarts at the last checkpoint. */
+  faint(fell: boolean) {
     if (this.state !== 'alive') return;
-    this.state = 'dead';
-    this.hp = 0;
-    this.stats.deaths++;
+    this.state = 'fainted';
     this.body.setVelocity(0, 0);
     this.body.enable = false;
     sfx.die();
-    this.view.setFrame('hurt').setAlpha(1).setRotation(0).setScale(S);
-    if (!fell) {
-      // classic hop-and-fall-off-screen
-      this.view.setDepth(DEPTH.fx + 5);
+    this.view.setFrame('hurt').setAlpha(1);
+    this.meter.clear();
+    if (fell) {
+      this.view.setVisible(false);
+    } else {
+      // wobble, tip over, little dizzy stars
       this.scene.tweens.add({
         targets: this.view,
-        y: this.view.y - 70,
-        duration: 380,
-        ease: 'Quad.easeOut',
-        onComplete: () =>
-          this.scene.tweens.add({
-            targets: this.view,
-            y: this.view.y + 600,
-            angle: 200 * this.facing,
-            duration: 900,
-            ease: 'Quad.easeIn',
-          }),
+        rotation: this.facing * -1.45,
+        y: this.view.y - 2,
+        duration: 420,
+        ease: 'Bounce.easeOut',
       });
-    } else {
-      this.view.setVisible(false);
+      this.scene.fx.dizzy(this.view, 1400);
     }
-    this.scene.onPlayerDied(this);
+    this.scene.onPlayerFainted(this);
   }
 
-  /** Bring a player back in at (x, y) with brief invulnerability. */
-  respawn(x: number, y: number) {
-    this.scene.tweens.killTweensOf(this.view);
-    this.state = 'alive';
-    this.hp = this.char.maxHp;
-    this.body.enable = true;
-    this.body.reset(x, y);
-    this.body.setVelocity(0, -200);
+  /** Brief invulnerability when starting at a checkpoint. */
+  spawnProtection() {
     this.invulnUntil = this.scene.time.now + RESPAWN_INVULN * 1000;
-    this.stun = 0;
-    this.prev = emptyInput();
-    this.view.setVisible(true).setAngle(0).setDepth(DEPTH.players + this.slot);
     this.squash = { x: 0.6, y: 1.5 };
-    this.scene.fx.stars(x, y, 8);
   }
 
   finish() {
@@ -294,12 +293,7 @@ export class Player {
     this.invulnUntil = 0;
   }
 
-  setWaiting() {
-    this.state = 'waiting';
-    this.view.setVisible(false);
-  }
-
-  /** Clamp inside the visible camera area (co-op screen edges, like modern co-op platformers). */
+  /** Keep inside the camera view (used for co-op later). */
   clampTo(left: number, right: number) {
     if (this.state !== 'alive') return;
     const b = this.body;
@@ -315,7 +309,7 @@ export class Player {
   destroy() {
     this.hitbox.destroy();
     this.view.destroy();
-    this.tag.destroy();
+    this.meter.destroy();
   }
 }
 

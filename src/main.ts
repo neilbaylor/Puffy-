@@ -14,14 +14,18 @@ installInput();
  * Each scene then zooms its camera so exactly VIEW_H world pixels are visible
  * vertically; the visible width follows the screen's aspect ratio.
  */
-const dpr = () => Math.min(window.devicePixelRatio || 1, 2);
+// Cap the render resolution: full 2x on phones, 1.75x on big tablet screens (keeps Android tablets smooth).
+const dpr = () => {
+  const big = Math.min(window.innerWidth, window.innerHeight) >= 700;
+  return Math.min(window.devicePixelRatio || 1, big ? 1.75 : 2);
+};
 const size = () => ({ w: Math.max(1, Math.round(window.innerWidth * dpr())), h: Math.max(1, Math.round(window.innerHeight * dpr())) });
 
 const { w, h } = size();
 const game = new Phaser.Game({
   type: Phaser.AUTO, // WebGL, with Canvas fallback
   parent: 'game',
-  backgroundColor: '#3fb4ff',
+  backgroundColor: '#8fd3ff',
   width: w,
   height: h,
   scale: { mode: Phaser.Scale.NONE, zoom: 1 / dpr() },

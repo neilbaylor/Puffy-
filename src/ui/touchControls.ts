@@ -1,22 +1,28 @@
 import { touchState } from '../input/touch';
 
 /**
- * On-screen controls for phones (first draft — we'll tune this together):
- *   Left thumb:  floating stick. Drag a little = walk, drag far = run.
- *   Right thumb: JUMP (big) and FIRE buttons. You can slide between them.
+ * On-screen controls for phones and tablets.
+ *
+ *   Left thumb:  a stick that appears where you touch (bottom-left area).
+ *                It stays put — it never slides after your thumb. A small push
+ *                walks; pushing to the outer ring (a short push, ~50px) runs.
+ *   Right thumb: JUMP (big) and FIRE. You can slide between them.
+ *
+ * Sizes scale with the screen so they suit both phones and tablets.
  */
-const DEAD_ZONE = 10;
-const RUN_AT = 44;
-const MAX_TRAVEL = 58;
+const WALK_AT = 0.2; // fraction of the stick radius
+const RUN_AT = 0.72;
 
 export class TouchControls {
   readonly root: HTMLDivElement;
-  private stickBase: HTMLDivElement;
-  private stickKnob: HTMLDivElement;
+  private zone: HTMLDivElement;
+  private base: HTMLDivElement;
+  private knob: HTMLDivElement;
   private jumpBtn: HTMLDivElement;
   private fireBtn: HTMLDivElement;
   private stickId: number | null = null;
-  private stickOrigin = { x: 0, y: 0 };
+  private origin = { x: 0, y: 0 };
+  private radius = 56;
   private buttonPointers = new Map<number, { x: number; y: number }>();
 
   constructor(parent: HTMLElement) {
@@ -24,45 +30,52 @@ export class TouchControls {
     this.root.className = 'touch';
     this.root.innerHTML = `
       <div class="touch-left">
-        <div class="stick-hint">drag to move<br><b>far</b> to run</div>
-        <div class="stick-base"><div class="stick-run">RUN</div><div class="stick-knob"></div></div>
+        <div class="stick-ghost" aria-hidden="true"><span>move</span></div>
+        <div class="stick-base"><div class="stick-run-ring"></div><div class="stick-knob"></div></div>
       </div>
       <div class="touch-right">
-        <div class="tbtn tbtn-fire"><span>FIRE</span></div>
-        <div class="tbtn tbtn-jump"><span>JUMP</span></div>
+        <div class="tbtn tbtn-fire" aria-label="Fire"><span>FIRE</span></div>
+        <div class="tbtn tbtn-jump" aria-label="Jump"><span>JUMP</span></div>
       </div>`;
     parent.appendChild(this.root);
     const q = <T extends HTMLElement>(s: string) => this.root.querySelector(s) as T;
-    this.stickBase = q('.stick-base');
-    this.stickKnob = q('.stick-knob');
+    this.zone = q('.touch-left');
+    this.base = q('.stick-base');
+    this.knob = q('.stick-knob');
     this.jumpBtn = q('.tbtn-jump');
     this.fireBtn = q('.tbtn-fire');
 
-    const left = q<HTMLDivElement>('.touch-left');
-    left.addEventListener('pointerdown', (e) => {
+    const zone = this.zone;
+    zone.addEventListener('pointerdown', (e) => {
       if (this.stickId !== null) return;
-      left.setPointerCapture(e.pointerId);
+      zone.setPointerCapture(e.pointerId);
       this.stickId = e.pointerId;
-      this.stickOrigin = { x: e.clientX, y: e.clientY };
-      const r = left.getBoundingClientRect();
-      this.stickBase.style.left = `${e.clientX - r.left}px`;
-      this.stickBase.style.top = `${e.clientY - r.top}px`;
+      this.radius = this.base.getBoundingClientRect().width / 2 || 56;
+      // keep the whole stick on screen
+      const r = zone.getBoundingClientRect();
+      const R = this.radius;
+      this.origin = {
+        x: Math.min(Math.max(e.clientX, r.left + R + 6), r.right - R - 6),
+        y: Math.min(Math.max(e.clientY, r.top + R + 6), r.bottom - R - 6),
+      };
+      this.base.style.left = `${this.origin.x - r.left}px`;
+      this.base.style.top = `${this.origin.y - r.top}px`;
       this.root.classList.add('stick-active');
       this.moveStick(e.clientX, e.clientY);
       e.preventDefault();
     });
-    left.addEventListener('pointermove', (e) => {
+    zone.addEventListener('pointermove', (e) => {
       if (e.pointerId === this.stickId) this.moveStick(e.clientX, e.clientY);
     });
     const endStick = (e: PointerEvent) => {
       if (e.pointerId !== this.stickId) return;
       this.stickId = null;
       touchState.left = touchState.right = touchState.run = false;
-      this.stickKnob.style.transform = 'translate(-50%, -50%)';
+      this.knob.style.transform = 'translate(-50%, -50%)';
       this.root.classList.remove('stick-active', 'running');
     };
-    left.addEventListener('pointerup', endStick);
-    left.addEventListener('pointercancel', endStick);
+    zone.addEventListener('pointerup', endStick);
+    zone.addEventListener('pointercancel', endStick);
 
     const right = q<HTMLDivElement>('.touch-right');
     right.addEventListener('pointerdown', (e) => {
@@ -90,46 +103,35 @@ export class TouchControls {
   }
 
   private moveStick(x: number, y: number) {
-    let dx = x - this.stickOrigin.x;
-    const dy = y - this.stickOrigin.y;
-    // let the stick "follow" the thumb if it drags way past the edge
-    if (Math.abs(dx) > MAX_TRAVEL + 30) {
-      this.stickOrigin.x += dx - Math.sign(dx) * (MAX_TRAVEL + 30);
-      dx = x - this.stickOrigin.x;
-      const r = this.stickBase.parentElement!.getBoundingClientRect();
-      this.stickBase.style.left = `${this.stickOrigin.x - r.left}px`;
-    }
-    const kx = Math.max(-MAX_TRAVEL, Math.min(MAX_TRAVEL, dx));
-    const ky = Math.max(-MAX_TRAVEL * 0.4, Math.min(MAX_TRAVEL * 0.4, dy * 0.4));
-    this.stickKnob.style.transform = `translate(calc(-50% + ${kx}px), calc(-50% + ${ky}px))`;
-    touchState.left = dx < -DEAD_ZONE;
-    touchState.right = dx > DEAD_ZONE;
-    touchState.run = Math.abs(dx) >= RUN_AT;
+    const R = this.radius;
+    const dx = x - this.origin.x;
+    const dy = y - this.origin.y;
+    // the knob is clamped to the ring; the base itself never moves
+    const len = Math.hypot(dx, dy) || 1;
+    const k = Math.min(1, R / len);
+    this.knob.style.transform = `translate(calc(-50% + ${dx * k}px), calc(-50% + ${dy * k}px))`;
+    const fx = dx / R; // horizontal push as a fraction of the radius (can exceed 1)
+    touchState.left = fx < -WALK_AT;
+    touchState.right = fx > WALK_AT;
+    touchState.run = Math.abs(fx) >= RUN_AT;
     this.root.classList.toggle('running', touchState.run);
   }
 
   private updateButtons(pressed: boolean) {
-    const hit = (el: HTMLElement, p: { x: number; y: number }) => {
+    const centre = (el: HTMLElement) => {
       const r = el.getBoundingClientRect();
-      const cx = r.left + r.width / 2;
-      const cy = r.top + r.height / 2;
-      return Math.hypot(p.x - cx, p.y - cy) < r.width * 0.68;
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2, r: r.width / 2 };
     };
+    const j = centre(this.jumpBtn);
+    const f = centre(this.fireBtn);
     let jump = false;
     let fire = false;
     for (const p of this.buttonPointers.values()) {
-      const j = hit(this.jumpBtn, p);
-      const f = hit(this.fireBtn, p);
-      if (j && f) {
-        // between both: pick the closer one
-        const dj = dist(this.jumpBtn, p);
-        const df = dist(this.fireBtn, p);
-        if (dj < df) jump = true;
-        else fire = true;
-      } else {
-        jump ||= j;
-        fire ||= f;
-      }
+      const dj = Math.hypot(p.x - j.x, p.y - j.y) / j.r;
+      const df = Math.hypot(p.x - f.x, p.y - f.y) / f.r;
+      if (Math.min(dj, df) > 1.45) continue;
+      if (dj <= df) jump = true;
+      else fire = true;
     }
     if (pressed && ((jump && !touchState.jump) || (fire && !touchState.fire))) navigator.vibrate?.(8);
     touchState.jump = jump;
@@ -155,9 +157,4 @@ export class TouchControls {
     this.jumpBtn.classList.remove('down');
     this.fireBtn.classList.remove('down');
   }
-}
-
-function dist(el: HTMLElement, p: { x: number; y: number }) {
-  const r = el.getBoundingClientRect();
-  return Math.hypot(p.x - (r.left + r.width / 2), p.y - (r.top + r.height / 2));
 }

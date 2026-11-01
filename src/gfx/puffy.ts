@@ -7,7 +7,8 @@
  * same Puffy can be shown in every look-development option.
  */
 import type { Ctx, Pose } from './draw';
-import { ellipsePts, paddlePts, petalPts, roundRectPts, type Fill, type Pt, type Style } from './handdrawn';
+import { drawBazooka } from './bazooka';
+import { ellipsePts, paddlePts, petalPts, type Fill, type Pt, type Style } from './handdrawn';
 
 export const PUFFY = {
   body: { base: '#f28a2e', shade: '#c9611a', light: '#ffc27a' } as Fill,
@@ -20,6 +21,20 @@ export const PUFFY = {
 
 /** Frame is 56×56 units, feet on y = 54. */
 export function drawPuffyStyled(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style) {
+  if (pose === 'shoot') {
+    // recoil: the whole body rocks back on its heels and the tube kicks back
+    ctx.save();
+    ctx.translate(ox + 27, oy + 54);
+    ctx.rotate(-0.13);
+    ctx.translate(-(ox + 27), -(oy + 54));
+    drawPuffyPose(ctx, ox, oy, 'idle0', st, true);
+    ctx.restore();
+    return;
+  }
+  drawPuffyPose(ctx, ox, oy, pose, st, false);
+}
+
+function drawPuffyPose(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style, recoil: boolean) {
   const cx = ox + 27;
   const ground = oy + 54;
   if (pose === 'hurt') {
@@ -54,17 +69,23 @@ export function drawPuffyStyled(ctx: Ctx, ox: number, oy: number, pose: Pose, st
     armBack = f < 2 ? -1.1 : -0.3;
     armFront = f < 2 ? 0.1 : 0.8;
   }
+  // Puffy puffs up when he's in the air: rounder, fuller body
+  let puffed = false;
   if (pose === 'jump') {
     [legL, legR, liftL, liftR] = [-3, 5, 6, 3];
     armBack = -1.5;
     armFront = -0.7;
-    sx = 0.95;
-    sy = 1.05;
+    sx = 1.2;
+    sy = 1.03;
+    puffed = true;
   }
   if (pose === 'fall') {
     [legL, legR, liftL, liftR] = [-4, 6, 3, 6];
     armBack = -1.9;
     armFront = -1.2;
+    sx = 1.16;
+    sy = 1.0;
+    puffed = true;
   }
 
   const rx = 13 * sx;
@@ -89,7 +110,13 @@ export function drawPuffyStyled(ctx: Ctx, ox: number, oy: number, pose: Pose, st
   leg(-5, legL, liftL, PUFFY.limb, seed + 2);
 
   // body
-  st.shape(ctx, ellipsePts(cx, cy, rx, ry, tilt, 56), PUFFY.body, seed + 4, { light: [cx - 5, cy - 8] });
+  st.shape(ctx, ellipsePts(cx, cy, rx, ry, puffed ? 0.05 : tilt, 56), PUFFY.body, seed + 4, { light: [cx - 5, cy - 8] });
+  if (puffed) {
+    // puffed-out cheek + a couple of "puff" lines
+    st.shape(ctx, ellipsePts(cx + rx - 4.5, cy + 3, 4.2, 3.4, 0, 20), PUFFY.body, seed + 40, { lw: 0.7 });
+    st.line(ctx, [[cx - rx - 2.5, cy - 6], [cx - rx - 5.5, cy - 8]], seed + 41, 0.7);
+    st.line(ctx, [[cx - rx - 3, cy + 1], [cx - rx - 6.5, cy + 1]], seed + 42, 0.7);
+  }
 
   // eye (seen from the side)
   st.shape(ctx, ellipsePts(cx + 4, cy - 6, 5.3, 6.9, tilt, 32), PUFFY.eye, seed + 5, { lw: 0.85, plain: st.id === 'sticker' });
@@ -104,13 +131,10 @@ export function drawPuffyStyled(ctx: Ctx, ox: number, oy: number, pose: Pose, st
 
   leg(5, legR, liftR, PUFFY.body, seed + 7);
 
-  // bazooka, tucked low under the front arm
+  // bazooka, tucked low under the front arm (kicks back 3 units when firing)
   const by = cy + 9;
-  const bx0 = cx - 11;
-  const bx1 = cx + 23;
-  st.shape(ctx, roundRectPts(bx0, by - 3.2, bx1 - bx0, 6.4, 3), PUFFY.tube, seed + 8, { lw: 0.85 });
-  st.shape(ctx, roundRectPts(bx1 - 3, by - 4.6, 5, 9.2, 1.8), PUFFY.tubeDark, seed + 9, { lw: 0.85, plain: true });
-  st.shape(ctx, roundRectPts(bx0 - 2.5, by - 4.6, 4, 9.2, 1.6), PUFFY.tubeDark, seed + 10, { lw: 0.85, plain: true });
+  const kick = recoil ? 3 : 0;
+  drawBazooka(ctx, st, { x0: cx - 11 - kick, x1: cx + 22 - kick, y: by, h: 6.6, loaded: !recoil, seed: seed + 8 });
 
   // front arm flapping over it
   st.shape(ctx, paddlePts(cx + 2, cy + 6, 14, 7.5, armFront), PUFFY.body, seed + 11, { lw: 0.85 });

@@ -1,131 +1,129 @@
 import { LevelBuilder, type LevelData } from './builder';
 
 /**
- * Level 1 — "Sunny Hills".
- * Heights are in tiles from the bottom of the level (ground is usually 3).
- * Rough tour (column numbers):
- * Enemies: Puffballs everywhere (1 hit), a few Big Puffs (2 hits), two giant
- * Mega Puffs (5 hits, or run under them when they jump). Turrets and
- * flying bugs are placeholders until more bad-guy sketches arrive.
+ * World 1 · "Puff Ball Planet"
+ * Sunny rolling hills + a cloud kingdom. Heights are tiles from the bottom
+ * (ground is usually 3). Jump reach for reference:
+ *   walk-jump ≈ 3.4 tiles across / 3.3 up,  run-jump ≈ 7+ tiles across / 3.8 up.
  *
- *   0-44    Start meadow: first blocks, first enemies, little hill
- *   45-47   First pit
- *   48-72   Brick wall you have to blast through with the bazooka
- *   73-89   Long pit crossed on floating platforms (flyers!)
- *   90-118  Cannon turret + walkers, checkpoint at 114
- *   119-145 Spike field between stone pillars
- *   146-176 Rolling hills with hoppers
- *   177-209 The fort: two turrets, bricks, mixed enemies
- *   210-249 Big staircase, final run, goal
+ *   0-34    Meadow start: first Puffballs, a gentle hill, first aura
+ *   35-37   First little gap
+ *   38-62   Cloud step up to a floating island; Big Puff Ball; boulder wall to blast
+ *   63-82   GIANT #1 guarding checkpoint 1
+ *   83-101  Cloud crossing over a big drop (with a floating island)
+ *   102-128 Bramble valley with a rock ledge and a risky high cloud
+ *   129-150 GIANT #2 guarding checkpoint 2
+ *   151-169 Floating isles
+ *   170-200 Boulder wall, then GIANT #3 guarding checkpoint 3
+ *   201-239 Final run: hills, a running-jump gap, the Puff Gate
+ *
+ * Aura spots: each play only some of them have aura floating there.
  */
 export function buildLevel1(): LevelData {
-  const L = new LevelBuilder('Sunny Hills', 250, 16);
+  const L = new LevelBuilder('Puff Ball Planet', 'World 1', 240, 16);
 
-  // ── Start meadow ────────────────────────────────────────────
-  L.ground(0, 44, 3);
-  L.spawn('player', 3, 3);
-  L.coins(8, 3, 4);
-  L.blocks(13, 7, '?', ['coin']);
-  L.blocks(18, 7, 'B?B?B', ['coin', 'heart']);
-  L.blocks(20, 11, '?', ['coins']);
-  L.spawn('puffball', 23, 3);
-  L.spawn('puffball', 26, 3);
-  L.ground(30, 36, 5);
-  L.ground(32, 34, 6);
-  L.coinArc(30, 7, 8, 1);
-  L.spawn('puffball', 35, 5);
-  L.spawn('bigpuff', 41, 3);
+  // ── Meadow start ───────────────────────────────────────────
+  L.ground(0, 34, 3);
+  L.spawn('player', 4, 3);
+  L.spawn('tree', 1.5, 3, { h: 64 });
+  L.spawn('tree', 9, 3, { h: 52 });
+  L.auraArc(12, 4, 6, 1);
+  L.spawn('puffball', 18, 3);
+  L.spawn('puffball', 21, 3);
+  L.ground(24, 31, 4);
+  L.ground(26, 29, 5);
+  L.aura(27.5, 8);
+  L.spawn('puffball', 30, 4);
+  L.spawn('tree', 33, 3, { h: 58 });
 
-  // ── First pit ───────────────────────────────────────────────
-  L.coinArc(44, 5, 5, 2);
+  // ── Little gap, then up to a floating island ───────────────
+  L.ground(38, 62, 3);
+  L.cloud(38, 2, 6);
+  L.island(41, 46, 8);
+  L.auraArc(41.5, 4, 10, 0.6);
+  L.spawn('puffball', 44, 8);
+  L.spawn('tree', 49, 3, { h: 60 });
+  L.spawn('bigpuff', 51, 3);
+  L.boulders(55, 56, 4, 8); // 5 tall: blast through with the bazooka
+  L.aura(58.5, 5);
+  L.spawn('puffball', 60, 3);
 
-  // ── Brick wall ──────────────────────────────────────────────
-  L.ground(48, 72, 3);
-  L.spawn('puffball', 53, 3);
-  L.rect(60, 61, 4, 8, 'brick'); // 5 tall: too high to jump, blast it!
-  L.coins(63, 3, 4);
-  L.spawn('puffball', 65, 3);
+  // ── GIANT #1 · checkpoint 1 ────────────────────────────────
+  L.ground(63, 82, 3);
+  L.spawn('tree', 64, 3, { h: 70 });
   L.spawn('puffball', 68, 3);
-  L.blocks(67, 7, '???', ['coin', 'coin', 'coin']);
+  L.spawn('giant', 73, 3);
+  L.aura(77, 6);
+  L.spawn('checkpoint', 80, 3);
 
-  // ── Platforms over the long pit ─────────────────────────────
-  L.platform(74, 3, 5);
-  L.platform(79, 3, 7);
-  L.platform(84, 3, 5);
-  L.coinArc(74, 3, 6, 0);
-  L.coinArc(79, 3, 8, 0);
-  L.coinArc(84, 3, 6, 0);
-  L.spawn('flyer', 77, 7);
-  L.spawn('flyer', 87, 8);
+  // ── Cloud crossing ─────────────────────────────────────────
+  L.pit(83, 101);
+  L.cloud(84, 3, 5);
+  L.cloud(89, 3, 7);
+  L.auraArc(88.5, 3, 9.5, 0.5);
+  L.island(93, 96, 6);
+  L.spawn('puffball', 95, 6);
+  L.cloud(98, 3, 7);
+  L.aura(99.5, 9);
 
-  // ── Turret yard ─────────────────────────────────────────────
-  L.ground(90, 118, 3);
-  L.blocks(95, 7, 'B?B', ['heart']);
-  L.rect(101, 102, 4, 5, 'stone');
-  // a giant with puffballs crowding round his feet (the stone block is a safe spot)
-  L.spawn('megapuff', 110, 3);
-  L.spawn('puffball', 105, 3);
-  L.spawn('puffball', 107, 3);
-  L.coins(104, 4, 4);
-  L.spawn('checkpoint', 115, 3);
+  // ── Bramble valley ─────────────────────────────────────────
+  L.ground(102, 150, 3);
+  L.spawn('tree', 103, 3, { h: 56 });
+  L.spawn('bigpuff', 106, 3);
+  L.brambles(109, 3, 3);
+  L.rock(113, 114, 4, 5);
+  L.brambles(115, 4, 3);
+  L.cloud(115, 3, 8);
+  L.auraArc(115.3, 3, 10, 0.4);
+  L.spawn('puffball', 122, 3);
+  L.spawn('puffball', 125, 3);
+  L.spawn('tree', 128, 3, { h: 66 });
 
-  // ── Spike field ─────────────────────────────────────────────
-  L.ground(119, 145, 2);
-  L.spikes(121, 3, 2);
-  L.rect(124, 125, 3, 4, 'stone');
-  L.spikes(126, 3, 2);
-  L.rect(129, 130, 3, 5, 'stone');
-  L.spikes(131, 3, 2);
-  L.rect(134, 135, 3, 4, 'stone');
-  L.spikes(136, 3, 2);
-  L.platform(126, 3, 9);
-  L.coins(126, 3, 10);
-  L.spawn('flyer', 127, 6);
-  L.spawn('flyer', 133, 8);
-  L.spawn('puffball', 142, 2);
+  // ── GIANT #2 · checkpoint 2 ────────────────────────────────
+  L.spawn('puffball', 134, 3);
+  L.spawn('giant', 140, 3);
+  L.spawn('puffball', 144, 3);
+  L.aura(146, 6);
+  L.spawn('checkpoint', 148, 3);
 
-  // ── Rolling hills ───────────────────────────────────────────
-  L.ground(146, 150, 3);
-  L.ground(151, 154, 4);
-  L.ground(155, 159, 5);
-  L.ground(160, 163, 6);
-  L.ground(164, 167, 4);
-  L.ground(168, 172, 3);
-  L.spawn('puffball', 157, 5);
-  L.spawn('puffball', 162, 6);
-  L.spawn('bigpuff', 170, 3);
-  L.blocks(153, 8, '?B?', ['coin', 'coins']);
-  L.coinArc(160, 4, 9, 1);
-  L.coinArc(173, 4, 5, 2);
+  // ── Floating isles ─────────────────────────────────────────
+  L.pit(151, 169);
+  L.island(152, 155, 5);
+  L.aura(153.5, 7);
+  L.island(158, 161, 7);
+  L.spawn('puffball', 160, 7);
+  L.auraArc(158.5, 3, 9.5, 0.5);
+  L.island(164, 167, 6);
+  L.spawn('puffball', 165, 6);
+  L.cloud(161, 3, 10);
+  L.aura(162, 12);
 
-  // ── The fort ────────────────────────────────────────────────
-  L.ground(177, 209, 3);
-  L.blocks(181, 7, '?B?', ['coin', 'heart']);
-  L.rect(186, 187, 4, 5, 'stone');
-  L.spawn('turret', 186, 5);
-  L.rect(191, 193, 4, 6, 'brick');
-  L.spawn('puffball', 195, 3);
-  L.rect(197, 197, 4, 4, 'stone');
-  L.rect(198, 199, 4, 5, 'stone');
-  L.spawn('turret', 198, 5);
-  L.spawn('bigpuff', 202, 3);
-  L.spawn('puffball', 206, 3);
-  L.spawn('puffball', 208, 3);
-  L.coins(194, 3, 4);
+  // ── Boulder wall · GIANT #3 · checkpoint 3 ─────────────────
+  L.ground(170, 200, 3);
+  L.boulders(173, 174, 4, 7);
+  L.spawn('tree', 177, 3, { h: 60 });
+  L.spawn('puffball', 180, 3);
+  L.spawn('puffball', 183, 3);
+  L.spawn('giant', 189, 3);
+  L.spawn('puffball', 193, 3);
+  L.aura(195, 6);
+  L.spawn('checkpoint', 198, 3);
 
-  // ── Staircase & finale ──────────────────────────────────────
-  L.ground(210, 217, 3);
-  L.stairs(210, 8, 3, 1);
-  L.pit(218, 220);
-  L.ground(221, 249, 3);
-  L.stairs(221, 5, 3, -1);
-  L.coinArc(217, 5, 12, 1);
-  // final giant guarding the goal
-  L.spawn('puffball', 228, 3);
-  L.spawn('puffball', 231, 3);
-  L.spawn('megapuff', 236, 3);
-  L.coins(232, 5, 4);
-  L.spawn('goal', 241, 3);
+  // ── Final run ──────────────────────────────────────────────
+  L.ground(201, 214, 3);
+  L.spawn('puffball', 204, 3);
+  L.ground(206, 212, 4);
+  L.ground(208, 210, 5);
+  L.spawn('puffball', 211, 4);
+  L.aura(209, 8);
+  L.auraArc(214.5, 4, 6, 2); // over the gap: needs a running jump
+  L.ground(219, 239, 3);
+  L.spawn('puffball', 222, 3);
+  L.spawn('puffball', 225, 3);
+  L.spawn('bigpuff', 228, 3);
+  L.spawn('tree', 231, 3, { h: 62 });
+  L.spawn('goal', 235, 3);
+  L.spawn('tree', 238.5, 3, { h: 72 });
 
   return L.build();
 }

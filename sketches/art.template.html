@@ -1,0 +1,98 @@
+<title>Puff Ball Planet Art</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;800;900&display=swap">
+<style>
+/* Layout: one long column of labelled sections; every image is drawn live by the game's own art code. Committed warm-dark single theme. */
+:root {
+  --bg: #241a17;
+  --panel: #312420;
+  --line: #4d3a33;
+  --fg: #fff8ec;
+  --muted: #d6c4b4;
+  --gold: #ffc533;
+  --aura: #6ff0d8;
+  --display: 'Lilita One', 'Arial Black', system-ui, sans-serif;
+  --body: 'Nunito', system-ui, -apple-system, sans-serif;
+  color-scheme: dark;
+}
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 16px; line-height: 1.5; }
+.wrap { max-width: 1100px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 32px 64px; display: grid; gap: 44px; }
+header { display: grid; gap: 10px; }
+.eyebrow { font-weight: 900; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--aura); }
+h1 { margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(38px, 7vw, 70px); line-height: 0.95; text-wrap: balance; }
+h1 span { color: var(--gold); }
+h2 { margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(24px, 3.6vw, 34px); line-height: 1.05; text-wrap: balance; }
+.lede, .note { margin: 0; max-width: 66ch; color: var(--muted); font-weight: 600; }
+section { display: grid; gap: 14px; }
+.frame { border-radius: 16px; overflow: hidden; border: 3px solid #000; box-shadow: 0 6px 0 #000; background: #fff; }
+.frame canvas, .frame img { display: block; width: 100%; height: auto; max-width: 100%; }
+.scroll { overflow-x: auto; border-radius: 16px; border: 3px solid #000; box-shadow: 0 6px 0 #000; background: #fffdf8; }
+.scroll canvas { display: block; height: auto; max-width: none; }
+.looks { display: grid; gap: 22px; }
+.look { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 18px; align-items: center; }
+.look > * { min-width: 0; }
+.look h3 { margin: 0 0 4px; font-family: var(--display); font-weight: 400; font-size: 24px; }
+.tag { display: inline-block; vertical-align: middle; margin-left: 8px; padding: 3px 10px 2px; border-radius: 999px; font: 900 11px/1.4 var(--body); letter-spacing: 0.08em; text-transform: uppercase; background: var(--aura); color: #1d3b37; }
+.labels { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0; padding: 0; list-style: none; color: var(--muted); font-weight: 800; font-size: 13px; }
+.labels b { color: var(--fg); }
+.shots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.shots figure { margin: 0; display: grid; gap: 6px; }
+.shots figcaption { color: var(--muted); font-weight: 800; font-size: 13px; }
+.sketches { display: flex; gap: 10px; flex-wrap: wrap; }
+.sketches img { height: 110px; width: auto; border-radius: 10px; border: 2px solid var(--line); }
+.checklist { margin: 0; padding: 18px 20px 18px 40px; border-radius: 16px; background: var(--panel); border: 2px solid var(--line); display: grid; gap: 6px; font-weight: 700; }
+.checklist li::marker { color: var(--aura); }
+@media (max-width: 720px) { .look { grid-template-columns: 1fr; } .shots { grid-template-columns: 1fr; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Puffy · World 1 art pass</div>
+    <h1><span>Puff Ball Planet</span>: every asset</h1>
+    <p class="lede">Everything in the game, in the polished hand-drawn style only. All pictures on this page are drawn live by the same code the game uses, so this is exactly what you'll see on the tablet.</p>
+  </header>
+
+  <section>
+    <h2>Possible looks for the world</h2>
+    <p class="note">Same art, three colour moods. Sunny hills down below, cloud-kingdom islands and a sea of clouds under every gap. The game uses <b>Meadow morning</b> right now; pick another and the whole world switches.</p>
+    <div class="looks">
+__LOOKS__
+    </div>
+  </section>
+
+  <section>
+    <h2>The heroes</h2>
+    <p class="note">From your sketches. Left to right: standing, running ×2, jumping (Puffy puffs up), falling, firing the bazooka (recoil), and hurt.</p>
+    <ul class="labels"><li><b>Row 1</b> Puffy</li><li><b>Row 2</b> Scruffy</li><li><b>Row 3</b> Big Muscles</li></ul>
+    <div class="scroll"><canvas data-sheet="heroes" aria-label="Puffy, Scruffy and Big Muscles in seven poses each"></canvas></div>
+  </section>
+
+  <section>
+    <h2>The bad guys</h2>
+    <p class="note">Only the three from your sketches, shown at their real sizes next to each other.</p>
+    <ul class="labels"><li><b>Puffball</b> walking ×2, squashed · 1 hit</li><li><b>Big Puff Ball</b> calm ×2, angry ×2 · 2 hits</li><li><b>Giant</b> walking, crouch (warning), jump, slam · 5 hits</li></ul>
+    <div class="scroll"><canvas data-sheet="baddies" aria-label="Puffball, Big Puff Ball and Giant animation frames"></canvas></div>
+  </section>
+
+  <section>
+    <h2>World pieces</h2>
+    <ul class="labels"><li><b>Bazooka</b> with the warhead loaded, rocket, muzzle flash</li><li><b>Aura</b> wisps</li><li><b>Checkpoint</b> bud → bloom</li><li><b>Puff Gate</b> (goal)</li><li><b>Puff boulders</b> (blast them), <b>brambles</b> (ouch)</li><li><b>Cloud platform</b>, <b>puff trees</b></li></ul>
+    <div class="scroll"><canvas data-sheet="props" aria-label="Bazooka, rocket, flash, aura, checkpoint, goal gate, boulders, brambles, cloud platform, trees"></canvas></div>
+  </section>
+
+  <section>
+    <h2>In the game right now</h2>
+    <div class="shots">
+__SHOTS__
+    </div>
+  </section>
+
+  <section>
+    <h2>From your sketches</h2>
+    <div class="sketches">
+__SKETCHES__
+    </div>
+  </section>
+</div>
+<script>__JS__</script>

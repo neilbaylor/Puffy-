@@ -52,6 +52,16 @@ class KeyboardSource implements InputSource {
   }
 }
 
+/** Single-player keyboard: arrows or WASD to move, Space/W/↑ jump, F/J/X fire, Shift run. */
+export const soloKeyboard: InputSource = new KeyboardSource('kb', 'Keyboard', '←/→ or A/D move · Space jump · F fire · Shift run', {
+  left: ['ArrowLeft', 'KeyA'],
+  right: ['ArrowRight', 'KeyD'],
+  jump: ['Space', 'ArrowUp', 'KeyW', 'KeyZ', 'KeyK'],
+  fire: ['KeyF', 'KeyJ', 'KeyX'],
+  run: ['ShiftLeft', 'ShiftRight', 'KeyL'],
+});
+
+/** Separate layouts for local multiplayer later. */
 export const keyboardSources: InputSource[] = [
   new KeyboardSource('kb1', 'Keyboard A', 'A/D move · W or Space jump · F fire · Shift run', {
     left: ['KeyA'],

@@ -1,34 +1,52 @@
 import Phaser from 'phaser';
-import { GRAVITY, TEAM_LIVES, TILE, VIEW_H } from '../config';
+import { GRAVITY, MIN_VIEW_W, TILE, VIEW_H } from '../config';
 import { characterById } from '../data/characters';
-import { SLOT_COLORS, type Session } from '../core/session';
+import type { Session } from '../core/session';
 import { sfx } from '../core/sfx';
 import { createEnemy, type Enemy } from '../entities/enemies/Enemy';
-import { Checkpoint, Coin, Goal, Heart } from '../entities/Pickups';
+import { Aura, Checkpoint, Goal } from '../entities/Pickups';
 import { Player } from '../entities/Player';
-import { EnemyBullet, Rocket } from '../entities/Rocket';
-import { sourceById } from '../input/devices';
-import { touchSource } from '../input/touch';
+import { Rocket } from '../entities/Rocket';
+import { soloSource, sourceById } from '../input/devices';
 import type { EnemyKind } from '../level/builder';
 import { buildLevel1 } from '../level/level1';
-import { SOLID_TILES, T } from '../level/tiles';
+import { T } from '../level/tiles';
 import { Background, type View } from '../world/Background';
 import { Fx } from '../world/Fx';
 import { LevelView } from '../world/LevelView';
 
+export interface GameData {
+  session: Session;
+  /** Index of the checkpoint to start from (-1 / undefined = level start). */
+  checkpoint?: number;
+}
+
 export interface HudState {
-  players: { slot: number; name: string; charId: string; color: string; hp: number; maxHp: number; state: string }[];
-  lives: number;
-  score: number;
-  coins: number;
+  charId: string;
+  name: string;
+  aura: number;
+  stamina: number;
+  exhausted: boolean;
+  running: boolean;
 }
 
 export interface ResultState {
-  won: boolean;
-  score: number;
-  coins: number;
-  players: { slot: number; name: string; charId: string; color: string; score: number; coins: number; kills: number; deaths: number }[];
+  charId: string;
+  name: string;
+  aura: number;
+  popped: number;
+  giants: number;
+  faints: number;
+  seconds: number;
 }
+
+/** Chance that each aura spot in the level actually has aura this time. */
+const AURA_CHANCE = 0.65;
+/** Max wisps that scatter when you get hit while carrying aura. */
+const SCATTER_MAX = 10;
+
+/** Stats that survive restarting at a checkpoint (reset when a new run starts). */
+const run = { startedAt: 0, faints: 0, popped: 0, giants: 0, bestAura: 0 };
 
 type Group = Phaser.GameObjects.Group;
 
@@ -41,26 +59,20 @@ export class GameScene extends Phaser.Scene {
   players: Player[] = [];
   private enemies: Enemy[] = [];
   private rockets: Rocket[] = [];
-  private bullets: EnemyBullet[] = [];
-  private coins: Coin[] = [];
-  private hearts: Heart[] = [];
+  private auras: Aura[] = [];
   private checkpoints: Checkpoint[] = [];
   private goal?: Goal;
 
   private gPlayers!: Group;
   private gEnemies!: Group;
   private gRockets!: Group;
-  private gBullets!: Group;
-  private gCoins!: Group;
-  private gHearts!: Group;
+  private gAuras!: Group;
 
-  lives = TEAM_LIVES;
-  score = 0;
-  coinCount = 0;
-  private respawnPoint = { x: 0, y: 0 };
-  private qHits = new Map<string, number>();
+  aura = 0;
+  private startCheckpoint = -1;
+  private lastCheckpoint = -1;
   private ended = false;
-  private hudDirty = true;
+  private lastHud = '';
 
   private view: View = { left: 0, top: 0, width: 800, height: VIEW_H };
   private camX = 0;
@@ -71,22 +83,26 @@ export class GameScene extends Phaser.Scene {
     super('Game');
   }
 
-  init(data: Session) {
-    this.session = data;
+  init(data: GameData) {
+    this.session = data.session;
+    this.startCheckpoint = data.checkpoint ?? -1;
+    this.lastCheckpoint = this.startCheckpoint;
+    if (this.startCheckpoint < 0) {
+      run.startedAt = Date.now();
+      run.faints = 0;
+      run.popped = 0;
+      run.giants = 0;
+      run.bestAura = 0;
+    }
     this.players = [];
     this.enemies = [];
     this.rockets = [];
-    this.bullets = [];
-    this.coins = [];
-    this.hearts = [];
+    this.auras = [];
     this.checkpoints = [];
     this.goal = undefined;
-    this.lives = TEAM_LIVES;
-    this.score = 0;
-    this.coinCount = 0;
-    this.qHits.clear();
+    this.aura = 0;
     this.ended = false;
-    this.hudDirty = true;
+    this.lastHud = '';
   }
 
   create() {
@@ -102,42 +118,42 @@ export class GameScene extends Phaser.Scene {
     this.gPlayers = this.add.group();
     this.gEnemies = this.add.group();
     this.gRockets = this.add.group();
-    this.gBullets = this.add.group();
-    this.gCoins = this.add.group();
-    this.gHearts = this.add.group();
+    this.gAuras = this.add.group();
 
     // ── Spawns ──
-    const surface = (row: number) => (row + 1) * TILE; // y of the ground top under an entity standing in `row`
+    const surface = (row: number) => (row + 1) * TILE; // ground top under something standing in `row`
+    let start = { x: 0, y: 0 };
+    const cps = data.spawns.filter((s) => s.type === 'checkpoint').sort((a, b) => a.x - b.x);
     for (const s of data.spawns) {
       const cx = s.x * TILE + TILE / 2;
       switch (s.type) {
         case 'player':
-          this.respawnPoint = { x: cx, y: surface(s.y) - 20 };
+          start = { x: cx, y: surface(s.y) - 24 };
           break;
-        case 'coin': {
-          const c = new Coin(this, cx, s.y * TILE + TILE / 2);
-          this.coins.push(c);
-          this.gCoins.add(c);
+        case 'aura':
+          if (Math.random() < AURA_CHANCE) this.addAura(new Aura(this, cx, s.y * TILE + TILE / 2));
+          break;
+        case 'checkpoint': {
+          const idx = cps.indexOf(s);
+          const cp = new Checkpoint(this, cx, surface(s.y), idx);
+          if (idx <= this.startCheckpoint) {
+            cp.activate(true);
+            if (idx === this.startCheckpoint) start = { x: cx + 24, y: surface(s.y) - 24 };
+          }
+          this.checkpoints.push(cp);
           break;
         }
-        case 'checkpoint':
-          this.checkpoints.push(new Checkpoint(this, cx, surface(s.y)));
-          break;
         case 'goal':
           this.goal = new Goal(this, cx, surface(s.y));
           break;
-        case 'decor':
+        case 'tree':
           break;
         default: {
           const kind = s.type as EnemyKind;
-          const ex = kind === 'turret' ? (s.x + 1) * TILE : cx;
-          const e = createEnemy(this, kind, ex, 0);
-          if (kind === 'flyer') e.y = s.y * TILE + TILE / 2;
-          else {
-            // stand the body exactly on the ground, whatever the sprite's size/scale
-            e.body.updateFromGameObject();
-            e.y += surface(s.y) - e.body.bottom;
-          }
+          const e = createEnemy(this, kind, cx, surface(s.y) - 40);
+          // stand the body exactly on the ground, whatever the sprite's size/scale
+          e.body.updateFromGameObject();
+          e.y += surface(s.y) - e.body.bottom;
           e.syncBody();
           this.enemies.push(e);
           this.gEnemies.add(e);
@@ -145,73 +161,50 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // ── Players ──
-    const specs = this.session.players.length
-      ? this.session.players
-      : [{ slot: 0, characterId: 'puffy', inputId: 'kb1' }];
+    // ── The hero (single player for now; the code supports more later) ──
+    const specs = this.session.players.length ? this.session.players : [{ slot: 0, characterId: 'puffy', inputId: 'solo' }];
     specs.forEach((spec, i) => {
-      const input = sourceById(spec.inputId) ?? touchSource;
-      const p = new Player(
-        this,
-        spec.slot,
-        characterById(spec.characterId),
-        input,
-        this.respawnPoint.x - i * 28,
-        this.respawnPoint.y,
-        SLOT_COLORS[spec.slot],
-      );
+      const p = new Player(this, characterById(spec.characterId), sourceById(spec.inputId) ?? soloSource, start.x - i * 28, start.y);
+      p.spawnProtection();
       this.players.push(p);
       this.gPlayers.add(p.hitbox);
     });
-    this.lastSafe = new Map(this.players.map((p) => [p, { x: p.x, y: p.y }]));
 
     // ── Collisions ──
     const layer = this.level.layer;
-    this.physics.add.collider(this.gPlayers, layer, (h, t) => this.onPlayerTile(h as never, t as Phaser.Tilemaps.Tile));
+    this.physics.add.collider(this.gPlayers, layer, (h, t) => this.onPlayerTile(h as Phaser.GameObjects.GameObject, t as Phaser.Tilemaps.Tile));
     this.physics.add.collider(this.gEnemies, layer);
-    this.physics.add.collider(this.gHearts, layer);
+    this.physics.add.collider(this.gAuras, layer);
     this.physics.add.collider(this.gRockets, layer, (r) => (r as Rocket).explode());
-    this.physics.add.collider(this.gBullets, layer, (b) => b.destroy());
-    this.physics.add.overlap(this.gPlayers, this.gEnemies, (h, e) => this.onPlayerEnemy(h as never, e as Enemy));
+    this.physics.add.overlap(this.gPlayers, this.gEnemies, (h, e) => this.onPlayerEnemy(h as Phaser.GameObjects.GameObject, e as Enemy));
     this.physics.add.overlap(this.gRockets, this.gEnemies, (r) => (r as Rocket).explode());
-    this.physics.add.overlap(this.gRockets, this.gBullets, (r, b) => {
-      b.destroy();
-      (r as Rocket).explode();
-    });
-    this.physics.add.overlap(this.gPlayers, this.gBullets, (h, b) => {
-      const p = this.playerOf(h);
-      if (!p.alive || p.invulnerable) return;
-      p.hurt((b as EnemyBullet).x);
-      b.destroy();
-    });
-    this.physics.add.overlap(this.gPlayers, this.gCoins, (h, c) => this.collectCoin(this.playerOf(h), c as Coin));
-    this.physics.add.overlap(this.gPlayers, this.gHearts, (h, ht) => this.collectHeart(this.playerOf(h), ht as Heart));
+    this.physics.add.overlap(this.gPlayers, this.gAuras, (h, a) => this.collectAura(this.playerOf(h), a as Aura));
     for (const cp of this.checkpoints)
       this.physics.add.overlap(this.gPlayers, cp.zone, () => {
         if (cp.reached) return;
         cp.activate();
-        this.respawnPoint = { x: cp.x, y: cp.y - 20 };
+        this.lastCheckpoint = Math.max(this.lastCheckpoint, cp.index);
         sfx.checkpoint();
-        this.fx.stars(cp.x, cp.y - 100, 10);
-        this.fx.popText(cp.x, cp.y - 120, 'CHECKPOINT', '#3ddc84', 16);
+        this.fx.auraSparkle(cp.x, cp.y - 60, 16);
+        this.fx.popText(cp.x, cp.y - 112, 'CHECKPOINT', '#3ddc84', 16);
       });
     if (this.goal) this.physics.add.overlap(this.gPlayers, this.goal.zone, (h) => this.reachGoal(this.playerOf(h)));
 
     // ── Camera ──
-    const cam = this.cameras.main;
-    cam.setRoundPixels(false);
-    this.camX = this.respawnPoint.x;
+    this.camX = start.x;
     this.camTop = heightPx - VIEW_H;
     this.updateCamera(0, true);
+    this.cameras.main.fadeIn(this.startCheckpoint < 0 ? 400 : 250, 255, 248, 236);
 
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.players.forEach((p) => p.destroy());
-    });
-    this.game.events.emit('game-start', this);
-    this.emitHud();
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.players.forEach((p) => p.destroy()));
+    this.game.events.emit('game-start', this, { fresh: this.startCheckpoint < 0, level: data.name, world: data.world });
+    this.emitHud(true);
   }
 
-  private lastSafe = new Map<Player, { x: number; y: number }>();
+  private addAura(a: Aura) {
+    this.auras.push(a);
+    this.gAuras.add(a);
+  }
 
   private playerOf(h: unknown): Player {
     return (h as Phaser.GameObjects.GameObject).getData('player') as Player;
@@ -224,21 +217,15 @@ export class GameScene extends Phaser.Scene {
 
     for (const p of this.players) {
       p.update(dt);
-      if (p.alive && p.body.top > this.level.heightPx + 40) p.die(true);
-      if (p.alive && p.onGround) {
-        const under = this.level.layer.getTileAtWorldXY(p.x, p.bottom + 4);
-        if (under && under.index !== T.SPIKES) this.lastSafe.set(p, { x: p.x, y: p.y });
-      }
+      if (p.alive && p.body.top > this.level.heightPx + 40) p.faint(true);
     }
 
     this.updateCamera(dt);
-
     if (this.players.length > 1)
       for (const p of this.players) p.clampTo(this.view.left + 4, this.view.left + this.view.width - 4);
-
     for (const p of this.players) p.sync(dt);
 
-    // wake enemies that come into view
+    // wake enemies as they come into view
     const wakeR = this.view.left + this.view.width + 48;
     const wakeL = this.view.left - 48;
     this.enemies = this.enemies.filter((e) => e.active);
@@ -250,36 +237,27 @@ export class GameScene extends Phaser.Scene {
     this.rockets = this.rockets.filter((r) => r.active);
     for (const r of this.rockets) {
       r.tick(dt);
-      // fizzle quietly once well off-screen
-      if (r.active && (r.x < this.view.left - 40 || r.x > this.view.left + this.view.width + 40)) {
-        r.owner.rocketsInFlight = Math.max(0, r.owner.rocketsInFlight - 1);
-        r.exploded = true;
-        r.destroy();
-      }
+      if (r.active && (r.x < this.view.left - 40 || r.x > this.view.left + this.view.width + 40)) r.fizzle();
     }
-    this.bullets = this.bullets.filter((b) => b.active);
-    for (const b of this.bullets) b.tick(dt);
-    this.hearts = this.hearts.filter((h) => h.active);
-    for (const h of this.hearts) {
-      h.tick();
-      if (h.y > this.level.heightPx + 64) h.destroy();
-    }
+
     const now = this.time.now;
-    for (const c of this.coins) c.tick(now);
+    this.auras = this.auras.filter((a) => a.tick(now, dt));
 
     this.bg.update(this.view, dt);
-    if (this.hudDirty) this.emitHud();
+    this.emitHud();
   }
 
   private updateCamera(dt: number, snap = false) {
     const cam = this.cameras.main;
-    const zoom = this.scale.height / VIEW_H;
+    // Fit VIEW_H world px vertically, but always show at least MIN_VIEW_W across
+    // (so 4:3 iPads and 16:10 Android tablets see enough of the level ahead).
+    const zoom = Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W);
     cam.setZoom(zoom);
     const vw = this.scale.width / zoom;
-    const vh = VIEW_H;
+    const vh = this.scale.height / zoom;
     const { widthPx, heightPx } = this.level;
 
-    const tracked = this.players.filter((p) => p.state === 'alive' || p.state === 'finished');
+    const tracked = this.players.filter((p) => p.state !== 'fainted');
     if (tracked.length) {
       let minX = Infinity;
       let maxX = -Infinity;
@@ -291,20 +269,18 @@ export class GameScene extends Phaser.Scene {
         sumBottom += p.bottom;
         sumVx += p.body.velocity.x;
       }
-      // look ahead in the direction of travel (solo only, co-op stays centred on the group)
-      const lookTarget = tracked.length === 1 ? Phaser.Math.Clamp(sumVx / 3, -70, 70) : 0;
+      // look ahead in the direction of travel, so you can see what's coming
+      const lookTarget = tracked.length === 1 ? Phaser.Math.Clamp(sumVx / 3, -90, 90) : 0;
       this.lookAhead += (lookTarget - this.lookAhead) * (snap ? 1 : 1 - Math.exp(-dt * 2.5));
       const tx = (minX + maxX) / 2 + this.lookAhead;
-      const tTop = sumBottom / tracked.length - vh * 0.68;
-      const kx = snap ? 1 : 1 - Math.exp(-dt * 7);
-      const ky = snap ? 1 : 1 - Math.exp(-dt * 4);
-      this.camX += (tx - this.camX) * kx;
-      this.camTop += (tTop - this.camTop) * ky;
+      // keep the hero's feet ~62% down the screen: above the touch controls
+      const tTop = sumBottom / tracked.length - vh * 0.62;
+      this.camX += (tx - this.camX) * (snap ? 1 : 1 - Math.exp(-dt * 7));
+      this.camTop += (tTop - this.camTop) * (snap ? 1 : 1 - Math.exp(-dt * 4));
     }
     this.camX = Phaser.Math.Clamp(this.camX, vw / 2, Math.max(vw / 2, widthPx - vw / 2));
-    this.camTop = Phaser.Math.Clamp(this.camTop, 0, heightPx - vh);
+    this.camTop = Phaser.Math.Clamp(this.camTop, Math.min(0, heightPx - vh), heightPx - vh);
 
-    // snap to whole screen pixels to avoid shimmering
     const left = Math.round((this.camX - vw / 2) * zoom) / zoom;
     const top = Math.round(this.camTop * zoom) / zoom;
     cam.centerOn(left + vw / 2, top + vh / 2);
@@ -316,131 +292,37 @@ export class GameScene extends Phaser.Scene {
   private onPlayerTile(hitbox: Phaser.GameObjects.GameObject, tile: Phaser.Tilemaps.Tile) {
     const p = this.playerOf(hitbox);
     if (!p.alive) return;
-    const b = p.body;
-    // spikes hurt from above
-    if (tile.index === T.SPIKES && b.blocked.down && tile.pixelY >= b.bottom - 4) {
-      if (!p.invulnerable) {
-        p.hurt(p.x);
-        if (p.alive) b.setVelocityY(-520);
-      }
-      return;
-    }
-    // head-bump blocks from below
-    if (b.blocked.up && !p.bumpedThisFrame && tile.pixelY + TILE <= b.top + 6) {
-      const center = this.level.layer.getTileAt(Math.floor(p.x / TILE), tile.y);
-      const target = center && SOLID_TILES.includes(center.index) ? center : tile;
-      p.bumpedThisFrame = true;
-      this.bumpBlock(target, p);
+    // thorny brambles hurt when you touch them
+    if (tile.index === T.BRAMBLE) {
+      const wasDown = p.body.blocked.down;
+      this.hitPlayer(p, p.x - p.facing * 10);
+      if (p.alive && wasDown) p.body.setVelocityY(-480);
     }
   }
 
-  private bumpBlock(tile: Phaser.Tilemaps.Tile, p: Player) {
-    if (tile.index === T.QBLOCK) this.activateQ(tile, p);
-    else if (tile.index === T.BRICK) {
-      this.animateBump(tile);
-      sfx.bump();
-    } else sfx.bump();
-    // knock out enemies standing on the bumped block
-    for (const e of this.enemies) {
-      if (e.dead || !e.awake) continue;
-      const eb = e.body;
-      if (Math.abs(eb.bottom - tile.pixelY) < 6 && eb.right > tile.pixelX - 4 && eb.left < tile.pixelX + TILE + 4)
-        e.damage(99, 'blast', p);
-    }
-  }
-
-  private animateBump(tile: Phaser.Tilemaps.Tile) {
-    const idx = tile.index;
-    tile.setVisible(false);
-    const img = this.add.image(tile.pixelX + TILE / 2, tile.pixelY + TILE / 2, 'tiles', `t${idx}`).setDepth(1);
-    this.tweens.add({
-      targets: img,
-      y: img.y - 10,
-      duration: 70,
-      yoyo: true,
-      ease: 'Quad.easeOut',
-      onComplete: () => {
-        img.destroy();
-        const t = this.level.layer.getTileAt(tile.x, tile.y);
-        if (t) t.setVisible(true);
-      },
-    });
-  }
-
-  private activateQ(tile: Phaser.Tilemaps.Tile, p: Player | null) {
-    const key = `${tile.x},${tile.y}`;
-    const content = this.level.data.qContents.get(key) ?? 'coin';
-    const cx = tile.pixelX + TILE / 2;
-    const cy = tile.pixelY;
-    let usedUp = true;
-    if (content === 'heart') {
-      const h = new Heart(this, cx, cy - 12);
-      this.hearts.push(h);
-      this.gHearts.add(h);
-      sfx.powerup();
+  /** Something hurt the player: lose your aura if you have any, otherwise faint. */
+  hitPlayer(p: Player, fromX: number) {
+    if (!p.alive || p.invulnerable) return;
+    if (this.aura > 0) {
+      const n = Math.min(this.aura, SCATTER_MAX);
+      for (let i = 0; i < n; i++) this.addAura(new Aura(this, p.x, p.y - 10, true));
+      this.aura = 0;
+      p.knockBack(fromX);
+      this.fx.auraSparkle(p.x, p.y, 14);
     } else {
-      this.popCoin(cx, cy, p);
-      if (content === 'coins') {
-        const n = (this.qHits.get(key) ?? 0) + 1;
-        this.qHits.set(key, n);
-        usedUp = n >= 6;
-      }
-    }
-    if (usedUp) {
-      const t = this.level.layer.putTileAt(T.USED, tile.x, tile.y);
-      this.animateBump(t);
-    } else this.animateBump(tile);
-  }
-
-  private popCoin(x: number, y: number, p: Player | null) {
-    const c = this.add.sprite(x, y - 8, 'coin', 'c0').setDepth(1);
-    c.play({ key: 'coin-spin', repeat: -1 });
-    this.tweens.add({
-      targets: c,
-      y: y - 72,
-      duration: 260,
-      ease: 'Quad.easeOut',
-      yoyo: true,
-      hold: 40,
-      onComplete: () => {
-        this.fx.sparkle(c.x, c.y, 6);
-        c.destroy();
-      },
-    });
-    sfx.coin();
-    this.coinCount++;
-    if (p) p.stats.coins++;
-    this.addScore(p, 10, x, y - 60, false);
-  }
-
-  private collectCoin(p: Player, c: Coin) {
-    if (!p.alive || c.taken) return;
-    c.taken = true;
-    this.fx.sparkle(c.x, c.y, 6);
-    c.destroy();
-    sfx.coin();
-    this.coinCount++;
-    p.stats.coins++;
-    this.addScore(p, 10, c.x, c.y, false);
-    if (this.coinCount % 100 === 0) {
-      this.lives++;
-      this.fx.popText(p.x, p.y - 40, '1UP', '#3ddc84', 22);
-      sfx.powerup();
+      p.faint(false);
     }
   }
 
-  private collectHeart(p: Player, h: Heart) {
-    if (!p.alive || h.taken) return;
-    h.taken = true;
-    if (p.hp >= p.char.maxHp) this.addScore(p, 500, h.x, h.y);
-    else {
-      p.heal(1);
-      this.fx.popText(h.x, h.y - 10, '+1 ♥', '#ff4d6d', 18);
-    }
-    this.fx.stars(h.x, h.y, 6);
-    sfx.powerup();
-    h.destroy();
-    this.hudDirty = true;
+  private collectAura(p: Player, a: Aura) {
+    if (!p.alive || a.taken) return;
+    // freshly scattered wisps can't be grabbed for a split second
+    if (this.time.now < a.collectableAt) return;
+    this.aura++;
+    run.bestAura = Math.max(run.bestAura, this.aura);
+    this.fx.auraSparkle(a.x, a.y, 8);
+    sfx.aura();
+    a.vanish();
   }
 
   private onPlayerEnemy(hitbox: Phaser.GameObjects.GameObject, e: Enemy) {
@@ -455,19 +337,21 @@ export class GameScene extends Phaser.Scene {
       pb.y = eb.top - pb.height;
       return;
     }
-    if (fromAbove) {
-      if (e.stompable) {
-        e.damage(1, 'stomp', p);
-        e.touchGraceUntil = this.time.now + 250;
-        p.bounce();
-        pb.y = eb.top - pb.height; // don't sink into the enemy
-      } else {
-        p.hurt(e.x);
-        if (p.alive) p.bounce();
-      }
+    if (fromAbove && e.stompable) {
+      e.damage(1, 'stomp', p);
+      e.touchGraceUntil = this.time.now + 250;
+      p.bounce();
+      pb.y = eb.top - pb.height;
       return;
     }
-    if (!p.invulnerable) e.touchPlayer(p);
+    this.hitPlayer(p, e.x);
+  }
+
+  onEnemyDefeated(e: Enemy, by: Player | null) {
+    if (!by) return;
+    if (e.kind === 'giant') run.giants++;
+    else run.popped++;
+    this.fx.popText(e.x, e.y - e.displayHeight / 2 - 6, e.kind === 'giant' ? 'GIANT DOWN!' : 'POP!', '#ffffff', e.kind === 'giant' ? 22 : 15);
   }
 
   // ─────────────────────────────────────────── bazooka ──
@@ -476,22 +360,14 @@ export class GameScene extends Phaser.Scene {
     const x = p.x + p.facing * 24;
     const y = p.bottom - (p.char.muzzleY ?? 18);
     sfx.shoot();
-    this.fx.dust(x, y, 3);
-    this.fx.sparkle(x, y, 3);
-    this.fx.dust(p.x - p.facing * 20, y, 3); // backblast
-    if (this.level.isSolidAt(x, y) && !this.isOneWayAt(x, y)) {
-      // muzzle is inside a wall: explode right there
-      this.explode(x, y, p);
+    this.fx.muzzle(x, y, p.facing, p.x - p.facing * 18);
+    if (this.level.isSolidAt(x, y) && this.level.layer.getTileAtWorldXY(x, y)?.index !== T.CLOUD) {
+      this.explode(x, y, p); // muzzle is inside a wall: explode right there
       return;
     }
     const r = new Rocket(this, p, x, y, p.facing);
     this.rockets.push(r);
     this.gRockets.add(r);
-  }
-
-  private isOneWayAt(x: number, y: number) {
-    const t = this.level.layer.getTileAtWorldXY(x, y);
-    return !!t && t.index >= T.PLAT_L && t.index <= T.PLAT_R;
   }
 
   explode(x: number, y: number, owner: Player) {
@@ -507,38 +383,61 @@ export class GameScene extends Phaser.Scene {
       const dy = Math.max(eb.top - y, 0, y - eb.bottom);
       if (dx * dx + dy * dy < r * r) e.damage(owner.char.damage, 'blast', owner);
     }
-    for (const b of this.bullets) if (b.active && Phaser.Math.Distance.Between(x, y, b.x, b.y) < r) b.destroy();
 
-    // destroy bricks / pop ? blocks
+    // blast puff boulders
     const layer = this.level.layer;
     const br = r * 0.72;
-    const tx0 = Math.floor((x - br) / TILE);
-    const tx1 = Math.floor((x + br) / TILE);
-    const ty0 = Math.floor((y - br) / TILE);
-    const ty1 = Math.floor((y + br) / TILE);
     let broke = false;
-    for (let ty = ty0; ty <= ty1; ty++)
-      for (let tx = tx0; tx <= tx1; tx++) {
+    for (let ty = Math.floor((y - br) / TILE); ty <= Math.floor((y + br) / TILE); ty++)
+      for (let tx = Math.floor((x - br) / TILE); tx <= Math.floor((x + br) / TILE); tx++) {
         const t = layer.getTileAt(tx, ty);
-        if (!t) continue;
+        if (!t || t.index !== T.BOULDER) continue;
         const dx = Math.max(t.pixelX - x, 0, x - (t.pixelX + TILE));
         const dy = Math.max(t.pixelY - y, 0, y - (t.pixelY + TILE));
         if (dx * dx + dy * dy >= br * br) continue;
-        if (t.index === T.BRICK) {
-          layer.removeTileAt(tx, ty);
-          this.fx.debris(tx * TILE + TILE / 2, ty * TILE + TILE / 2);
-          this.addScore(owner, 50, tx * TILE + TILE / 2, ty * TILE, false);
-          broke = true;
-        } else if (t.index === T.QBLOCK) this.activateQ(t, owner);
+        layer.removeTileAt(tx, ty);
+        const key = `${tx},${ty}`;
+        this.level.boulderSprites.get(key)?.destroy();
+        this.level.boulderSprites.delete(key);
+        this.fx.debris(tx * TILE + TILE / 2, ty * TILE + TILE / 2);
+        broke = true;
       }
-    if (broke) sfx.brick();
+    if (broke) {
+      sfx.crumble();
+      this.collapseBoulders();
+    }
   }
 
-  spawnBullet(x: number, y: number, vx: number, vy: number) {
-    const b = new EnemyBullet(this, x, y, vx, vy);
-    this.bullets.push(b);
-    this.gBullets.add(b);
-    sfx.enemyShot();
+  /** Boulders with nothing under them tumble down (so a blasted wall never floats). */
+  private collapseBoulders() {
+    const layer = this.level.layer;
+    let changed = true;
+    let wave = 0;
+    while (changed) {
+      changed = false;
+      wave++;
+      for (const [key, img] of [...this.level.boulderSprites]) {
+        const [tx, ty] = key.split(',').map(Number);
+        const below = layer.getTileAt(tx, ty + 1);
+        if (below && below.index !== T.EMPTY) continue;
+        layer.removeTileAt(tx, ty);
+        this.level.boulderSprites.delete(key);
+        changed = true;
+        this.tweens.add({
+          targets: img,
+          y: img.y + 40,
+          angle: Phaser.Math.Between(-40, 40),
+          alpha: 0,
+          delay: wave * 60,
+          duration: 260,
+          ease: 'Quad.easeIn',
+          onComplete: () => {
+            this.fx.debris(img.x + 16, img.y + 16);
+            img.destroy();
+          },
+        });
+      }
+    }
   }
 
   nearestPlayer(x: number, y: number): Player | null {
@@ -555,50 +454,18 @@ export class GameScene extends Phaser.Scene {
     return best;
   }
 
-  addScore(p: Player | null, n: number, x: number, y: number, pop = true) {
-    this.score += n;
-    if (p) p.stats.score += n;
-    if (pop) this.fx.popText(x, y, `${n}`, '#ffffff', 16);
-    this.hudDirty = true;
-  }
+  // ─────────────────────────────────────────── faint, restart, goal ──
 
-  // ─────────────────────────────────────────── life & death ──
-
-  onPlayerHurt(_p: Player) {
-    this.hudDirty = true;
-  }
-
-  onPlayerDied(p: Player) {
-    this.hudDirty = true;
-    this.time.delayedCall(1700, () => this.tryRespawn(p));
-  }
-
-  private tryRespawn(p: Player) {
-    if (this.ended || p.state !== 'dead') return;
-    if (this.lives <= 0) {
-      p.setWaiting();
-      this.hudDirty = true;
-      this.checkGameOver();
-      return;
-    }
-    this.lives--;
-    const buddy = this.players.find((o) => o !== p && o.alive);
-    if (buddy) {
-      const safe = this.lastSafe.get(buddy) ?? { x: buddy.x, y: buddy.y };
-      p.respawn(safe.x, safe.y - 30);
-    } else {
-      p.respawn(this.respawnPoint.x, this.respawnPoint.y);
-      // bring any other dead players back with them
-      this.camX = this.respawnPoint.x;
-    }
-    this.lastSafe.set(p, { x: p.x, y: p.y });
-    this.hudDirty = true;
-  }
-
-  private checkGameOver() {
-    if (this.players.some((p) => p.alive || p.state === 'dead')) return;
-    this.ended = true;
-    this.time.delayedCall(800, () => this.game.events.emit('game-over', this.results(false)));
+  onPlayerFainted(p: Player) {
+    run.faints++;
+    this.aura = 0;
+    const fell = !p.view.visible;
+    this.time.delayedCall(fell ? 700 : 1500, () => {
+      this.cameras.main.fadeOut(300, 255, 248, 236);
+      this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () =>
+        this.scene.restart({ session: this.session, checkpoint: this.lastCheckpoint } satisfies GameData),
+      );
+    });
   }
 
   private reachGoal(p: Player) {
@@ -606,44 +473,35 @@ export class GameScene extends Phaser.Scene {
     this.ended = true;
     this.goal.celebrate();
     sfx.goal();
-    this.addScore(p, 1000, this.goal.sign.x, this.goal.sign.y - 40);
-    this.fx.stars(this.goal.sign.x, this.goal.sign.y, 16);
+    this.fx.auraSparkle(this.goal.swirl.x, this.goal.swirl.y, 30);
     for (const q of this.players) if (q.alive) q.finish();
     for (const e of this.enemies) if (!e.dead && e.awake) e.damage(99, 'blast', null);
-    this.time.delayedCall(2600, () => this.game.events.emit('level-complete', this.results(true)));
-  }
-
-  private results(won: boolean): ResultState {
-    return {
-      won,
-      score: this.score,
-      coins: this.coinCount,
-      players: this.players.map((p) => ({
-        slot: p.slot,
-        name: p.char.name,
-        charId: p.char.id,
-        color: SLOT_COLORS[p.slot],
-        ...p.stats,
-      })),
+    const res: ResultState = {
+      charId: p.char.id,
+      name: p.char.name,
+      aura: this.aura,
+      popped: run.popped,
+      giants: run.giants,
+      faints: run.faints,
+      seconds: Math.round((Date.now() - run.startedAt) / 1000),
     };
+    this.time.delayedCall(1800, () => this.game.events.emit('level-complete', res));
   }
 
-  private emitHud() {
-    this.hudDirty = false;
+  private emitHud(force = false) {
+    const p = this.players[0];
+    if (!p) return;
     const s: HudState = {
-      players: this.players.map((p) => ({
-        slot: p.slot,
-        name: p.char.name,
-        charId: p.char.id,
-        color: SLOT_COLORS[p.slot],
-        hp: p.hp,
-        maxHp: p.char.maxHp,
-        state: p.state,
-      })),
-      lives: this.lives,
-      score: this.score,
-      coins: this.coinCount,
+      charId: p.char.id,
+      name: p.char.name,
+      aura: this.aura,
+      stamina: Math.round(p.stamina * 100) / 100,
+      exhausted: p.exhausted,
+      running: p.running,
     };
+    const key = `${s.aura}|${s.stamina}|${s.exhausted}|${s.running}`;
+    if (!force && key === this.lastHud) return;
+    this.lastHud = key;
     this.game.events.emit('hud', s);
   }
 }

@@ -82,9 +82,9 @@ export const sfx = {
     noise(0.6, 0.6, 1800, 80);
     tone({ type: 'sine', from: 120, to: 35, dur: 0.45, vol: 0.4 });
   },
-  coin: () => {
-    tone({ type: 'square', from: 988, dur: 0.07, vol: 0.07 });
-    tone({ type: 'square', from: 1319, dur: 0.22, vol: 0.07, delay: 0.07 });
+  aura: () => {
+    tone({ type: 'sine', from: 880, to: 1320, dur: 0.12, vol: 0.12 });
+    tone({ type: 'triangle', from: 1760, to: 2200, dur: 0.18, vol: 0.06, delay: 0.05 });
   },
   stomp: () => {
     tone({ type: 'square', from: 420, to: 120, dur: 0.12, vol: 0.14 });
@@ -99,7 +99,7 @@ export const sfx = {
     noise(0.5, 0.15, 900, 200);
   },
   bump: () => tone({ type: 'triangle', from: 160, to: 90, dur: 0.1, vol: 0.25 }),
-  brick: () => noise(0.3, 0.4, 3000, 200),
+  crumble: () => noise(0.3, 0.4, 3000, 200),
   hurt: () => {
     tone({ type: 'square', from: 520, to: 140, dur: 0.3, vol: 0.12 });
   },

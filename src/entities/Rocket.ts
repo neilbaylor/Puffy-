@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { DEPTH } from '../config';
+import { ART_RES } from '../gfx/draw';
 import type { GameScene } from '../scenes/GameScene';
 import type { Player } from './Player';
 
@@ -22,9 +23,9 @@ export class Rocket extends Phaser.Physics.Arcade.Image {
     super(gs, x, y, 'rocket');
     gs.add.existing(this);
     gs.physics.add.existing(this);
-    this.setDepth(DEPTH.projectiles).setFlipX(dir < 0);
+    this.setScale(1 / ART_RES).setDepth(DEPTH.projectiles).setFlipX(dir < 0);
     this.body.setAllowGravity(false);
-    this.body.setSize(16, 8, true);
+    this.body.setSize(18 * ART_RES, 8 * ART_RES, true);
     this.body.setVelocityX(dir * owner.char.rocketSpeed * 0.45);
     owner.rocketsInFlight++;
   }
@@ -35,7 +36,6 @@ export class Rocket extends Phaser.Physics.Arcade.Image {
     const target = this.dir * this.owner.char.rocketSpeed;
     const vx = this.body.velocity.x;
     this.body.setVelocityX(vx + (target - vx) * Math.min(1, dt * 7));
-    // tiny wobble for life
     this.setRotation(Math.sin(this.age * 40) * 0.04);
     this.trailT -= dt;
     if (this.trailT <= 0) {
@@ -52,26 +52,12 @@ export class Rocket extends Phaser.Physics.Arcade.Image {
     this.gs.explode(this.x + this.dir * 6, this.y, this.owner);
     this.destroy();
   }
-}
 
-/** Slow glowing orb fired by turrets. Can be dodged, or shot down with a rocket. */
-export class EnemyBullet extends Phaser.Physics.Arcade.Image {
-  declare body: Phaser.Physics.Arcade.Body;
-  private age = 0;
-
-  constructor(scene: Phaser.Scene, x: number, y: number, vx: number, vy: number) {
-    super(scene, x, y, 'bullet');
-    scene.add.existing(this);
-    scene.physics.add.existing(this);
-    this.setDepth(DEPTH.projectiles);
-    this.body.setAllowGravity(false);
-    this.body.setCircle(5, 5, 5);
-    this.body.setVelocity(vx, vy);
-  }
-
-  tick(dt: number) {
-    this.age += dt;
-    this.setAlpha(0.8 + Math.sin(this.age * 20) * 0.2);
-    if (this.age > 5) this.destroy();
+  /** Leave quietly (off-screen). */
+  fizzle() {
+    if (this.exploded) return;
+    this.exploded = true;
+    this.owner.rocketsInFlight = Math.max(0, this.owner.rocketsInFlight - 1);
+    this.destroy();
   }
 }

@@ -62,8 +62,8 @@ export function roundRect(
 // Characters
 // ─────────────────────────────────────────────────────────────
 
-export type Pose = 'idle0' | 'idle1' | 'walk0' | 'walk1' | 'walk2' | 'walk3' | 'jump' | 'fall' | 'hurt';
-export const POSES: Pose[] = ['idle0', 'idle1', 'walk0', 'walk1', 'walk2', 'walk3', 'jump', 'fall', 'hurt'];
+export type Pose = 'idle0' | 'idle1' | 'walk0' | 'walk1' | 'walk2' | 'walk3' | 'jump' | 'fall' | 'hurt' | 'shoot';
+export const POSES: Pose[] = ['idle0', 'idle1', 'walk0', 'walk1', 'walk2', 'walk3', 'jump', 'fall', 'hurt', 'shoot'];
 export const CHAR_W = 56;
 export const CHAR_H = 56;
 
