@@ -78,6 +78,7 @@ export const CHARACTERS: CharacterDef[] = [
     tagline: 'Small & speedy',
     colors: { main: '#f7953a', shade: '#cf6b1c', light: '#ffc98a', accent: '#fff3e2' },
     scale: 0.86, // 10% bigger than he was
+    knockback: 1.35, // small and light: hits send him flying further
     hitW: 16,
     hitH: 22,
     muzzleY: 8,
