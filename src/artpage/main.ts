@@ -11,6 +11,7 @@ import { drawMusclesStyled } from '../gfx/muscles';
 import { drawNuggie, drawRootBeer } from '../gfx/collectibles';
 import { KING_FRAMES, drawArena, drawArenaFront, drawCrowd, drawBackboard, drawBall, drawKing, drawRimBack, drawRimFront, HOOP, STAGE_OX, STAGE_OY } from '../gfx/hoops';
 import { drawPuffyStyled } from '../gfx/puffy';
+import { MOUNTAIN_LOOKS, drawClimbMap, drawMountainScene } from './part2';
 import { drawScruffyStyled } from '../gfx/scruffy';
 import {
   PALETTES,
@@ -190,6 +191,22 @@ async function paint() {
   } catch {
     /* fallback font */
   }
+  document.querySelectorAll<HTMLCanvasElement>('canvas[data-part2]').forEach((c) => {
+    const look = MOUNTAIN_LOOKS.find((l) => l.id === c.dataset.part2) ?? MOUNTAIN_LOOKS[0];
+    c.width = 1280;
+    c.height = 720;
+    const ctx = c.getContext('2d')!;
+    ctx.scale(2, 2);
+    drawMountainScene(ctx, look);
+  });
+  document.querySelectorAll<HTMLCanvasElement>('canvas[data-part2map]').forEach((c) => {
+    const look = MOUNTAIN_LOOKS.find((l) => l.id === c.dataset.part2map) ?? MOUNTAIN_LOOKS[0];
+    c.width = 600;
+    c.height = 1800;
+    const ctx = c.getContext('2d')!;
+    ctx.scale(2, 2);
+    drawClimbMap(ctx, look);
+  });
   document.querySelectorAll<HTMLCanvasElement>('canvas[data-look]').forEach((c) => {
     const pal = PALETTES[c.dataset.look!];
     c.width = 1200;
