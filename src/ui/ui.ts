@@ -848,7 +848,7 @@ export class UI {
       <div class="panel results gameover">
         <div class="results-hero"><canvas width="160" height="160"></canvas></div>
         <div class="results-body">
-          <p class="eyebrow">${levelInfo(this.level).world} · ${levelName(this.level)}</p>
+          <p class="eyebrow">${levelName(this.level)}</p>
           <h2>Out of lives!</h2>
           <p class="gameover-note">${g.name} fainted one too many times. Start the level again with 3 spare lives.</p>
           <div class="row">
@@ -894,7 +894,7 @@ export class UI {
           <button class="btn btn-alt btn-small" data-act="hero">Pick player</button>
         </div>
         <div class="results-body">
-          <p class="eyebrow">${levelInfo(r.level ?? this.level).world} · ${levelName(r.level ?? this.level)}</p>
+          <p class="eyebrow">${levelName(r.level ?? this.level)}</p>
           <h2>Level clear!</h2>
           ${firstTime ? '<p class="unlock-note">New: pick which level to start from on the start screen!</p>' : ''}
           <dl class="stat-list">
