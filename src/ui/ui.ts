@@ -335,6 +335,8 @@ export class UI {
     });
     const checkOrientation = () => {
       const portrait = window.innerHeight > window.innerWidth;
+      // turned the phone upright mid-level: pause the game for them
+      if (portrait && isTouchDevice() && this.rotate.hidden && this.gameScene && !this.screen) this.pause();
       this.rotate.hidden = !(portrait && isTouchDevice());
       // the page behind matches the prompt, so no strip of sky shows under it (iOS home screen)
       document.documentElement.classList.toggle('rotating', !this.rotate.hidden);
