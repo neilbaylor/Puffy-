@@ -1,5 +1,5 @@
-// Tiny static server for the built game (dist/). Used by Railway: `npm start`.
-// No dependencies; gzips text files once and caches them in memory.
+// Tiny static server for the built game (dist/), plus the online battle server.
+// Used by Railway: `npm start`. Gzips text files once and caches them in memory.
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve } from 'node:path';
@@ -33,7 +33,7 @@ async function load(path) {
   return entry;
 }
 
-createServer(async (req, res) => {
+const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url ?? '/', 'http://x');
     let path = normalize(join(ROOT, decodeURIComponent(url.pathname)));
@@ -65,4 +65,14 @@ createServer(async (req, res) => {
     res.writeHead(500).end('Server error');
     console.error(e);
   }
-}).listen(PORT, '0.0.0.0', () => console.log(`Puffy is being served on port ${PORT}`));
+});
+
+// the online battle server (WebSockets at /battle), built from server/battle.ts
+try {
+  const { attachBattle } = await import('./dist-server/battle.mjs');
+  attachBattle(server);
+} catch (e) {
+  console.warn('Battle server not available:', e.message);
+}
+
+server.listen(PORT, '0.0.0.0', () => console.log(`Puffy is being served on port ${PORT}`));
