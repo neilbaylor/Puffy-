@@ -866,7 +866,12 @@ export class GameScene extends Phaser.Scene {
       const eb = e.body;
       const dx = Math.max(eb.left - x, 0, x - eb.right);
       const dy = Math.max(eb.top - y, 0, y - eb.bottom);
-      if (dx * dx + dy * dy < r * r) e.damage(owner.char.damage, 'blast', owner);
+      if (dx * dx + dy * dy < r * r) {
+        // Big Muscles' first rocket on a tough enemy counts double
+        const heavy = owner.char.heavyHitter && e.hp >= 3 && !e.heavyHit;
+        if (heavy) e.heavyHit = true;
+        e.damage(owner.char.damage + (heavy ? 1 : 0), 'blast', owner);
+      }
     }
 
     // blast puff boulders

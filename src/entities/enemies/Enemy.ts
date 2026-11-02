@@ -24,6 +24,8 @@ export abstract class Enemy extends Phaser.Physics.Arcade.Sprite {
   declare body: Phaser.Physics.Arcade.Body;
   abstract readonly kind: EnemyKind;
   hp = 1;
+  /** Already took Big Muscles' double-strength first hit. */
+  heavyHit = false;
   /** Some bad guys carry a weapon (gun, chainsaw, ball and chain). */
   weapon: Weapon | null = null;
   /** Can be killed by jumping on it. */
