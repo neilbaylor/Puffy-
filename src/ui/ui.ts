@@ -63,17 +63,28 @@ function controlsHtml(compact = false) {
   return `<div class="controls${compact ? ' compact' : ''}">${rows.map(([k, what]) => `<span class="ctl"><span class="keys">${k}</span><em>${what}</em></span>`).join('')}</div>`;
 }
 
-/** Letters as spans for the subtitle's rolling wave (words spaced out, dots as separators). */
+/** One run of words as letter spans for the rolling wave (--i = position in the whole line). */
+function waveWords(text: string, start = 0) {
+  let i = start;
+  return text
+    .split(' ')
+    .map((w) => `<span class="w">${[...w].map((ch, j) => `<i style="--i:${i++};--j:${j}">${ch}</i>`).join('')}</span>`)
+    .join('');
+}
+
+/**
+ * The subtitle's letters for the rolling wave: each " · " part (world, title,
+ * part) is its own segment, so a level switch can swap just the part that changed.
+ */
 function waveText(text: string) {
   let i = 0;
   return text
     .split(' · ')
-    .map((part) =>
-      part
-        .split(' ')
-        .map((w) => `<span class="w">${[...w].map((ch) => `<i style="--i:${i++}">${ch}</i>`).join('')}</span>`)
-        .join(''),
-    )
+    .map((part) => {
+      const html = `<span class="seg">${waveWords(part, i)}</span>`;
+      i += part.replace(/ /g, '').length;
+      return html;
+    })
     .join('<b class="sep">•</b>');
 }
 
@@ -343,7 +354,7 @@ export class UI {
       const bar = (n: number) => `<i style="--n:${n}"></i>`;
       const card = h(`<button class="card" role="radio" data-i="${i}" style="--c:${c.colors.main};--cs:${c.colors.shade}">
         <canvas width="320" height="320"></canvas>
-        <div class="card-name">${c.name}</div>
+        <div class="card-name" aria-label="${c.name}" style="--d:${i * -0.9}s">${waveWords(c.name)}</div>
         <div class="card-tag">${c.tagline}</div>
         <dl class="bars">
           <dt>Speed</dt><dd>${bar(c.bars.speed)}</dd>
@@ -379,16 +390,35 @@ export class UI {
       const text = `${levelInfo(this.level).world} · ${levelName(this.level)}`;
       if (wn.getAttribute('aria-label') === text) return;
       wn.setAttribute('aria-label', text);
-      // the old name's letters hop away and the new one pops in, letter by letter
-      // (works the same for a new world as for a new part)
+      // only the parts that changed (e.g. "Part 1" → "Part 2"; the world only when
+      // it's a new world) hop away, and the new words pop in letter by letter
       clearTimeout(this.subtitleTimer);
-      wn.classList.remove('swap-in');
-      wn.classList.add('swap-out');
-      this.subtitleTimer = window.setTimeout(() => {
+      const parts = text.split(' · ');
+      const segs = [...wn.querySelectorAll<HTMLElement>('.seg')];
+      if (segs.length !== parts.length) {
         wn.innerHTML = waveText(text);
-        wn.classList.remove('swap-out');
-        void wn.offsetWidth;
-        wn.classList.add('swap-in');
+        return;
+      }
+      const changed: number[] = [];
+      segs.forEach((seg, k) => {
+        seg.classList.remove('swap-in');
+        // (a part still hopping away from a quick switch back also pops in again)
+        if (seg.classList.contains('swap-out') || seg.textContent !== parts[k].replace(/ /g, '')) {
+          changed.push(k);
+          seg.classList.add('swap-out');
+        }
+      });
+      this.subtitleTimer = window.setTimeout(() => {
+        let i = 0;
+        segs.forEach((seg, k) => {
+          if (changed.includes(k)) {
+            seg.innerHTML = waveWords(parts[k], i);
+            seg.classList.remove('swap-out');
+            void seg.offsetWidth;
+            seg.classList.add('swap-in');
+          }
+          i += parts[k].replace(/ /g, '').length;
+        });
       }, 260);
     };
     el.querySelectorAll<HTMLButtonElement>('.lvl').forEach((b) =>
@@ -449,7 +479,81 @@ export class UI {
     });
     const btn = el.querySelector<HTMLButtonElement>('[data-act=play]');
     if (btn) btn.textContent = `Play as ${CHARACTERS[i].name}`;
-    if (!quiet) sfx.select();
+    if (!quiet) {
+      sfx.select();
+      this.cheer(i);
+    }
+  }
+
+  /** Each hero's card poses, drawn once (a hop flips between them with no redraw cost). */
+  private cardPoses = new Map<string, Record<string, HTMLCanvasElement>>();
+  private cheerRaf = 0;
+
+  /** The picked hero celebrates: crouch, hop, land with a squash, name bounces, sparkles. */
+  private cheer(i: number) {
+    const card = this.screen?.querySelectorAll<HTMLElement>('.card')[i];
+    const cv = card?.querySelector('canvas');
+    if (!card || !cv) return;
+    const ch = CHARACTERS[i];
+    let poses = this.cardPoses.get(ch.id);
+    if (!poses) {
+      poses = {};
+      for (const pose of ['idle0', 'jump', 'fall'] as const) {
+        const c = document.createElement('canvas');
+        c.width = cv.width;
+        c.height = cv.height;
+        drawHeroCard(c, ch, pose);
+        poses[pose] = c;
+      }
+      this.cardPoses.set(ch.id, poses);
+    }
+    const ctx = cv.getContext('2d')!;
+    let shown = '';
+    const show = (pose: string) => {
+      if (pose === shown) return;
+      shown = pose;
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      ctx.drawImage(poses![pose], 0, 0);
+    };
+    cancelAnimationFrame(this.cheerRaf);
+    this.screen?.querySelectorAll<HTMLElement>('.card.cheer').forEach((c) => {
+      c.classList.remove('cheer');
+      const other = c.querySelector('canvas');
+      const op = this.cardPoses.get(CHARACTERS[Number(c.dataset.i)].id);
+      if (other && op) {
+        const oc = other.getContext('2d')!;
+        oc.clearRect(0, 0, other.width, other.height);
+        oc.drawImage(op.idle0, 0, 0);
+      }
+    });
+    card.querySelectorAll('.spark').forEach((s) => s.remove());
+    void card.offsetWidth;
+    card.classList.add('cheer');
+    // the poses follow the hop's own clock (.cheer keyframes, 0.75 s), so they
+    // always line up with it: crouch → up → coming down → landed
+    const hop = cv.getAnimations()[0];
+    const t0 = performance.now();
+    const step = () => {
+      const t = hop && typeof hop.currentTime === 'number' ? hop.currentTime : performance.now() - t0;
+      show(t < 105 ? 'idle0' : t < 330 ? 'jump' : t < 540 ? 'fall' : 'idle0');
+      if (card.isConnected && hop?.playState !== 'finished' && t < 760) this.cheerRaf = requestAnimationFrame(step);
+      else {
+        show('idle0');
+        card.classList.remove('cheer');
+      }
+    };
+    this.cheerRaf = requestAnimationFrame(step);
+    // a little burst of sparkles around the hero
+    const colors = ['#ffd23f', '#ff7eb6', '#7ee3ff', '#ffffff', ch.colors.main];
+    for (let k = 0; k < 9; k++) {
+      const s = document.createElement('i');
+      s.className = 'spark';
+      const a = -Math.PI / 2 + (k / 8 - 0.5) * Math.PI * 1.25 + (Math.random() - 0.5) * 0.3;
+      const d = 46 + Math.random() * 30;
+      s.style.cssText = `--dx:${(Math.cos(a) * d).toFixed(1)}px;--dy:${(Math.sin(a) * d).toFixed(1)}px;--c:${colors[k % colors.length]};--r:${Math.round(Math.random() * 180)}deg;animation-delay:${(0.12 + Math.random() * 0.08).toFixed(2)}s`;
+      card.appendChild(s);
+      window.setTimeout(() => s.remove(), 1100);
+    }
   }
 
   /** Hide the browser's address bar etc. (Android, iPad, desktop). iPhone needs "Add to Home Screen". */
@@ -640,7 +744,7 @@ export class UI {
       <div class="panel results">
         <div class="results-hero"><canvas width="160" height="160"></canvas></div>
         <div class="results-body">
-          <p class="eyebrow">World 1 · ${levelName(r.level ?? this.level)}</p>
+          <p class="eyebrow">${levelInfo(r.level ?? this.level).world} · ${levelName(r.level ?? this.level)}</p>
           <h2>Level clear!</h2>
           ${firstTime ? '<p class="unlock-note">New: pick which level to start from on the start screen!</p>' : ''}
           <dl class="stat-list">

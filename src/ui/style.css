@@ -346,14 +346,14 @@ body {
      (the cards take up the slack), with only a small margin under Play */
   .start { justify-content: flex-start; gap: 0; padding-top: calc(clamp(10px, 8.5vh, 40px) + var(--safe-t)); padding-bottom: calc(clamp(6px, 3vh, 14px) + var(--safe-b)); }
   .start .cards { margin-top: clamp(8px, 3.6vh, 18px); }
-  .start .levels { margin-top: clamp(5px, 2.2vh, 10px); }
+  .start .levels { margin-top: clamp(9px, 3.8vh, 18px); }
   .start .start-foot { margin-top: clamp(6px, 2.4vh, 12px); }
   .logo { font-size: clamp(30px, 11vh, 52px); }
   .world-name { font-size: clamp(11px, 3.6vh, 16px); }
   /* shorter cards: the heroes are drawn smaller so everything fits under the title */
   .cards { flex: 0 1 auto; width: min(100%, 760px); }
   .card { padding: 4px 8px 8px; border-radius: 16px; box-shadow: 0 4px 0 var(--ink); }
-  .card canvas { height: max(70px, min(30vh, 40vmin, calc(100vh - 262px - var(--safe-t) - var(--safe-b)))); }
+  .card canvas { height: max(70px, min(30vh, 40vmin, calc(100vh - 270px - var(--safe-t) - var(--safe-b)))); }
   /* a little headroom for the logo's hopping letters */
   .start-head { margin-top: clamp(4px, 2.5vh, 12px); }
   .card-name { font-size: clamp(15px, 5vh, 22px); }
@@ -1623,18 +1623,87 @@ kbd {
   from { opacity: 0; transform: translateX(-50%) translateY(30px); }
 }
 
-/* the subtitle swapping to a new level / world name: old letters hop away, new ones pop in */
-.world-name.swap-out i {
+/* the subtitle swapping to a new level / world name: just the part that changed —
+   its old letters hop away, the new ones pop in */
+.world-name .seg { display: contents; }
+.world-name .swap-out i {
   animation: wn-out 0.24s ease-in forwards;
-  animation-delay: calc(var(--i) * 0.008s);
+  animation-delay: calc(var(--j) * 0.012s);
 }
 @keyframes wn-out {
   to { transform: translateY(-0.7em) rotate(-12deg) scale(0.5); opacity: 0; }
 }
-.world-name.swap-in i {
+.world-name .swap-in i {
   animation: wn-in 0.55s cubic-bezier(0.2, 1.6, 0.4, 1) both, wn-wave 2.6s ease-in-out infinite;
-  animation-delay: calc(var(--i) * 0.03s), calc(0.7s + var(--i) * 0.06s);
+  animation-delay: calc(var(--j) * 0.045s), calc(0.7s + var(--i) * 0.06s);
 }
 @keyframes wn-in {
   from { transform: translateY(0.9em) rotate(14deg) scale(0.2); opacity: 0; }
+}
+
+/* hero names wave like the subtitle (each card a little out of step) */
+.card-name .w { display: inline-block; white-space: nowrap; }
+.card-name .w + .w { margin-left: 0.28em; }
+.card-name i {
+  display: inline-block;
+  font-style: normal;
+  animation: wn-wave 2.6s ease-in-out infinite;
+  animation-delay: calc(var(--d, 0s) + var(--i) * 0.06s);
+}
+
+/* picking a hero: a happy hop with a crouch and a squashy landing */
+.card.cheer canvas {
+  transform-origin: 50% 100%;
+  animation: card-cheer 0.75s linear;
+}
+@keyframes card-cheer {
+  0% { transform: translateY(0) scale(1, 1); }
+  14% { transform: translateY(0) scale(1.08, 0.9); animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1); }
+  44% { transform: translateY(-11%) scale(0.95, 1.07); animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.4); }
+  72% { transform: translateY(0) scale(1.02, 0.98); animation-timing-function: ease-out; }
+  80% { transform: translateY(0) scale(1.1, 0.88); animation-timing-function: ease-in-out; }
+  90% { transform: translateY(0) scale(0.97, 1.03); }
+  100% { transform: translateY(0) scale(1, 1); }
+}
+.card.cheer .card-name i {
+  animation: name-cheer 0.6s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+  animation-delay: calc(0.1s + var(--i) * 0.035s);
+}
+@keyframes name-cheer {
+  40% { transform: translateY(-0.35em) rotate(-8deg) scale(1.2); }
+  100% { transform: translateY(0) rotate(0) scale(1); }
+}
+.card .spark {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  width: 11px;
+  height: 11px;
+  margin: -5.5px;
+  pointer-events: none;
+  background: var(--c);
+  border: 2px solid var(--ink);
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  opacity: 0;
+  animation: spark-pop 0.7s cubic-bezier(0.2, 0.8, 0.4, 1) both;
+}
+@keyframes spark-pop {
+  0% { opacity: 1; transform: translate(0, 0) rotate(0) scale(0.3); }
+  60% { opacity: 1; transform: translate(var(--dx), var(--dy)) rotate(var(--r)) scale(1.4); }
+  100% { opacity: 0; transform: translate(var(--dx), calc(var(--dy) + 10px)) rotate(var(--r)) scale(0.6); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-name i, .card.cheer canvas, .card.cheer .card-name i, .card .spark { animation: none; }
+}
+
+/* results on a phone in landscape: stats in two columns, all buttons on one row */
+@media (max-height: 500px) {
+  .results { max-width: min(100%, 780px); padding: 12px 20px 16px; }
+  .results-body { gap: 6px; }
+  .results h2 { font-size: clamp(22px, 7vh, 30px); }
+  .results .stat-list { grid-template-columns: 1fr auto 1fr auto; gap: 2px 14px; font-size: 14px; }
+  .results .stat-list dd { font-size: 18px; }
+  .results .stat-list dd:nth-of-type(odd) { margin-right: 10px; }
+  .results .row { flex-wrap: nowrap; margin-top: 6px; }
+  .results .row .btn { white-space: nowrap; padding-left: 16px; padding-right: 16px; }
 }
