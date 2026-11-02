@@ -113,7 +113,7 @@ export const CHARACTERS: CharacterDef[] = [
     jump: 585,
     staminaSecs: 2.4,
     refillSecs: 2.2,
-    fireRate: 0.6,
+    fireRate: 0.55,
     maxRockets: 1,
     rocketSpeed: 560,
     blastRadius: 86,
