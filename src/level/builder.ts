@@ -8,7 +8,7 @@ import { T } from './tiles';
 
 export type Cell = 'ground' | 'rock' | 'boulder' | 'bramble' | 'cloud' | null;
 
-export type EnemyKind = 'puffball' | 'bigpuff' | 'giant';
+export type EnemyKind = 'puffball' | 'bigpuff' | 'giant' | 'goat';
 
 export interface Spawn {
   type: EnemyKind | 'aura' | 'rootbeer' | 'checkpoint' | 'goal' | 'player' | 'tree' | 'soccer';

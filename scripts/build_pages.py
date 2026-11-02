@@ -21,7 +21,7 @@ SHOTS = [
     ('shot-giant.jpg', 'A Giant slamming down on someone sneaking under'),
     ('shot-hoops.jpg', 'The free-throw contest (iPad size)'),
 ]
-SKETCHES = ['puffy-sketch-1.jpg', 'puffy-sketch-2.jpg', 'scruffy-sketch.jpg', 'muscles-sketch.jpg', 'muscles-hurt-sketch.jpg', 'baddie-sketch-1.jpg', 'baddie-sketch-2.jpg', 'giant-sketch.jpg', 'king-sketch.jpg', 'meters-sketch.jpg']
+SKETCHES = ['puffy-sketch-1.jpg', 'puffy-sketch-2.jpg', 'scruffy-sketch.jpg', 'muscles-sketch.jpg', 'muscles-hurt-sketch.jpg', 'baddie-sketch-1.jpg', 'baddie-sketch-2.jpg', 'giant-sketch.jpg', 'king-sketch.jpg', 'meters-sketch.jpg', 'goat-sketch.jpg']
 b64 = lambda f: base64.b64encode((sk / f).read_bytes()).decode()
 tpl = (sk / 'art.template.html').read_text()
 js = (root / 'dist-art/art.js').read_text()

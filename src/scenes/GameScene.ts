@@ -296,6 +296,13 @@ export class GameScene extends Phaser.Scene {
     this.gAuras.add(a);
   }
 
+  /** Spawn an enemy standing on the ground at `groundY` (used by level spawns and for testing). */
+  spawnEnemy(kind: EnemyKind, x: number, groundY: number) {
+    const e = createEnemy(this, kind, x, groundY - 40);
+    this.addEnemy(e, groundY);
+    return e;
+  }
+
   /** Add an enemy standing on the ground at `groundY` (whatever its sprite's size/scale). */
   addEnemy(e: Enemy, groundY: number) {
     e.body.updateFromGameObject();

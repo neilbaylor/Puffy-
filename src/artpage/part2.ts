@@ -1,7 +1,7 @@
 /**
  * Concept art for World 1 · Part 2: climbing up the mountain.
  * Three possible looks (same layout, different mood) and a map of the climb.
- * Mountain goats are marked as placeholders until the goat drawing arrives.
+ * Mountain goats are drawn from the goat sketch.
  */
 import { drawBigPuff, drawPuffball } from '../gfx/baddies';
 import { canvas, rng, type Ctx } from '../gfx/draw';
@@ -10,6 +10,7 @@ import { drawMusclesStyled } from '../gfx/muscles';
 import { drawNuggie, drawRootBeer } from '../gfx/collectibles';
 import { drawPuffyStyled } from '../gfx/puffy';
 import { drawScruffyStyled } from '../gfx/scruffy';
+import { drawGoat } from '../gfx/goat';
 import { PALETTES, drawBloom, drawCloudLayer, drawTerrainPiece, roundPoly, traceCells, type TerrainKind, type WorldPalette } from '../gfx/world';
 
 const ST = STYLES.polished;
@@ -239,28 +240,6 @@ function waterfall(ctx: Ctx, x: number, yTop: number, yBot: number, w: number) {
   }
 }
 
-/** Where a mountain goat will go (your drawing is coming): a dashed outline and a label. */
-function goatSpot(ctx: Ctx, x: number, groundY: number, w = 46, h = 42) {
-  ctx.save();
-  ctx.setLineDash([5, 4]);
-  ctx.strokeStyle = 'rgba(58,36,24,0.85)';
-  ctx.lineWidth = 2;
-  ctx.fillStyle = 'rgba(255,255,255,0.45)';
-  ctx.beginPath();
-  ctx.roundRect(x - w / 2, groundY - h, w, h, 10);
-  ctx.fill();
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillStyle = '#3a2418';
-  ctx.font = `400 11px ${FONT}`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('GOAT', x, groundY - h / 2 - 5);
-  ctx.font = `700 7.5px Nunito, sans-serif`;
-  ctx.fillText('your drawing', x, groundY - h / 2 + 7);
-  ctx.restore();
-}
-
 /** One gameplay-sized view of the climb (640 × 360 world units). */
 export function drawMountainScene(ctx: Ctx, look: MountainLook) {
   const W = 640;
@@ -321,8 +300,9 @@ export function drawMountainScene(ctx: Ctx, look: MountainLook) {
   at(ctx, 15.1 * T, 3.4 * T, 1.15, () => drawPuffyStyled(ctx, -27, -54, 'jump', ST));
   at(ctx, 8.6 * T, 7 * T, 0.95, () => drawPuffball(ctx, -24, -46, 'w1', ST));
   at(ctx, 18.3 * T, 2 * T, 0.8, () => drawBigPuff(ctx, -38, -86, "w0", ST));
-  goatSpot(ctx, 13.9 * T, 5 * T);
-  goatSpot(ctx, 10.5 * T, 4 * T, 40, 36);
+  // mountain goats: one charging along the ledge, one pawing on the rock perch
+  at(ctx, 13.95 * T - 32 * 1.05, 5 * T - 62 * 1.05, 1.05, () => drawGoat(ctx, 0, 0, 'c0', ST));
+  at(ctx, 10.5 * T + 32 * 0.85, 4 * T - 62 * 0.85, 0.85, () => drawGoat(ctx, 0, 0, 'w1', ST), true);
   // weather
   const r = rng(99);
   if (look.extras === 'snowfall') {

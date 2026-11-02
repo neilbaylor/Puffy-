@@ -12,6 +12,7 @@ import { drawNuggie, drawRootBeer } from '../gfx/collectibles';
 import { KING_FRAMES, drawArena, drawArenaFront, drawCrowd, drawBackboard, drawBall, drawKing, drawRimBack, drawRimFront, HOOP, STAGE_OX, STAGE_OY } from '../gfx/hoops';
 import { drawPuffyStyled } from '../gfx/puffy';
 import { MOUNTAIN_LOOKS, drawClimbMap, drawMountainScene } from './part2';
+import { GOAT_FRAMES, GOAT_W, drawGoat } from '../gfx/goat';
 import { drawScruffyStyled } from '../gfx/scruffy';
 import {
   PALETTES,
@@ -131,7 +132,7 @@ function heroSheet(c: HTMLCanvasElement) {
 
 function baddieSheet(c: HTMLCanvasElement) {
   const S = 1.4;
-  c.width = Math.round((PUFFBALL_W * 3 + BIGPUFF_W * 4 + GIANT_W * 4) * S * 0.86 + 60);
+  c.width = Math.round((PUFFBALL_W * 3 + BIGPUFF_W * 4 + GIANT_W * 4 + GOAT_W * 5) * S * 0.86 + 80);
   c.height = Math.round(236 * S);
   const ctx = c.getContext('2d')!;
   let x = 10;
@@ -150,6 +151,12 @@ function baddieSheet(c: HTMLCanvasElement) {
     const lift = f === 'air' ? 20 : f === 'slam' ? 8 : 0;
     at(ctx, x, foot - 200 * S - lift * S, S, () => drawGiant(ctx, 0, 0, f, ST));
     x += GIANT_W * S * 0.78;
+  }
+  // the mountain goat (Part 2), facing right like the sketch
+  x += 10;
+  for (const f of GOAT_FRAMES) {
+    at(ctx, x + GOAT_W * S, foot - 62 * S, S, () => drawGoat(ctx, 0, 0, f, ST), true);
+    x += GOAT_W * S * 0.95;
   }
 }
 

@@ -392,8 +392,98 @@ export class Giant extends Enemy {
   }
 }
 
+/**
+ * Mountain goat (Part 2, from the sketch). Trots along its ledge (turning back
+ * at edges). When it spots you on its level it paws the ground — "!" — then
+ * charges horns-first; if it smacks into a wall it's left dizzy for a moment.
+ * Its spiky back hurts to land on, so it can't be stomped: two shots, or jump
+ * over the charge.
+ */
+export class Goat extends Enemy {
+  readonly kind: EnemyKind = 'goat';
+  private dir = -1;
+  private mode: 'walk' | 'windup' | 'charge' | 'stun' = 'walk';
+  private timer = 0;
+  private cooldown = 1;
+
+  constructor(gs: GameScene, x: number, y: number) {
+    super(gs, x, y, 'goat', 'w0');
+    hiRes(this, 40, 38, 12, 24);
+    this.hp = 2;
+    this.stompable = false;
+  }
+
+  tick(dt: number) {
+    const b = this.body;
+    const target = this.gs.nearestPlayer(this.x, this.y);
+    this.timer -= dt;
+    this.cooldown -= dt;
+    const ahead = (d: number) => this.gs.level.isSolidAt(d > 0 ? b.right + 4 : b.left - 4, b.bottom + 6);
+    switch (this.mode) {
+      case 'walk': {
+        if ((this.dir < 0 && b.blocked.left) || (this.dir > 0 && b.blocked.right) || (b.blocked.down && !ahead(this.dir))) this.dir *= -1;
+        b.setVelocityX(this.dir * 42);
+        this.setFrame(Math.floor(this.t * 6) % 2 ? 'w1' : 'w0');
+        const dx = target ? target.x - this.x : 0;
+        const sameLevel = target ? Math.abs(target.bottom - b.bottom) < 40 : false;
+        if (target && this.cooldown <= 0 && b.blocked.down && sameLevel && Math.abs(dx) < 260 && Math.abs(dx) > 30) {
+          this.dir = Math.sign(dx);
+          this.mode = 'windup';
+          this.timer = 0.6;
+          b.setVelocityX(0);
+          this.gs.fx.popText(this.x, b.top - 14, '!', '#ff5a3c', 22);
+          sfx.bump();
+        }
+        break;
+      }
+      case 'windup':
+        // paws the ground
+        this.setFrame(Math.floor(this.t * 12) % 2 ? 'w1' : 'w0');
+        if (Math.random() < 0.3) this.gs.fx.dust(this.dir > 0 ? b.left + 6 : b.right - 6, b.bottom, 1);
+        if (this.timer <= 0) {
+          this.mode = 'charge';
+          this.timer = 1.4;
+        }
+        break;
+      case 'charge': {
+        const wall = this.dir < 0 ? b.blocked.left : b.blocked.right;
+        const edge = b.blocked.down && !ahead(this.dir);
+        b.setVelocityX(edge ? 0 : this.dir * 290);
+        this.setFrame(Math.floor(this.t * 12) % 2 ? 'c1' : 'c0');
+        if (Math.random() < 0.5) this.gs.fx.dust(this.dir > 0 ? b.left + 6 : b.right - 6, b.bottom, 1);
+        if (wall) {
+          // BONK
+          this.mode = 'stun';
+          this.timer = 1.1;
+          b.setVelocity(-this.dir * 80, -160);
+          this.gs.cameras.main.shake(100, 0.004);
+          this.gs.fx.stars(this.x - this.dir * -16, b.top + 6, 5);
+          sfx.thud();
+        } else if (edge || this.timer <= 0) {
+          this.mode = 'walk';
+          this.cooldown = 1.8;
+          b.setVelocityX(0);
+        }
+        break;
+      }
+      case 'stun':
+        this.setFrame('stun');
+        if (b.blocked.down) b.setVelocityX(0);
+        if (this.timer <= 0) {
+          this.mode = 'walk';
+          this.cooldown = 1.5;
+          this.dir *= -1;
+        }
+        break;
+    }
+    this.setFlipX(this.dir > 0);
+  }
+}
+
 export function createEnemy(gs: GameScene, kind: EnemyKind, x: number, y: number): Enemy {
   switch (kind) {
+    case 'goat':
+      return new Goat(gs, x, y);
     case 'puffball':
       return new Puffball(gs, x, y);
     case 'bigpuff':
