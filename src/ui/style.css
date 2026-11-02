@@ -1403,7 +1403,7 @@ html.rotating body {
 .hoops-lb.on i { height: 11vh; }
 .hoops-l3 {
   position: absolute;
-  left: calc(4vw + var(--safe-l));
+  left: calc(max(5vw, 24px) + var(--safe-l));
   bottom: calc(14vh + 6px);
   display: grid;
   transform: translateX(-120%);

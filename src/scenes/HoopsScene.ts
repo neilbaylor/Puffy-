@@ -408,6 +408,8 @@ export class HoopsScene extends Phaser.Scene {
     const ease = wk * wk * (3 - 2 * wk);
     // each arena's broadcast camera sits in its own spot
     const lc = this.style.layout.cam;
+    // the wide shot centres on the hoop (the scoreboard hangs right above it)
+    fx += (A(HOOP.rimX, 0).x - 800) * ease;
     fx += lc.dx * ease;
     fy += lc.dy * ease;
     fz *= 1 + (lc.zoom - 1) * ease;
@@ -447,7 +449,11 @@ export class HoopsScene extends Phaser.Scene {
       const jx0 = A(JUMBO.x, 0).x - 12 - SAFE.l / target;
       const jx1 = A(JUMBO.x + JUMBO.w * JUMBO.s, 0).x + 12 + SAFE.r / target;
       const yw = Phaser.Math.Clamp(Phaser.Math.Clamp(y, Math.min(feet - vh / 2, jTop + vh / 2), jTop + vh / 2), vh / 2, ARENA_H - vh / 2);
-      const xw = Phaser.Math.Clamp(Phaser.Math.Clamp(x, jx1 - vw / 2, jx0 + vw / 2), vw / 2, ARENA_W - vw / 2);
+      // …but never so far that a shooter on the edge of the court is cut off
+      const left = A(Math.min(...HERO_SPOTS.map((p) => p.x)), 0).x - 70;
+      const right = A(Math.max(...KING_SPOTS.map((p) => p.x)), 0).x + 130;
+      const xs = Phaser.Math.Clamp(x, right - vw / 2, Math.max(right - vw / 2, left + vw / 2));
+      const xw = Phaser.Math.Clamp(Phaser.Math.Clamp(xs, jx1 - vw / 2, jx0 + vw / 2), vw / 2, ARENA_W - vw / 2);
       x += (xw - x) * ease;
       y += (yw - y) * ease;
     }
