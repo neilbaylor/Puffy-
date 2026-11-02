@@ -16,6 +16,7 @@ import { levelInfo } from '../level/levels';
 import { buildLevel1 } from '../level/level1';
 import { T } from '../level/tiles';
 import { Background, type View } from '../world/Background';
+import { Ambience } from '../world/Ambience';
 import type { HoopsData } from './HoopsScene';
 import { Fx } from '../world/Fx';
 import { stingerCover } from '../ui/stinger';
@@ -108,6 +109,7 @@ export class GameScene extends Phaser.Scene {
   level!: LevelView;
   fx!: Fx;
   private bg!: Background;
+  private amb!: Ambience;
 
   players: Player[] = [];
   private matches: SoccerMatch[] = [];
@@ -192,6 +194,10 @@ export class GameScene extends Phaser.Scene {
     const { widthPx, heightPx } = this.level;
     this.physics.world.setBounds(0, -400, widthPx, heightPx + 800, true, true, false, false);
     this.bg = new Background(this, heightPx - VIEW_H);
+    this.amb = new Ambience(this, this.levelId, (x, y, max) => {
+      for (let d = 0; d <= max; d += 6) if (this.level.isSolidAt(x, y + d)) return Math.floor((y + d) / TILE) * TILE;
+      return null;
+    });
     this.applyTheme();
     this.fx = new Fx(this);
 
@@ -412,7 +418,23 @@ export class GameScene extends Phaser.Scene {
     this.applyTheme();
     this.level.animate(this.time.now / 1000, this.view.left, this.view.left + this.view.width);
     this.bg.update(this.view, dt);
+    this.updateAmbience(dt);
     this.emitHud();
+  }
+
+  /** Shadows, critters and sunlight (visual only). */
+  private updateAmbience(dt: number) {
+    const targets: { obj: Phaser.GameObjects.GameObject; x: number; bottom: number; w: number; alive: boolean }[] = [];
+    for (const p of this.players) {
+      this.amb.shadowFor(p.view);
+      targets.push({ obj: p.view, x: p.x, bottom: p.bottom, w: p.body.width * 1.3, alive: p.state !== 'fainted' });
+    }
+    for (const e of this.enemies) {
+      if (!e.active) continue;
+      this.amb.shadowFor(e);
+      targets.push({ obj: e, x: e.x, bottom: e.body.bottom, w: e.body.width * 1.15, alive: !e.dead && e.awake });
+    }
+    this.amb.update(this.view, dt, targets);
   }
 
   // ─────────────────────────────────────────── level intro flyover ──
@@ -513,6 +535,7 @@ export class GameScene extends Phaser.Scene {
     this.applyTheme();
     this.level.animate(this.time.now / 1000, this.view.left, this.view.left + this.view.width);
     this.bg.update(this.view, dt);
+    this.updateAmbience(dt);
   }
 
   private updateCamera(dt: number, snap = false) {

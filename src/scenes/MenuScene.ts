@@ -1,14 +1,16 @@
 import Phaser from 'phaser';
-import { MIN_VIEW_W, VIEW_H } from '../config';
+import { MIN_VIEW_W, TILE, VIEW_H } from '../config';
 import { buildLevel1 } from '../level/level1';
 import { levelInfo } from '../level/levels';
 import { Background } from '../world/Background';
+import { Ambience } from '../world/Ambience';
 import { LevelView } from '../world/LevelView';
 import { mixTint, themeClock, themeMix, themesFor } from '../world/theme';
 
 /** Animated backdrop behind the start screen: a slow fly-over of Puff Ball Planet. */
 export class MenuScene extends Phaser.Scene {
   private bg!: Background;
+  private amb!: Ambience;
   private level!: LevelView;
   private x = 0;
   private t = 0;
@@ -43,6 +45,10 @@ export class MenuScene extends Phaser.Scene {
     this.levelId = id;
     this.level = new LevelView(this, (levelInfo(id).build ?? buildLevel1)());
     this.bg = new Background(this, this.level.heightPx - VIEW_H);
+    this.amb = new Ambience(this, id, (x, y, max) => {
+      for (let d = 0; d <= max; d += 8) if (this.level.isSolidAt(x, y + d)) return Math.floor((y + d) / TILE) * TILE;
+      return null;
+    });
     this.x = 0;
     this.top = null;
   }
@@ -77,5 +83,6 @@ export class MenuScene extends Phaser.Scene {
     this.level.setTint(mixTint(m));
     this.level.animate(this.time.now / 1000, this.x, this.x + vw);
     this.bg.update({ left: this.x - 50, top: top - 50, width: vw + 100, height: vh + 100 }, dt);
+    this.amb.update({ left: this.x, top, width: vw, height: vh }, dt, []);
   }
 }
