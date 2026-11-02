@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { CHARACTERS, characterById } from '../data/characters';
 import type { Session } from '../core/session';
-import { fadeOutMusic, playLevelClear, playLevelMusic, primeMusic, setMusicMuted, stopMusic } from '../core/music';
+import { fadeOutMusic, playLevelClear, playLevelMusic, playLevelSong, primeMusic, setMusicMuted, stopMusic } from '../core/music';
 import { isMuted, setMuted, sfx, unlockAudio } from '../core/sfx';
 import { drawHeroCard, drawPortrait } from '../gfx/draw';
 import { gamepadSources } from '../input/gamepad';
@@ -61,6 +61,7 @@ export class UI {
   private gameScene: GameScene | null = null;
   private pickRaf = 0;
   private selected = 0;
+  private introEl: HTMLElement | null = null;
   /** Which level to start (1-based); you can pick once you've beaten a level. */
   private level = 1;
 
@@ -113,12 +114,42 @@ export class UI {
     game.events.on('game-start', (s: GameScene, info: { fresh: boolean; atStart: boolean; level: string; world: string }) => {
       this.gameScene = s;
       this.setScreen(null);
-      this.showHud();
       // a new run starts the song from the top; restarts after a faint keep it going
-      if (info.fresh) playLevelClear();
-      else playLevelMusic();
+      if (info.fresh) playLevelSong(this.level);
+      else playLevelMusic(this.level);
+      if (this.introEl) return; // the level intro is playing: HUD and controls come after it
+      this.showHud();
       if (info.fresh) this.showBanner(`<small>${info.world}</small>${info.level}`, 2600);
       else this.showBanner(info.atStart ? '<small>Back to the</small>Start' : '<small>Back to the</small>Checkpoint', 1300);
+    });
+    // the level intro flyover: letterbox, title card, a Skip button; then GO!
+    game.events.on('level-intro', (i: { world: string; title: string; part: string }) => {
+      this.introEl?.remove();
+      this.hud.hidden = true;
+      this.touch.hide();
+      this.introEl = h(`<div class="lvl-intro">
+        <i class="li-bar"></i><i class="li-bar"></i>
+        <div class="li-title"><small>${i.world}</small><strong>${i.title}</strong><em>${i.part}</em></div>
+        <button class="li-skip">Skip ›</button>
+      </div>`);
+      this.introEl.querySelector('.li-skip')!.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+        game.events.emit('skip-intro');
+      });
+      this.root.appendChild(this.introEl);
+      void this.introEl.offsetWidth;
+      this.introEl.classList.add('on');
+    });
+    game.events.on('level-intro-end', () => {
+      const el = this.introEl;
+      this.introEl = null;
+      if (el) {
+        el.classList.remove('on');
+        el.classList.add('off');
+        setTimeout(() => el.remove(), 500);
+      }
+      this.showHud();
+      this.showBanner('GO!', 900);
     });
     game.events.on('hud', (s: HudState) => this.renderHud(s));
     game.events.on('hoops-start', () => {
@@ -253,6 +284,7 @@ export class UI {
         this.level = Number(b.dataset.lvl);
         sfx.select();
         syncLevels();
+        this.game.events.emit('menu-level', this.level);
       }),
     );
     syncLevels();
@@ -340,6 +372,8 @@ export class UI {
 
   private startGame(session: Session, checkpoint = -1) {
     sfx.select();
+    this.introEl?.remove();
+    this.introEl = null;
     this.session = session;
     this.setScreen(null);
     this.game.scene.stop('Menu');
@@ -426,6 +460,8 @@ export class UI {
   }
 
   private quitToStart() {
+    this.introEl?.remove();
+    this.introEl = null;
     this.setScreen(null);
     stopMusic();
     this.game.scene.stop('Hoops');
@@ -433,7 +469,7 @@ export class UI {
     this.gameScene = null;
     this.hud.hidden = true;
     this.touch.hide();
-    this.game.scene.start('Menu', { silent: true });
+    this.game.scene.start('Menu', { silent: true, level: this.level });
     this.showStart();
   }
 

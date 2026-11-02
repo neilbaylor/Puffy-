@@ -1,5 +1,6 @@
 import levelClearUrl from '../assets/level-clear.m4a';
 import hoopsUrl from '../assets/hoops.m4a';
+import mountainUrl from '../assets/mountain-climb.m4a';
 import { isMuted } from './sfx';
 
 /**
@@ -7,8 +8,8 @@ import { isMuted } from './sfx';
  * browsers only allow audio started by a tap, so `primeMusic()` runs on the
  * first tap to "unlock" every track; after that the game can start them.
  */
-type Track = 'levelClear' | 'hoops';
-const urls: Record<Track, string> = { levelClear: levelClearUrl, hoops: hoopsUrl };
+type Track = 'levelClear' | 'hoops' | 'mountain';
+const urls: Record<Track, string> = { levelClear: levelClearUrl, hoops: hoopsUrl, mountain: mountainUrl };
 const tracks: Partial<Record<Track, HTMLAudioElement>> = {};
 let primed = false;
 
@@ -51,11 +52,16 @@ function play(t: Track) {
 
 export const playLevelClear = () => play('levelClear');
 
+/** Each level's own song (Part 1: Level Clear, Part 2: Mountain Climb). */
+const levelTrack = (level: number): Track => (level === 2 ? 'mountain' : 'levelClear');
+
+/** Start a level's song from the top. */
+export const playLevelSong = (level = 1) => play(levelTrack(level));
+
 /** The level track: loops during play. Keeps going (no restart) if it's already on. */
-export function playLevelMusic() {
-  const a = el('levelClear');
-  const hoops = tracks.hoops;
-  if (hoops && !hoops.paused) hoops.pause();
+export function playLevelMusic(level = 1) {
+  const a = el(levelTrack(level));
+  for (const [k, t] of Object.entries(tracks)) if (t && t !== a && !t.paused && k !== levelTrack(level)) t.pause();
   a.muted = isMuted();
   if (!a.paused) return;
   a.volume = 0.85;

@@ -316,17 +316,33 @@ export class HoopsScene extends Phaser.Scene {
   private fitCamera(snap = false) {
     const cam = this.cameras.main;
     this.baseZoom = Math.max(this.scale.width / 1280, this.scale.height / 720);
-    const z = this.baseZoom * this.camFocus.zoom;
-    const target = snap ? z : cam.zoom + (z - cam.zoom) * 0.12;
+    // during the contest the wide shot is alive: a slow drift and breathing zoom like a
+    // broadcast camera, leaning toward the ball while it's in the air (not in cutscene shots)
+    let fx = this.camFocus.x;
+    let fy = this.camFocus.y;
+    let fz = this.camFocus.zoom;
+    if (!this.inIntro && fz <= 1.05) {
+      const t = this.clock / 1000;
+      fx += Math.sin(t * 0.23) * 30 + Math.sin(t * 0.57 + 1) * 8;
+      fy += Math.sin(t * 0.17 + 2) * 14;
+      fz *= 1.01 + 0.02 * Math.sin(t * 0.29);
+      if (this.flight || this.loose) {
+        fx += (this.ball.x - fx) * 0.18;
+        fy += (this.ball.y - fy) * 0.08;
+        fz *= 1.03;
+      }
+    }
+    const z = this.baseZoom * fz;
+    const target = snap ? z : cam.zoom + (z - cam.zoom) * 0.06;
     cam.setZoom(target);
     const vw = this.scale.width / target;
     const vh = this.scale.height / target;
-    const x = Phaser.Math.Clamp(this.camFocus.x, vw / 2, ARENA_W - vw / 2);
-    const y = Phaser.Math.Clamp(this.camFocus.y, vh / 2, ARENA_H - vh / 2);
+    const x = Phaser.Math.Clamp(fx, vw / 2, ARENA_W - vw / 2);
+    const y = Phaser.Math.Clamp(fy, vh / 2, ARENA_H - vh / 2);
     if (snap) cam.centerOn(x, y);
     else {
-      const cx = cam.midPoint.x + (x - cam.midPoint.x) * 0.12;
-      const cy = cam.midPoint.y + (y - cam.midPoint.y) * 0.12;
+      const cx = cam.midPoint.x + (x - cam.midPoint.x) * 0.06;
+      const cy = cam.midPoint.y + (y - cam.midPoint.y) * 0.06;
       cam.centerOn(cx, cy);
     }
   }

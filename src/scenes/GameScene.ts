@@ -282,6 +282,8 @@ export class GameScene extends Phaser.Scene {
     this.camX = start.x;
     this.camTop = heightPx - VIEW_H;
     this.updateCamera(0, true);
+    this.intro = null;
+    if (!this.retry) this.startIntro(start.x);
     this.cameras.main.fadeIn(this.retry ? 250 : 400, 255, 248, 236);
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.players.forEach((p) => p.destroy()));
@@ -311,6 +313,7 @@ export class GameScene extends Phaser.Scene {
 
   update(_time: number, deltaMs: number) {
     const dt = Math.min(deltaMs / 1000, 1 / 30);
+    if (this.intro) return this.updateIntro(dt);
 
     for (const p of this.players) {
       p.update(dt);
@@ -349,6 +352,111 @@ export class GameScene extends Phaser.Scene {
     this.level.animate(this.time.now / 1000, this.view.left, this.view.left + this.view.width);
     this.bg.update(this.view, dt);
     this.emitHud();
+  }
+
+  // ─────────────────────────────────────────── level intro flyover ──
+
+  /** The flyover camera: x centre, zoom (× normal), rotation and how far above the ground it rides. */
+  private intro: null | { x: number; zoom: number; rot: number; lift: number; phase: 'fly' | 'land' | 'done' } = null;
+
+  /**
+   * A quick cinematic at the start of a level: the camera starts high and far out over the
+   * end of the level, swoops down and flies back along it (a slight tilt + the parallax
+   * layers give it a 3D feel), pushes in on the hero, then GO!
+   */
+  private startIntro(startX: number) {
+    const { widthPx } = this.level;
+    const base = Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W);
+    const farVW = this.scale.width / (base * 0.62);
+    this.physics.world.pause();
+    this.intro = { x: widthPx - farVW / 2, zoom: 0.62, rot: 0.045, lift: 110, phase: 'fly' };
+    const info = levelInfo(this.levelId);
+    this.game.events.emit('level-intro', { world: 'World 1', title: info.title, part: info.part });
+    // swoop down from up high, then skim back along the whole level
+    this.tweens.add({ targets: this.intro, lift: 0, duration: 1300, ease: 'Cubic.easeOut' });
+    this.tweens.add({
+      targets: this.intro,
+      x: startX + 260,
+      zoom: 0.82,
+      rot: -0.03,
+      duration: 3600,
+      ease: 'Sine.easeInOut',
+      onComplete: () => this.landIntro(startX),
+    });
+    this.introSkip = () => this.landIntro(startX);
+    this.game.events.once('skip-intro', this.introSkip);
+  }
+
+  private introSkip: (() => void) | null = null;
+
+  /** Push in on the hero, then hand over the controls. */
+  private landIntro(startX: number) {
+    const I = this.intro;
+    if (!I || I.phase !== 'fly') return;
+    I.phase = 'land';
+    if (this.introSkip) this.game.events.off('skip-intro', this.introSkip);
+    this.tweens.killTweensOf(I);
+    this.tweens.add({
+      targets: I,
+      x: startX + 30,
+      zoom: 1.45,
+      rot: 0,
+      lift: 0,
+      duration: 950,
+      ease: 'Cubic.easeInOut',
+      onComplete: () => {
+        const p = this.players[0];
+        if (p) p.view.setFrame('jump');
+        sfx.jump();
+        this.tweens.add({
+          targets: I,
+          zoom: 1,
+          x: startX,
+          duration: 520,
+          delay: 260,
+          ease: 'Sine.easeInOut',
+          onComplete: () => this.endIntro(),
+        });
+      },
+    });
+  }
+
+  private endIntro() {
+    if (!this.intro) return;
+    this.intro = null;
+    this.cameras.main.setRotation(0);
+    this.physics.world.resume();
+    this.updateCamera(0, true);
+    for (const p of this.players) p.spawnProtection();
+    this.game.events.emit('level-intro-end');
+  }
+
+  private updateIntro(dt: number) {
+    const I = this.intro!;
+    const cam = this.cameras.main;
+    const base = Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W);
+    const zoom = base * I.zoom;
+    const vw = this.scale.width / zoom;
+    const vh = this.scale.height / zoom;
+    const { widthPx, heightPx } = this.level;
+    const x = Phaser.Math.Clamp(I.x, vw / 2, Math.max(vw / 2, widthPx - vw / 2));
+    // ride above the ground; close up, frame the hero like normal play
+    const p = this.players[0];
+    const heroTop = p ? p.bottom - vh * 0.62 : heightPx - vh;
+    const ground = Math.min(heroTop, heightPx - vh);
+    const top = (I.zoom > 0.95 ? heroTop : ground) - I.lift;
+    cam.setZoom(zoom);
+    cam.setRotation(I.rot);
+    cam.centerOn(x, top + vh / 2);
+    this.camX = x;
+    this.camTop = top;
+    // the background is drawn a bit oversize so the tilt never shows an edge
+    this.view = { left: x - vw / 2 - 40, top: top - 40, width: vw + 80, height: vh + 80 };
+    for (const pl of this.players) pl.sync(dt);
+    themeClock.t += dt;
+    this.applyTheme();
+    this.level.animate(this.time.now / 1000, this.view.left, this.view.left + this.view.width);
+    this.bg.update(this.view, dt);
   }
 
   private updateCamera(dt: number, snap = false) {

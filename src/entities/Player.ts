@@ -249,20 +249,45 @@ export class Player {
   }
 
   /** Small stamina ring over the hero's head, only while it isn't full. */
+  /** Stamina gauge floating over the hero's head: a little glossy pill with a lightning bolt. */
+  private meterAlpha = 0;
   private drawMeter() {
     const g = this.meter;
     g.clear();
-    if (this.state !== 'alive' || this.stamina >= 0.999) return;
-    const x = this.view.x;
-    const y = this.body.top - 14;
-    const r = 6.5;
-    const col = this.exhausted ? (Math.floor(this.scene.time.now / 120) % 2 ? 0xff5a4f : 0xffb3a8) : this.stamina < 0.35 ? 0xffb627 : 0x6fe07a;
-    g.fillStyle(0x2a1e2e, 0.55).fillCircle(x, y, r + 2);
-    g.lineStyle(3, 0xffffff, 0.25).beginPath().arc(x, y, r, 0, Math.PI * 2).strokePath();
-    g.lineStyle(3, col, 1)
-      .beginPath()
-      .arc(x, y, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * this.stamina)
-      .strokePath();
+    const show = this.state === 'alive' && this.stamina < 0.999;
+    this.meterAlpha += ((show ? 1 : 0) - this.meterAlpha) * 0.18;
+    if (this.meterAlpha < 0.02) return;
+    g.setAlpha(this.meterAlpha);
+    const w = 30;
+    const h = 7;
+    const x0 = Math.round(this.view.x - w / 2 + 4);
+    const y = Math.round(this.body.top - 30);
+    const flash = Math.floor(this.scene.time.now / 120) % 2;
+    const col = this.exhausted ? (flash ? 0xff5a4f : 0xffa89c) : this.stamina < 0.35 ? 0xffb627 : this.running ? 0x7cf0ff : 0x6fe07a;
+    // case
+    g.fillStyle(0x1b1424, 0.8).fillRoundedRect(x0 - 2, y - 2, w + 4, h + 4, (h + 4) / 2);
+    g.fillStyle(0xffffff, 0.16).fillRoundedRect(x0, y, w, h, h / 2);
+    // fill + gloss
+    const fw = Math.max(h, w * this.stamina);
+    g.fillStyle(col, 1).fillRoundedRect(x0, y, fw, h, h / 2);
+    g.fillStyle(0xffffff, 0.4).fillRoundedRect(x0 + 2, y + 1, Math.max(2, fw - 4), 2, 1);
+    // when worn out: a tick showing how full it must get before you can run again
+    if (this.exhausted) g.fillStyle(0xffffff, 0.85).fillRect(x0 + w * EXHAUSTED_UNTIL - 0.5, y - 1, 1.5, h + 2);
+    // lightning bolt badge on the left
+    const bx = x0 - 7;
+    const by = y + h / 2;
+    g.fillStyle(0x1b1424, 0.8).fillCircle(bx, by, 6);
+    g.fillStyle(this.exhausted ? 0xff8a7a : 0xffd23f, 1).fillPoints(
+      [
+        { x: bx + 1.2, y: by - 4.2 },
+        { x: bx - 2.6, y: by + 0.6 },
+        { x: bx - 0.2, y: by + 0.6 },
+        { x: bx - 1.2, y: by + 4.2 },
+        { x: bx + 2.6, y: by - 0.8 },
+        { x: bx + 0.2, y: by - 0.8 },
+      ],
+      true,
+    );
   }
 
   /** Start the munch animation (nuggie pickup). */

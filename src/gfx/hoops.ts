@@ -608,7 +608,7 @@ interface Ad {
 }
 const ADS: Ad[] = [
   { text: 'PUFF COLA', bg: '#c8102e', fg: '#ffffff' },
-  { text: 'NUGGIE KING', bg: '#ffc629', fg: '#4a1f05' },
+  { text: 'MADE BY HENRY & NEIL', bg: '#ffc629', fg: '#4a1f05' },
   { text: 'KING PUFF BALL PALACE', bg: '#3d1478', fg: '#ffd23f' },
   { text: 'ROOT BEER · ICE COLD', bg: '#5a2a10', fg: '#ffe2b0' },
   { text: 'PUFF BALL PLANET', bg: '#0b7c78', fg: '#eafffb' },

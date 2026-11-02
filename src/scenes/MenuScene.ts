@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { MIN_VIEW_W, VIEW_H } from '../config';
 import { buildLevel1 } from '../level/level1';
+import { levelInfo } from '../level/levels';
 import { Background } from '../world/Background';
 import { LevelView } from '../world/LevelView';
 import { mixTint, themeClock, themeMix } from '../world/theme';
@@ -15,12 +16,32 @@ export class MenuScene extends Phaser.Scene {
     super('Menu');
   }
 
-  create(data?: { silent?: boolean }) {
-    this.level = new LevelView(this, buildLevel1());
-    this.bg = new Background(this, this.level.heightPx - VIEW_H);
-    this.x = 0;
+  create(data?: { silent?: boolean; level?: number }) {
+    this.build(data?.level ?? 1);
+    // picking a level on the start screen fades the fly-over to that level's world
+    const onLevel = (id: number) => {
+      if (id === this.levelId || !levelInfo(id).build) return;
+      const cam = this.cameras.main;
+      cam.fadeOut(350, 255, 248, 236);
+      cam.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+        this.children.removeAll(true);
+        this.build(id);
+        cam.fadeIn(450, 255, 248, 236);
+      });
+    };
+    this.game.events.on('menu-level', onLevel);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.game.events.off('menu-level', onLevel));
     // the boot already put the start screen up; coming back from a game shows it again
     if (!data?.silent) this.game.events.emit('menu');
+  }
+
+  private levelId = 1;
+
+  private build(id: number) {
+    this.levelId = id;
+    this.level = new LevelView(this, (levelInfo(id).build ?? buildLevel1)());
+    this.bg = new Background(this, this.level.heightPx - VIEW_H);
+    this.x = 0;
   }
 
   update(_t: number, deltaMs: number) {
