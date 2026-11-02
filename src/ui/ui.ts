@@ -50,6 +50,20 @@ const store = {
  * All menus and the HUD are plain DOM over the canvas: crisp text at any
  * pixel density and easy safe-area handling on notched phones and tablets.
  */
+/** Letters as spans for the subtitle's rolling wave (words spaced out, dots as separators). */
+function waveText(text: string) {
+  let i = 0;
+  return text
+    .split(' · ')
+    .map((part) =>
+      part
+        .split(' ')
+        .map((w) => `<span class="w">${[...w].map((ch) => `<i style="--i:${i++}">${ch}</i>`).join('')}</span>`)
+        .join(''),
+    )
+    .join('<b class="sep">•</b>');
+}
+
 export class UI {
   private root: HTMLElement;
   private screen: HTMLElement | null = null;
@@ -221,7 +235,7 @@ export class UI {
     const el = h(`<div class="screen start">
       <header class="start-head">
         <div class="logo"><span>P</span><span>U</span><span>F</span><span>F</span><span>Y</span></div>
-        <p class="world-name">World 1 · ${levelName(this.level)}</p>
+        <p class="world-name" aria-label="World 1 · ${levelName(this.level)}">${waveText(`World 1 · ${levelName(this.level)}`)}</p>
       </header>
       <h2>Pick your player</h2>
       <div class="cards" role="radiogroup" aria-label="Pick your player"></div>
@@ -236,7 +250,6 @@ export class UI {
       <p class="version">v${VERSION}</p>
       <div class="start-foot">
         <button class="btn btn-big" data-act="play">Play</button>
-        <p class="keys-hint">${isTouchDevice() ? 'Tap a hero, then Play' : '← → to choose · Enter to play'}</p>
       </div>
     </div>`);
     const cards = el.querySelector('.cards')!;
@@ -276,7 +289,9 @@ export class UI {
     el.querySelector('[data-act=play]')!.addEventListener('click', () => this.play());
     const syncLevels = () => {
       el.querySelectorAll<HTMLButtonElement>('.lvl').forEach((b) => b.classList.toggle('picked', Number(b.dataset.lvl) === this.level));
-      el.querySelector('.world-name')!.textContent = `World 1 · ${levelName(this.level)}`;
+      const wn = el.querySelector('.world-name')!;
+      wn.innerHTML = waveText(`World 1 · ${levelName(this.level)}`);
+      wn.setAttribute('aria-label', `World 1 · ${levelName(this.level)}`);
     };
     el.querySelectorAll<HTMLButtonElement>('.lvl').forEach((b) =>
       b.addEventListener('click', () => {

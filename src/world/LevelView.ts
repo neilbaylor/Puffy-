@@ -12,6 +12,18 @@ const PAD = 34; // room around each terrain piece for grass blades / roots
 /** Terrain pieces are cut into chunks no wider than this (world px), to stay under mobile texture limits. */
 const CHUNK = 1600;
 
+/** Highest point (smallest y) of a closed outline within the column range x0..x1. */
+function localTop(outline: Pt[], x0: number, x1: number) {
+  let top = Infinity;
+  for (let i = 0; i < outline.length; i++) {
+    const [ax, ay] = outline[i];
+    const [bx, by] = outline[(i + 1) % outline.length];
+    if (Math.max(ax, bx) < x0 || Math.min(ax, bx) > x1) continue;
+    top = Math.min(top, ay, by);
+  }
+  return top;
+}
+
 /**
  * Builds the level: an invisible tilemap for collision, plus the hand-drawn
  * world on top (organic terrain pieces, clouds, boulders, brambles, trees,
@@ -29,6 +41,9 @@ export class LevelView {
     private scene: Phaser.Scene,
     readonly data: LevelData,
   ) {
+    // only one level's terrain lives in memory at a time (phones run out otherwise)
+    for (const k of scene.textures.getTextureKeys())
+      if (k.startsWith('terrain-') && !k.startsWith(`terrain-${data.name}-`)) scene.textures.remove(k);
     this.map = scene.make.tilemap({ data: data.tiles.map((r) => [...r]), tileWidth: TILE, tileHeight: TILE });
     const tileset = this.map.addTilesetImage('tiles', 'tiles', TILE, TILE, 1, 2)!;
     this.layer = this.map.createLayer(0, tileset, 0, 0)!.setVisible(false);
@@ -143,21 +158,24 @@ export class LevelView {
         }
         const pal = this.paletteAt((x0 + x1) / 2);
         const pieceId = piece++;
-        const h = y1 - y0 + PAD * 2;
         // the whole piece is drawn into each chunk (clipped by the chunk's canvas), so the
         // chunks join seamlessly; each one stays small enough for phones and tablets
         for (let cx0 = x0, ci = 0; cx0 < x1; cx0 += CHUNK, ci++) {
           const cw = Math.min(CHUNK, x1 - cx0);
+          // each chunk only as tall as the terrain inside it (a mountain is low at one
+          // end and high at the other: no point keeping all that empty sky in memory)
+          const top = Math.max(y0, localTop(outline, cx0 - PAD, cx0 + cw + PAD) - 24);
+          const ch = y1 - top + PAD * 2;
           const key = `terrain-${d.name}-${kind}-${pieceId}-${ci}`;
           if (!this.scene.textures.exists(key)) {
-            const c = hires(cw + PAD * 2, h, PROP_RES, (ctx) => {
-              ctx.translate(PAD - cx0, PAD - y0);
+            const c = hires(cw + PAD * 2, ch, PROP_RES, (ctx) => {
+              ctx.translate(PAD - cx0, PAD - top);
               drawTerrainPiece(ctx, { kind, outline, pal, seed: Math.round(x0 + y0), floorY: this.heightPx });
             });
-            addCanvas(this.scene, key, c);
+            addCanvas(this.scene, key, c, undefined, { release: true });
           }
           this.scene.add
-            .image(cx0 - PAD, y0 - PAD, key)
+            .image(cx0 - PAD, top - PAD, key)
             .setOrigin(0, 0)
             .setScale(1 / PROP_RES)
             .setDepth(DEPTH.tiles);

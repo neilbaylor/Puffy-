@@ -41,16 +41,33 @@ import {
 export const PROP_RES = 2;
 export const BG_RES = 1.5;
 
+/**
+ * Register a drawn canvas as a (static) texture. Uses a plain image texture —
+ * Phaser's CanvasTexture keeps a full getImageData() copy of every pixel,
+ * doubling memory, which is what got phones (iOS Safari especially) killed.
+ * With `release`, the canvas's own pixels are freed once they're on the GPU
+ * (fine for anything only shown as an Image; TileSprites still need them).
+ */
 export function addCanvas(
   scene: Phaser.Scene,
   key: string,
   c: HTMLCanvasElement,
-  frames?: (tex: Phaser.Textures.CanvasTexture) => void,
+  frames?: (tex: Phaser.Textures.Texture) => void,
+  opts?: { release?: boolean },
 ) {
   if (scene.textures.exists(key)) scene.textures.remove(key);
-  const tex = scene.textures.addCanvas(key, c)!;
+  const tex = scene.textures.addImage(key, c as unknown as HTMLImageElement)!;
   frames?.(tex);
+  if (opts?.release && scene.game.renderer.type === Phaser.WEBGL) {
+    c.width = 1;
+    c.height = 1;
+  }
   return tex;
+}
+
+/** Free textures whose keys start with `prefix` (e.g. the terrain of a level we left). */
+export function dropTextures(scene: Phaser.Scene, prefix: string) {
+  for (const k of scene.textures.getTextureKeys()) if (k.startsWith(prefix)) scene.textures.remove(k);
 }
 
 /** Draw `fn` in world units into a canvas of world size (w × h) at resolution `res`. */
@@ -71,17 +88,23 @@ function sheet<F extends string>(
   draw: (ctx: Ctx, f: F) => void,
   res = ART_RES,
 ) {
-  const { c, ctx } = canvas(Math.ceil(w * frames.length * res), Math.ceil(h * res));
-  ctx.scale(res, res);
+  // each frame is clipped to its own cell, with a transparent gutter between cells,
+  // so nothing from one frame (a bazooka tip, a fist) ever shows up in the next
+  const fw = Math.round(w * res);
+  const fh = Math.round(h * res);
+  const pitch = fw + 4;
+  const { c, ctx } = canvas(pitch * frames.length, fh);
   frames.forEach((f, i) => {
     ctx.save();
-    ctx.translate(i * w, 0);
+    ctx.beginPath();
+    ctx.rect(i * pitch, 0, fw, fh);
+    ctx.clip();
+    ctx.translate(i * pitch, 0);
+    ctx.scale(res, res);
     draw(ctx, f);
     ctx.restore();
   });
-  addCanvas(scene, key, c, (t) =>
-    frames.forEach((f, i) => t.add(f, 0, Math.round(i * w * res), 0, Math.round(w * res), Math.round(h * res))),
-  );
+  addCanvas(scene, key, c, (t) => frames.forEach((f, i) => t.add(f, 0, i * pitch, 0, fw, fh)));
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -94,7 +117,9 @@ function makeCollisionTiles(scene: Phaser.Scene) {
 }
 
 function makeCharacters(scene: Phaser.Scene) {
-  for (const ch of CHARACTERS) sheet(scene, `char-${ch.id}`, CHAR_W, CHAR_H, POSES, (ctx, p) => drawCharacter(ctx, 0, 0, ch, p));
+  // a little extra room either side (the bazooka tip pokes out of the 56-unit cell)
+  const M = 8;
+  for (const ch of CHARACTERS) sheet(scene, `char-${ch.id}`, CHAR_W + M * 2, CHAR_H, POSES, (ctx, p) => drawCharacter(ctx, M, 0, ch, p));
 }
 
 function makeBaddies(scene: Phaser.Scene) {
@@ -253,6 +278,7 @@ export const BG_LAYERS = {
 function padV(src: HTMLCanvasElement) {
   const { c, ctx } = canvas(src.width, src.height + 4);
   ctx.drawImage(src, 0, 2);
+  src.width = src.height = 1; // free the scratch canvas right away (Safari is slow to collect them)
   return c;
 }
 
@@ -278,6 +304,14 @@ function makeMountainBackgrounds(scene: Phaser.Scene, look: MountainLook) {
   addCanvas(scene, k('near'), padV(hires(L.near.w, L.near.h, BG_RES, (ctx) => drawMountainNear(ctx, L.near.w, L.near.h, look))));
 }
 
+/** Make sure a look's background layers exist (built right now if the boot hasn't got to them yet). */
+export function ensureLook(scene: Phaser.Scene, id: string) {
+  if (scene.textures.exists(bgKey('near', id))) return;
+  const look = MOUNTAIN_LOOKS.find((l) => l.pal.id === id);
+  if (look) makeMountainBackgrounds(scene, look);
+  else if (PALETTES[id]) makeBackgrounds(scene, PALETTES[id]);
+}
+
 /**
  * The same work as generateTextures, split into steps so the boot can draw one
  * per frame behind the start screen (the screen appears right away).
@@ -288,8 +322,7 @@ export function textureSteps(scene: Phaser.Scene, pal: WorldPalette = DEFAULT_PA
     { name: 'heroes', run: () => makeCharacters(scene) },
     { name: 'baddies', run: () => makeBaddies(scene) },
     { name: 'items', run: () => makeItems(scene, pal) },
-    ...['puff', 'meadow', 'candy', 'golden'].map((id) => ({ name: `bg-${id}`, run: () => makeBackgrounds(scene, PALETTES[id]) })),
-    ...MOUNTAIN_LOOKS.map((look) => ({ name: `bg-${look.pal.id}`, run: () => makeMountainBackgrounds(scene, look) })),
+    ...['puff', 'meadow', 'candy', 'golden', ...MOUNTAIN_LOOKS.map((l) => l.pal.id)].map((id) => ({ name: `bg-${id}`, run: () => ensureLook(scene, id) })),
   ];
 }
 

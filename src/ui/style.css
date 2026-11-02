@@ -177,13 +177,37 @@ body {
 }
 .world-name {
   margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  column-gap: 0.55em;
   font-family: var(--display);
   font-size: clamp(13px, 2.8vmin, 20px);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: #fff;
   -webkit-text-stroke: 5px var(--ink);
   paint-order: stroke fill;
+}
+.world-name .w { white-space: nowrap; }
+/* a gentle wave rolling through the letters, like the logo's hop but softer */
+.world-name i {
+  display: inline-block;
+  font-style: normal;
+  animation: wn-wave 2.6s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 0.06s);
+}
+.world-name .sep {
+  font-weight: 400;
+  color: var(--gold);
+  margin: 0 0.15em;
+}
+@keyframes wn-wave {
+  0%, 55%, 100% { transform: translateY(0) rotate(0); }
+  15% { transform: translateY(-0.28em) rotate(-4deg); }
+  30% { transform: translateY(0.06em) rotate(2deg); }
+  42% { transform: translateY(-0.04em) rotate(0); }
 }
 .start h2 {
   margin: 0;
@@ -288,6 +312,9 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 4px;
+  /* sits a little lower now the hint line is gone */
+  margin-bottom: calc(-1 * clamp(2px, 1.2vmin, 10px));
+  transform: translateY(clamp(2px, 1vmin, 8px));
 }
 .keys-hint {
   margin: 0;
@@ -773,6 +800,7 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .logo span,
+  .world-name i,
   .results-hero canvas,
   .rotate-phone,
   .banner > div {

@@ -201,7 +201,7 @@ export class HoopsScene extends Phaser.Scene {
 
   private makeTextures() {
     setArenaStyle(this.style);
-    if (!this.textures.exists(this.k('arena'))) addCanvas(this, this.k('arena'), hires(ARENA_W, ARENA_H, ARENA_RES, (ctx) => drawArena(ctx)));
+    if (!this.textures.exists(this.k('arena'))) addCanvas(this, this.k('arena'), hires(ARENA_W, ARENA_H, ARENA_RES, (ctx) => drawArena(ctx)), undefined, { release: true });
     if (!this.textures.exists('king')) {
       const { c, ctx } = canvas(Math.ceil(KING_W * KING_FRAMES.length * KING_RES), Math.ceil(KING_H * KING_RES));
       ctx.scale(KING_RES, KING_RES);
@@ -213,9 +213,9 @@ export class HoopsScene extends Phaser.Scene {
       });
       addCanvas(this, 'king', c, (t) => KING_FRAMES.forEach((f, i) => t.add(f, 0, Math.round(i * KING_W * KING_RES), 0, Math.round(KING_W * KING_RES), Math.round(KING_H * KING_RES))));
     }
-    if (!this.textures.exists(this.k('crowd'))) addCanvas(this, this.k('crowd'), hires(ARENA_W, CROWD_H, ARENA_RES, (ctx) => drawCrowd(ctx, false)));
-    if (!this.textures.exists(this.k('crowd2'))) addCanvas(this, this.k('crowd2'), hires(ARENA_W, CROWD_H, ARENA_RES, (ctx) => drawCrowd(ctx, true)));
-    if (!this.textures.exists(this.k('arenafront'))) addCanvas(this, this.k('arenafront'), hires(ARENA_W, FRONT_H, ARENA_RES, (ctx) => drawArenaFront(ctx)));
+    if (!this.textures.exists(this.k('crowd'))) addCanvas(this, this.k('crowd'), hires(ARENA_W, CROWD_H, ARENA_RES, (ctx) => drawCrowd(ctx, false)), undefined, { release: true });
+    if (!this.textures.exists(this.k('crowd2'))) addCanvas(this, this.k('crowd2'), hires(ARENA_W, CROWD_H, ARENA_RES, (ctx) => drawCrowd(ctx, true)), undefined, { release: true });
+    if (!this.textures.exists(this.k('arenafront'))) addCanvas(this, this.k('arenafront'), hires(ARENA_W, FRONT_H, ARENA_RES, (ctx) => drawArenaFront(ctx)), undefined, { release: true });
     if (!this.textures.exists('camflash')) addCanvas(this, 'camflash', hires(48, 48, 1, (ctx) => drawCameraFlash(ctx, 24)));
     if (!this.textures.exists('hball')) addCanvas(this, 'hball', hires(52, 52, 3, (ctx) => drawBall(ctx, 26, 26, 24)));
     if (!this.textures.exists(this.k('backboard'))) {

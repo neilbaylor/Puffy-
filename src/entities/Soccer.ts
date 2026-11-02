@@ -72,8 +72,8 @@ export class SoccerMatch implements Coach {
       const x0 = this.left - 28 - PITCH.END;
       const front = `pitch-front-${pitchW}`;
       const back = `pitch-back-${pitchW}`;
-      if (!gs.textures.exists(front)) addCanvas(gs, front, hires(W, PITCH.FRONT_UP + PITCH.FRONT_DOWN, 2, (ctx) => drawPitchFront(ctx, pitchW)));
-      if (!gs.textures.exists(back)) addCanvas(gs, back, hires(W, PITCH.BACK_UP + 2, 2, (ctx) => drawPitchBack(ctx, pitchW)));
+      if (!gs.textures.exists(front)) addCanvas(gs, front, hires(W, PITCH.FRONT_UP + PITCH.FRONT_DOWN, 2, (ctx) => drawPitchFront(ctx, pitchW)), undefined, { release: true });
+      if (!gs.textures.exists(back)) addCanvas(gs, back, hires(W, PITCH.BACK_UP + 2, 2, (ctx) => drawPitchBack(ctx, pitchW)), undefined, { release: true });
       gs.add.image(x0, ground, back).setOrigin(0, PITCH.BACK_UP / (PITCH.BACK_UP + 2)).setScale(1 / 2).setDepth(DEPTH.decor - 1);
       gs.add.image(x0, ground, front).setOrigin(0, PITCH.FRONT_UP / (PITCH.FRONT_UP + PITCH.FRONT_DOWN)).setScale(1 / 2).setDepth(DEPTH.tiles + 0.5);
     }

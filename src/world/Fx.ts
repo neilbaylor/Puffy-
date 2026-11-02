@@ -18,6 +18,7 @@ export class Fx {
   private emberE: Emitter;
   private ashE: Emitter;
   private goopE: Emitter;
+  private crumbE: Emitter;
 
   constructor(private scene: Phaser.Scene) {
     const mk = (tex: string, cfg: Phaser.Types.GameObjects.Particles.ParticleEmitterConfig, depth: number = DEPTH.fx) =>
@@ -122,6 +123,16 @@ export class Fx {
       tint: [0xc8f26a, 0xe9ffc2, 0x9fd84a],
       gravityY: 700,
     }, DEPTH.projectiles);
+    // nuggie crumbs flying off a munch
+    this.crumbE = mk('chip', {
+      speed: { min: 50, max: 160 },
+      angle: { min: 200, max: 340 },
+      lifespan: { min: 300, max: 560 },
+      scale: { start: 0.45, end: 0.15 },
+      rotate: { start: 0, end: 540 },
+      tint: [0xe8a640, 0xf6c86a, 0xc9822c, 0xffe2a0],
+      gravityY: 900,
+    }, DEPTH.players + 1);
     this.trailE = mk('puff', {
       speed: { min: 5, max: 25 },
       lifespan: 360,
@@ -133,6 +144,11 @@ export class Fx {
 
   dust(x: number, y: number, n = 6) {
     this.dustE.explode(n, x, y);
+  }
+
+  /** Crumbs flying from a munching mouth. */
+  crumbs(x: number, y: number, n = 6) {
+    this.crumbE.explode(n, x, y);
   }
 
   /** A glob of goat spit going splat. */

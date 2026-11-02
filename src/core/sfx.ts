@@ -135,6 +135,11 @@ export const sfx = {
     tone({ type: 'sine', from: 400, to: 900, dur: 0.12, vol: 0.12 });
   },
   laugh: () => [0, 1, 2, 3].forEach((i) => tone({ type: 'square', from: 300 - i * 20, to: 200 - i * 20, dur: 0.12, vol: 0.08, delay: i * 0.17 })),
+  /** A smaller crunchy bite (the 2nd and 3rd munch). */
+  munch: () => {
+    noise(0.06, 0.18, 1600, 500);
+    tone({ type: 'triangle', from: 260, to: 170, dur: 0.05, vol: 0.08, delay: 0.03 });
+  },
   chomp: () => {
     noise(0.07, 0.25, 1400, 400);
     noise(0.07, 0.22, 1200, 300, 0.12);

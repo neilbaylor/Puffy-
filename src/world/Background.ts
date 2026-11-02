@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { DEPTH } from '../config';
-import { BG_LAYERS, BG_RES, bgKey } from '../gfx/textures';
+import { BG_LAYERS, BG_RES, bgKey, ensureLook } from '../gfx/textures';
 import { rng } from '../gfx/draw';
 import { PALETTES } from '../gfx/world';
 import { hex, lerpRgb, mixSea, type ThemeId, type ThemeMix } from './theme';
@@ -120,6 +120,8 @@ export class Background {
 
   /** Show look `a`, with look `b` faded in on top by `w`. */
   setTheme(m: ThemeMix) {
+    if (m.a !== this.themeA) ensureLook(this.scene, m.a);
+    if (m.b !== this.themeB && m.w > 0.001) ensureLook(this.scene, m.b);
     if (m.a !== this.themeA) {
       this.themeA = m.a;
       this.skyA.setTexture(bgKey('sky', m.a));

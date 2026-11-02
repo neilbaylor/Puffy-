@@ -11,6 +11,7 @@ export class MenuScene extends Phaser.Scene {
   private bg!: Background;
   private level!: LevelView;
   private x = 0;
+  private t = 0;
 
   constructor() {
     super('Menu');
@@ -54,14 +55,20 @@ export class MenuScene extends Phaser.Scene {
     const vw = this.scale.width / zoom;
     const vh = this.scale.height / zoom;
     const maxX = this.level.widthPx - vw;
-    this.x = (this.x + dt * 36) % Math.max(1, maxX);
+    // a slow, slightly unsteady glide: speed breathes, the camera drifts up and down,
+    // zooms gently in and out and banks a touch, like a camera drone
+    this.t += dt;
+    const t = this.t;
+    this.x = (this.x + dt * (36 + 10 * Math.sin(t * 0.21) + 5 * Math.sin(t * 0.53 + 1))) % Math.max(1, maxX);
     // follow the terrain up and down (the mountain climbs), smoothly
     const H = this.level.heightPx;
     const cx = this.x + vw / 2;
     const surf = (this.level.surfaceY(cx - vw * 0.3) + this.level.surfaceY(cx) + this.level.surfaceY(cx + vw * 0.3)) / 3;
     const want = Phaser.Math.Clamp(surf - vh * 0.7, Math.min(0, H - vh), H - vh);
     this.top = this.top === null || this.x < 1 ? want : this.top + (want - this.top) * (1 - Math.exp(-dt * 1.5));
-    const top = this.top;
+    const top = this.top + 26 * Math.sin(t * 0.17 + 0.7) + 9 * Math.sin(t * 0.41);
+    cam.setZoom(zoom * (1.04 + 0.04 * Math.sin(t * 0.13 + 2)));
+    cam.setRotation(0.012 * Math.sin(t * 0.19) + 0.005 * Math.sin(t * 0.47 + 1.3));
     cam.centerOn(this.x + vw / 2, top + vh / 2);
     // the looks keep drifting behind the start screen too (same clock as the game)
     themeClock.t += dt;
@@ -69,6 +76,6 @@ export class MenuScene extends Phaser.Scene {
     this.bg.setTheme(m);
     this.level.setTint(mixTint(m));
     this.level.animate(this.time.now / 1000, this.x, this.x + vw);
-    this.bg.update({ left: this.x, top, width: vw, height: vh }, dt);
+    this.bg.update({ left: this.x - 50, top: top - 50, width: vw + 100, height: vh + 100 }, dt);
   }
 }

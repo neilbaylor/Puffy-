@@ -298,7 +298,6 @@ export class GameScene extends Phaser.Scene {
     this.updateCamera(0, true);
     this.intro = null;
     this.introTop = null;
-    this.landBlend = 0;
     if (!this.retry) this.startIntro(start.x);
     this.cameras.main.fadeIn(this.retry ? 250 : 400, 255, 248, 236);
 
@@ -416,75 +415,35 @@ export class GameScene extends Phaser.Scene {
   // ─────────────────────────────────────────── level intro flyover ──
 
   /** The flyover camera: x centre, zoom (× normal), rotation and how far above the ground it rides. */
-  private intro: null | { x: number; zoom: number; rot: number; lift: number; phase: 'fly' | 'land' | 'done' } = null;
+  private intro: null | { u: number; x0: number; x1: number; phase: 'fly' | 'done' } = null;
 
   /**
-   * A quick cinematic at the start of a level: the camera starts high and far out over the
-   * end of the level, swoops down and flies back along it (a slight tilt + the parallax
-   * layers give it a 3D feel), pushes in on the hero, then GO!
+   * A cinematic at the start of a level, like a camera drone: it starts close in
+   * over the goal at the far end, then flies back along the whole level while
+   * slowly pulling out, drifting up and down and banking a little — and it
+   * arrives on the hero at exactly the normal framing (zoom 1, no tilt, no
+   * motion left), so the game simply starts from there.
    */
   private startIntro(startX: number) {
     const { widthPx } = this.level;
-    const base = Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W);
-    const farVW = this.scale.width / (base * 0.62);
     this.physics.world.pause();
-    this.intro = { x: widthPx - farVW / 2, zoom: 0.62, rot: 0.045, lift: 110, phase: 'fly' };
+    this.intro = { u: 0, x0: widthPx - 300, x1: startX, phase: 'fly' };
+    this.introU = 0;
     const info = levelInfo(this.levelId);
     this.game.events.emit('level-intro', { world: 'World 1', title: info.title, part: info.part });
-    // swoop down from up high, then skim back along the whole level
-    this.tweens.add({ targets: this.intro, lift: 0, duration: 1300, ease: 'Cubic.easeOut' });
-    this.tweens.add({
-      targets: this.intro,
-      x: startX + 260,
-      zoom: 0.82,
-      rot: -0.03,
-      duration: 3600,
-      ease: 'Sine.easeInOut',
-      onComplete: () => this.landIntro(startX),
-    });
-    this.introSkip = () => this.landIntro(startX);
+    const tw = this.tweens.add({ targets: this.intro, u: 1, duration: 5600, ease: 'Linear', onComplete: () => this.endIntro() });
+    // skipping just fast-forwards the same flight (still lands smoothly)
+    this.introSkip = () => tw.setTimeScale(5);
     this.game.events.once('skip-intro', this.introSkip);
   }
 
   private introSkip: (() => void) | null = null;
   private introTop: number | null = null;
-  /** Once the landing has blended onto the hero it stays there (even while zooming back out). */
-  private landBlend = 0;
-
-  /** Push in on the hero, then hand over the controls. */
-  private landIntro(startX: number) {
-    const I = this.intro;
-    if (!I || I.phase !== 'fly') return;
-    I.phase = 'land';
-    if (this.introSkip) this.game.events.off('skip-intro', this.introSkip);
-    this.tweens.killTweensOf(I);
-    this.tweens.add({
-      targets: I,
-      x: startX + 20,
-      zoom: 1.32,
-      rot: 0,
-      lift: 0,
-      duration: 700,
-      ease: 'Sine.easeInOut',
-      onComplete: () => {
-        const p = this.players[0];
-        if (p) p.view.setFrame('jump');
-        sfx.jump();
-        this.tweens.add({
-          targets: I,
-          zoom: 1,
-          x: startX,
-          duration: 380,
-          delay: 110,
-          ease: 'Sine.easeOut',
-          onComplete: () => this.endIntro(),
-        });
-      },
-    });
-  }
+  private introU = 0;
 
   private endIntro() {
     if (!this.intro) return;
+    if (this.introSkip) this.game.events.off('skip-intro', this.introSkip);
     this.intro = null;
     this.cameras.main.setRotation(0);
     this.physics.world.resume();
@@ -495,33 +454,57 @@ export class GameScene extends Phaser.Scene {
 
   private updateIntro(dt: number) {
     const I = this.intro!;
+    const u = I.u;
     const cam = this.cameras.main;
+    const smooth = (a: number, b: number, t: number) => {
+      const k = Phaser.Math.Clamp((t - a) / (b - a), 0, 1);
+      return k * k * k * (k * (k * 6 - 15) + 10);
+    };
+    // pull out from close-in to the normal zoom, easing to a stop at the end
+    const zoomK = 1 + 0.42 * Math.pow(1 - u, 3);
+    // banking: a couple of slow swings that fade out completely before the end
+    const fade = 1 - smooth(0.5, 0.96, u);
+    const rot = (0.045 * Math.sin(u * Math.PI * 2.2 + 0.5) + 0.018 * Math.sin(u * Math.PI * 5.3)) * fade;
+    // height above the ground: rises like a drone, dips, settles
+    const lift = (55 * Math.sin(Math.min(1, u * 1.25) * Math.PI) + 18 * Math.sin(u * Math.PI * 3.1)) * fade;
     const base = Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W);
-    const zoom = base * I.zoom;
+    const zoom = base * zoomK;
     const vw = this.scale.width / zoom;
     const vh = this.scale.height / zoom;
     const { widthPx, heightPx } = this.level;
-    const x = Phaser.Math.Clamp(I.x, vw / 2, Math.max(vw / 2, widthPx - vw / 2));
-    // ride above the terrain (it climbs on the mountain); as we land, blend smoothly into
-    // the normal framing on the hero so nothing jumps at the hand-over
+    const endX = this.players[0]?.x ?? I.x1;
+    const rawX = I.x0 + (endX - I.x0) * smooth(0, 1, u);
+    const x = Phaser.Math.Clamp(rawX, vw / 2, Math.max(vw / 2, widthPx - vw / 2));
     const clampTop = (t: number) => Phaser.Math.Clamp(t, Math.min(0, heightPx - vh), heightPx - vh);
-    const surf = (this.level.surfaceY(x - vw * 0.25) + this.level.surfaceY(x) + this.level.surfaceY(x + vw * 0.25)) / 3;
-    const terrainTop = clampTop(surf - vh * 0.66);
-    this.introTop = this.introTop === null ? terrainTop : this.introTop + (terrainTop - this.introTop) * (1 - Math.exp(-dt * 3));
+    // ride above the terrain (it climbs on the mountain), then blend onto the hero's framing
+    // spatially smoothed ground height under the view (smooth because x moves smoothly),
+    // so the camera keeps up with steep slopes without lagging behind them
+    let surf = 0;
+    let wsum = 0;
+    for (let k = -4; k <= 4; k++) {
+      const sy = this.level.surfaceY(Phaser.Math.Clamp(x + k * vw * 0.12, 0, widthPx - 1));
+      if (sy >= heightPx) continue; // a pit: no ground to frame
+      const w = 5 - Math.abs(k);
+      surf += w * sy;
+      wsum += w;
+    }
+    surf = wsum ? surf / wsum : heightPx - TILE * 3;
+    const terrainTop = clampTop(surf - vh * 0.58);
+    // smoothing tied to how far the flight has progressed (not to the frame rate)
+    const du = Math.max(0, u - this.introU);
+    this.introU = u;
+    this.introTop = this.introTop === null ? terrainTop : this.introTop + (terrainTop - this.introTop) * (1 - Math.exp(-du * 60));
     const p = this.players[0];
     const heroTop = clampTop(p ? p.bottom - vh * 0.62 : heightPx - vh);
-    if (I.phase === 'land') {
-      const k = Phaser.Math.Clamp((I.zoom - 0.82) / (1.32 - 0.82), 0, 1);
-      this.landBlend = Math.max(this.landBlend, k * k * (3 - 2 * k)); // never goes back once on the hero
-    }
-    const top = this.introTop + (heroTop - this.introTop) * this.landBlend - I.lift;
+    const land = smooth(0.62, 1, u);
+    const top = this.introTop + (heroTop - this.introTop) * land - lift;
     cam.setZoom(zoom);
-    cam.setRotation(I.rot);
+    cam.setRotation(rot);
     cam.centerOn(x, top + vh / 2);
     this.camX = x;
     this.camTop = top;
     // the background is drawn a bit oversize so the tilt never shows an edge
-    this.view = { left: x - vw / 2 - 40, top: top - 40, width: vw + 80, height: vh + 80 };
+    this.view = { left: x - vw / 2 - 60, top: top - 60, width: vw + 120, height: vh + 120 };
     for (const pl of this.players) pl.sync(dt);
     themeClock.t += dt;
     this.applyTheme();
@@ -603,18 +586,29 @@ export class GameScene extends Phaser.Scene {
     if (this.time.now < a.collectableAt) return;
     const nug = this.add.image(a.x, a.y, 'nuggie').setScale(1 / 3).setDepth(p.view.depth + 1);
     a.vanish();
-    sfx.chomp();
+    this.fx.sparkle(a.x, a.y, 5);
+    // pop! (it jumps up, bigger) then arcs into the mouth, spinning and shrinking
+    this.tweens.add({ targets: nug, scale: 0.5, y: a.y - 10, duration: 90, ease: 'Back.easeOut' });
+    const from = { x: a.x, y: a.y - 10 };
+    const fly = { t: 0 };
     this.tweens.add({
-      targets: nug,
-      x: { getEnd: () => p.mouth.x },
-      y: { getEnd: () => p.mouth.y },
-      scale: 0.18,
-      duration: 160,
+      targets: fly,
+      t: 1,
+      delay: 90,
+      duration: 190,
       ease: 'Quad.easeIn',
+      onUpdate: () => {
+        const m = p.mouth;
+        const t = fly.t;
+        nug.setPosition(from.x + (m.x - from.x) * t, from.y + (m.y - from.y) * t - Math.sin(t * Math.PI) * 22);
+        nug.setScale(0.5 - 0.36 * t).setAngle(t * 300 * (p.facing || 1));
+      },
       onComplete: () => {
         nug.destroy();
+        sfx.chomp();
         p.eat();
-        this.pendingAura.push({ at: this.time.now + 330, p });
+        this.fx.popText(p.mouth.x + p.facing * 6, p.mouth.y - 14, 'NOM!', '#ffd27a', 13);
+        this.pendingAura.push({ at: this.time.now + 470, p });
       },
     });
   }
@@ -663,6 +657,26 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  /** A glowing ring that swells out from the hero when the aura goes up. */
+  private auraRing(p: Player) {
+    const ring = this.add.graphics().setDepth(p.view.depth - 1).setBlendMode(Phaser.BlendModes.ADD);
+    const st = { r: 8, a: 0.9 };
+    this.tweens.add({
+      targets: st,
+      r: 46,
+      a: 0,
+      duration: 420,
+      ease: 'Cubic.easeOut',
+      onUpdate: () => {
+        ring.clear();
+        ring.lineStyle(4, 0x6ff0d8, st.a).strokeCircle(p.x, p.y - 4, st.r);
+        ring.lineStyle(2, 0xe6fffa, st.a * 0.8).strokeCircle(p.x, p.y - 4, st.r * 0.7);
+      },
+      onComplete: () => ring.destroy(),
+    });
+    p.squash = { x: 0.9, y: 1.14 };
+  }
+
   /** Aura goes up once the munch animation has played. */
   private settleAura() {
     const now = this.time.now;
@@ -671,8 +685,9 @@ export class GameScene extends Phaser.Scene {
       if (p.state === 'fainted') return false;
       this.aura++;
       run.bestAura = Math.max(run.bestAura, this.aura);
-      this.fx.auraSparkle(p.x, p.y - 6, 12);
-      this.fx.popText(p.x, p.body.top - 18, '+1 AURA', '#6ff0d8', 15);
+      this.fx.auraSparkle(p.x, p.y - 6, 16);
+      this.auraRing(p);
+      this.fx.popText(p.x, p.body.top - 18, '+1 AURA', '#6ff0d8', 17);
       sfx.aura();
       return false;
     });

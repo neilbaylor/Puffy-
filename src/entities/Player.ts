@@ -54,7 +54,7 @@ export class Player {
   private invulnUntil = 0;
   private wasOnGround = true;
   private animTime = 0;
-  private squash = { x: 1, y: 1 };
+  squash = { x: 1, y: 1 };
   private tilt = 0;
   private recoil = 0;
   private recoilShift = 0;
@@ -232,7 +232,7 @@ export class Player {
       let frame: string;
       if (this.stun > 0) frame = 'hurt';
       else if (this.recoil > 0) frame = 'shoot';
-      else if (this.eating > 0) frame = this.eating > 0.32 ? 'eat0' : Math.floor(this.eating * 12) % 2 ? 'eat1' : 'idle0';
+      else if (this.eating > 0) frame = this.eating > 0.12 ? (Math.floor(this.eating * 10) % 2 ? 'eat0' : 'eat1') : 'idle0';
       else if (!this.onGround) frame = b.velocity.y < 0 ? 'jump' : 'fall';
       else if (speed > 15) {
         this.animTime += dt * (4 + speed / 22);
@@ -292,8 +292,17 @@ export class Player {
 
   /** Start the munch animation (nuggie pickup). */
   eat() {
-    this.eating = 0.62;
-    this.squash = { x: 1.12, y: 0.9 };
+    this.eating = 0.72;
+    this.squash = { x: 1.22, y: 0.84 };
+    // three big munches, each with a cheek-bulge squash and a spray of crumbs
+    for (const [i, at] of [0, 210, 400].entries())
+      this.scene.time.delayedCall(at, () => {
+        if (this.state === 'fainted') return;
+        this.squash = { x: 1.18 - i * 0.03, y: 0.86 + i * 0.02 };
+        const m = this.mouth;
+        this.scene.fx.crumbs(m.x + this.facing * 3, m.y + 2, 5 - i);
+        if (i > 0) sfx.munch();
+      });
   }
 
   /** Where the hero's mouth is in the world (for the nuggie fly-in). */
