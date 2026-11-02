@@ -1765,7 +1765,7 @@ kbd {
 /* Scruffy's celebration: crouch, spring up into a little backflip, squashy landing */
 .card.cheer[data-hero='scruffy'] canvas {
   transform-origin: 50% 80%;
-  animation: card-flip 0.88s linear;
+  animation: card-flip 0.75s linear;
 }
 @keyframes card-flip {
   0% { transform: translateY(0) rotate(0) scale(1, 1); }
