@@ -134,7 +134,7 @@ function heroSheet(c: HTMLCanvasElement) {
 
 function baddieSheet(c: HTMLCanvasElement) {
   const S = 1.4;
-  c.width = Math.round((PUFFBALL_W * 3 + BIGPUFF_W * 4 + GIANT_W * 4 + GOAT_W * 5) * S * 0.86 + 80);
+  c.width = Math.round((PUFFBALL_W * 3 + BIGPUFF_W * 4 + GIANT_W * 5 + GOAT_W * 9) * S * 0.86 + 120);
   c.height = Math.round(236 * S);
   const ctx = c.getContext('2d')!;
   let x = 10;
@@ -144,12 +144,12 @@ function baddieSheet(c: HTMLCanvasElement) {
     x += PUFFBALL_W * S * 0.95;
   }
   x += 10;
-  for (const f of ['w0', 'w1', 'm0', 'm1'] as BigPuffFrame[]) {
+  for (const f of ['w0', 'wc0', 'm0', 'mc0'] as BigPuffFrame[]) {
     at(ctx, x, foot - 86 * S, S, () => drawBigPuff(ctx, 0, 0, f, ST));
     x += BIGPUFF_W * S * 0.85;
   }
   x += 10;
-  for (const f of ['w0', 'crouch', 'air', 'slam'] as GiantFrame[]) {
+  for (const f of ['w0', 'w0c', 'crouch', 'air', 'slam'] as GiantFrame[]) {
     const lift = f === 'air' ? 20 : f === 'slam' ? 8 : 0;
     at(ctx, x, foot - 200 * S - lift * S, S, () => drawGiant(ctx, 0, 0, f, ST));
     x += GIANT_W * S * 0.78;

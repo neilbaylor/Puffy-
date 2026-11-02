@@ -89,7 +89,7 @@ section { display: grid; gap: 14px; }
   <section>
     <h2>The bad guys</h2>
     <p class="note">Only the three from your sketches, shown at their real sizes next to each other.</p>
-    <ul class="labels"><li><b>Puffball</b> walking ×2, squashed · 1 hit</li><li><b>Big Puff Ball</b> calm ×2, angry ×2 · 2 hits</li><li><b>Giant</b> walking, crouch (warning), jump, slam · 5 hits</li></ul>
+    <ul class="labels"><li><b>Puffball</b> walking ×2, squashed · 1 hit</li><li><b>Big Puff Ball</b> calm (mouth open / shut), angry (open / gritted teeth) · 2 hits</li><li><b>Giant</b> walking (mouth open / clenched), crouch (warning), jump, slam · 5 hits</li></ul>
     <div class="scroll"><canvas data-sheet="baddies" aria-label="Puffball, Big Puff Ball and Giant animation frames"></canvas></div>
   </section>
 
@@ -1207,6 +1207,7 @@ section { display: grid; gap: 14px; }
     const cx = ox + 38;
     const ground = oy + 86;
     const mad = frame[0] === "m";
+    const closed = frame[1] === "c";
     const step = frame.endsWith("0") ? 1 : -1;
     const bob = step > 0 ? 0 : -1.5;
     const body = mad ? ANGRY : FLUFF_DARK;
@@ -1238,6 +1239,19 @@ section { display: grid; gap: 14px; }
     }
     const mx = cx - 8;
     const my = cy + 12;
+    if (closed) {
+      if (mad) {
+        st2.shape(ctx, [[mx - 11, my - 3], [mx + 10, my - 5], [mx + 11, my + 3], [mx - 10, my + 4]], { base: "#fdf8ee", shade: "#e4d8c4", light: "#ffffff" }, 452, { lw: 0.95 });
+        st2.line(ctx, [[mx - 10.5, my], [mx + 10.5, my - 1]], 453, 0.7);
+        for (let i = 0; i < 5; i++) st2.line(ctx, [[mx - 7 + i * 3.6, my - 4], [mx - 7 + i * 3.6, my + 3.5]], 454 + i, 0.6);
+      } else {
+        const lip = [];
+        for (let i = 0; i <= 10; i++) lip.push([mx - 10 + i * 2, my + Math.sin(i / 10 * Math.PI) * 3 + (i % 2 ? 0.8 : 0)]);
+        st2.line(ctx, lip, 452, 1.2);
+        for (const tx of [mx - 5, mx + 4]) st2.shape(ctx, [[tx - 1.8, my + 2.2], [tx + 1.8, my + 2.4], [tx, my + 5.4]], { base: "#fdf8ee", shade: "#e4d8c4", light: "#ffffff" }, 456 + tx, { lw: 0.6, plain: true });
+      }
+      return;
+    }
     st2.shape(ctx, ellipsePts(mx, my, 10.5, mad ? 12 : 10, -0.15, 36), MOUTH, 450, { lw: 0.95 });
     ctx.save();
     ctx.beginPath();
@@ -1286,6 +1300,8 @@ section { display: grid; gap: 14px; }
     const crouch = frame === "crouch";
     const air = frame === "air";
     const slam = frame === "slam";
+    const shut = frame === "w0c" || frame === "w1c";
+    if (shut) frame = frame === "w0c" ? "w0" : "w1";
     const step = frame === "w1" ? -1 : 1;
     const cx = ox + 88;
     const rx = slam ? 60 : 64;
@@ -1307,7 +1323,8 @@ section { display: grid; gap: 14px; }
     st2.shape(ctx, paddlePts(cx + rx - 10, cy + 6, 34, 18, armRot), MEGA_LIMB, 630, { lw: 1.3 });
     st2.shape(ctx, fluffPts(cx, cy, rx, ry, 12, 0.045, 0.2), MEGA, 640, { light: [cx - 20, cy - 40], lw: 1.6 });
     st2.shape(ctx, paddlePts(cx - rx + 6, cy + 18, 22, 11, slam ? Math.PI + 0.9 : Math.PI + 0.15), MEGA, 631, { lw: 1.2 });
-    const open = crouch ? 0.85 : slam ? 1.15 : 1;
+    const open = shut ? 0.3 : crouch ? 0.85 : slam ? 1.15 : 1;
+    const toothK = shut ? 0.55 : 1;
     const m = grin(cx - 20, cy + 16, 78, 44, open);
     st2.shape(ctx, m.outline, MOUTH_IN, 650, { lw: 1.5, light: [cx - 10, cy + 40] });
     ctx.save();
@@ -1320,7 +1337,7 @@ section { display: grid; gap: 14px; }
     up.forEach((t, i) => {
       const idx = Math.round(t * (m.top.length - 1));
       const [x, y] = m.top[idx];
-      st2.shape(ctx, toothPts(x, y - 1, 11, i === 0 || i === 5 ? 11 : 15, Math.PI / 2), TOOTH, 660 + i, { lw: 0.9 });
+      st2.shape(ctx, toothPts(x, y - 1, 11, (i === 0 || i === 5 ? 11 : 15) * toothK, Math.PI / 2), TOOTH, 660 + i, { lw: 0.9 });
     });
     [0.2, 0.36, 0.64, 0.8].forEach((t, i) => {
       const idx = Math.round(t * (m.bot.length - 1));
@@ -1328,7 +1345,7 @@ section { display: grid; gap: 14px; }
       const prev = m.bot[Math.max(0, idx - 1)];
       const next = m.bot[Math.min(m.bot.length - 1, idx + 1)];
       const ang = Math.atan2(next[1] - prev[1], next[0] - prev[0]) - Math.PI / 2;
-      st2.shape(ctx, toothPts(x, y + 1, 10, 11, ang), TOOTH, 680 + i, { lw: 0.9 });
+      st2.shape(ctx, toothPts(x, y + 1, 10, 11 * toothK, ang), TOOTH, 680 + i, { lw: 0.9 });
     });
     ctx.restore();
     st2.line(ctx, m.top, 690, 1.5);
@@ -4036,7 +4053,7 @@ section { display: grid; gap: 14px; }
   }
   function baddieSheet(c) {
     const S = 1.4;
-    c.width = Math.round((PUFFBALL_W * 3 + BIGPUFF_W * 4 + GIANT_W * 4 + GOAT_W * 5) * S * 0.86 + 80);
+    c.width = Math.round((PUFFBALL_W * 3 + BIGPUFF_W * 4 + GIANT_W * 5 + GOAT_W * 9) * S * 0.86 + 120);
     c.height = Math.round(236 * S);
     const ctx = c.getContext("2d");
     let x = 10;
@@ -4046,12 +4063,12 @@ section { display: grid; gap: 14px; }
       x += PUFFBALL_W * S * 0.95;
     }
     x += 10;
-    for (const f of ["w0", "w1", "m0", "m1"]) {
+    for (const f of ["w0", "wc0", "m0", "mc0"]) {
       at2(ctx, x, foot - 86 * S, S, () => drawBigPuff(ctx, 0, 0, f, ST4));
       x += BIGPUFF_W * S * 0.85;
     }
     x += 10;
-    for (const f of ["w0", "crouch", "air", "slam"]) {
+    for (const f of ["w0", "w0c", "crouch", "air", "slam"]) {
       const lift = f === "air" ? 20 : f === "slam" ? 8 : 0;
       at2(ctx, x, foot - 200 * S - lift * S, S, () => drawGiant(ctx, 0, 0, f, ST4));
       x += GIANT_W * S * 0.78;

@@ -111,7 +111,7 @@ export class Confetti {
   private pieces: Piece[] = [];
   /** Slow-motion factor (1 = normal). */
   timeScale = 1;
-  private readonly max = 1400;
+  private readonly max = 3600;
 
   constructor(
     private scene: Phaser.Scene,
@@ -176,17 +176,57 @@ export class Confetti {
     });
   }
 
-  /** An explosion of confetti from (x, y). */
+  /**
+   * An explosion of confetti from (x, y). The blast is split into a few
+   * random jets (each with its own direction and strength) plus a general
+   * spray, and speeds are very uneven — so no two explosions look alike.
+   */
   burst(x: number, y: number, n: number, o: BurstOpts = {}) {
     const power = o.power ?? 900;
     const angle = o.angle ?? -Math.PI / 2;
     const spread = o.spread ?? Math.PI;
+    const jets = Array.from({ length: 2 + Math.floor(Math.random() * 5) }, () => ({
+      a: angle + (Math.random() * 2 - 1) * spread,
+      k: 0.7 + Math.random() * 0.7,
+      w: 0.12 + Math.random() * 0.3,
+    }));
     for (let i = 0; i < n; i++) {
-      const a = angle + (Math.random() * 2 - 1) * spread;
-      // most pieces slow, a few really fast: feels like a real blast
-      const sp = power * (0.18 + 0.82 * Math.pow(Math.random(), 0.65));
-      this.spawn(x + (Math.random() - 0.5) * 16, y + (Math.random() - 0.5) * 16, Math.cos(a) * sp, Math.sin(a) * sp - (o.lift ?? 0), o);
+      let a: number;
+      let pk = 1;
+      if (Math.random() < 0.55) {
+        // part of a jet
+        const j = jets[Math.floor(Math.random() * jets.length)];
+        a = j.a + (Math.random() * 2 - 1) * j.w;
+        pk = j.k;
+      } else a = angle + (Math.random() * 2 - 1) * spread;
+      // most pieces slow, a few REALLY fast: feels like a real blast
+      const r = Math.random();
+      const sp = power * pk * (0.12 + 0.88 * Math.pow(r, 0.55)) * (r > 0.97 ? 1.5 : 1);
+      this.spawn(x + (Math.random() - 0.5) * 18, y + (Math.random() - 0.5) * 18, Math.cos(a) * sp, Math.sin(a) * sp - (o.lift ?? 0), o);
     }
+  }
+
+  /** A pop of confetti in mid-air somewhere: a flash and a random-coloured burst. */
+  pop(x: number, y: number, n: number, power = 900) {
+    const palettes = [
+      [0xffd23f, 0xffffff, 0xff5a6e],
+      [0x2fd0c0, 0xffffff, 0x4db5ff],
+      [0xff8fb3, 0xffd23f, 0x7a5cff],
+      [0x8fe36a, 0xffffff, 0xffd23f],
+      COLORS,
+    ];
+    const flash = this.scene.add.image(x, y, 'cf-glitter').setBlendMode(Phaser.BlendModes.ADD).setDepth(this.depth + 0.1).setScale(1);
+    this.scene.tweens.add({ targets: flash, scale: 9, alpha: 0, duration: 380, ease: 'Cubic.easeOut', onComplete: () => flash.destroy() });
+    this.burst(x, y, n, { power: power * (0.75 + Math.random() * 0.5), spread: Math.PI, glitter: 0.2, streamers: 0.1, colors: palettes[Math.floor(Math.random() * palettes.length)] });
+  }
+
+  /** A fountain: keeps spraying confetti up from (x, y) for a while. */
+  fountain(x: number, y: number, perSecond: number, ms: number, o: BurstOpts = {}) {
+    return this.scene.time.addEvent({
+      delay: 40,
+      repeat: Math.floor(ms / 40),
+      callback: () => this.burst(x, y, Math.round((perSecond / 25) * (0.6 + Math.random() * 0.8)), { power: 1500, spread: 0.55, angle: -Math.PI / 2, streamers: 0.16, ...o }),
+    });
   }
 
   /** A confetti cannon: a tight cone fired from (x, y). */

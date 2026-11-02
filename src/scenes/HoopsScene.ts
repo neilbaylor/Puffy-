@@ -906,20 +906,24 @@ export class HoopsScene extends Phaser.Scene {
       this.tweens.add({ targets: p, x: cx + Math.cos(a) * 260, y: cy + Math.sin(a) * 170, displayWidth: 260, displayHeight: 200, alpha: 0, duration: 1400 + Math.random() * 500, ease: 'Cubic.easeOut', onComplete: () => p.destroy() });
     }
     // THE blast
-    this.confettiFx.burst(cx, cy, 520, { power: 2300, spread: Math.PI, streamers: 0.12, sequins: 0.14, glitter: 0.12, scale: 1.25 });
-    this.confettiFx.burst(cx, cy, 160, { power: 1300, spread: 0.9, angle: -Math.PI / 2, streamers: 0.25, scale: 1.4 });
+    // the biggest confetti blast in the game, by a lot
+    this.confettiFx.burst(cx, cy, 1300, { power: 2800, spread: Math.PI, streamers: 0.12, sequins: 0.14, glitter: 0.14, scale: 1.3 });
+    this.confettiFx.burst(cx, cy, 380, { power: 1700, spread: 0.9, angle: -Math.PI / 2, streamers: 0.25, scale: 1.45 });
+    this.time.delayedCall(90, () => this.confettiFx.burst(cx, cy, 500, { power: 3600, spread: Math.PI, glitter: 0.25, scale: 1.1 }));
+    // and it keeps erupting from where he stood
+    this.confettiFx.fountain(cx, cy + 30, 600, 1800, { scale: 1.2 });
     // secondary pops, like fireworks
-    for (let i = 0; i < 4; i++)
-      this.time.delayedCall(260 + i * 210, () => {
-        const px = cx + (Math.random() - 0.5) * 700;
+    for (let i = 0; i < 12; i++)
+      this.time.delayedCall(260 + i * (120 + Math.random() * 160), () => {
+        const px = cx + (Math.random() - 0.5) * 1100;
         const py = cy - 120 - Math.random() * 260;
         sfx.pop();
         const f = this.add.image(px, py, 'spot').setBlendMode(Phaser.BlendModes.ADD).setTint(0xffffff).setDepth(12.2).setScale(0.1);
         this.tweens.add({ targets: f, scale: 1.1, alpha: 0, duration: 450, onComplete: () => f.destroy() });
-        this.confettiFx.burst(px, py, 110, { power: 1100, spread: Math.PI, glitter: 0.25, colors: [[0xffd23f, 0xffffff, 0xff5a6e], [0x2fd0c0, 0xffffff, 0x4db5ff], [0xff8fb3, 0xffd23f, 0x7a5cff]][i % 3] });
+        this.confettiFx.pop(px, py, 140 + Math.round(Math.random() * 90), 1100 + Math.random() * 600);
       });
     // cannons from both sides of the court
-    this.time.delayedCall(700, () => this.confetti(260));
+    this.time.delayedCall(700, () => this.confetti(420));
     // his crown spins up into the rafters… and lands on the champion
     const cs = this.crownState;
     cs.mode = 'gone';
@@ -952,13 +956,19 @@ export class HoopsScene extends Phaser.Scene {
     const view = this.cameras.main.worldView;
     const L = A(-60, 360);
     const R = A(1340, 360);
-    for (let i = 0; i < 3; i++)
-      this.time.delayedCall(i * 420, () => {
-        this.confettiFx.cannon(L.x, L.y, -1.05 + i * 0.12, Math.round(n * 0.22), { power: 1600 });
-        this.confettiFx.cannon(R.x, R.y, -Math.PI + 1.05 - i * 0.12, Math.round(n * 0.22), { power: 1600 });
+    for (let i = 0; i < 5; i++)
+      this.time.delayedCall(i * 380, () => {
+        this.confettiFx.cannon(L.x, L.y, -1.1 + Math.random() * 0.35, Math.round(n * 0.3), { power: 1500 + Math.random() * 600 });
+        this.confettiFx.cannon(R.x, R.y, -Math.PI + 1.1 - Math.random() * 0.35, Math.round(n * 0.3), { power: 1500 + Math.random() * 600 });
         sfx.pop();
       });
-    this.confettiFx.rain(new Phaser.Geom.Rectangle(view.x, view.y, view.width, view.height), n * 0.35, 4500);
+    // random explosions all over the arena
+    for (let i = 0; i < 9; i++)
+      this.time.delayedCall(200 + i * (180 + Math.random() * 260), () => {
+        this.confettiFx.pop(view.x + view.width * (0.1 + Math.random() * 0.8), view.y + view.height * (0.08 + Math.random() * 0.35), Math.round(n * (0.35 + Math.random() * 0.4)), 800 + Math.random() * 700);
+        sfx.pop();
+      });
+    this.confettiFx.rain(new Phaser.Geom.Rectangle(view.x, view.y, view.width, view.height), n * 0.6, 5500);
   }
 
   // ───────────────────────────────────────────── the show ──
@@ -1414,9 +1424,16 @@ export class HoopsScene extends Phaser.Scene {
     const cam = this.cameras.main;
     cam.shake(150 * k, 0.003 * k);
     // confetti cannons pop from both sides of the court
-    const n = Math.round(45 * k);
-    this.confettiFx.cannon(A(-40, 330).x, A(-40, 330).y, -0.95, n, { power: 1250 });
-    this.confettiFx.cannon(A(1320, 330).x, A(1320, 330).y, -Math.PI + 0.95, n, { power: 1250 });
+    const n = Math.round(75 * k);
+    this.confettiFx.cannon(A(-40, 330).x, A(-40, 330).y, -0.95 + (Math.random() - 0.5) * 0.3, n, { power: 1250 + Math.random() * 500 });
+    this.confettiFx.cannon(A(1320, 330).x, A(1320, 330).y, -Math.PI + 0.95 + (Math.random() - 0.5) * 0.3, n, { power: 1250 + Math.random() * 500 });
+    // and a couple of random pops up in the air
+    const pops = Math.round(1 + k * 2 + Math.random() * 2);
+    for (let i = 0; i < pops; i++)
+      this.time.delayedCall(150 + i * (120 + Math.random() * 200), () => {
+        this.confettiFx.pop(A(200 + Math.random() * 880, 0).x, A(0, 40 + Math.random() * 180).y, Math.round(45 * k + Math.random() * 40));
+        sfx.pop();
+      });
   }
 
   // ── endings ──

@@ -83,6 +83,7 @@ export abstract class Enemy extends Phaser.Physics.Arcade.Sprite {
     }
     if (this.awake) this.tick(dt);
     this.weapon?.update(dt, this.awake);
+    if (!this.dead && this.active) this.animateMouth(dt);
     if (this.y > this.gs.level.heightPx + 120) this.kill('fall');
   }
 
@@ -97,6 +98,36 @@ export abstract class Enemy extends Phaser.Physics.Arcade.Sprite {
       this.flashUntil = this.gs.time.now + 90;
       sfx.bump();
     }
+  }
+
+  /** Mouth open/shut cycling (bad guys with a closed-mouth version of their frames). */
+  private mouthT = Math.random() * 2;
+  private mouthShut = false;
+  private chomps = 0;
+  protected animateMouth(dt: number) {
+    const shutName = this.shutFrame(this.frame.name);
+    if (shutName === null) return;
+    this.mouthT -= dt;
+    if (this.mouthT <= 0) {
+      if (this.chomps > 0) {
+        // a quick chomp-chomp-chomp
+        this.chomps--;
+        this.mouthShut = !this.mouthShut;
+        this.mouthT = 0.09;
+      } else if (Math.random() < 0.18) {
+        this.chomps = 6;
+        this.mouthT = 0;
+      } else {
+        this.mouthShut = !this.mouthShut;
+        this.mouthT = this.mouthShut ? 0.5 + Math.random() * 1.1 : 0.8 + Math.random() * 1.7;
+      }
+    }
+    if (this.mouthShut) this.setFrame(shutName);
+  }
+
+  /** The closed-mouth version of a frame (null if this bad guy / frame has none). */
+  protected shutFrame(_f: string): string | null {
+    return null;
   }
 
   /** Hand this bad guy a weapon. */
@@ -303,6 +334,10 @@ export class BigPuff extends Walker {
     this.setFrame(Math.floor(this.t * (this.mad ? 9 : 7)) % 2 ? (this.mad ? 'm1' : 'w1') : this.mad ? 'm0' : 'w0');
   }
 
+  protected shutFrame(f: string) {
+    return f === 'w0' || f === 'w1' || f === 'm0' || f === 'm1' ? `${f[0]}c${f[1]}` : null;
+  }
+
   damage(n: number, how: DeathKind, by: Player | null) {
     super.damage(n, how, by);
     if (this.dead) return;
@@ -495,6 +530,11 @@ export class Giant extends Enemy {
     this.gs.spawnShockwave(b.left + 6, b.bottom, -1, slam ? 275 : 220);
     this.gs.spawnShockwave(b.right - 6, b.bottom, 1, slam ? 275 : 220);
     sfx.thud();
+  }
+
+  protected shutFrame(f: string) {
+    // only while walking (he roars open-mouthed when he crouches, jumps and slams)
+    return f === 'w0' || f === 'w1' ? `${f}c` : null;
   }
 
   private drawPips() {

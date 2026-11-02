@@ -94,7 +94,9 @@ export function drawPuffball(ctx: Ctx, ox: number, oy: number, frame: PuffballFr
 
 // ───────────────────────────── Big Puff (72 × 88, feet at y = 86) ──
 
-export type BigPuffFrame = 'w0' | 'w1' | 'm0' | 'm1';
+export type BigPuffFrame = 'w0' | 'w1' | 'm0' | 'm1' | 'wc0' | 'wc1' | 'mc0' | 'mc1';
+/** All Big Puff frames (…c… = mouth closed). */
+export const BIGPUFF_FRAMES: BigPuffFrame[] = ['w0', 'w1', 'm0', 'm1', 'wc0', 'wc1', 'mc0', 'mc1'];
 export const BIGPUFF_W = 72;
 export const BIGPUFF_H = 88;
 
@@ -102,6 +104,7 @@ export function drawBigPuff(ctx: Ctx, ox: number, oy: number, frame: BigPuffFram
   const cx = ox + 38;
   const ground = oy + 86;
   const mad = frame[0] === 'm';
+  const closed = frame[1] === 'c';
   const step = frame.endsWith('0') ? 1 : -1;
   const bob = step > 0 ? 0 : -1.5;
   const body = mad ? ANGRY : FLUFF_DARK;
@@ -138,9 +141,23 @@ export function drawBigPuff(ctx: Ctx, ox: number, oy: number, frame: BigPuffFram
     st.line(ctx, [[cx - 16, cy - 22], [cx - 7, cy - 19.5], [cx + 1, cy - 21]], 445, 1.3);
   }
 
-  // big open mouth with scribbly teeth
   const mx = cx - 8;
   const my = cy + 12;
+  if (closed) {
+    // mouth shut: calm = a wide wobbly grin with little teeth peeking out; mad = gritted teeth
+    if (mad) {
+      st.shape(ctx, [[mx - 11, my - 3], [mx + 10, my - 5], [mx + 11, my + 3], [mx - 10, my + 4]], { base: '#fdf8ee', shade: '#e4d8c4', light: '#ffffff' }, 452, { lw: 0.95 });
+      st.line(ctx, [[mx - 10.5, my], [mx + 10.5, my - 1]], 453, 0.7);
+      for (let i = 0; i < 5; i++) st.line(ctx, [[mx - 7 + i * 3.6, my - 4], [mx - 7 + i * 3.6, my + 3.5]], 454 + i, 0.6);
+    } else {
+      const lip: Pt[] = [];
+      for (let i = 0; i <= 10; i++) lip.push([mx - 10 + i * 2, my + Math.sin((i / 10) * Math.PI) * 3 + (i % 2 ? 0.8 : 0)]);
+      st.line(ctx, lip, 452, 1.2);
+      for (const tx of [mx - 5, mx + 4]) st.shape(ctx, [[tx - 1.8, my + 2.2], [tx + 1.8, my + 2.4], [tx, my + 5.4]], { base: '#fdf8ee', shade: '#e4d8c4', light: '#ffffff' }, 456 + tx, { lw: 0.6, plain: true });
+    }
+    return;
+  }
+  // big open mouth with scribbly teeth
   st.shape(ctx, ellipsePts(mx, my, 10.5, mad ? 12 : 10, -0.15, 36), MOUTH, 450, { lw: 0.95 });
   ctx.save();
   ctx.beginPath();
@@ -165,7 +182,9 @@ export function drawBigPuff(ctx: Ctx, ox: number, oy: number, frame: BigPuffFram
 // with a perfectly timed run while he's in the air — he slams down on anyone
 // who tries it late.
 
-export type GiantFrame = 'w0' | 'w1' | 'crouch' | 'air' | 'slam';
+export type GiantFrame = 'w0' | 'w1' | 'crouch' | 'air' | 'slam' | 'w0c' | 'w1c';
+/** All Giant frames (w0c / w1c = walking with his mouth shut). */
+export const GIANT_FRAMES: GiantFrame[] = ['w0', 'w1', 'crouch', 'air', 'slam', 'w0c', 'w1c'];
 export const GIANT_W = 172;
 export const GIANT_H = 204;
 const MEGA: Fill = { base: '#f0812c', shade: '#c55a16', light: '#ffb36a' };
@@ -205,6 +224,8 @@ export function drawGiant(ctx: Ctx, ox: number, oy: number, frame: GiantFrame, s
   const crouch = frame === 'crouch';
   const air = frame === 'air';
   const slam = frame === 'slam';
+  const shut = frame === 'w0c' || frame === 'w1c';
+  if (shut) frame = frame === 'w0c' ? 'w0' : 'w1';
   const step = frame === 'w1' ? -1 : 1;
   const cx = ox + 88;
   const rx = slam ? 60 : 64;
@@ -232,7 +253,9 @@ export function drawGiant(ctx: Ctx, ox: number, oy: number, frame: GiantFrame, s
   st.shape(ctx, paddlePts(cx - rx + 6, cy + 18, 22, 11, slam ? Math.PI + 0.9 : Math.PI + 0.15), MEGA, 631, { lw: 1.2 });
 
   // ── the mouth: a big toothy grin on the face side ──
-  const open = crouch ? 0.85 : slam ? 1.15 : 1;
+  // mouth shut = teeth clenched in a big grin
+  const open = shut ? 0.3 : crouch ? 0.85 : slam ? 1.15 : 1;
+  const toothK = shut ? 0.55 : 1;
   const m = grin(cx - 20, cy + 16, 78, 44, open);
   st.shape(ctx, m.outline, MOUTH_IN, 650, { lw: 1.5, light: [cx - 10, cy + 40] });
   ctx.save();
@@ -247,7 +270,7 @@ export function drawGiant(ctx: Ctx, ox: number, oy: number, frame: GiantFrame, s
   up.forEach((t, i) => {
     const idx = Math.round(t * (m.top.length - 1));
     const [x, y] = m.top[idx];
-    st.shape(ctx, toothPts(x, y - 1, 11, i === 0 || i === 5 ? 11 : 15, Math.PI / 2), TOOTH, 660 + i, { lw: 0.9 });
+    st.shape(ctx, toothPts(x, y - 1, 11, (i === 0 || i === 5 ? 11 : 15) * toothK, Math.PI / 2), TOOTH, 660 + i, { lw: 0.9 });
   });
   [0.2, 0.36, 0.64, 0.8].forEach((t, i) => {
     const idx = Math.round(t * (m.bot.length - 1));
@@ -255,7 +278,7 @@ export function drawGiant(ctx: Ctx, ox: number, oy: number, frame: GiantFrame, s
     const prev = m.bot[Math.max(0, idx - 1)];
     const next = m.bot[Math.min(m.bot.length - 1, idx + 1)];
     const ang = Math.atan2(next[1] - prev[1], next[0] - prev[0]) - Math.PI / 2;
-    st.shape(ctx, toothPts(x, y + 1, 10, 11, ang), TOOTH, 680 + i, { lw: 0.9 });
+    st.shape(ctx, toothPts(x, y + 1, 10, 11 * toothK, ang), TOOTH, 680 + i, { lw: 0.9 });
   });
   ctx.restore();
   // lip outline + a soft highlight along the lower lip
