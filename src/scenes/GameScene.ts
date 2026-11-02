@@ -64,6 +64,8 @@ export interface ResultState {
 /** Chance that each aura spot in the level actually has aura this time. */
 const AURA_CHANCE = 0.6;
 const DEPTH_WAVE = 12;
+/** Display scale of the Giant's rolling flames (art is drawn at 3x). */
+const FLAME_S = 1.25 / 3;
 /** Max wisps that scatter when you get hit while carrying aura. */
 const SCATTER_MAX = 10;
 
@@ -103,7 +105,7 @@ export class GameScene extends Phaser.Scene {
   private auras: Aura[] = [];
   private rootbeers: RootBeer[] = [];
   private pendingAura: { at: number; p: Player }[] = [];
-  private waves: { img: Phaser.GameObjects.Image; dir: number; speed: number; life: number; y: number }[] = [];
+  private waves: { img: Phaser.GameObjects.Image; glow: Phaser.GameObjects.Image; dir: number; speed: number; life: number; y: number; t: number }[] = [];
   private gRootbeer!: Group;
   private checkpoints: Checkpoint[] = [];
   private goal?: Goal;
@@ -429,20 +431,29 @@ export class GameScene extends Phaser.Scene {
 
   /** A giant's landing shockwave: rolls along the ground; jump over it. */
   spawnShockwave(x: number, groundY: number, dir: number, speed: number) {
-    const img = this.add.image(x, groundY + 2, 'wave').setOrigin(0.5, 1).setScale(0.12, 1 / 3).setFlipX(dir < 0).setDepth(DEPTH_WAVE);
-    this.tweens.add({ targets: img, scaleX: 1 / 3, duration: 120 });
-    this.waves.push({ img, dir, speed, life: 1.5, y: groundY });
+    // a rolling wall of fire (flickering hand-drawn flames over an orange glow)
+    const glow = this.add.image(x, groundY - 16, 'glow').setTint(0xff7a2a).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.75).setScale(1.6, 1.1).setDepth(DEPTH_WAVE - 0.1);
+    const img = this.add.image(x, groundY + 3, 'flame', 'f0').setOrigin(0.5, 1).setScale(0.1 * FLAME_S, FLAME_S).setFlipX(dir < 0).setDepth(DEPTH_WAVE);
+    this.tweens.add({ targets: img, scaleX: FLAME_S, duration: 140, ease: 'Back.easeOut' });
+    this.fx.flameBurst(x, groundY);
+    this.waves.push({ img, glow, dir, speed, life: 1.5, y: groundY, t: Math.random() });
   }
 
   private updateWaves(dt: number) {
     this.waves = this.waves.filter((w) => {
       w.life -= dt;
       w.img.x += w.dir * w.speed * dt;
+      w.t += dt;
+      w.img.setFrame(`f${Math.floor(w.t * 14) % 4}`);
+      w.img.scaleY = FLAME_S * (1 + Math.sin(w.t * 23) * 0.06);
+      w.glow.setPosition(w.img.x, w.y - 16).setAlpha(0.6 + Math.sin(w.t * 31) * 0.15);
       const front = w.img.x + w.dir * 20;
       const groundAhead = this.level.isSolidAt(front, w.y + 6) && !this.level.isSolidAt(front, w.y - 8);
-      if (Math.random() < 0.4) this.fx.dust(w.img.x, w.y, 1);
+      this.fx.flameTrail(w.img.x, w.y, w.dir);
       if (w.life <= 0 || !groundAhead) {
-        this.tweens.add({ targets: w.img, alpha: 0, scaleY: 0.05, duration: 160, onComplete: () => w.img.destroy() });
+        // the flame gutters out in a puff of smoke
+        this.fx.flameBurst(w.img.x, w.y);
+        this.tweens.add({ targets: [w.img, w.glow], alpha: 0, scaleY: 0.05, duration: 200, onComplete: () => (w.img.destroy(), w.glow.destroy()) });
         return false;
       }
       for (const p of this.players) {

@@ -9,7 +9,7 @@ import { isKeyDown } from '../input/keyboard';
 import { isTouchDevice } from '../input/touch';
 import type { GameData, GameOverState, GameScene, HudState, ResultState } from '../scenes/GameScene';
 import { TouchControls } from './touchControls';
-import { drawNuggie } from '../gfx/collectibles';
+import { drawNuggie, drawRootBeer } from '../gfx/collectibles';
 import { VERSION } from '../version';
 
 const h = (html: string) => {
@@ -72,6 +72,14 @@ export class UI {
       ctx.scale(2, 2);
       drawNuggie(ctx, 20, 17, 13, 0);
       document.documentElement.style.setProperty('--nuggie-img', `url(${c.toDataURL()})`);
+      // and the root beer icon is the same bottle you find in the level
+      const rb = document.createElement('canvas');
+      rb.width = 60;
+      rb.height = 80;
+      const rctx = rb.getContext('2d')!;
+      rctx.scale(2, 2);
+      drawRootBeer(rctx, 15, 38, 34);
+      document.documentElement.style.setProperty('--rootbeer-img', `url(${rb.toDataURL()})`);
     } catch {
       /* falls back to the CSS icon */
     }

@@ -547,11 +547,10 @@ body {
 }
 .rb-ico {
   display: inline-block;
-  width: 0.5em;
-  height: 1em;
-  border-radius: 30% 30% 22% 22% / 18% 18% 12% 12%;
-  background: linear-gradient(180deg, #e8463f 0 14%, #7a3e1c 14% 40%, #fff1d6 40% 64%, #7a3e1c 64%);
-  border: 2px solid var(--ink);
+  width: 0.85em;
+  height: 1.15em;
+  background: var(--rootbeer-img, linear-gradient(180deg, #e8463f 0 14%, #7a3e1c 14% 40%, #fff1d6 40% 64%, #7a3e1c 64%)) center / contain no-repeat;
+  filter: drop-shadow(0 1px 0 #0006);
 }
 .stat-list dd small {
   font-family: var(--body);

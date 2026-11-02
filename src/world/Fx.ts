@@ -14,6 +14,9 @@ export class Fx {
   private trailE: Emitter;
   private fluffE: Emitter;
   private auraE: Emitter;
+  private burnE: Emitter;
+  private emberE: Emitter;
+  private ashE: Emitter;
 
   constructor(private scene: Phaser.Scene) {
     const mk = (tex: string, cfg: Phaser.Types.GameObjects.Particles.ParticleEmitterConfig, depth: number = DEPTH.fx) =>
@@ -44,6 +47,33 @@ export class Fx {
       tint: [0xffe14d, 0xff9a2e, 0xff5a3c, 0xffffff],
       blendMode: Phaser.BlendModes.ADD,
     });
+    // the Giant's rolling flames: flickers of fire, glowing embers and dark smoke
+    this.burnE = mk('puff', {
+      speedX: { min: -30, max: 30 },
+      speedY: { min: -90, max: -40 },
+      lifespan: { min: 200, max: 380 },
+      scale: { start: 0.55, end: 0.05 },
+      alpha: { start: 0.95, end: 0 },
+      tint: [0xffe14d, 0xff9a2e, 0xff5a1f],
+      blendMode: Phaser.BlendModes.ADD,
+    }, DEPTH.players + 1);
+    this.emberE = mk('spark', {
+      speedX: { min: -40, max: 40 },
+      speedY: { min: -170, max: -70 },
+      lifespan: { min: 450, max: 900 },
+      scale: { start: 0.45, end: 0 },
+      tint: [0xffe14d, 0xffb627, 0xff6a2a],
+      gravityY: 60,
+      blendMode: Phaser.BlendModes.ADD,
+    }, DEPTH.players + 1);
+    this.ashE = mk('puff', {
+      speedX: { min: -20, max: 20 },
+      speedY: { min: -60, max: -25 },
+      lifespan: { min: 800, max: 1400 },
+      scale: { start: 0.35, end: 1.2 },
+      alpha: { start: 0.55, end: 0 },
+      tint: [0x4a4250, 0x5e5662, 0x3a3440],
+    }, DEPTH.players - 2);
     this.sparkE = mk('spark', {
       speed: { min: 120, max: 380 },
       lifespan: { min: 250, max: 500 },
@@ -132,6 +162,20 @@ export class Fx {
     const ring = this.scene.add.image(x, y + 2, 'ring').setDepth(DEPTH.fx).setTint(0xffffff).setAlpha(0.85).setScale(0.12, 0.04);
     this.scene.tweens.add({ targets: ring, scaleX: 0.42, scaleY: 0.12, y: y + 10, alpha: 0, duration: 260, ease: 'Quad.easeOut', onComplete: () => ring.destroy() });
     this.dustE.explode(5, x, y + 2);
+  }
+
+  /** Fire, embers and smoke left behind by a rolling flame (x, ground y, moving dir). */
+  flameTrail(x: number, y: number, dir: number) {
+    if (Math.random() < 0.7) this.burnE.emitParticleAt(x - dir * (6 + Math.random() * 14), y - 4 - Math.random() * 10);
+    if (Math.random() < 0.35) this.emberE.emitParticleAt(x - dir * Math.random() * 10, y - 20 - Math.random() * 16);
+    if (Math.random() < 0.45) this.ashE.emitParticleAt(x - dir * (16 + Math.random() * 12), y - 26 - Math.random() * 10);
+  }
+
+  /** A whoomph of fire where a flame wave starts. */
+  flameBurst(x: number, y: number) {
+    for (let i = 0; i < 10; i++) this.burnE.emitParticleAt(x + (Math.random() - 0.5) * 30, y - Math.random() * 14);
+    for (let i = 0; i < 8; i++) this.ashE.emitParticleAt(x + (Math.random() - 0.5) * 30, y - 10 - Math.random() * 20);
+    for (let i = 0; i < 6; i++) this.emberE.emitParticleAt(x + (Math.random() - 0.5) * 20, y - 10);
   }
 
   /** Ground shockwave ring (giant slam). */

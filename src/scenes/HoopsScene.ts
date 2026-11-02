@@ -159,20 +159,20 @@ export class HoopsScene extends Phaser.Scene {
     if (!this.textures.exists('hball')) addCanvas(this, 'hball', hires(52, 52, 3, (ctx) => drawBall(ctx, 26, 26, 24)));
     if (!this.textures.exists('backboard')) {
       // drawn in stage coordinates around the hoop, then cropped
-      addCanvas(this, 'backboard', hires(320, 420, 2, (ctx) => {
+      addCanvas(this, 'backboard', hires(320, 420, 3, (ctx) => {
         ctx.translate(160 - HOOP.rimX, 220 - HOOP.rimY);
         drawBackboard(ctx);
         drawRimBack(ctx);
       }));
     }
     if (!this.textures.exists('netf')) {
-      const { c, ctx } = canvas(2 * 140 * 2, 100 * 2);
-      ctx.scale(2, 2);
+      const { c, ctx } = canvas(2 * 140 * 3, 100 * 3);
+      ctx.scale(3, 3);
       drawRimFront(ctx, 70, 16, 0);
       drawRimFront(ctx, 210, 16, 1);
       addCanvas(this, 'netf', c, (t) => {
-        t.add('n0', 0, 0, 0, 280, 200);
-        t.add('n1', 0, 280, 0, 280, 200);
+        t.add('n0', 0, 0, 0, 420, 300);
+        t.add('n1', 0, 420, 0, 420, 300);
       });
     }
     if (!this.textures.exists('spot')) addCanvas(this, 'spot', hires(300, 700, 1, (ctx) => drawSpotlight(ctx, 300, 700)));
@@ -194,7 +194,7 @@ export class HoopsScene extends Phaser.Scene {
     this.excitedUntil = 0;
 
     const bb = A(HOOP.rimX, HOOP.rimY);
-    this.add.image(bb.x, bb.y, 'backboard').setOrigin(0.5, 220 / 420).setScale(0.5).setDepth(5);
+    this.add.image(bb.x, bb.y, 'backboard').setOrigin(0.5, 220 / 420).setScale(1 / 3).setDepth(5);
 
     // spotlights
     for (const sp of [SPOTS.hero, SPOTS.king]) {
@@ -219,7 +219,7 @@ export class HoopsScene extends Phaser.Scene {
     this.ballShadow = this.add.image(0, 0, 'softshadow').setDisplaySize(48, 14).setDepth(6).setVisible(false);
     for (let i = 0; i < 4; i++) this.ghosts.push(this.add.image(0, 0, 'hball').setDepth(8.9).setVisible(false).setAlpha(0.3 - i * 0.07));
     this.ball = this.add.image(0, 0, 'hball').setScale(1 / 3).setDepth(9).setVisible(false);
-    this.net = this.add.image(bb.x, bb.y, 'netf', 'n0').setOrigin(0.5, 16 / 100).setScale(0.5).setDepth(10);
+    this.net = this.add.image(bb.x, bb.y, 'netf', 'n0').setOrigin(0.5, 16 / 100).setScale(1 / 3).setDepth(10);
 
     // darkness with spotlights cut out of it, plus the visible beams from the rafters
     this.darkRT = this.add.renderTexture(0, 0, ARENA_W, ARENA_H).setOrigin(0, 0).setDepth(11).setVisible(false);

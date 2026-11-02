@@ -5,6 +5,7 @@ import { TILE_COUNT } from '../level/tiles';
 import { BIGPUFF_H, BIGPUFF_W, GIANT_H, GIANT_W, PUFFBALL_H, PUFFBALL_W, drawBigPuff, drawGiant, drawPuffball } from './baddies';
 import { drawMuzzleFlash, drawRocket } from './bazooka';
 import { drawSoccerBall, drawSoccerGoal } from './soccer';
+import { FLAME_FRAMES, FLAME_H, FLAME_W, drawFlame } from './flame';
 import { ART_RES, ART_STYLE, CHAR_H, CHAR_W, POSES, canvas, drawCharacter, ellipse, type Ctx } from './draw';
 import { STYLES } from './handdrawn';
 import {
@@ -128,6 +129,7 @@ function makeItems(scene: Phaser.Scene, pal: WorldPalette) {
       st.line(ctx, [[26, 28], [36, 20], [44, 19]], 2103, 0.7, '#fff6c8');
     }),
   );
+  sheet(scene, 'flame', FLAME_W, FLAME_H, FLAME_FRAMES, (ctx, f) => drawFlame(ctx, +f[1]));
   addCanvas(scene, 'nuggie', hires(40, 34, ART_RES, (ctx) => drawNuggie(ctx, 20, 17, 11)));
   addCanvas(scene, 'rootbeer', hires(30, 40, ART_RES, (ctx) => drawRootBeer(ctx, 15, 38, 34)));
   addCanvas(scene, 'rocket', hires(30, 16, ART_RES, (ctx) => drawRocket(ctx, st, 15, 8)));

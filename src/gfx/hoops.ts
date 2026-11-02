@@ -462,82 +462,116 @@ function drawBoard(ctx: Ctx, x: number, y: number) {
   ctx.fillRect(x - 9, y - 9, 18, 11);
 }
 
-const RIM = '#e2531f';
-const RIM_DARK = '#7a2a10';
-const RIM_LIGHT = '#ffb48c';
+const RIM_DARK = '#5e1a08';
+const RIM_BASE = '#cf4a1a';
+const RIM_MID = '#f06a2c';
+const RIM_LIGHT = '#ffc7a0';
 
-/** Back half of the rim (behind the ball). */
-export function drawRimBack(ctx: Ctx) {
-  const { rimX: x, rimY: y, rimRX: rx, rimRY: ry } = HOOP;
-  ctx.strokeStyle = RIM_DARK;
-  ctx.lineWidth = 5.2;
+/** Rim tube along an elliptical arc (a0..a1), shaded like painted steel. */
+function rimTube(ctx: Ctx, x: number, y: number, a0: number, a1: number, front: boolean) {
+  const { rimRX: rx, rimRY: ry } = HOOP;
+  const arc = (dy: number, w: number, col: string, b0 = a0, b1 = a1) => {
+    ctx.strokeStyle = col;
+    ctx.lineWidth = w;
+    ctx.beginPath();
+    ctx.ellipse(x, y + dy, rx, ry, 0, b0, b1);
+    ctx.stroke();
+  };
+  ctx.lineCap = 'round';
+  arc(1.4, 6.4, RIM_DARK);
+  arc(0.3, 5, RIM_BASE);
+  arc(-0.6, 2.8, RIM_MID);
+  if (front) {
+    arc(-1.4, 1.1, RIM_LIGHT, 0.45, Math.PI - 0.45);
+    // little steel hooks the net hangs from
+    ctx.fillStyle = '#d9d6de';
+    for (let i = 1; i < 12; i++) {
+      const a = (i / 12) * Math.PI;
+      ctx.beginPath();
+      ctx.arc(x + Math.cos(a) * rx, y + Math.sin(a) * ry + 2.6, 0.9, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else {
+    arc(-1.2, 0.8, '#ff9d6e', Math.PI + 0.5, Math.PI * 2 - 0.5);
+  }
+}
+
+/** Net lattice: rows of points from the rim down to the narrow bottom. */
+function netLattice(ox: number, oy: number, stretch: number) {
+  const { rimRX: rx, rimRY: ry } = HOOP;
+  const ROWS = 6;
+  const N = 18;
+  const depth = 44 + stretch * 18;
+  const bottomR = rx * (0.5 - stretch * 0.1);
+  const pt = (k: number, i: number): Pt => {
+    const t = k / ROWS;
+    const r = rx + (bottomR - rx) * Math.pow(t, 0.8);
+    const a = ((i + (k % 2) * 0.5) / N) * Math.PI * 2;
+    const sway = stretch * Math.sin(a * 2 + k) * 2.2;
+    return [ox + Math.cos(a) * r + sway, oy + depth * t + Math.sin(a) * ry * (1 - 0.45 * t)];
+  };
+  const segs: { a: Pt; b: Pt; front: boolean; t: number }[] = [];
+  for (let k = 0; k < ROWS; k++) {
+    for (let i = 0; i < N; i++) {
+      const a = pt(k, i);
+      for (const j of k % 2 ? [i, i + 1] : [i - 1, i]) {
+        const b = pt(k + 1, (j + N) % N);
+        const ang = ((i + (k % 2) * 0.5 + (j + ((k + 1) % 2) * 0.5)) / 2 / N) * Math.PI * 2;
+        segs.push({ a, b, front: Math.sin(ang) >= 0, t: k / ROWS });
+      }
+    }
+  }
+  // dangling cord ends under the bottom ring
+  const tails: { a: Pt; b: Pt; front: boolean }[] = [];
+  for (let i = 0; i < N; i += 2) {
+    const a = pt(ROWS, i);
+    const ang = ((i + (ROWS % 2) * 0.5) / N) * Math.PI * 2;
+    tails.push({ a, b: [a[0] + Math.cos(ang) * 1.5, a[1] + 5 + stretch * 2], front: Math.sin(ang) >= 0 });
+  }
+  return { segs, tails };
+}
+
+/** A sagging cord between two knots. */
+function cord(ctx: Ctx, a: Pt, b: Pt) {
   ctx.beginPath();
-  ctx.ellipse(x, y, rx, ry, 0, Math.PI, Math.PI * 2);
-  ctx.stroke();
-  ctx.strokeStyle = RIM;
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.ellipse(x, y - 0.6, rx, ry, 0, Math.PI, Math.PI * 2);
+  ctx.moveTo(a[0], a[1]);
+  ctx.quadraticCurveTo((a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + 1.4, b[0], b[1]);
   ctx.stroke();
 }
 
-/** Front half of the rim + the net, drawn into a canvas whose origin is the rim centre. `stretch` 0..1 swishes the net. */
-export function drawRimFront(ctx: Ctx, ox: number, oy: number, stretch = 0) {
-  const { rimRX: rx, rimRY: ry } = HOOP;
-  const depth = 40 + stretch * 16;
-  const bottomR = rx * (0.56 - stretch * 0.12);
-  const ROWS = 5;
-  const N = 16;
-  const ring = (k: number, i: number): Pt => {
-    const t = k / ROWS;
-    const r = rx + (bottomR - rx) * Math.pow(t, 0.85);
-    const a = ((i + (k % 2) * 0.5) / N) * Math.PI * 2;
-    const sway = stretch * Math.sin(a * 2) * 2;
-    return [ox + Math.cos(a) * r + sway, oy + depth * t + Math.sin(a) * ry * (1 - 0.4 * t)];
-  };
+/** Back half of the rim + the back of the net (behind the ball). */
+export function drawRimBack(ctx: Ctx) {
+  const { rimX: x, rimY: y } = HOOP;
+  const { segs } = netLattice(x, y, 0);
   ctx.lineCap = 'round';
-  const strands = (front: boolean) => {
-    for (let k = 0; k < ROWS; k++) {
-      for (let i = 0; i < N; i++) {
-        const a = ring(k, i);
-        const nb = k % 2 ? [i, i + 1] : [i - 1, i];
-        for (const j of nb) {
-          const b = ring(k + 1, (j + N) % N);
-          const isFront = (a[1] - oy - (depth * k) / ROWS + (b[1] - oy - (depth * (k + 1)) / ROWS)) > 0;
-          if (isFront !== front) continue;
-          seg(ctx, a, b);
-        }
-      }
-    }
-  };
-  // back of the net, seen through the front
-  ctx.strokeStyle = 'rgba(200,200,205,0.55)';
-  ctx.lineWidth = 1.1;
-  strands(false);
-  // front of the net: soft shadow then white cord
-  ctx.strokeStyle = 'rgba(60,60,70,0.35)';
-  ctx.lineWidth = 2.2;
-  strands(true);
-  ctx.strokeStyle = '#fbfbf8';
-  ctx.lineWidth = 1.4;
-  strands(true);
-  // rim front: dark underside, orange steel, highlight
-  ctx.lineCap = 'butt';
-  ctx.strokeStyle = RIM_DARK;
-  ctx.lineWidth = 5.4;
-  ctx.beginPath();
-  ctx.ellipse(ox, oy + 0.6, rx, ry, 0, 0, Math.PI);
-  ctx.stroke();
-  ctx.strokeStyle = RIM;
-  ctx.lineWidth = 3.2;
-  ctx.beginPath();
-  ctx.ellipse(ox, oy - 0.4, rx, ry, 0, 0, Math.PI);
-  ctx.stroke();
-  ctx.strokeStyle = RIM_LIGHT;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.ellipse(ox, oy - 1.4, rx - 1, ry - 1, 0, 0.35, Math.PI - 0.35);
-  ctx.stroke();
+  for (const sg of segs) {
+    if (sg.front) continue;
+    ctx.strokeStyle = `rgba(150,146,162,${0.75 - sg.t * 0.3})`;
+    ctx.lineWidth = 1.1;
+    cord(ctx, sg.a, sg.b);
+  }
+  rimTube(ctx, x, y, Math.PI, Math.PI * 2, false);
+}
+
+/** Front half of the rim + the front of the net, drawn into a canvas whose origin is the rim centre. `stretch` 0..1 swishes the net. */
+export function drawRimFront(ctx: Ctx, ox: number, oy: number, stretch = 0) {
+  const { segs, tails } = netLattice(ox, oy, stretch);
+  ctx.lineCap = 'round';
+  const front = segs.filter((sg) => sg.front);
+  // cord shadow, then the white cord (a touch greyer deeper in the net)
+  ctx.strokeStyle = 'rgba(70,64,84,0.45)';
+  ctx.lineWidth = 2.5;
+  for (const sg of front) cord(ctx, [sg.a[0] + 0.5, sg.a[1] + 0.6], [sg.b[0] + 0.5, sg.b[1] + 0.6]);
+  for (const sg of front) {
+    const g = Math.round(250 - sg.t * 34);
+    ctx.strokeStyle = `rgb(${g},${g - 2},${g - 6})`;
+    ctx.lineWidth = 1.5;
+    cord(ctx, sg.a, sg.b);
+  }
+  ctx.strokeStyle = '#e8e5ee';
+  ctx.lineWidth = 1.2;
+  for (const tl of tails) if (tl.front) cord(ctx, tl.a, tl.b);
+  rimTube(ctx, ox, oy, 0, Math.PI, true);
 }
 
 // ───────────────────────────── arena (1600 × 900, the 1280 × 720 stage sits at +160, +90) ──
