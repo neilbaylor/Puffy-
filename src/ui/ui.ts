@@ -731,7 +731,6 @@ export class UI {
     const el = h(`<div class="screen modal">
       <div class="panel results">
         <div class="results-hero">
-          <p class="results-lives" aria-label="${r.lives} ${r.lives === 1 ? 'life' : 'lives'} left">${'<i class="life-ico"></i>'.repeat(Math.max(0, r.lives))}<span>${r.lives === 1 ? '1 life left' : `${r.lives} lives left`}</span></p>
           <canvas width="160" height="160"></canvas>
           <button class="btn btn-alt btn-small" data-act="hero">Pick player</button>
         </div>
@@ -744,6 +743,7 @@ export class UI {
             <dt>Root beer found <i class="rb-ico"></i></dt><dd>${r.rootbeerTotal}</dd>
             <dt>Puffballs popped</dt><dd>${r.popped}</dd>
             <dt>Giants beaten</dt><dd>${r.giants}</dd>
+            <dt>Lives left <i class="life-ico"></i></dt><dd>${r.lives}</dd>
             <dt>Time</dt><dd>${mins}:${secs}</dd>
           </dl>
           <div class="row">

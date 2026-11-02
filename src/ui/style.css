@@ -1734,8 +1734,7 @@ kbd {
   color: var(--ink-soft);
 }
 
-/* level clear: the left column stacks from the top — lives (level with the
-   World/Part line), the hero right under them, then Pick player */
+/* level clear: the left column stacks from the top — the hero, then Pick player */
 .results:not(.gameover) { align-items: flex-start; }
 .results:not(.gameover) .results-hero { gap: 6px; }
 .results:not(.gameover) .results-hero canvas { max-width: 150px; }
