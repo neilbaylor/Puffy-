@@ -348,7 +348,7 @@ body {
   .start h2 { display: none; }
   /* the title sits a little way down; the rows below it are packed snugly
      (the cards take up the slack), with only a small margin under Play */
-  .start { justify-content: flex-start; gap: 0; padding-top: calc(clamp(10px, 8.5vh, 40px) + var(--safe-t)); padding-bottom: calc(clamp(6px, 3vh, 14px) + var(--safe-b)); }
+  .start { justify-content: flex-start; gap: 0; padding-top: calc(clamp(8px, 6.2vh, 30px) + var(--safe-t)); padding-bottom: calc(clamp(6px, 3vh, 14px) + var(--safe-b)); }
   .start .cards { margin-top: clamp(8px, 3.6vh, 18px); }
   .start .levels { margin-top: clamp(14px, 6vh, 28px); }
   .start .start-foot { margin-top: clamp(6px, 2.4vh, 12px); }
@@ -1705,9 +1705,8 @@ kbd {
   .results { max-width: min(100%, 780px); padding: 12px 20px 16px; }
   .results-body { gap: 6px; }
   .results h2 { font-size: clamp(22px, 7vh, 30px); }
-  .results .stat-list { grid-template-columns: 1fr auto 1fr auto; gap: 2px 14px; font-size: 14px; }
+  .results .stat-list { gap: 2px 18px; }
   .results .stat-list dd { font-size: 18px; }
-  .results .stat-list dd:nth-of-type(odd) { margin-right: 10px; }
   .results .row { flex-wrap: nowrap; margin-top: 6px; }
   .results .row .btn { white-space: nowrap; padding-left: 16px; padding-right: 16px; }
 }
@@ -1727,4 +1726,23 @@ kbd {
 }
 @media (max-height: 500px) {
   .results-hero canvas { width: clamp(80px, 24vh, 130px); }
+}
+
+/* lives left, as hearts above the hero on the level-clear panel */
+.results-lives {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 3px;
+  font-size: 20px;
+}
+.results-lives span {
+  flex-basis: 100%;
+  text-align: center;
+  font: 800 12px / 1.2 var(--body);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
 }

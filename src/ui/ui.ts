@@ -700,13 +700,14 @@ export class UI {
     sfx.groan();
     const el = h(`<div class="screen modal">
       <div class="panel results gameover">
-        <div class="results-hero"><canvas width="160" height="160"></canvas><button class="btn btn-alt btn-small" data-act="hero">Pick player</button></div>
+        <div class="results-hero"><canvas width="160" height="160"></canvas></div>
         <div class="results-body">
           <p class="eyebrow">${levelInfo(this.level).world} · ${levelName(this.level)}</p>
           <h2>Out of lives!</h2>
           <p class="gameover-note">${g.name} fainted one too many times. Start the level again with 3 spare lives.</p>
           <div class="row">
             <button class="btn" data-act="again">Try again</button>
+            <button class="btn btn-alt" data-act="hero">Pick player</button>
           </div>
         </div>
       </div>
@@ -741,7 +742,11 @@ export class UI {
     const secs = String(r.seconds % 60).padStart(2, '0');
     const el = h(`<div class="screen modal">
       <div class="panel results">
-        <div class="results-hero"><canvas width="160" height="160"></canvas><button class="btn btn-alt btn-small" data-act="hero">Pick player</button></div>
+        <div class="results-hero">
+          <p class="results-lives" aria-label="${r.lives} ${r.lives === 1 ? 'life' : 'lives'} left">${'<i class="life-ico"></i>'.repeat(Math.max(0, r.lives))}<span>${r.lives === 1 ? '1 life left' : `${r.lives} lives left`}</span></p>
+          <canvas width="160" height="160"></canvas>
+          <button class="btn btn-alt btn-small" data-act="hero">Pick player</button>
+        </div>
         <div class="results-body">
           <p class="eyebrow">${levelInfo(r.level ?? this.level).world} · ${levelName(r.level ?? this.level)}</p>
           <h2>Level clear!</h2>
@@ -749,11 +754,8 @@ export class UI {
           <dl class="stat-list">
             <dt>Aura carried <i class="aura-ico"></i></dt><dd>${r.aura}</dd>
             <dt>Root beer found <i class="rb-ico"></i></dt><dd>${r.rootbeer} <small>(${r.rootbeerTotal} saved)</small></dd>
-            ${r.hoops ? `<dt>Beat King Puff Ball</dt><dd>${r.hoops}</dd>` : ''}
             <dt>Puffballs popped</dt><dd>${r.popped}</dd>
             <dt>Giants beaten</dt><dd>${r.giants}</dd>
-            <dt>Faints</dt><dd>${r.faints}</dd>
-            <dt>Lives left <i class="life-ico"></i></dt><dd>${r.lives}</dd>
             <dt>Time</dt><dd>${mins}:${secs}</dd>
           </dl>
           <div class="row">
