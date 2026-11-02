@@ -790,7 +790,7 @@ body {
 /* while it shows, the page itself is the same colour as the bottom of the prompt */
 html.rotating,
 html.rotating body {
-  background: #7fe3b8;
+  background: #a3ecca;
 }
 .rotate {
   /* overscan past every edge so no strip of the page shows (iOS home-screen apps) */
@@ -842,11 +842,22 @@ html.rotating body {
   box-shadow: 0 7px 0 var(--ink), 0 14px 30px #3a241844;
   animation: turn 3s cubic-bezier(0.5, 0, 0.3, 1.3) infinite;
 }
-.rotate-phone canvas {
+.rotate-hero {
+  display: grid;
+  place-items: center;
+  /* Puffy stays upright as the phone turns, with a happy hop */
+  animation: turn-hero 3s cubic-bezier(0.5, 0, 0.3, 1.3) infinite;
+}
+.rotate-hero canvas {
   width: 104px;
   height: 104px;
-  /* Puffy stays upright-ish as the phone turns, with a happy bounce */
-  animation: turn-hero 3s cubic-bezier(0.5, 0, 0.3, 1.3) infinite;
+  transform-origin: 50% 90%;
+  /* a bouncy little idle: squash, stretch and sway */
+  animation: hero-bob 0.9s ease-in-out infinite;
+}
+@keyframes hero-bob {
+  0%, 100% { transform: translateY(0) scale(1.04, 0.96) rotate(-2deg); }
+  50% { transform: translateY(-5px) scale(0.97, 1.04) rotate(2deg); }
 }
 .rc {
   position: absolute;
@@ -879,9 +890,11 @@ html.rotating body {
   left: -10%;
   right: -10%;
   bottom: 0;
-  height: calc(80px + var(--safe-b) + 14vh);
-  border-radius: 50% 50% 0 0 / 70% 70% 0 0;
-  background: linear-gradient(180deg, #a6f5d2, #7fe3b8);
+  /* reaches well past the bottom edge, and ends in exactly the page colour, so no band shows */
+  bottom: -200px;
+  height: calc(280px + var(--safe-b) + 14vh);
+  border-radius: 50% 50% 0 0 / 40% 40% 0 0;
+  background: linear-gradient(180deg, #b8f5d9 0, #a3ecca 160px);
   border-top: 5px solid var(--ink);
 }
 @keyframes turn {
@@ -902,6 +915,8 @@ html.rotating body {
   .world-name i,
   .results-hero canvas,
   .rotate-phone,
+  .rotate-hero,
+  .rotate-hero canvas,
   .banner > div {
     animation: none;
   }

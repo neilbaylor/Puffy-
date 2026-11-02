@@ -136,11 +136,26 @@ export class UI {
     this.rotate = h(`<div class="rotate" hidden>
       <i class="rc rc1"></i><i class="rc rc2"></i><i class="rc rc3"></i>
       <div class="logo"><span>P</span><span>U</span><span>F</span><span>F</span><span>Y</span></div>
-      <div class="rotate-stage"><div class="rotate-phone"><canvas width="200" height="200"></canvas></div></div>
+      <div class="rotate-stage"><div class="rotate-phone"><div class="rotate-hero"><canvas width="200" height="200"></canvas></div></div></div>
       <p>Turn your phone sideways to play!</p>
       <div class="rotate-hill"></div>
     </div>`);
-    drawPortrait(this.rotate.querySelector('canvas')!, CHARACTERS[0], 'idle0');
+    // Puffy is alive in there: idle poses back and forth, and his jump pose for the hop
+    const rc = this.rotate.querySelector('canvas')!;
+    let lastPose = '';
+    const t0 = performance.now();
+    const animatePuffy = () => {
+      if (!this.rotate.hidden) {
+        const t = (performance.now() - t0) % 3000;
+        const pose = t > 1440 && t < 1800 ? 'jump' : Math.floor((performance.now() - t0) / 450) % 2 ? 'idle1' : 'idle0';
+        if (pose !== lastPose) {
+          drawPortrait(rc, CHARACTERS[0], pose as 'idle0');
+          lastPose = pose;
+        }
+      }
+      requestAnimationFrame(animatePuffy);
+    };
+    requestAnimationFrame(animatePuffy);
     this.root.appendChild(this.rotate);
     this.selected = Math.max(0, CHARACTERS.findIndex((c) => c.id === store.get('puffy.hero')));
 
