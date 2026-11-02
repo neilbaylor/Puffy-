@@ -4,12 +4,13 @@ import { sfx } from '../core/sfx';
 import { characterById } from '../data/characters';
 import { ART_RES, WALK_FRAMES } from '../gfx/draw';
 import { recolorForSlot } from '../gfx/recolor';
-import { addCanvas } from '../gfx/textures';
+import { addCanvas, hires } from '../gfx/textures';
+import { drawBombBall, drawChute, drawPrize } from '../gfx/prizes';
 import { soloSource } from '../input/devices';
 import type { BattleNet, Snapshot } from '../net/battleNet';
 import { buildArena } from '../shared/battle/arena';
 import { SLOT_COLORS, type SnapPlayer } from '../shared/battle/protocol';
-import { ArenaMap, BTN, DT, HEARTS, stepMove, type BEvent, type BPlayer } from '../shared/battle/sim';
+import { ArenaMap, BTN, DT, HEARTS, POWER, sizeOf, stepMove, type BEvent, type BPlayer, type PrizeKind } from '../shared/battle/sim';
 import { Background } from '../world/Background';
 import { Fx } from '../world/Fx';
 import { LevelView } from '../world/LevelView';
@@ -26,7 +27,19 @@ interface HeroView {
   tilt: number;
   slot: number;
   hero: string;
+  /** Drawn size (eases to big when they grow). */
+  size: number;
+  sparkT: number;
 }
+
+const PRIZE_TEXT: Record<PrizeKind, [string, string]> = {
+  bomb: ['BOMBS!', '#ff8a3d'],
+  star: ['INVINCIBLE!', '#ffd23f'],
+  grow: ['GROW!', '#c39bff'],
+  rapid: ['RAPID FIRE!', '#ff6b6b'],
+  heart: ['+1 HEART', '#ff7eb6'],
+};
+const PRIZE_KINDS: PrizeKind[] = ['bomb', 'star', 'grow', 'rapid', 'heart'];
 
 export interface BattleHud {
   timeLeft: number;
@@ -47,6 +60,7 @@ export class BattleScene extends Phaser.Scene {
   fx!: Fx;
   private views = new Map<string, HeroView>();
   private rocketViews = new Map<number, Phaser.GameObjects.Image>();
+  private prizeViews = new Map<number, { img: Phaser.GameObjects.Image; chute: Phaser.GameObjects.Image; glow: Phaser.GameObjects.Image; lastY: number; falling: number }>();
   private snaps: Snapshot[] = [];
   private me: BPlayer | null = null;
   private pending: [number, number][] = [];
@@ -70,6 +84,8 @@ export class BattleScene extends Phaser.Scene {
     this.fx = new Fx(this);
     this.views.clear();
     this.rocketViews.clear();
+    this.prizeViews.clear();
+    this.makePrizeTextures();
     this.snaps = [];
     this.me = null;
     this.pending = [];
@@ -82,6 +98,13 @@ export class BattleScene extends Phaser.Scene {
     this.fitCamera();
     this.scale.on('resize', this.fitCamera, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off('resize', this.fitCamera, this));
+  }
+
+  private makePrizeTextures() {
+    const R = ART_RES;
+    for (const k of PRIZE_KINDS) if (!this.textures.exists(`prize-${k}`)) addCanvas(this, `prize-${k}`, hires(30, 30, R, (ctx) => drawPrize(ctx, k)));
+    if (!this.textures.exists('prize-chute')) addCanvas(this, 'prize-chute', hires(30, 22, R, (ctx) => drawChute(ctx)));
+    if (!this.textures.exists('bbomb')) addCanvas(this, 'bbomb', hires(24, 24, R, (ctx) => drawBombBall(ctx, 11, 13, 7)));
   }
 
   /** The whole arena is always in view. */
@@ -129,7 +152,7 @@ export class BattleScene extends Phaser.Scene {
         .setDepth(DEPTH.text)
         .setResolution(2);
       const hearts = this.add.graphics().setDepth(DEPTH.text);
-      v = { sprite, tag, hearts, anim: 0, tilt: 0, slot: p.slot, hero: p.hero };
+      v = { sprite, tag, hearts, anim: 0, tilt: 0, slot: p.slot, hero: p.hero, size: 1, sparkT: 0 };
       this.views.set(p.id, v);
     }
     return v;
@@ -181,13 +204,19 @@ export class BattleScene extends Phaser.Scene {
     if (this.pending.length > 90) this.pending.splice(0, this.pending.length - 90);
     if (me.respawn > 0) return;
     const ev: BEvent[] = [];
-    const max = characterById(me.hero).maxRockets;
-    const fired = stepMove(me, b, this.map, ev, () => this.myRockets() < max);
+    const max = characterById(me.hero).maxRockets + (me.power === POWER.rapid ? 3 : 0);
+    const fired = stepMove(me, b, this.map, ev, () => me.bombs > 0 || this.myRockets() < max);
     for (const e of ev) if (e.k === 'jump') this.jumpFx(me.x, me.y, e.air, true);
     if (fired) {
-      sfx.shoot();
       const c = characterById(me.hero);
-      this.fx.muzzle(me.x + me.facing * 24 * c.scale, me.y - (c.muzzleY ?? 18), me.facing, me.x - me.facing * 14 * c.scale);
+      const k = sizeOf(me);
+      if (me.bombs > 0) {
+        me.bombs--;
+        sfx.whoosh();
+      } else {
+        sfx.shoot();
+        this.fx.muzzle(me.x + me.facing * 24 * c.scale * k, me.y - (c.muzzleY ?? 18) * k, me.facing, me.x - me.facing * 14 * c.scale * k);
+      }
     }
   }
 
@@ -201,9 +230,10 @@ export class BattleScene extends Phaser.Scene {
     const before = this.me ? { x: this.me.x, y: this.me.y } : null;
     const me: BPlayer = { ...mine, lastHitBy: null };
     this.pending = this.pending.filter(([q]) => q > mine.ack);
-    const max = characterById(me.hero).maxRockets;
+    const max = characterById(me.hero).maxRockets + (me.power === POWER.rapid ? 3 : 0);
     const mineInFlight = s.rockets.filter((r) => r.owner === me.id).length;
-    for (const [, b] of this.pending) if (me.respawn <= 0) stepMove(me, b, this.map, undefined, () => mineInFlight < max);
+    for (const [, b] of this.pending)
+      if (me.respawn <= 0 && stepMove(me, b, this.map, undefined, () => me.bombs > 0 || mineInFlight < max) && me.bombs > 0) me.bombs--;
     if (before && me.respawn <= 0) {
       this.fix.x += before.x - me.x;
       this.fix.y += before.y - me.y;
@@ -213,7 +243,12 @@ export class BattleScene extends Phaser.Scene {
   }
 
   /** Where everyone else is right now: a smooth blend between two snapshots, a moment ago. */
-  private othersAt(): { players: Map<string, SnapPlayer>; rockets: Map<number, { x: number; y: number; dir: 1 | -1 }>; timeLeft: number } | null {
+  private othersAt(): {
+    players: Map<string, SnapPlayer>;
+    rockets: Map<number, { x: number; y: number; dir: 1 | -1; kind: 'rocket' | 'bomb' }>;
+    prizes: [number, PrizeKind, number, number, number][];
+    timeLeft: number;
+  } | null {
     const n = this.snaps.length;
     if (!n) return null;
     const last = this.snaps[n - 1];
@@ -235,12 +270,16 @@ export class BattleScene extends Phaser.Scene {
       if (!pa || pa.respawn > 0 !== pb.respawn > 0 || Math.abs(pa.x - pb.x) > 120) players.set(pb.id, pb);
       else players.set(pb.id, { ...(k < 0.5 ? pa : pb), x: pa.x + (pb.x - pa.x) * k, y: pa.y + (pb.y - pa.y) * k, vx: pa.vx + (pb.vx - pa.vx) * k, vy: pa.vy + (pb.vy - pa.vy) * k });
     }
-    const rockets = new Map<number, { x: number; y: number; dir: 1 | -1 }>();
+    const rockets = new Map<number, { x: number; y: number; dir: 1 | -1; kind: 'rocket' | 'bomb' }>();
     for (const rb of b.rockets) {
       const ra = a.rockets.find((r) => r.id === rb.id);
-      rockets.set(rb.id, ra ? { x: ra.x + (rb.x - ra.x) * k, y: ra.y + (rb.y - ra.y) * k, dir: rb.dir } : rb);
+      rockets.set(rb.id, ra ? { x: ra.x + (rb.x - ra.x) * k, y: ra.y + (rb.y - ra.y) * k, dir: rb.dir, kind: rb.kind } : rb);
     }
-    return { players, rockets, timeLeft: last.timeLeft };
+    const prizes = b.prizes.map(([id, kind, x, y, age]) => {
+      const pa = a.prizes.find((z) => z[0] === id);
+      return [id, kind, x, pa ? pa[3] + (y - pa[3]) * k : y, age] as [number, PrizeKind, number, number, number];
+    });
+    return { players, rockets, prizes, timeLeft: last.timeLeft };
   }
 
   private render(dt: number) {
@@ -278,15 +317,35 @@ export class BattleScene extends Phaser.Scene {
       }
       const targetTilt = (p.vx / c.runSpeed) * (p.onGround ? 0.14 : 0.06);
       v.tilt += (targetTilt - v.tilt) * Math.min(1, dt * 12);
+      // growing / shrinking back eases in, with a little wobble
+      const size = sizeOf(p);
+      v.size += (size - v.size) * Math.min(1, dt * 9);
+      const wob = Math.abs(v.size - size) > 0.02 ? 1 + Math.sin(this.time.now / 30) * 0.04 : 1;
+      const star = p.power === POWER.star;
       v.sprite
         .setFrame(frame)
         .setPosition(x, y + 2)
         .setFlipX(p.facing < 0)
         .setRotation(v.tilt)
-        .setAlpha(p.invuln > 0 ? (Math.floor(this.time.now / 70) % 2 ? 0.45 : 1) : 1);
-      const top = y - (c.hitH ?? 34) - 10;
+        .setScale((c.scale / ART_RES) * v.size * wob, (c.scale / ART_RES) * v.size / wob)
+        .setAlpha(p.invuln > 0 && !star ? (Math.floor(this.time.now / 70) % 2 ? 0.45 : 1) : 1);
+      // invincible: rainbow shimmer and sparkles; rapid fire: sparks off the bazooka
+      v.sparkT -= dt;
+      if (star) {
+        const hue = ((this.time.now / 4) % 360) / 360;
+        v.sprite.setTint(Phaser.Display.Color.HSVToRGB(hue, 0.45, 1).color);
+        if (v.sparkT <= 0) {
+          v.sparkT = 0.06;
+          this.fx.sparkle(x + (Math.random() - 0.5) * 30 * v.size, y - Math.random() * 40 * v.size, 1);
+        }
+      } else if (v.sprite.isTinted && v.sprite.tintFill === false) v.sprite.clearTint();
+      if (p.power === POWER.rapid && v.sparkT <= 0) {
+        v.sparkT = 0.09;
+        this.fx.flameTrail(x + p.facing * 22 * c.scale, y - (c.muzzleY ?? 18), p.facing, 0.5);
+      }
+      const top = y - (c.hitH ?? 34) * v.size - 10;
       v.tag.setText(this.names.get(id) ?? '').setPosition(x, top - 9);
-      this.drawHearts(v.hearts, x, top, p.hp);
+      this.drawHearts(v.hearts, x, top, p.hp, p.bombs);
     }
     for (const [id, v] of this.views)
       if (!seen.has(id)) {
@@ -299,18 +358,59 @@ export class BattleScene extends Phaser.Scene {
     for (const [id, r] of cur.rockets) {
       let img = this.rocketViews.get(id);
       if (!img) {
-        img = this.add.image(r.x, r.y, 'rocket').setScale(1 / ART_RES).setDepth(DEPTH.projectiles).setFlipX(r.dir < 0);
+        img = this.add.image(r.x, r.y, r.kind === 'bomb' ? 'bbomb' : 'rocket').setScale(1 / ART_RES).setDepth(DEPTH.projectiles).setFlipX(r.dir < 0);
         this.rocketViews.set(id, img);
       }
-      img.setPosition(r.x, r.y).setRotation(Math.sin(this.time.now / 25 + id) * 0.04);
-      if (Math.random() < 0.6) this.fx.trail(r.x - r.dir * 12, r.y + (Math.random() - 0.5) * 3);
+      if (r.kind === 'bomb') {
+        img.setPosition(r.x, r.y).setRotation(img.rotation + r.dir * dt * 7);
+        if (Math.random() < 0.5) this.fx.sparkle(r.x + 6, r.y - 8, 1);
+      } else {
+        img.setPosition(r.x, r.y).setRotation(Math.sin(this.time.now / 25 + id) * 0.04);
+        if (Math.random() < 0.6) this.fx.trail(r.x - r.dir * 12, r.y + (Math.random() - 0.5) * 3);
+      }
     }
     for (const [id, img] of this.rocketViews)
       if (!cur.rockets.has(id)) {
         img.destroy();
         this.rocketViews.delete(id);
       }
-    // scenery + HUD
+    // prizes: float down under a little parachute, bob about once they land, blink before they go
+    const live = new Set<number>();
+    for (const [pid, kind, px, py, age] of cur.prizes) {
+      live.add(pid);
+      let pv = this.prizeViews.get(pid);
+      if (!pv) {
+        const glow = this.add.image(px, py, 'glow').setTint(0xfff3b0).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.6).setDepth(DEPTH.pickups - 0.1).setScale(0.55);
+        const chute = this.add.image(px, py, 'prize-chute').setScale(1 / ART_RES).setOrigin(0.5, 1).setDepth(DEPTH.pickups);
+        const img = this.add.image(px, py, `prize-${kind}`).setScale(1 / ART_RES).setOrigin(0.5, 1).setDepth(DEPTH.pickups + 0.1);
+        pv = { img, chute, glow, lastY: py, falling: 1 };
+        this.prizeViews.set(pid, pv);
+      }
+      const falling = py > pv.lastY + 0.01;
+      pv.falling += ((falling ? 1 : 0) - pv.falling) * Math.min(1, dt * 6);
+      pv.lastY = py;
+      const t = this.time.now / 1000 + pid;
+      const bob = falling ? Math.sin(t * 3) * 1.5 : -3 - Math.abs(Math.sin(t * 2.6)) * 4;
+      const sway = falling ? Math.sin(t * 2) * 0.12 : 0;
+      pv.img.setPosition(px, py + bob).setRotation(sway);
+      pv.chute.setPosition(px, py + bob - 26).setRotation(sway).setAlpha(pv.falling).setVisible(pv.falling > 0.05);
+      pv.glow.setPosition(px, py + bob - 15).setAlpha(0.45 + Math.sin(t * 5) * 0.15);
+      const blink = age > 12 && Math.floor(this.time.now / 110) % 2 === 0;
+      pv.img.setVisible(!blink);
+      pv.glow.setVisible(!blink);
+    }
+    for (const [pid, pv] of this.prizeViews)
+      if (!live.has(pid)) {
+        pv.img.destroy();
+        pv.chute.destroy();
+        pv.glow.destroy();
+        this.prizeViews.delete(pid);
+      }
+    // scenery + HUD (the looks drift slowly, like in the levels)
+    themeClock.t += dt;
+    const look = themeMix(themeClock.t);
+    this.bg.setTheme(look);
+    this.level.setTint(mixTint(look));
     const cam = this.cameras.main;
     const wv = cam.worldView;
     this.bg.update({ left: wv.x - 40, top: wv.y - 40, width: wv.width + 80, height: wv.height + 80 }, dt);
@@ -326,10 +426,16 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
-  private drawHearts(g: Phaser.GameObjects.Graphics, x: number, y: number, hp: number) {
+  private drawHearts(g: Phaser.GameObjects.Graphics, x: number, y: number, hp: number, bombs = 0) {
     g.clear();
     const w = 9;
-    const x0 = x - (HEARTS * w) / 2 + w / 2;
+    const x0 = x - (HEARTS * w) / 2 + w / 2 - (bombs ? 5 : 0);
+    // bombs to throw: little black dots after the hearts
+    for (let i = 0; i < Math.min(bombs, 6); i++) {
+      const bx = x0 + HEARTS * w + 2 + (i % 3) * 6;
+      const by = y + 1 - Math.floor(i / 3) * 6;
+      g.fillStyle(0x2b1a12, 1).fillCircle(bx, by, 3).fillStyle(0xffd23f, 1).fillCircle(bx + 2, by - 2.6, 1.1);
+    }
     for (let i = 0; i < HEARTS; i++) {
       const cx = x0 + i * w;
       const full = i < hp;
@@ -395,6 +501,25 @@ export class BattleScene extends Phaser.Scene {
           if (e.by === myId) sfx.cheer();
           break;
         }
+        case 'drop': {
+          // a prize is coming: a "!" where it'll come down
+          this.fx.popText(e.x, 70, '!', '#ffd23f', 34);
+          sfx.whoosh();
+          break;
+        }
+        case 'prize': {
+          const [text, col] = PRIZE_TEXT[e.kind];
+          const v = this.views.get(e.id);
+          this.fx.popText(e.x, e.y - 40, text, col, 18);
+          this.fx.sparkle(e.x, e.y - 14, 12);
+          if (v && e.kind === 'grow') this.cameras.main.shake(180, 0.006);
+          (e.kind === 'heart' ? sfx.rootbeer : sfx.aura)();
+          break;
+        }
+        case 'bounce':
+          sfx.bump();
+          this.fx.dust(e.x, e.y + 7, 3);
+          break;
         case 'spawn': {
           const v = this.views.get(e.id);
           if (v) this.fx.fluffBurst(v.sprite.x, v.sprite.y - 20, 1);

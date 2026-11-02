@@ -12,7 +12,7 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import { CHARACTERS } from '../src/data/characters';
 import { buildArena } from '../src/shared/battle/arena';
 import { BattleSim, DT, TICK_HZ } from '../src/shared/battle/sim';
-import { MAX_BATTLERS, packPlayer, type ClientMsg, type Phase, type RoomPlayer, type RoomState, type ServerMsg } from '../src/shared/battle/protocol';
+import { MAX_BATTLERS, packPlayer, type ClientMsg, type Phase, type RoomPlayer, type RoomState, type ServerMsg, type SnapPrize } from '../src/shared/battle/protocol';
 
 const COUNTDOWN_SECS = 3;
 const RESULTS_SECS = 8;
@@ -217,8 +217,10 @@ class Room {
           const { lastHitBy: _, ...rest } = p;
           return packPlayer({ ...rest, ack: this.clients.get(p.id)?.lastSeq ?? 0 });
         });
-        const rockets = sim.rockets.map((r) => ({ id: r.id, owner: r.owner, x: Math.round(r.x * 10) / 10, y: Math.round(r.y * 10) / 10, dir: r.dir }));
-        this.broadcast({ t: 'snap', k: sim.tick, tl: Math.round(sim.timeLeft * 10) / 10, p: players, r: rockets, e: events });
+        const r1 = (v: number) => Math.round(v * 10) / 10;
+        const rockets = sim.rockets.map((r) => ({ id: r.id, owner: r.owner, kind: r.kind, x: r1(r.x), y: r1(r.y), dir: r.dir }));
+        const prizes = sim.prizes.map((z): SnapPrize => [z.id, z.kind, r1(z.x), r1(z.y), r1(z.age)]);
+        this.broadcast({ t: 'snap', k: sim.tick, tl: r1(sim.timeLeft), p: players, r: rockets, z: prizes, e: events });
         const anyone = [...this.clients.values()].some((c) => c.playing && c.ws);
         if (sim.over || !anyone) this.endBattle();
         break;

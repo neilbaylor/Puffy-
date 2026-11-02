@@ -1,7 +1,7 @@
 /**
  * Messages between the game and the battle server (JSON over a WebSocket at /battle).
  */
-import type { BEvent, BPlayer } from './sim';
+import type { BEvent, BPlayer, PrizeKind } from './sim';
 
 export const MAX_BATTLERS = 4;
 
@@ -48,21 +48,25 @@ export type SnapPlayer = Omit<BPlayer, 'lastHitBy'> & { ack: number };
 export interface SnapRocket {
   id: number;
   owner: string;
+  kind: 'rocket' | 'bomb';
   x: number;
   y: number;
   dir: 1 | -1;
 }
+
+/** A prize in the arena: [id, kind, x, y (bottom), seconds it has been there]. */
+export type SnapPrize = [number, PrizeKind, number, number, number];
 
 // ── server → game ──
 export type ServerMsg =
   | { t: 'welcome'; id: string }
   | { t: 'full' }
   | { t: 'room'; room: RoomState }
-  | { t: 'snap'; k: number; tl: number; p: PackedPlayer[]; r: SnapRocket[]; e: BEvent[] }
+  | { t: 'snap'; k: number; tl: number; p: PackedPlayer[]; r: SnapRocket[]; z: SnapPrize[]; e: BEvent[] }
   | { t: 'pong'; c: number };
 
 // ── compact player encoding (a snapshot goes out 30 times a second) ──
-const NUM_FIELDS = ['x', 'y', 'vx', 'vy', 'facing', 'airJumps', 'coyote', 'jumpBuf', 'prevBtn', 'fireCd', 'stamina', 'stun', 'invuln', 'shotAgo', 'hp', 'respawn', 'kos', 'deaths', 'slot', 'ack'] as const;
+const NUM_FIELDS = ['x', 'y', 'vx', 'vy', 'facing', 'airJumps', 'coyote', 'jumpBuf', 'prevBtn', 'fireCd', 'stamina', 'stun', 'invuln', 'shotAgo', 'hp', 'respawn', 'kos', 'deaths', 'slot', 'ack', 'bombs', 'power', 'powerT'] as const;
 const BOOL_FIELDS = ['onGround', 'jumping', 'exhausted', 'running'] as const;
 export type PackedPlayer = [string, string, ...number[]];
 

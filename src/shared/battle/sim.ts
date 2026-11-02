@@ -30,6 +30,25 @@ const SPAWN_INVULN = 1.6;
 const EXHAUSTED_UNTIL = 0.3;
 const ROCKET_LIFE = 1.4;
 
+/** Prizes that drop into the arena (a race to grab each one). */
+export type PrizeKind = 'bomb' | 'star' | 'grow' | 'rapid' | 'heart';
+/** How often each kind turns up (out of the total). */
+const PRIZE_ODDS: [PrizeKind, number][] = [
+  ['bomb', 24],
+  ['rapid', 22],
+  ['grow', 20],
+  ['star', 16],
+  ['heart', 18],
+];
+/** Timed powers: 0 none, 1 star (invincible), 2 grow (big & strong), 3 rapid fire. */
+export const POWER = { none: 0, star: 1, grow: 2, rapid: 3 } as const;
+const POWER_SECS: Record<number, number> = { 1: 6, 2: 8, 3: 7 };
+/** How much bigger "grow" makes you. */
+export const GROW = 1.45;
+const BOMBS_PER_PRIZE = 3;
+const MAX_PRIZES = 3;
+const PRIZE_LIFE = 15;
+
 /** Buttons, as bits (what the game sends the server each tick). */
 export const BTN = { left: 1, right: 2, jump: 4, fire: 8, run: 16 } as const;
 
@@ -62,31 +81,56 @@ export interface BPlayer {
   kos: number;
   deaths: number;
   lastHitBy: string | null;
+  /** Bombs to throw (each shot throws one instead of a rocket). */
+  bombs: number;
+  /** POWER.* and the seconds it has left. */
+  power: number;
+  powerT: number;
 }
 
 export interface BRocket {
   id: number;
   owner: string;
+  kind: 'rocket' | 'bomb';
   x: number;
   y: number;
   vx: number;
+  vy: number;
   dir: 1 | -1;
   age: number;
   speed: number;
   radius: number;
+  /** Hearts it takes off. */
+  damage: number;
+}
+
+export interface BPrize {
+  id: number;
+  kind: PrizeKind;
+  x: number;
+  /** The bottom of the bubble. */
+  y: number;
+  vy: number;
+  landed: boolean;
+  age: number;
 }
 
 export type BEvent =
-  | { k: 'fire'; id: string; x: number; y: number; dir: 1 | -1 }
+  | { k: 'fire'; id: string; x: number; y: number; dir: 1 | -1; bomb?: boolean }
   | { k: 'jump'; id: string; air: boolean }
   | { k: 'boom'; x: number; y: number; r: number }
   | { k: 'hit'; id: string; by: string }
   | { k: 'ko'; id: string; by: string | null }
-  | { k: 'spawn'; id: string };
+  | { k: 'spawn'; id: string }
+  | { k: 'drop'; x: number; kind: PrizeKind }
+  | { k: 'prize'; id: string; kind: PrizeKind; x: number; y: number }
+  | { k: 'bounce'; x: number; y: number };
 
 const charOf = (hero: string): CharacterDef => CHARACTERS.find((c) => c.id === hero) ?? CHARACTERS[0];
-const boxW = (c: CharacterDef) => c.hitW ?? 22;
-const boxH = (c: CharacterDef) => c.hitH ?? 34;
+/** How big this hero is right now ("grow" makes you bigger). */
+export const sizeOf = (p: { power: number }) => (p.power === POWER.grow ? GROW : 1);
+const boxW = (c: CharacterDef, k = 1) => (c.hitW ?? 22) * k;
+const boxH = (c: CharacterDef, k = 1) => (c.hitH ?? 34) * k;
 
 function approach(v: number, target: number, step: number) {
   return v < target ? Math.min(v + step, target) : Math.max(v - step, target);
@@ -124,7 +168,7 @@ export function newPlayer(id: string, hero: string, slot: number): BPlayer {
   return {
     id, hero, slot, x: 0, y: 0, vx: 0, vy: 0, facing: 1, onGround: false, airJumps: 1, coyote: 0, jumpBuf: 0,
     jumping: false, prevBtn: 0, fireCd: 0, stamina: 1, exhausted: false, running: false, stun: 0, invuln: 0,
-    shotAgo: 9, hp: HEARTS, respawn: 0, kos: 0, deaths: 0, lastHitBy: null,
+    shotAgo: 9, hp: HEARTS, respawn: 0, kos: 0, deaths: 0, lastHitBy: null, bombs: 0, power: 0, powerT: 0,
   };
 }
 
@@ -145,6 +189,13 @@ export function stepMove(p: BPlayer, btn: number, map: ArenaMap, ev?: BEvent[], 
   p.stun = Math.max(0, p.stun - dt);
   p.invuln = Math.max(0, p.invuln - dt);
   p.shotAgo += dt;
+  if (p.power) {
+    p.powerT -= dt;
+    if (p.powerT <= 0) {
+      p.power = 0;
+      p.powerT = 0;
+    }
+  }
   const ctl = p.stun <= 0;
   const dir = ctl ? ((btn & BTN.right) ? 1 : 0) - ((btn & BTN.left) ? 1 : 0) : 0;
 
@@ -212,7 +263,7 @@ export function stepMove(p: BPlayer, btn: number, map: ArenaMap, ev?: BEvent[], 
   p.fireCd -= dt;
   let fire = false;
   if (ctl && (btn & BTN.fire) && p.fireCd <= 0 && canFire()) {
-    p.fireCd = c.fireRate;
+    p.fireCd = c.fireRate * (p.power === POWER.rapid ? 0.4 : 1);
     fire = true;
     p.vx -= p.facing * 80; // recoil push
     p.shotAgo = 0;
@@ -222,8 +273,8 @@ export function stepMove(p: BPlayer, btn: number, map: ArenaMap, ev?: BEvent[], 
 }
 
 function moveAndCollide(p: BPlayer, c: CharacterDef, map: ArenaMap) {
-  const w = boxW(c);
-  const h = boxH(c);
+  const w = boxW(c, sizeOf(p));
+  const h = boxH(c, sizeOf(p));
   const T = TILE_PX;
   // horizontal
   p.x += p.vx * DT;
@@ -290,9 +341,12 @@ export class BattleSim {
   readonly map: ArenaMap;
   players = new Map<string, BPlayer>();
   rockets: BRocket[] = [];
+  prizes: BPrize[] = [];
   tick = 0;
   timeLeft = MATCH_SECS;
   private nextRocket = 1;
+  private nextPrize = 1;
+  private dropIn = 3;
 
   constructor(data: LevelData) {
     this.map = new ArenaMap(data);
@@ -337,6 +391,14 @@ export class BattleSim {
     p.exhausted = false;
     p.stun = 0;
     p.onGround = true;
+    p.bombs = 0;
+    p.power = 0;
+    p.powerT = 0;
+  }
+
+  /** Most shots in the air at once (rapid fire allows more). */
+  private maxShots(p: BPlayer) {
+    return charOf(p.hero).maxRockets + (p.power === POWER.rapid ? 3 : 0);
   }
 
   /** One tick. `inputs` = buttons per player id. Returns what happened (for sounds and effects). */
@@ -356,26 +418,58 @@ export class BattleSim {
         continue;
       }
       const c = charOf(p.hero);
-      const fire = stepMove(p, inputs.get(p.id) ?? 0, this.map, ev, () => this.rocketsOf(p.id) < c.maxRockets);
+      const fire = stepMove(p, inputs.get(p.id) ?? 0, this.map, ev, () => p.bombs > 0 || this.rocketsOf(p.id) < this.maxShots(p));
       if (fire) {
-        const s = c.scale;
+        const k = sizeOf(p);
+        const s = c.scale * k;
         const rx = p.x + p.facing * 18 * s;
-        const ry = p.y - (c.muzzleY ?? 18);
-        this.rockets.push({ id: this.nextRocket++, owner: p.id, x: rx, y: ry, vx: p.facing * c.rocketSpeed * 0.45, dir: p.facing, age: 0, speed: c.rocketSpeed, radius: c.blastRadius });
-        ev.push({ k: 'fire', id: p.id, x: rx, y: ry, dir: p.facing });
+        const ry = p.y - (c.muzzleY ?? 18) * k;
+        const big = p.power === POWER.grow;
+        if (p.bombs > 0) {
+          // a lobbed bomb: bounces about, then a big blast
+          p.bombs--;
+          this.rockets.push({ id: this.nextRocket++, owner: p.id, kind: 'bomb', x: rx, y: ry, vx: p.facing * 300 + p.vx * 0.35, vy: -430, dir: p.facing, age: 0, speed: 0, radius: 118 * (big ? 1.25 : 1), damage: 2 });
+          ev.push({ k: 'fire', id: p.id, x: rx, y: ry, dir: p.facing, bomb: true });
+        } else {
+          this.rockets.push({ id: this.nextRocket++, owner: p.id, kind: 'rocket', x: rx, y: ry, vx: p.facing * c.rocketSpeed * 0.45, vy: 0, dir: p.facing, age: 0, speed: c.rocketSpeed, radius: c.blastRadius * (big ? 1.4 : 1), damage: big ? 2 : 1 });
+          ev.push({ k: 'fire', id: p.id, x: rx, y: ry, dir: p.facing });
+        }
       }
     }
-    // rockets: speed up, fly straight, blow up on walls, heroes or old age
+    this.stepPrizes(ev);
+    this.starContacts(ev);
+    // rockets: speed up, fly straight, blow up on walls, heroes or old age;
+    // bombs: arc and bounce, and go off when the fuse runs out (or they hit someone)
     for (const r of this.rockets) {
       r.age += DT;
-      r.vx += (r.dir * r.speed - r.vx) * Math.min(1, DT * 7);
-      r.x += r.vx * DT;
-      let boom = r.age > ROCKET_LIFE || r.x < -40 || r.x > this.map.widthPx + 40 || this.map.solidAt(r.x + r.dir * 6, r.y);
-      if (!boom)
+      let boom = false;
+      if (r.kind === 'bomb') {
+        r.vy = Math.min(MAX_FALL, r.vy + GRAVITY * DT);
+        const nx = r.x + r.vx * DT;
+        if (this.map.solidAt(nx + Math.sign(r.vx) * 7, r.y)) r.vx *= -0.5;
+        else r.x = nx;
+        const prevY = r.y;
+        r.y += r.vy * DT;
+        const ty = Math.floor((r.y + 7) / TILE_PX);
+        const tx = Math.floor(r.x / TILE_PX);
+        if (r.vy > 0 && (this.map.solid(tx, ty) || (this.map.oneWay(tx, ty) && prevY + 7 <= ty * TILE_PX + 0.5))) {
+          r.y = ty * TILE_PX - 7;
+          if (r.vy > 160) ev.push({ k: 'bounce', x: r.x, y: r.y });
+          r.vy = r.vy > 160 ? -r.vy * 0.45 : 0;
+          r.vx *= 0.72;
+        }
+        boom = r.age > 1.6 || r.y > this.map.heightPx + 60;
+      } else {
+        r.vx += (r.dir * r.speed - r.vx) * Math.min(1, DT * 7);
+        r.x += r.vx * DT;
+        boom = r.age > ROCKET_LIFE || r.x < -40 || r.x > this.map.widthPx + 40 || this.map.solidAt(r.x + r.dir * 6, r.y);
+      }
+      if (!boom && (r.kind === 'rocket' || r.age > 0.2))
         for (const p of this.players.values()) {
           if (p.id === r.owner || p.respawn > 0) continue;
           const c = charOf(p.hero);
-          if (Math.abs(r.x - p.x) < boxW(c) / 2 + 6 && r.y > p.y - boxH(c) - 3 && r.y < p.y + 3) {
+          const k = sizeOf(p);
+          if (Math.abs(r.x - p.x) < boxW(c, k) / 2 + 6 && r.y > p.y - boxH(c, k) - 3 && r.y < p.y + 3) {
             boom = true;
             break;
           }
@@ -390,30 +484,134 @@ export class BattleSim {
   }
 
   private explode(r: BRocket, ev: BEvent[]) {
-    const bx = r.x + r.dir * 6;
+    const bx = r.x + (r.kind === 'rocket' ? r.dir * 6 : 0);
     ev.push({ k: 'boom', x: bx, y: r.y, r: r.radius });
     for (const p of this.players.values()) {
-      if (p.id === r.owner || p.respawn > 0 || p.invuln > 0) continue;
+      if (p.id === r.owner || p.respawn > 0) continue;
       const c = charOf(p.hero);
-      const cy = p.y - boxH(c) / 2;
+      const k = sizeOf(p);
+      const cy = p.y - boxH(c, k) / 2;
       const d = Math.hypot(p.x - bx, cy - r.y);
-      if (d > r.radius + Math.max(boxW(c), boxH(c)) / 2) continue;
-      p.hp -= 1;
-      p.lastHitBy = r.owner;
-      const away = Math.sign(p.x - bx) || r.dir;
-      p.vx = away * 280;
-      p.vy = -400;
-      p.onGround = false;
-      p.stun = HIT_STUN;
-      p.invuln = HIT_INVULN;
-      ev.push({ k: 'hit', id: p.id, by: r.owner });
-      if (p.hp <= 0) {
-        p.respawn = RESPAWN_SECS;
-        p.deaths++;
-        const by = this.players.get(r.owner);
-        if (by) by.kos++;
-        ev.push({ k: 'ko', id: p.id, by: r.owner });
+      if (d > r.radius + Math.max(boxW(c, k), boxH(c, k)) / 2) continue;
+      this.hurt(p, r.owner, bx, r.damage, r.damage > 1 ? 1.3 : 1, ev);
+    }
+  }
+
+  /** Take hearts off a hero (unless they can't be hurt right now) and knock them back. */
+  private hurt(p: BPlayer, by: string, fromX: number, damage: number, knock: number, ev: BEvent[]) {
+    if (p.respawn > 0 || p.invuln > 0 || p.power === POWER.star) return;
+    p.hp -= damage;
+    p.lastHitBy = by;
+    const away = Math.sign(p.x - fromX) || 1;
+    // big heroes are harder to push about
+    const heavy = p.power === POWER.grow ? 0.6 : 1;
+    p.vx = away * 280 * knock * heavy;
+    p.vy = -400 * knock * heavy;
+    p.onGround = false;
+    p.stun = HIT_STUN;
+    p.invuln = HIT_INVULN;
+    ev.push({ k: 'hit', id: p.id, by });
+    if (p.hp <= 0) {
+      p.hp = 0;
+      p.respawn = RESPAWN_SECS;
+      p.deaths++;
+      const killer = this.players.get(by);
+      if (killer) killer.kos++;
+      ev.push({ k: 'ko', id: p.id, by });
+    }
+  }
+
+  /** Running into someone while invincible knocks them flying. */
+  private starContacts(ev: BEvent[]) {
+    for (const a of this.players.values()) {
+      if (a.power !== POWER.star || a.respawn > 0) continue;
+      const ca = charOf(a.hero);
+      for (const b of this.players.values()) {
+        if (b === a || b.respawn > 0 || b.invuln > 0 || b.power === POWER.star) continue;
+        const cb = charOf(b.hero);
+        const kb = sizeOf(b);
+        const overlapX = Math.abs(a.x - b.x) < (boxW(ca) + boxW(cb, kb)) / 2;
+        const overlapY = a.y - boxH(ca) < b.y && b.y - boxH(cb, kb) < a.y;
+        if (overlapX && overlapY) this.hurt(b, a.id, a.x, 1, 1.4, ev);
       }
+    }
+  }
+
+  /** Prizes float down now and then; whoever gets there first gets it. */
+  private stepPrizes(ev: BEvent[]) {
+    this.dropIn -= DT;
+    if (this.dropIn <= 0) {
+      this.dropIn = 4 + Math.random() * 3;
+      if (this.prizes.length < MAX_PRIZES) {
+        let roll = Math.random() * PRIZE_ODDS.reduce((t, [, w]) => t + w, 0);
+        let kind: PrizeKind = 'bomb';
+        for (const [k, w] of PRIZE_ODDS) {
+          roll -= w;
+          if (roll <= 0) {
+            kind = k;
+            break;
+          }
+        }
+        // somewhere it can land, not right on top of another prize
+        let x = 0;
+        for (let tries = 0; tries < 12; tries++) {
+          x = (2 + Math.floor(Math.random() * (this.map.w - 4)) + 0.5) * TILE_PX;
+          if (!this.prizes.some((q) => Math.abs(q.x - x) < 90)) break;
+        }
+        this.prizes.push({ id: this.nextPrize++, kind, x, y: -24, vy: 40, landed: false, age: 0 });
+        ev.push({ k: 'drop', x, kind });
+      }
+    }
+    for (const z of this.prizes) {
+      z.age += DT;
+      if (!z.landed) {
+        // a gentle float down (so everyone can race for it)
+        z.vy = Math.min(150, z.vy + 300 * DT);
+        const prevY = z.y;
+        z.y += z.vy * DT;
+        const tx = Math.floor(z.x / TILE_PX);
+        const ty = Math.floor(z.y / TILE_PX);
+        if (ty >= 0 && (this.map.solid(tx, ty) || (this.map.oneWay(tx, ty) && prevY <= ty * TILE_PX + 0.5))) {
+          z.y = ty * TILE_PX;
+          z.landed = true;
+        }
+      }
+      // grabbed?
+      for (const p of this.players.values()) {
+        if (p.respawn > 0) continue;
+        const c = charOf(p.hero);
+        const k = sizeOf(p);
+        if (Math.abs(p.x - z.x) < boxW(c, k) / 2 + 13 && z.y > p.y - boxH(c, k) - 6 && z.y - 26 < p.y) {
+          this.grant(p, z.kind);
+          ev.push({ k: 'prize', id: p.id, kind: z.kind, x: z.x, y: z.y });
+          z.age = 1e9;
+          break;
+        }
+      }
+    }
+    this.prizes = this.prizes.filter((z) => z.age < PRIZE_LIFE);
+  }
+
+  private grant(p: BPlayer, kind: PrizeKind) {
+    switch (kind) {
+      case 'bomb':
+        p.bombs = Math.min(6, p.bombs + BOMBS_PER_PRIZE);
+        break;
+      case 'heart':
+        p.hp = Math.min(HEARTS, p.hp + 1);
+        break;
+      case 'star':
+        p.power = POWER.star;
+        p.powerT = POWER_SECS[POWER.star];
+        break;
+      case 'grow':
+        p.power = POWER.grow;
+        p.powerT = POWER_SECS[POWER.grow];
+        break;
+      case 'rapid':
+        p.power = POWER.rapid;
+        p.powerT = POWER_SECS[POWER.rapid];
+        break;
     }
   }
 
