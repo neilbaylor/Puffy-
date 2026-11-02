@@ -87,9 +87,11 @@ export class BattleScene extends Phaser.Scene {
   /** The whole arena is always in view. */
   private fitCamera() {
     const cam = this.cameras.main;
-    const zoom = Math.min(this.scale.width / this.map.widthPx, this.scale.height / (this.map.heightPx + 24));
+    // (the empty sky above the highest cloud is trimmed off, so the heroes are bigger)
+    const SKY = 56;
+    const zoom = Math.min(this.scale.width / this.map.widthPx, this.scale.height / (this.map.heightPx - SKY));
     cam.setZoom(zoom);
-    cam.centerOn(this.map.widthPx / 2, this.map.heightPx / 2 - 8);
+    cam.centerOn(this.map.widthPx / 2, (this.map.heightPx + SKY) / 2);
   }
 
   /** The hero's picture in this player's colour (made once per hero + colour). */
