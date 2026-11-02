@@ -75,7 +75,7 @@ const DEPTH_WAVE = 12;
 /** Display scale of the Giant's rolling flames (art is drawn at 3x). */
 const FLAME_S = 1.25 / 3;
 /** A flame spends its last this-many seconds dying down. */
-const FLAME_FADE = 0.7;
+const FLAME_FADE = 1.6; // the burn-out takes its time
 /** Max wisps that scatter when you get hit while carrying aura. */
 const SCATTER_MAX = 10;
 
@@ -656,7 +656,7 @@ export class GameScene extends Phaser.Scene {
     const img = this.add.image(x, groundY + 3, 'flame', 'f0').setOrigin(0.5, 1).setScale(0.1 * FLAME_S, FLAME_S).setFlipX(dir < 0).setDepth(DEPTH_WAVE);
     this.tweens.add({ targets: img, scaleX: FLAME_S, duration: 140, ease: 'Back.easeOut' });
     this.fx.flameBurst(x, groundY);
-    this.waves.push({ img, glow, dir, speed, life: 1.5 + FLAME_FADE * 0.6, y: groundY, t: Math.random() });
+    this.waves.push({ img, glow, dir, speed, life: 1.5 + FLAME_FADE * 0.85, y: groundY, t: Math.random() });
   }
 
   private updateWaves(dt: number) {
@@ -668,12 +668,12 @@ export class GameScene extends Phaser.Scene {
       w.img.x += w.dir * w.speed * dt * (0.35 + 0.65 * vigor);
       // full flames loop through 8 frames; as it burns out it breaks up into small
       // sputtering flickers over glowing coals
-      const dying = vigor < 0.55;
+      const dying = vigor < 0.42;
       w.img.setFrame(dying ? `d${Math.floor(w.t * 9) % 4}` : `f${Math.floor(w.t * (14 + 8 * vigor)) % 8}`);
       const sputter = vigor < 1 ? (Math.random() < 0.2 ? 0.82 : 1) : 1;
-      w.img.scaleY = FLAME_S * (dying ? 0.8 + 0.6 * vigor : 0.55 + 0.45 * vigor) * (1 + Math.sin(w.t * 23) * 0.05) * sputter;
-      w.img.scaleX = FLAME_S * (dying ? 0.9 : 0.7 + 0.3 * vigor);
-      w.img.setAlpha(dying ? 0.6 + 0.4 * (vigor / 0.55) : 1);
+      w.img.scaleY = FLAME_S * (dying ? 0.85 + 0.5 * vigor : 0.7 + 0.3 * vigor) * (1 + Math.sin(w.t * 23) * 0.05) * sputter;
+      w.img.scaleX = FLAME_S * (dying ? 0.95 : 0.8 + 0.2 * vigor);
+      w.img.setAlpha(dying ? 0.7 + 0.3 * (vigor / 0.42) : 1);
       w.glow.setPosition(w.img.x, w.y - 16).setAlpha((0.6 + Math.sin(w.t * 31) * 0.15) * vigor).setScale(1.6 * (0.5 + 0.5 * vigor), 1.1 * (0.5 + 0.5 * vigor));
       const front = w.img.x + w.dir * 20;
       const groundAhead = this.level.isSolidAt(front, w.y + 6) && !this.level.isSolidAt(front, w.y - 8);
@@ -684,7 +684,7 @@ export class GameScene extends Phaser.Scene {
         this.fx.flameDie(w.img.x, w.y);
         const mark = this.add.image(w.img.x, w.y + 1, 'scorch').setScale(1 / PROP_RES).setDepth(DEPTH.tiles + 0.55).setAlpha(0.9);
         this.tweens.add({ targets: mark, alpha: 0, delay: 1500, duration: 2500, onComplete: () => mark.destroy() });
-        this.tweens.add({ targets: w.img, scaleY: 0.02, scaleX: FLAME_S * 0.4, alpha: 0, duration: 800, ease: 'Sine.easeIn', onComplete: () => w.img.destroy() });
+        this.tweens.add({ targets: w.img, scaleY: 0.02, scaleX: FLAME_S * 0.4, alpha: 0, duration: 1400, ease: 'Sine.easeIn', onComplete: () => w.img.destroy() });
         this.tweens.add({ targets: w.glow, alpha: 0, duration: 600, onComplete: () => w.glow.destroy() });
         return false;
       }

@@ -13,6 +13,7 @@ export class MenuScene extends Phaser.Scene {
   private amb!: Ambience;
   private level!: LevelView;
   private x = 0;
+  private x0 = 0;
   private t = 0;
 
   constructor() {
@@ -25,11 +26,11 @@ export class MenuScene extends Phaser.Scene {
     const onLevel = (id: number) => {
       if (id === this.levelId || !levelInfo(id).build) return;
       const cam = this.cameras.main;
-      cam.fadeOut(350, 255, 248, 236);
+      cam.fadeOut(180, 255, 248, 236);
       cam.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
         this.children.removeAll(true);
         this.build(id);
-        cam.fadeIn(450, 255, 248, 236);
+        cam.fadeIn(380, 255, 248, 236);
       });
     };
     this.game.events.on('menu-level', onLevel);
@@ -43,13 +44,17 @@ export class MenuScene extends Phaser.Scene {
 
   private build(id: number) {
     this.levelId = id;
-    this.level = new LevelView(this, (levelInfo(id).build ?? buildLevel1)());
+    // the fly-over starts somewhere that shows off the level (Part 2: up in the snow, not the
+    // green foothills that look like Part 1); only the terrain near the camera is drawn now,
+    // the rest a chunk per frame, so switching levels is quick
+    this.x0 = id === 2 ? 86 * 32 : 0;
+    this.level = new LevelView(this, (levelInfo(id).build ?? buildLevel1)(), { lazyNear: this.x0 + 500 });
     this.bg = new Background(this, this.level.heightPx - VIEW_H);
     this.amb = new Ambience(this, id, (x, y, max) => {
       for (let d = 0; d <= max; d += 8) if (this.level.isSolidAt(x, y + d)) return Math.floor((y + d) / TILE) * TILE;
       return null;
     });
-    this.x = 0;
+    this.x = this.x0;
     this.top = null;
   }
 
@@ -65,13 +70,14 @@ export class MenuScene extends Phaser.Scene {
     // zooms gently in and out and banks a touch, like a camera drone
     this.t += dt;
     const t = this.t;
-    this.x = (this.x + dt * (36 + 10 * Math.sin(t * 0.21) + 5 * Math.sin(t * 0.53 + 1))) % Math.max(1, maxX);
+    this.x += dt * (36 + 10 * Math.sin(t * 0.21) + 5 * Math.sin(t * 0.53 + 1));
+    if (this.x > maxX) this.x = this.x0;
     // follow the terrain up and down (the mountain climbs), smoothly
     const H = this.level.heightPx;
     const cx = this.x + vw / 2;
     const surf = (this.level.surfaceY(cx - vw * 0.3) + this.level.surfaceY(cx) + this.level.surfaceY(cx + vw * 0.3)) / 3;
     const want = Phaser.Math.Clamp(surf - vh * 0.7, Math.min(0, H - vh), H - vh);
-    this.top = this.top === null || this.x < 1 ? want : this.top + (want - this.top) * (1 - Math.exp(-dt * 1.5));
+    this.top = this.top === null || this.x < this.x0 + 1 ? want : this.top + (want - this.top) * (1 - Math.exp(-dt * 1.5));
     const top = this.top + 26 * Math.sin(t * 0.17 + 0.7) + 9 * Math.sin(t * 0.41);
     cam.setZoom(zoom * (1.04 + 0.04 * Math.sin(t * 0.13 + 2)));
     cam.setRotation(0.012 * Math.sin(t * 0.19) + 0.005 * Math.sin(t * 0.47 + 1.3));

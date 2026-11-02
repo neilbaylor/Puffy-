@@ -28,7 +28,10 @@ export class Weapon {
   private warn = 0;
   private t = Math.random() * 10;
   private angle = Math.random() * Math.PI * 2;
-  private reach = 34;
+  private bx: number | null = null;
+  private by: number | null = null;
+  private bitePhase: 'stalk' | 'lunge' | 'snap' | 'back' = 'stalk';
+  private biteT = 0.6;
   private charge = 0;
   private recoil = 0;
   /** The owner should stand still facing its target (aiming / revving). */
@@ -138,20 +141,90 @@ export class Weapon {
         if (Math.max(x0, x1) > pb.left && Math.min(x0, x1) < pb.right && hand.y + 8 > pb.top && hand.y - 8 < pb.bottom) this.gs.hitPlayer(tgt, o.x);
       }
     } else {
-      // the flail: swung round and round, wider when you're close
-      const near = alive && Math.abs(dx) < 190 && Math.abs(dy) < 120;
-      this.reach += ((near ? 66 : 36) - this.reach) * Math.min(1, dt * 3);
-      this.angle += dt * (near ? 6.2 : 4.2) * -f;
-      const bx = hand.x + Math.cos(this.angle) * this.reach;
-      const by = hand.y - 4 + Math.sin(this.angle) * this.reach * 0.75;
-      this.ball!.setPosition(bx, by).setRotation(this.angle * 0.5).setFrame(Math.floor(this.t * 7) % 2 ? 'open' : 'shut');
+      // the ball and chain has a mind of its own: it drifts and looks about when you're far
+      // away; close up it stalks you with chattering teeth, then LUNGES and snaps its jaws
+      const near = alive && Math.abs(dx) < 200 && Math.abs(dy) < 130;
+      const ball = this.ball!;
+      if (this.bx === null) {
+        this.bx = hand.x - 30;
+        this.by = hand.y + 10;
+      }
+      let tx: number;
+      let ty: number;
+      let follow = 7;
+      let frame: 'open' | 'shut' = Math.floor(this.t * 2.5) % 3 === 0 ? 'open' : 'shut';
+      if (!near || !tgt) {
+        this.bitePhase = 'stalk';
+        this.biteT = 0.6;
+        this.angle += dt * 1.8 * -f;
+        tx = hand.x + Math.cos(this.angle) * 34;
+        ty = hand.y + 6 + Math.sin(this.angle) * 22;
+      } else {
+        const px = tgt.x;
+        const py = tgt.body.center.y;
+        const ang = Math.atan2(py - hand.y, px - hand.x);
+        const dist = Math.hypot(px - hand.x, py - hand.y);
+        this.biteT -= dt;
+        if (this.bitePhase === 'stalk') {
+          // sizing you up: hovering, swaying, teeth chattering
+          tx = hand.x + Math.cos(ang) * 40 + Math.sin(this.t * 5) * 6;
+          ty = hand.y + Math.sin(ang) * 40 + Math.cos(this.t * 7) * 5 - 6;
+          frame = Math.floor(this.t * 14) % 2 ? 'open' : 'shut';
+          if (this.biteT <= 0) {
+            this.bitePhase = 'lunge';
+            this.biteT = 0.24;
+            sfx.whoosh();
+          }
+        } else if (this.bitePhase === 'lunge') {
+          // GO: jaws wide open, straight at you
+          const reach = Math.min(dist, 92);
+          tx = hand.x + Math.cos(ang) * reach;
+          ty = hand.y + Math.sin(ang) * reach;
+          follow = 20;
+          frame = 'open';
+          if (this.biteT <= 0) {
+            this.bitePhase = 'snap';
+            this.biteT = 0.18;
+            sfx.chomp();
+          }
+        } else if (this.bitePhase === 'snap') {
+          // CHOMP — jaws slam shut with a little shudder
+          tx = this.bx! + Math.sin(this.t * 70) * 1.5;
+          ty = this.by!;
+          follow = 30;
+          frame = 'shut';
+          if (this.biteT <= 0) {
+            this.bitePhase = 'back';
+            this.biteT = 0.35;
+          }
+        } else {
+          // pulls back for another go
+          tx = hand.x + Math.cos(ang) * 26;
+          ty = hand.y + Math.sin(ang) * 26 - 4;
+          follow = 6;
+          frame = 'shut';
+          if (this.biteT <= 0) {
+            this.bitePhase = 'stalk';
+            this.biteT = 0.45 + Math.random() * 0.5;
+          }
+        }
+      }
+      const kf = 1 - Math.exp(-dt * follow);
+      this.bx! += (tx - this.bx!) * kf;
+      this.by! += (ty - this.by!) * kf;
+      const bx = this.bx!;
+      const by = this.by!;
+      // it always faces you (or wherever it's looking)
+      const lookX = near && tgt ? tgt.x : bx + Math.cos(this.angle) * 10;
+      ball.setPosition(bx, by).setFlipX(lookX > bx).setRotation(Math.sin(this.t * 3) * 0.15).setFrame(frame);
       const g = this.chain!;
       g.clear();
-      const n = Math.max(4, Math.round(this.reach / 7));
+      const len = Math.hypot(bx - hand.x, by - hand.y);
+      const n = Math.max(4, Math.round(len / 7));
       for (let i = 1; i < n; i++) {
         const u = i / n;
         const cx = hand.x + (bx - hand.x) * u;
-        const cy = hand.y + (by - hand.y) * u + Math.sin(u * Math.PI) * 3;
+        const cy = hand.y + (by - hand.y) * u + Math.sin(u * Math.PI) * Math.max(0, 10 - len * 0.08);
         g.fillStyle(0x3a3844, 1).fillCircle(cx, cy, 2.6);
         g.fillStyle(0x9a98a2, 1).fillCircle(cx, cy, 1.6);
       }

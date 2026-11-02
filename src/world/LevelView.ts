@@ -39,10 +39,19 @@ export class LevelView {
   /** Boulder sprites by "x,y" tile key, so blasting a boulder removes its picture too. */
   readonly boulderSprites = new Map<string, Phaser.GameObjects.Image>();
 
+  /** Terrain chunks not drawn yet (lazy mode): drawn when the view gets near, or one per frame. */
+  private pending: { x0: number; x1: number; make: () => void }[] = [];
+  private readonly lazy: boolean;
+  private readonly lazyNear: number;
+
   constructor(
     private scene: Phaser.Scene,
     readonly data: LevelData,
+    /** Lazy: only draw the terrain near `nearX` now, the rest bit by bit (the start screen). */
+    opts?: { lazyNear?: number },
   ) {
+    this.lazy = opts?.lazyNear !== undefined;
+    this.lazyNear = opts?.lazyNear ?? 0;
     // only one level's terrain lives in memory at a time (phones run out otherwise)
     for (const k of scene.textures.getTextureKeys())
       if (k.startsWith('terrain-') && !k.startsWith(`terrain-${data.name}-`)) scene.textures.remove(k);
@@ -71,6 +80,16 @@ export class LevelView {
 
   /** Sway the plants on screen; gusts come and go. `t` in seconds. */
   animate(t: number, left: number, right: number) {
+    // lazy terrain: anything the view is about to reach right away, otherwise one chunk per frame
+    if (this.pending.length) {
+      const near = this.pending.filter((p) => p.x1 > left - 400 && p.x0 < right + 400);
+      const rest = this.pending.filter((p) => !near.includes(p));
+      for (const p of near) p.make();
+      const mid = (left + right) / 2;
+      rest.sort((a, b) => Math.abs((a.x0 + a.x1) / 2 - mid) - Math.abs((b.x0 + b.x1) / 2 - mid));
+      rest.shift()?.make();
+      this.pending = rest;
+    }
     const gust = 0.55 + 0.45 * Math.sin(t * 0.33) * Math.sin(t * 0.21 + 1);
     for (const s of this.sway) {
       if (s.img.x < left - 80 || s.img.x > right + 80) continue;
@@ -184,6 +203,7 @@ export class LevelView {
           const cut = Math.min(y1 + PAD, Math.max(top + 200, deep + 300));
           const ch = cut - top + PAD;
           const key = `terrain-${d.name}-${kind}-${pieceId}-${ci}`;
+          const make = () => {
           let fillCol = DEEP_FILL.get(key);
           if (!this.scene.textures.exists(key)) {
             const c = hires(cw + PAD * 2, ch, PROP_RES, (ctx) => {
@@ -191,21 +211,13 @@ export class LevelView {
               drawTerrainPiece(ctx, { kind, outline, pal, seed: Math.round(x0 + y0), floorY: this.heightPx });
             });
             if (cut < y1 + PAD) {
-              // median of a few samples a little above the cut (so a pebble doesn't set the colour),
-              // then fade the bottom of the chunk into that colour so the plain block below is seamless
+              // the deep rock is the palette's deep soil colour (no pixel read-back: that stalls the GPU);
+              // fade the bottom of the chunk into it so the plain block below is seamless
+              const hex = kind === 'ground' ? pal.soilDeep : pal.rock.shade;
+              fillCol = Phaser.Display.Color.HexStringToColor(hex).color;
+              DEEP_FILL.set(key, fillCol);
               const cctx = c.getContext('2d')!;
               const fadeH = Math.round(90 * PROP_RES);
-              const row = cctx.getImageData(0, c.height - fadeH, c.width, 1).data;
-              const cols: number[] = [];
-              for (let k = 1; k <= 9; k++) {
-                const i = Math.floor((c.width * k) / 10) * 4;
-                if (row[i + 3] > 200) cols.push((row[i] << 16) | (row[i + 1] << 8) | row[i + 2]);
-              }
-              const lum = (v: number) => ((v >> 16) & 255) * 0.3 + ((v >> 8) & 255) * 0.59 + (v & 255) * 0.11;
-              cols.sort((p1, p2) => lum(p1) - lum(p2));
-              fillCol = cols[Math.floor(cols.length / 2)] ?? 0x8a6a5a;
-              DEEP_FILL.set(key, fillCol);
-              const hex = `#${fillCol.toString(16).padStart(6, '0')}`;
               const g2 = cctx.createLinearGradient(0, c.height - fadeH, 0, c.height);
               g2.addColorStop(0, hex + '00');
               g2.addColorStop(0.75, hex + 'ff');
@@ -235,6 +247,9 @@ export class LevelView {
             if (gx0 === x0 + 3) g.fillRect(x0 + 1, cut - 6, 2.5, this.heightPx + 200 - cut);
             if (gx1 === x1 - 3) g.fillRect(x1 - 3.5, cut - 6, 2.5, this.heightPx + 200 - cut);
           }
+          };
+          if (this.lazy && (cx0 + cw < (this.lazyNear - 900) || cx0 > this.lazyNear + 1800)) this.pending.push({ x0: cx0, x1: cx0 + cw, make });
+          else make();
         }
       }
   }

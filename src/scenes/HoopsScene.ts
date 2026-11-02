@@ -50,7 +50,7 @@ import type { GameData, GameOverState, ResultState } from './GameScene';
 import { loseLife } from '../core/lives';
 import { NetSim } from './hoopsNet';
 import { Confetti } from '../world/Confetti';
-import { PLOP_FRAMES, PLOP_H, PLOP_W, drawPlop } from '../gfx/plops';
+import { PLOP_FRAMES, PLOP_H, PLOP_KINDS, PLOP_SCALE, PLOP_W, drawPlop, type PlopKind } from '../gfx/plops';
 import { STYLES } from '../gfx/handdrawn';
 
 export interface HoopsData {
@@ -228,7 +228,8 @@ export class HoopsScene extends Phaser.Scene {
       });
       addCanvas(this, 'king', c, (t) => KING_FRAMES.forEach((f, i) => t.add(f, 0, Math.round(i * KING_W * KING_RES), 0, Math.round(KING_W * KING_RES), Math.round(KING_H * KING_RES))));
     }
-    for (const [key, crowned] of [['plop', false], ['plop-k', true]] as const)
+    for (const kind of PLOP_KINDS) {
+      const key = `plop-${kind}`;
       if (!this.textures.exists(key)) {
         const R = 2.5;
         const pw = Math.round(PLOP_W * R) + 4;
@@ -237,11 +238,12 @@ export class HoopsScene extends Phaser.Scene {
           ctx.save();
           ctx.translate(i * pw, 0);
           ctx.scale(R, R);
-          drawPlop(ctx, 0, 0, f, STYLES.polished, crowned);
+          drawPlop(ctx, 0, 0, f, STYLES.polished, kind);
           ctx.restore();
         });
         addCanvas(this, key, c, (t) => PLOP_FRAMES.forEach((f, i) => t.add(f, 0, i * pw, 0, Math.round(PLOP_W * R), Math.round(PLOP_H * R))));
       }
+    }
     if (!this.textures.exists('kingcrown')) addCanvas(this, 'kingcrown', hires(64, 44, KING_RES, (ctx) => drawKingCrown(ctx, 32, 40)));
     if (!this.textures.exists(this.k('crowd'))) addCanvas(this, this.k('crowd'), hires(ARENA_W, CROWD_H, ARENA_RES, (ctx) => drawCrowd(ctx, false)), undefined, { release: true });
     if (!this.textures.exists(this.k('crowd2'))) addCanvas(this, this.k('crowd2'), hires(ARENA_W, CROWD_H, ARENA_RES, (ctx) => drawCrowd(ctx, true)), undefined, { release: true });
@@ -1475,10 +1477,10 @@ export class HoopsScene extends Phaser.Scene {
    */
   private async plopInvasion() {
     const floorY = this.hero.y + 10;
-    const sizes = [0.95, 0.8, 1.15, 0.72, 0.9];
-    const plops = sizes.map((k, i) => {
-      const key = i === 2 ? 'plop-k' : 'plop';
-      const p = this.add.sprite(ARENA_W + 120 + i * 110, floorY - (i % 2) * 26, key, 'run0').setOrigin(0.5, 1).setScale((k * 1.25) / 2.5).setDepth(8.5 - (i % 2) * 0.2);
+    // the whole family: small, medium and large Plops, and their King in the middle
+    const line: PlopKind[] = ['small', 'medium', 'king', 'large', 'small', 'medium'];
+    const plops = line.map((kind, i) => {
+      const p = this.add.sprite(ARENA_W + 120 + i * 110, floorY - (i % 2) * 26, `plop-${kind}`, 'run0').setOrigin(0.5, 1).setScale((PLOP_SCALE[kind] * 1.15) / 2.5).setDepth(8.5 - (i % 2) * 0.2);
       return p;
     });
     const shadows = plops.map((p) => this.add.image(p.x, p.y, 'softshadow').setDisplaySize(110 * p.scaleX * 2.5, 22).setDepth(6));
@@ -1502,7 +1504,7 @@ export class HoopsScene extends Phaser.Scene {
     });
     anim(['run0', 'run1'], 9);
     // they charge in from the right and skid to a stop in a ragged line
-    const stopX = [880, 1010, 1150, 1270, 1390];
+    const stopX = [800, 920, 1060, 1210, 1330, 1440];
     await Promise.all(plops.map((p, i) => this.tween({ targets: p, x: stopX[i], duration: 1000 + i * 120, ease: 'Quad.easeOut' })));
     // POOPA! POOPA! (with angry little hops)
     anim(['yell0', 'yell1'], 7);

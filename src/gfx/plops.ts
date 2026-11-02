@@ -14,7 +14,10 @@ export const PLOP_FRAMES: PlopFrame[] = ['idle', 'run0', 'run1', 'yell0', 'yell1
 export const PLOP_W = 96;
 export const PLOP_H = 104;
 
-const BODY: Fill = { base: '#8b5434', shade: '#5f3520', light: '#b98058' };
+const BODY0: Fill = { base: '#8b5434', shade: '#5f3520', light: '#b98058' };
+const BIG_BODY: Fill = { base: '#74432a', shade: '#4c2a18', light: '#a06a48' };
+const SMALL_BODY: Fill = { base: '#9c6240', shade: '#6e4128', light: '#c99068' };
+const CAPE: Fill = { base: '#d8243a', shade: '#9c1426', light: '#ff6a7a' };
 const LEG: Fill = { base: '#6e3f25', shade: '#4a2716', light: '#9a6440' };
 const EYE: Fill = { base: '#ffffff', shade: '#ece4dc', light: '#ffffff' };
 const GOLD: Fill = { base: '#ffd23f', shade: '#d9a316', light: '#fff2a8' };
@@ -35,7 +38,17 @@ function leg(ctx: Ctx, st: Style, x: number, top: number, ground: number, dx: nu
   st.shape(ctx, pts, LEG, seed, { lw: 1 });
 }
 
-export function drawPlop(ctx: Ctx, ox: number, oy: number, f: PlopFrame, st: Style, crowned = false) {
+/** The Plop family: three sizes (each with its own personality) and their King. */
+export type PlopKind = 'small' | 'medium' | 'large' | 'king';
+export const PLOP_KINDS: PlopKind[] = ['small', 'medium', 'large', 'king'];
+/** How big each kind is shown in the game (relative). */
+export const PLOP_SCALE: Record<PlopKind, number> = { small: 0.68, medium: 1, large: 1.32, king: 1.5 };
+
+export function drawPlop(ctx: Ctx, ox: number, oy: number, f: PlopFrame, st: Style, kind: PlopKind | boolean = 'medium') {
+  if (kind === true) kind = 'king';
+  if (kind === false) kind = 'medium';
+  const crowned = kind === 'king';
+  const BODY = kind === 'large' ? BIG_BODY : kind === 'small' ? SMALL_BODY : BODY0;
   const ground = oy + 100;
   const cx = ox + 50;
   const run = f === 'run0' || f === 'run1';
@@ -47,6 +60,12 @@ export function drawPlop(ctx: Ctx, ox: number, oy: number, f: PlopFrame, st: Sty
   const botY = ground - 30 + bob;
   leg(ctx, st, cx + 10, botY + 8, ground, -stride, stride < 0 ? 4 : 0, 2001);
   leg(ctx, st, cx - 12, botY + 8, ground, stride, stride > 0 ? 4 : 0, 2002);
+
+  // the King's royal cape, behind him
+  if (kind === 'king') {
+    st.shape(ctx, [[cx - 26, botY - 26], [cx + 26, botY - 26], [cx + 38, ground - 6], [cx + 18, ground - 2], [cx, ground - 6], [cx - 18, ground - 2], [cx - 38, ground - 6]], CAPE, 2005, { lw: 1.1, light: [cx - 14, botY - 10] });
+    st.line(ctx, [[cx - 30, ground - 6], [cx + 30, ground - 6]], 2006, 2.2, '#ffffff');
+  }
 
   // leaf-shaped arms out to the sides (waving up when yelling)
   const arm = (x: number, y: number, ang: number, seed: number) => {
@@ -62,20 +81,32 @@ export function drawPlop(ctx: Ctx, ox: number, oy: number, f: PlopFrame, st: Sty
 
   // top tier: a smaller dome (behind the bottom tier, like the sketch), with the swirl tip
   const topY = botY - 27;
-  st.shape(ctx, [[cx - 8, topY - 12], [cx + 2, topY - 34], [cx + 12, topY - 44], [cx + 10, topY - 30], [cx + 14, topY - 12]], BODY, 2030, { lw: 1.2, light: [cx + 4, topY - 26] });
+  const tipH = kind === 'large' ? 1.25 : kind === 'small' ? 0.75 : 1;
+  st.shape(ctx, [[cx - 8, topY - 12], [cx + 2, topY - 12 - 22 * tipH], [cx + 12, topY - 12 - 32 * tipH], [cx + 10, topY - 12 - 18 * tipH], [cx + 14, topY - 12]], BODY, 2030, { lw: 1.2, light: [cx + 4, topY - 26] });
   st.shape(ctx, ellipsePts(cx + 1, topY + 2, 26, 19, 0, 36), BODY, 2031, { lw: 1.3, light: [cx - 8, topY - 7] });
   // bottom tier: a wide squashy oval in front
   st.shape(ctx, ellipsePts(cx, botY, 35, 21, 0, 40), BODY, 2020, { lw: 1.3, light: [cx - 12, botY - 8] });
 
   // big googly eyes with slit pupils (looking left, the way they face)
-  for (const [ex, er, s] of [[cx - 10, 9, 1], [cx + 11, 8.4, 2]] as const) {
+  const eyeK = kind === 'small' ? 1.22 : kind === 'large' ? 0.9 : 1;
+  for (const [ex, er0, s] of [[cx - 10, 9, 1], [cx + 11, 8.4, 2]] as const) {
+    const er = er0 * eyeK;
     st.shape(ctx, ellipsePts(ex, topY - 3, er * 0.82, er, 0, 24), EYE, 2040 + s, { lw: 1 });
     ctx.fillStyle = st.ink;
     ctx.beginPath();
     ctx.ellipse(ex - 2.4, topY - 3 + (yell ? -1 : 1), 1.5, er * 0.42, 0, 0, Math.PI * 2);
     ctx.fill();
   }
-  if (yell) {
+  if (kind === 'small') {
+    // rosy cheeks
+    ctx.fillStyle = 'rgba(255,120,140,0.45)';
+    for (const bx of [cx - 22, cx + 22]) {
+      ctx.beginPath();
+      ctx.ellipse(bx, topY + 8, 4.5, 2.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  if (yell || kind === 'large' || kind === 'king') {
     // angry brows
     st.line(ctx, [[cx - 19, topY - 15], [cx - 4, topY - 10]], 2045, 1.3);
     st.line(ctx, [[cx + 3, topY - 10], [cx + 19, topY - 15]], 2046, 1.3);
@@ -90,12 +121,26 @@ export function drawPlop(ctx: Ctx, ox: number, oy: number, f: PlopFrame, st: Sty
     const zig = (y: number, dir: number): Pt[] => Array.from({ length: 7 }, (_, i) => [cx - 14 + i * 3.4, y + (i % 2 ? dir * 3.6 : 0)] as Pt);
     st.line(ctx, zig(botY + 2 - open + 3, 1), 2051, 0.8);
     st.line(ctx, zig(botY + 2 + open - 3, -1), 2052, 0.8);
+  } else if (kind === 'large' || kind === 'king') {
+    // a grumpy underbite with two teeth poking up
+    st.line(ctx, [[cx - 14, botY + 3], [cx - 4, botY + 6], [cx + 8, botY + 3]], 2050, 1.2);
+    for (const tx of [cx - 10, cx + 3]) st.shape(ctx, [[tx, botY + 4.5], [tx + 2, botY - 0.5], [tx + 4, botY + 5]], { base: '#fdf8ee', shade: '#e4d8c4', light: '#ffffff' }, 2053 + tx, { lw: 0.7, plain: true });
   } else {
     st.line(ctx, [[cx - 12, botY + 4], [cx - 4, botY + 5], [cx + 6, botY + 4]], 2050, 1.1);
+  }
+  // the King carries a little sceptre
+  if (kind === 'king') {
+    const sx = cx + 39;
+    const sy = botY - (yell ? 30 : 20);
+    st.line(ctx, [[sx - 8, sy + 22], [sx, sy]], 2070, 2.6, '#c9971a');
+    st.shape(ctx, ellipsePts(sx + 1, sy - 2, 4.4, 4.4, 0, 16), GOLD, 2071, { lw: 0.9, light: [sx - 1, sy - 4] });
+    st.shape(ctx, ellipsePts(sx + 1, sy - 2, 1.8, 1.8, 0, 10), { base: '#e8463f', shade: '#b52c27', light: '#ff8a80' }, 2072, { lw: 0.4, plain: true });
   }
 
   if (crowned) {
     const by = topY - 14;
-    st.shape(ctx, [[cx - 14, by + 2], [cx - 15, by - 13], [cx - 7, by - 4], [cx, by - 16], [cx + 7, by - 4], [cx + 15, by - 13], [cx + 14, by + 2]], GOLD, 2060, { lw: 1, light: [cx - 4, by - 8] });
+    st.shape(ctx, [[cx - 17, by + 3], [cx - 19, by - 15], [cx - 9, by - 5], [cx, by - 19], [cx + 9, by - 5], [cx + 19, by - 15], [cx + 17, by + 3]], GOLD, 2060, { lw: 1.1, light: [cx - 4, by - 8] });
+    for (const [gx, gy] of [[-11, -2], [0, -5], [11, -2]] as const)
+      st.shape(ctx, ellipsePts(cx + gx, by + gy, 2.4, 2.6, 0, 12), { base: '#e8463f', shade: '#b52c27', light: '#ff8a80' }, 2061 + gx, { lw: 0.5, plain: true });
   }
 }

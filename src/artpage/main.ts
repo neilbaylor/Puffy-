@@ -13,7 +13,7 @@ import { KING_FRAMES, drawArena, drawArenaFront, drawCrowd, drawBackboard, drawB
 import { drawPuffyStyled } from '../gfx/puffy';
 import { MOUNTAIN_LOOKS, drawClimbMap, drawMountainScene } from './part2';
 import { BLASTER, SAW, drawBlaster, drawBullet, drawChainsaw, drawFlailBall } from '../gfx/weapons';
-import { PLOP_FRAMES, PLOP_H, PLOP_W, drawPlop } from '../gfx/plops';
+import { PLOP_H, PLOP_KINDS, PLOP_SCALE, PLOP_W, drawPlop } from '../gfx/plops';
 import { GOAT_FRAMES, GOAT_W, drawGoat } from '../gfx/goat';
 import { drawScruffyStyled } from '../gfx/scruffy';
 import {
@@ -333,12 +333,23 @@ async function paint() {
   if (wp) weaponSheet(wp);
   const pl = document.querySelector<HTMLCanvasElement>('canvas[data-sheet=plops]');
   if (pl) {
-    const S = 1.7;
-    const frames = [...PLOP_FRAMES, 'yell0'] as const;
-    pl.width = Math.round(frames.length * PLOP_W * S + 20);
-    pl.height = Math.round(PLOP_H * S + 10);
+    // the three sizes and the King, each standing and yelling, at their real relative sizes
+    const S = 1.45;
+    const kinds = PLOP_KINDS;
+    const widths = kinds.map((k) => PLOP_W * PLOP_SCALE[k] * S);
+    pl.width = Math.round(widths.reduce((a, w) => a + w * 2 + 10, 20));
+    pl.height = Math.round(PLOP_H * PLOP_SCALE.king * S + 10);
     const ctx = pl.getContext('2d')!;
-    frames.forEach((f, i) => at(ctx, 10 + i * PLOP_W * S, 5, S, () => drawPlop(ctx, 0, 0, f, ST, i === frames.length - 1)));
+    const foot = pl.height - 6;
+    let x = 10;
+    kinds.forEach((k, i) => {
+      const sc = PLOP_SCALE[k] * S;
+      for (const f of ['idle', 'yell0'] as const) {
+        at(ctx, x, foot - 100 * sc, sc, () => drawPlop(ctx, 0, 0, f, ST, k));
+        x += widths[i];
+      }
+      x += 10;
+    });
   }
   const ps = document.querySelector<HTMLCanvasElement>('canvas[data-sheet=props]');
   if (ps) propSheet(ps, PALETTES.meadow);
