@@ -102,6 +102,18 @@ export const sfx = {
     noise(0.25, 0.35, 2400, 300);
     tone({ type: 'sawtooth', from: 180, to: 60, dur: 0.18, vol: 0.12 });
   },
+  /** A little Plop shouting "POO-PA!" (two squeaky syllables). */
+  poopa: (pitch = 1) => {
+    tone({ type: 'square', from: 420 * pitch, to: 330 * pitch, dur: 0.12, vol: 0.06 });
+    tone({ type: 'square', from: 520 * pitch, to: 640 * pitch, dur: 0.16, vol: 0.07, delay: 0.15 });
+    noise(0.05, 0.08, 1800, 600, 0.14);
+  },
+  /** A confetti cannon going off. */
+  pop: () => {
+    noise(0.18, 0.35, 900, 200);
+    tone({ type: 'sine', from: 180, to: 60, dur: 0.14, vol: 0.22 });
+    noise(0.5, 0.06, 6000, 2500, 0.05);
+  },
   explode: () => {
     noise(0.6, 0.6, 1800, 80);
     tone({ type: 'sine', from: 120, to: 35, dur: 0.45, vol: 0.4 });

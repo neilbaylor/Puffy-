@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { characterById } from '../data/characters';
 import type { Session } from '../core/session';
-import { fadeOutMusic, playHoops } from '../core/music';
+import { fadeOutMusic, playHoops, setMusicRate } from '../core/music';
 import { sfx } from '../core/sfx';
 import { ART_RES, canvas } from '../gfx/draw';
 import {
@@ -26,6 +26,8 @@ import {
   drawBall,
   drawCrowd,
   drawKing,
+  drawKingCrown,
+  kingCrownAt,
   drawRimBack,
   drawRimFrontTube,
   drawSoftShadow,
@@ -45,6 +47,9 @@ import { isKeyDown } from '../input/keyboard';
 import type { GameData, GameOverState, ResultState } from './GameScene';
 import { loseLife } from '../core/lives';
 import { NetSim } from './hoopsNet';
+import { Confetti } from '../world/Confetti';
+import { PLOP_FRAMES, PLOP_H, PLOP_W, drawPlop } from '../gfx/plops';
+import { STYLES } from '../gfx/handdrawn';
 
 export interface HoopsData {
   session: Session;
@@ -113,6 +118,13 @@ export class HoopsScene extends Phaser.Scene {
   private loose: null | { vx: number; vy: number; floorY: number; t: number; res: () => void } = null;
   private heroScale = 1;
   private kingScale = 1;
+  private crown!: Phaser.GameObjects.Image;
+  private crownState!: { mode: 'on' | 'loose' | 'back' | 'gone'; x: number; y: number; vx: number; vy: number; rot: number; vr: number; tilt: number; bounces: number; falls: number };
+  private kingHop = { h: 0 };
+  private nextHop = 3000;
+  private kingTalkUntil = 0;
+  private confettiFx!: Confetti;
+  private heroCrowned = false;
   private heroShadow!: Phaser.GameObjects.Image;
   private kingShadow!: Phaser.GameObjects.Image;
   /** Index of the spot each player is standing on. */
@@ -173,6 +185,7 @@ export class HoopsScene extends Phaser.Scene {
     this.flight = null;
     this.meter = null;
     this.score = { you: [], king: [] };
+    this.lastBug = { you: -1, king: -1, yn: 0, kn: 0 };
     this.tapped = false;
     this.prevKey = true;
     this.dark = { level: 0 };
@@ -208,11 +221,26 @@ export class HoopsScene extends Phaser.Scene {
       KING_FRAMES.forEach((f, i) => {
         ctx.save();
         ctx.translate(i * KING_W, 0);
-        drawKing(ctx, 0, 0, f);
+        drawKing(ctx, 0, 0, f, false);
         ctx.restore();
       });
       addCanvas(this, 'king', c, (t) => KING_FRAMES.forEach((f, i) => t.add(f, 0, Math.round(i * KING_W * KING_RES), 0, Math.round(KING_W * KING_RES), Math.round(KING_H * KING_RES))));
     }
+    for (const [key, crowned] of [['plop', false], ['plop-k', true]] as const)
+      if (!this.textures.exists(key)) {
+        const R = 2.5;
+        const pw = Math.round(PLOP_W * R) + 4;
+        const { c, ctx } = canvas(pw * PLOP_FRAMES.length, Math.round(PLOP_H * R));
+        PLOP_FRAMES.forEach((f, i) => {
+          ctx.save();
+          ctx.translate(i * pw, 0);
+          ctx.scale(R, R);
+          drawPlop(ctx, 0, 0, f, STYLES.polished, crowned);
+          ctx.restore();
+        });
+        addCanvas(this, key, c, (t) => PLOP_FRAMES.forEach((f, i) => t.add(f, 0, i * pw, 0, Math.round(PLOP_W * R), Math.round(PLOP_H * R))));
+      }
+    if (!this.textures.exists('kingcrown')) addCanvas(this, 'kingcrown', hires(64, 44, KING_RES, (ctx) => drawKingCrown(ctx, 32, 40)));
     if (!this.textures.exists(this.k('crowd'))) addCanvas(this, this.k('crowd'), hires(ARENA_W, CROWD_H, ARENA_RES, (ctx) => drawCrowd(ctx, false)), undefined, { release: true });
     if (!this.textures.exists(this.k('crowd2'))) addCanvas(this, this.k('crowd2'), hires(ARENA_W, CROWD_H, ARENA_RES, (ctx) => drawCrowd(ctx, true)), undefined, { release: true });
     if (!this.textures.exists(this.k('arenafront'))) addCanvas(this, this.k('arenafront'), hires(ARENA_W, FRONT_H, ARENA_RES, (ctx) => drawArenaFront(ctx)), undefined, { release: true });
@@ -266,6 +294,14 @@ export class HoopsScene extends Phaser.Scene {
     this.kingSpot = 0;
     this.hero = this.add.sprite(hp.x, hp.y + 4, `char-${ch.id}`, 'idle0').setOrigin(0.5, 1).setScale(this.heroScale).setDepth(8);
     this.king = this.add.sprite(kp.x, kp.y + 6, 'king', 'idle0').setOrigin(0.5, 1).setScale(this.kingScale).setDepth(8);
+    // his crown is its own sprite: it rides on his head, and now and then it falls off
+    this.crown = this.add.image(0, 0, 'kingcrown').setOrigin(0.5, 40 / 44).setScale(this.kingScale).setDepth(8.05);
+    this.crownState = { mode: 'on', x: 0, y: 0, vx: 0, vy: 0, rot: 0, vr: 0, tilt: 0, bounces: 0, falls: 0 };
+    this.kingHop = { h: 0 };
+    this.nextHop = 2500 + Math.random() * 2000;
+    this.kingTalkUntil = 0;
+    this.heroCrowned = false;
+    this.confettiFx = new Confetti(this, 12, () => ARENA_H, [STAGE_OY + 360, ARENA_H - 30]);
     // faint mirror images in the glossy floor
     this.heroRefl = this.add.sprite(0, 0, `char-${ch.id}`, 'idle0').setOrigin(0.5, 1).setFlipY(true).setAlpha(0.16).setDepth(4);
     this.kingRefl = this.add.sprite(0, 0, 'king', 'idle0').setOrigin(0.5, 1).setFlipY(true).setAlpha(0.16).setDepth(4);
@@ -348,7 +384,16 @@ export class HoopsScene extends Phaser.Scene {
     let fx = this.camFocus.x;
     let fy = this.camFocus.y;
     let fz = this.camFocus.zoom;
-    if (!this.inIntro && fz <= 1.05) {
+    const wide = fz <= 1.05;
+    if (wide) {
+      // each arena's broadcast camera sits in its own spot
+      const lc = this.style.layout.cam;
+      fx += lc.dx;
+      fy += lc.dy;
+      fz *= lc.zoom;
+    }
+    cam.setRotation(this.style.layout.cam.rot * (wide ? 1 : 0.4));
+    if (!this.inIntro && wide) {
       const t = this.clock / 1000;
       fx += Math.sin(t * 0.23) * 30 + Math.sin(t * 0.57 + 1) * 8;
       fy += Math.sin(t * 0.17 + 2) * 14;
@@ -385,6 +430,7 @@ export class HoopsScene extends Phaser.Scene {
   private callout(text: string, cls = '', ms = 1100) {
     const el = this.dom.querySelector<HTMLElement>('.hoops-callout')!;
     el.className = `hoops-callout show ${cls}`;
+    if (cls.includes('speech')) this.kingTalkUntil = this.clock + Math.min(ms, 1500);
     el.innerHTML = text;
     void el.offsetWidth;
     const token = ++this.calloutToken;
@@ -393,16 +439,28 @@ export class HoopsScene extends Phaser.Scene {
     });
   }
 
+  private lastBug = { you: -1, king: -1, yn: 0, kn: 0 };
   private renderScore() {
     if (this.jumbo.kind !== 'big') this.jumbo = this.scoreJumbo();
     const n = Math.max(REGULATION, this.score.you.length, this.score.king.length);
-    const dots = (arr: boolean[]) =>
-      Array.from({ length: n }, (_, i) => `<i class="${i < arr.length ? (arr[i] ? 'in' : 'out') : ''}"></i>`).join('');
     const sum = (a: boolean[]) => a.filter(Boolean).length;
-    const sudden = n > REGULATION ? '<span class="sd">SUDDEN DEATH</span>' : '';
+    const you = sum(this.score.you);
+    const king = sum(this.score.king);
+    const lb = this.lastBug;
+    const dots = (arr: boolean[], prevN: number) =>
+      Array.from({ length: n }, (_, i) => `<i class="${i < arr.length ? (arr[i] ? 'in' : 'out') : ''}${i === arr.length - 1 && arr.length > prevN ? ' new' : ''}"></i>`).join('');
+    const done = Math.min(this.score.you.length, this.score.king.length);
+    const sudden = n > REGULATION;
+    const status = sudden ? `<span class="sd">SUDDEN DEATH</span>` : `SHOT <b>${Math.min(done + 1, REGULATION)}</b> OF ${REGULATION}`;
+    const row = (cls: string, name: string, arr: boolean[], score: number, prev: number, prevN: number, lead: boolean) =>
+      `<div class="hs-row ${cls}${lead ? ' lead' : ''}"><i class="tab"></i><b>${name}</b><span class="dots">${dots(arr, prevN)}</span><em class="${score !== prev && prev >= 0 ? 'bump' : ''}">${score}</em></div>`;
     this.dom.querySelector('.hoops-score')!.innerHTML = `
-      <div class="hs-row you"><b>${characterById(this.hd.charId).name}</b><span class="dots">${dots(this.score.you)}</span><em>${sum(this.score.you)}</em></div>
-      <div class="hs-row king"><b>King Puff Ball</b><span class="dots">${dots(this.score.king)}</span><em>${sum(this.score.king)}</em></div>${sudden}`;
+      <div class="hs-head"><i class="live"></i>${this.style.words.join(' ')}<span>${status}</span></div>
+      ${row('you', characterById(this.hd.charId).name, this.score.you, you, lb.you, lb.yn, you > king)}
+      ${row('king', 'King Puff Ball', this.score.king, king, lb.king, lb.kn, king > you)}
+      <i class="sheen"></i>`;
+    this.dom.querySelector('.hoops-score')!.classList.toggle('sudden', sudden);
+    this.lastBug = { you, king, yn: this.score.you.length, kn: this.score.king.length };
   }
 
   private prevKey = true;
@@ -430,7 +488,11 @@ export class HoopsScene extends Phaser.Scene {
 
     // idle animation loops
     const k = this.kingAnim;
-    this.king.setFrame(k.frames[Math.floor((this.clock / 1000) * k.fps) % k.frames.length]);
+    let kf = k.frames[Math.floor((this.clock / 1000) * k.fps) % k.frames.length];
+    // talking: his mouth flaps while he speaks (unless he's laughing or sulking)
+    if (this.clock < this.kingTalkUntil && (kf === 'idle0' || kf === 'idle1')) kf = Math.floor(this.clock / 110) % 2 ? 'talk' : 'idle0';
+    this.king.setFrame(kf);
+    this.updateKingLife(dt);
     const h = this.heroAnim;
     this.hero.setFrame(h.frames[Math.floor((this.clock / 1000) * h.fps) % h.frames.length]);
     this.mirror(this.heroRefl, this.hero);
@@ -514,6 +576,119 @@ export class HoopsScene extends Phaser.Scene {
   // ───────────────────────────────────────────── lighting, jumbotron, broadcast bits ──
 
   /** Draw the darkness with spotlight pools cut out of it, and aim the beams. */
+  /** The King can't keep still: little hops, and his crown keeps slipping off. */
+  private updateKingLife(dt: number) {
+    const k = this.king;
+    const idle = this.kingAnim.frames[0] === 'idle0' && this.king.visible;
+    if (idle && this.clock > this.nextHop && this.kingHop.h === 0 && !this.tweens.isTweening(this.kingHop)) {
+      this.nextHop = this.clock + 2600 + Math.random() * 3200;
+      const big = Math.random() < 0.35;
+      this.tweens.add({
+        targets: this.kingHop,
+        h: big ? 34 : 16,
+        duration: big ? 230 : 160,
+        yoyo: true,
+        repeat: big ? 0 : 1,
+        ease: 'Quad.easeOut',
+        onComplete: () => {
+          this.kingHop.h = 0;
+          sfx.bump();
+          // a big landing can knock his crown off (not every time, and not too often)
+          if (big && this.crownState.mode === 'on' && this.crownState.falls < 2 && Math.random() < 0.6) this.crownFall();
+        },
+      });
+    }
+    // the hop lifts the picture, not the King's real position (walks and tweens own that)
+    const hopPx = this.kingHop.h;
+    k.setOrigin(0.5, 1 + hopPx / (KING_H * KING_RES));
+    // the crown
+    const c = this.crown;
+    const cs = this.crownState;
+    const at = kingCrownAt(k.frame.name);
+    const flip = k.flipX ? -1 : 1;
+    const headX = k.x + (at.x - KING_W / 2) * KING_RES * k.scaleX * flip;
+    const headY = k.y + (at.y - KING_H) * KING_RES * k.scaleY - hopPx * k.scaleY * KING_RES;
+    c.setVisible(k.visible || cs.mode === 'loose' || cs.mode === 'gone');
+    if (!this.heroCrowned && cs.mode !== 'gone') c.setScale(Math.abs(k.scaleX), k.scaleY);
+    if (this.heroCrowned && !this.tweens.isTweening(c)) {
+      // the champion wears it now
+      const h = this.hero;
+      c.setPosition(h.x + (h.flipX ? -2 : 2), h.y - h.displayHeight * 0.9 + 12).setAngle(h.flipX ? 12 : -12);
+    } else if (cs.mode === 'on') {
+      cs.tilt *= Math.exp(-dt / 1000 * 3);
+      c.setPosition(headX, headY).setRotation(k.rotation + cs.tilt).setFlipX(k.flipX);
+    } else if (cs.mode === 'loose') {
+      const t = dt / 1000;
+      cs.vy += 1500 * t;
+      cs.x += cs.vx * t;
+      cs.y += cs.vy * t;
+      cs.rot += cs.vr * t;
+      const floor = k.y + 4;
+      if (cs.y > floor && cs.vy > 0) {
+        cs.y = floor;
+        cs.vy *= -0.38;
+        cs.vx *= 0.6;
+        cs.vr *= 0.5;
+        cs.bounces++;
+        sfx.bump();
+        if (cs.bounces > 2) {
+          cs.vy = 0;
+          cs.vx = 0;
+          cs.vr = 0;
+        }
+      }
+      c.setPosition(cs.x, cs.y).setRotation(cs.rot);
+    }
+  }
+
+  /** Oops — the crown slips off, bounces on the floor; he grabs it and straightens it. */
+  private crownFall() {
+    const cs = this.crownState;
+    if (cs.mode !== 'on' || !this.king.visible) return;
+    cs.mode = 'loose';
+    cs.falls++;
+    cs.x = this.crown.x;
+    cs.y = this.crown.y;
+    const side = Math.random() < 0.5 ? -1 : 1;
+    cs.vx = side * (90 + Math.random() * 80);
+    cs.vy = -380;
+    cs.rot = this.crown.rotation;
+    cs.vr = side * 9;
+    cs.bounces = 0;
+    sfx.whoosh?.();
+    const prev = this.kingAnim;
+    this.kingAnim = { frames: ['sad'], fps: 1 };
+    this.kingTalkUntil = 0;
+    // after it settles he snatches it back up and plonks it on, crooked, then fixes it
+    this.time.delayedCall(1150, () => {
+      if (cs.mode !== 'loose') return;
+      cs.mode = 'back';
+      this.kingAnim = { frames: ['shoot'], fps: 1 };
+      const k = this.king;
+      const at = kingCrownAt('shoot');
+      const flip = k.flipX ? -1 : 1;
+      const hx = k.x + (at.x - KING_W / 2) * KING_RES * k.scaleX * flip;
+      const hy = k.y + (at.y - KING_H) * KING_RES * k.scaleY;
+      this.tweens.add({
+        targets: this.crown,
+        x: hx,
+        y: hy,
+        rotation: 0.5,
+        duration: 320,
+        ease: 'Back.easeOut',
+        onComplete: () => {
+          cs.mode = 'on';
+          cs.tilt = 0.45 * (Math.random() < 0.5 ? -1 : 1);
+          this.kingAnim = prev.frames[0] === 'sad' ? { frames: ['idle0', 'idle1'], fps: 2.5 } : prev;
+          // the little adjust: wiggle it straight
+          this.tweens.add({ targets: cs, tilt: { from: cs.tilt, to: 0 }, duration: 520, ease: 'Elastic.easeOut' });
+          const t = this.add.text(hx, hy - 80, '*ahem*', { fontFamily: '"Lilita One", sans-serif', fontSize: '26px', color: '#ffe58a', stroke: '#2a1030', strokeThickness: 6 }).setOrigin(0.5).setDepth(12);
+          this.tweens.add({ targets: t, y: hy - 120, alpha: 0, delay: 500, duration: 700, onComplete: () => t.destroy() });
+        },
+      });
+    });
+  }
+
   private updateLighting() {
     const lv = this.dark.level;
     const on = lv > 0.01;
@@ -614,47 +789,108 @@ export class HoopsScene extends Phaser.Scene {
     this.flashIn = 0;
   }
 
-  /** Part 2's ending: the King explodes into a cloud of confetti. */
+  /**
+   * Part 2's ending: the King EXPLODES. A white-hot flash and a moment of slow
+   * motion, a shockwave ring, a fireball glow and smoke, then a huge blast of
+   * confetti, streamers and glitter (with a few secondary pops), cannons from
+   * both sides — and his crown spins up into the rafters and lands on you.
+   */
   private burstKing() {
     const k = this.king;
     const cx = k.x;
     const cy = k.y - k.displayHeight * 0.5;
+    const cam = this.cameras.main;
     sfx.explode();
-    this.cameras.main.flash(300, 255, 245, 220);
-    this.cameras.main.shake(400, 0.012);
+    sfx.drum();
+    cam.flash(420, 255, 250, 235);
+    cam.shake(700, 0.022);
     k.setVisible(false);
     this.kingRefl.setVisible(false);
     this.kingShadow.setVisible(false);
-    const cols = [0xffd23f, 0xff8f5c, 0xffffff, 0xe8463f, 0x2fd0c0, 0xff8fb3, 0x7a2ec2];
-    for (let i = 0; i < 220; i++) {
-      const a = Math.random() * Math.PI * 2;
-      const sp = 220 + Math.random() * 620;
-      const c = this.add.rectangle(cx, cy, 5 + Math.random() * 4, 8 + Math.random() * 6, cols[i % cols.length]).setDepth(12).setAngle(Math.random() * 360);
-      const tx = cx + Math.cos(a) * sp;
-      const ty = cy + Math.sin(a) * sp * 0.7 - 120;
-      this.tweens.add({ targets: c, x: tx, y: ty, duration: 600 + Math.random() * 300, ease: 'Quad.easeOut' });
-      this.tweens.add({ targets: c, y: ty + 700, x: tx + (Math.random() - 0.5) * 160, delay: 600, duration: 2400 + Math.random() * 1600, ease: 'Sine.easeIn', onComplete: () => c.destroy() });
-      this.tweens.add({ targets: c, scaleX: -1, duration: 150 + Math.random() * 200, yoyo: true, repeat: -1 });
+    // slow motion for a beat, easing back to full speed
+    this.confettiFx.timeScale = 0.25;
+    this.tweens.add({ targets: this.confettiFx, timeScale: 1, delay: 380, duration: 900, ease: 'Sine.easeIn' });
+    // fireball glow
+    const glow = this.add.image(cx, cy, 'spot').setBlendMode(Phaser.BlendModes.ADD).setTint(0xffd27a).setDepth(12.2).setScale(0.2).setAlpha(1);
+    this.tweens.add({ targets: glow, scale: 3.2, alpha: 0, duration: 900, ease: 'Cubic.easeOut', onComplete: () => glow.destroy() });
+    // shockwave rings
+    for (const [delay, col, w] of [[0, 0xffffff, 14], [90, 0xffd23f, 8], [180, 0xff8fb3, 5]] as const) {
+      const ring = this.add.graphics().setDepth(12.3).setBlendMode(Phaser.BlendModes.ADD);
+      const st = { r: 20, a: 1 };
+      this.tweens.add({
+        targets: st,
+        r: 760,
+        a: 0,
+        delay,
+        duration: 900,
+        ease: 'Cubic.easeOut',
+        onUpdate: () => {
+          ring.clear();
+          ring.lineStyle(w * st.a + 1, col, st.a).strokeEllipse(cx, cy, st.r * 2, st.r * 1.3);
+        },
+        onComplete: () => ring.destroy(),
+      });
     }
-    // and his crown pops off and spins away
-    const crown = this.add.image(cx, cy - 60, 'star').setTint(0xffd23f).setScale(1.2).setDepth(12.5);
-    this.tweens.add({ targets: crown, y: cy - 340, angle: 720, duration: 900, ease: 'Quad.easeOut' });
-    this.tweens.add({ targets: crown, y: cy + 600, delay: 900, duration: 1400, ease: 'Quad.easeIn', onComplete: () => crown.destroy() });
+    // smoke puffs rolling out
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2;
+      const p = this.add.image(cx, cy, 'softshadow').setTint(0xffffff).setAlpha(0.5).setDepth(11.9).setDisplaySize(90, 70);
+      this.tweens.add({ targets: p, x: cx + Math.cos(a) * 260, y: cy + Math.sin(a) * 170, displayWidth: 260, displayHeight: 200, alpha: 0, duration: 1400 + Math.random() * 500, ease: 'Cubic.easeOut', onComplete: () => p.destroy() });
+    }
+    // THE blast
+    this.confettiFx.burst(cx, cy, 520, { power: 2300, spread: Math.PI, streamers: 0.12, sequins: 0.14, glitter: 0.12, scale: 1.25 });
+    this.confettiFx.burst(cx, cy, 160, { power: 1300, spread: 0.9, angle: -Math.PI / 2, streamers: 0.25, scale: 1.4 });
+    // secondary pops, like fireworks
+    for (let i = 0; i < 4; i++)
+      this.time.delayedCall(260 + i * 210, () => {
+        const px = cx + (Math.random() - 0.5) * 700;
+        const py = cy - 120 - Math.random() * 260;
+        sfx.pop();
+        const f = this.add.image(px, py, 'spot').setBlendMode(Phaser.BlendModes.ADD).setTint(0xffffff).setDepth(12.2).setScale(0.1);
+        this.tweens.add({ targets: f, scale: 1.1, alpha: 0, duration: 450, onComplete: () => f.destroy() });
+        this.confettiFx.burst(px, py, 110, { power: 1100, spread: Math.PI, glitter: 0.25, colors: [[0xffd23f, 0xffffff, 0xff5a6e], [0x2fd0c0, 0xffffff, 0x4db5ff], [0xff8fb3, 0xffd23f, 0x7a5cff]][i % 3] });
+      });
+    // cannons from both sides of the court
+    this.time.delayedCall(700, () => this.confetti(260));
+    // his crown spins up into the rafters… and lands on the champion
+    const cs = this.crownState;
+    cs.mode = 'gone';
+    this.tweens.killTweensOf(this.crown);
+    this.crown.setVisible(true).setPosition(cx, cy - 60).setDepth(12.5);
+    this.tweens.add({ targets: this.crown, y: cy - 520, angle: 900, duration: 1100, ease: 'Quad.easeOut' });
+    this.time.delayedCall(1100, () => {
+      const h = this.hero;
+      const top = h.y - h.displayHeight * 0.9;
+      this.crown.setDepth(8.06);
+      this.tweens.add({
+        targets: this.crown,
+        x: h.x,
+        y: top + 12,
+        angle: 1080 + (h.flipX ? 12 : -12),
+        scale: this.kingScale * 0.42,
+        duration: 1200,
+        ease: 'Quad.easeIn',
+        onComplete: () => {
+          sfx.bump();
+          this.tweens.add({ targets: this.crown, y: top + 6, duration: 120, yoyo: true, ease: 'Quad.easeOut' });
+          this.heroCrowned = true;
+        },
+      });
+    });
   }
 
-  /** Paper confetti: flips, flutters and drifts down in front of everything. */
+  /** A celebration: cannons from both sides, then confetti raining down for a while. */
   private confetti(n: number) {
-    const cols = [0xffd23f, 0x7a2ec2, 0xffffff, 0xe8463f, 0x2fd0c0, 0xff8fb3];
     const view = this.cameras.main.worldView;
-    for (let i = 0; i < n; i++) {
-      const x = view.x + Math.random() * view.width;
-      const c = this.add.rectangle(x, view.y - 20 - Math.random() * 200, 5 + Math.random() * 3, 9 + Math.random() * 4, cols[i % cols.length]).setDepth(12).setAngle(Math.random() * 360);
-      const fall = 2400 + Math.random() * 2200;
-      this.tweens.add({ targets: c, y: view.y + view.height + 40, duration: fall, ease: 'Linear', onComplete: () => c.destroy() });
-      this.tweens.add({ targets: c, x: x + (Math.random() - 0.5) * 120, duration: 600 + Math.random() * 500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-      this.tweens.add({ targets: c, scaleX: -1, duration: 160 + Math.random() * 260, yoyo: true, repeat: -1 });
-      this.tweens.add({ targets: c, angle: c.angle + (Math.random() < 0.5 ? -360 : 360), duration: 900 + Math.random() * 900, repeat: -1 });
-    }
+    const L = A(-60, 360);
+    const R = A(1340, 360);
+    for (let i = 0; i < 3; i++)
+      this.time.delayedCall(i * 420, () => {
+        this.confettiFx.cannon(L.x, L.y, -1.05 + i * 0.12, Math.round(n * 0.22), { power: 1600 });
+        this.confettiFx.cannon(R.x, R.y, -Math.PI + 1.05 - i * 0.12, Math.round(n * 0.22), { power: 1600 });
+        sfx.pop();
+      });
+    this.confettiFx.rain(new Phaser.Geom.Rectangle(view.x, view.y, view.width, view.height), n * 0.35, 4500);
   }
 
   // ───────────────────────────────────────────── the show ──
@@ -677,6 +913,7 @@ export class HoopsScene extends Phaser.Scene {
       if (this.decided(round, 'king')) break;
       if (round === REGULATION && this.total('you') === this.total('king')) {
         this.renderScore();
+        setMusicRate(1.5); // the band plays faster: sudden death!
         await this.callout('TIED!<small>Sudden death</small>', 'title', 1400);
       }
     }
@@ -906,6 +1143,8 @@ export class HoopsScene extends Phaser.Scene {
       this.kingAnim = { frames: ['sad'], fps: 1 };
       this.heroAnim = { frames: ['jump', 'idle0'], fps: 5 };
       this.cheer(0.5);
+      // he stamps in a huff — sometimes his crown flies off
+      if (this.crownState.falls < 2 && Math.random() < 0.4) this.time.delayedCall(250, () => this.crownFall());
       this.jumboShow({ kind: 'big', text: 'NO GOOD!', sub: 'The King misses', color: '#8fe8ff', bg: '#0b2a5e' }, 1300);
       await this.callout('The King misses!', 'good', 1000);
     }
@@ -1099,20 +1338,10 @@ export class HoopsScene extends Phaser.Scene {
     this.tweens.add({ targets: this.crowd, y: -4 * k, duration: 150, yoyo: true, repeat: Math.round(3 * k), ease: 'Quad.easeOut' });
     const cam = this.cameras.main;
     cam.shake(150 * k, 0.003 * k);
-    // confetti
-    for (let i = 0; i < 40 * k; i++) {
-      const x = 300 + Math.random() * 1000;
-      const c = this.add.rectangle(x, 60, 6, 10, Phaser.Display.Color.HSVToRGB(Math.random(), 0.7, 1).color).setDepth(12);
-      this.tweens.add({
-        targets: c,
-        y: 700 + Math.random() * 200,
-        x: x + (Math.random() - 0.5) * 200,
-        angle: Math.random() * 720,
-        duration: 1400 + Math.random() * 900,
-        ease: 'Sine.easeIn',
-        onComplete: () => c.destroy(),
-      });
-    }
+    // confetti cannons pop from both sides of the court
+    const n = Math.round(45 * k);
+    this.confettiFx.cannon(A(-40, 330).x, A(-40, 330).y, -0.95, n, { power: 1250 });
+    this.confettiFx.cannon(A(1320, 330).x, A(1320, 330).y, -Math.PI + 0.95, n, { power: 1250 });
   }
 
   // ── endings ──
@@ -1122,7 +1351,8 @@ export class HoopsScene extends Phaser.Scene {
     this.cut(kp.x - 40, kp.y - 120, 1.9);
     this.kingAnim = { frames: ['sad'], fps: 1 };
     await this.callout('“NOOOO!”', 'speech', 1100);
-    this.jumboShow({ kind: 'big', text: this.hard ? 'KING DESTROYED!' : 'NEW CHAMP!', sub: `${characterById(this.hd.charId).name} beats the King ${this.total('you')} – ${this.total('king')}`, color: '#ffd23f', bg: this.hard ? '#0b2a44' : '#3d1478' }, 1e9);
+    const name = characterById(this.hd.charId).name;
+    this.jumboShow({ kind: 'big', text: this.hard ? 'KING DESTROYED!' : 'NEW CHAMP!', sub: this.hard ? `${name} destroyed the King ${this.total('you')} – ${this.total('king')}` : `${name} beats the King ${this.total('you')} – ${this.total('king')}`, color: '#ffd23f', bg: this.hard ? '#0b2a44' : '#3d1478' }, 1e9);
     if (this.hard) {
       // the King swells up, shakes… and BURSTS into confetti
       this.kingAnim = { frames: ['sad', 'laugh1'], fps: 14 };
@@ -1133,12 +1363,23 @@ export class HoopsScene extends Phaser.Scene {
       this.cheer(1.6);
       await this.wait(900);
     } else {
-      // the King runs out of the arena
+      // the King runs off… stops at the edge of the court, turns, and gets the last word
       this.kingAnim = { frames: ['run0', 'run1'], fps: 10 };
       this.camFocus = { x: 800, y: 450, zoom: 1 };
       this.king.setFlipX(true);
       this.cheer(1.5);
-      await this.tween({ targets: this.king, x: ARENA_W + 220, duration: 1500, ease: 'Quad.easeIn' });
+      await this.tween({ targets: this.king, x: Math.min(ARENA_W - 260, this.king.x + 260), duration: 700, ease: 'Quad.easeOut' });
+      this.king.setFlipX(false);
+      this.kingAnim = { frames: ['idle0', 'idle1'], fps: 2.5 };
+      this.cut(this.king.x - 30, this.king.y - 130, 1.7);
+      await this.callout('“Hmm… nice shooting.”', 'speech', 1700);
+      this.kingAnim = { frames: ['laugh0', 'laugh1'], fps: 7 };
+      sfx.laugh();
+      await this.callout('“Let’s see how you are at<br><b>MOUNTAIN CLIMBING</b>…<br>HA HA HA HA!”', 'speech', 2600);
+      this.camFocus = { x: 800, y: 450, zoom: 1 };
+      this.king.setFlipX(true);
+      this.kingAnim = { frames: ['run0', 'run1'], fps: 10 };
+      await this.tween({ targets: this.king, x: ARENA_W + 260, duration: 1100, ease: 'Quad.easeIn' });
     }
     // the house lights dip and a spotlight finds the champion; confetti everywhere
     const hpw = { x: this.hero.x, y: this.hero.y - 4 };
@@ -1148,10 +1389,73 @@ export class HoopsScene extends Phaser.Scene {
     this.confetti(160);
     this.excitedUntil = this.clock + 4000;
     this.heroAnim = { frames: ['jump', 'idle0'], fps: 5 };
-    await this.callout(`YOU BEAT<br>KING PUFF BALL!<small>${this.total('you')} – ${this.total('king')}</small>`, 'title', 2200);
+    await this.callout(`${this.hard ? 'YOU DESTROYED' : 'YOU BEAT'}<br>KING PUFF BALL!<small>${this.total('you')} – ${this.total('king')}</small>`, 'title', 2200);
+    if (this.hard) await this.plopInvasion();
     fadeOutMusic(500);
     const result: ResultState = { ...this.hd.result, hoops: `${this.total('you')} – ${this.total('king')}`, level: this.hd.level ?? 1 };
     this.game.events.emit('level-complete', result);
+  }
+
+  /**
+   * …but who's this? After the King is destroyed, a gang of Plops (World 2's
+   * bad guys) come charging onto the court, yell "POOPA!" at you, and run off.
+   */
+  private async plopInvasion() {
+    const floorY = this.hero.y + 10;
+    const sizes = [0.95, 0.8, 1.15, 0.72, 0.9];
+    const plops = sizes.map((k, i) => {
+      const key = i === 2 ? 'plop-k' : 'plop';
+      const p = this.add.sprite(ARENA_W + 120 + i * 110, floorY - (i % 2) * 26, key, 'run0').setOrigin(0.5, 1).setScale((k * 1.25) / 2.5).setDepth(8.5 - (i % 2) * 0.2);
+      return p;
+    });
+    const shadows = plops.map((p) => this.add.image(p.x, p.y, 'softshadow').setDisplaySize(110 * p.scaleX * 2.5, 22).setDepth(6));
+    this.cameras.main.shake(300, 0.004);
+    sfx.drum();
+    let t0 = this.clock;
+    const anim = (frames: string[], fps: number) => {
+      t0 = this.clock;
+      plops.forEach((p, i) => p.setData('anim', { frames, fps, off: i * 0.13 }));
+    };
+    const ev = this.time.addEvent({
+      delay: 40,
+      loop: true,
+      callback: () => {
+        plops.forEach((p, i) => {
+          const a = p.getData('anim') as { frames: string[]; fps: number; off: number };
+          if (a) p.setFrame(a.frames[Math.floor(((this.clock - t0) / 1000 + a.off) * a.fps) % a.frames.length]);
+          shadows[i].setPosition(p.x, p.y - 2);
+        });
+      },
+    });
+    anim(['run0', 'run1'], 9);
+    // they charge in from the right and skid to a stop in a ragged line
+    const stopX = [880, 1010, 1150, 1270, 1390];
+    await Promise.all(plops.map((p, i) => this.tween({ targets: p, x: stopX[i], duration: 1000 + i * 120, ease: 'Quad.easeOut' })));
+    // POOPA! POOPA! (with angry little hops)
+    anim(['yell0', 'yell1'], 7);
+    const t = this.add.text(1130, floorY - 330, 'POOPA!', { fontFamily: '"Lilita One", sans-serif', fontSize: '84px', color: '#ffe0a8', stroke: '#4a2716', strokeThickness: 14 }).setOrigin(0.5).setDepth(12.6).setScale(0.2);
+    this.tweens.add({ targets: t, scale: 1, duration: 260, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: t, angle: { from: -6, to: 6 }, yoyo: true, repeat: 6, duration: 160 });
+    for (let r = 0; r < 3; r++) {
+      plops.forEach((p, i) => {
+        this.time.delayedCall(i * 70, () => {
+          sfx.poopa(0.85 + i * 0.12);
+          this.tweens.add({ targets: p, y: p.y - 26, duration: 140, yoyo: true, ease: 'Quad.easeOut' });
+          const b = this.add.text(p.x, p.y - p.displayHeight - 10, 'POOPA!', { fontFamily: '"Lilita One", sans-serif', fontSize: '30px', color: '#fff6e0', stroke: '#4a2716', strokeThickness: 7 }).setOrigin(0.5).setDepth(12.6).setAngle((Math.random() - 0.5) * 20);
+          this.tweens.add({ targets: b, y: b.y - 50, alpha: 0, scale: 1.3, duration: 700, ease: 'Quad.easeOut', onComplete: () => b.destroy() });
+        });
+      });
+      await this.wait(620);
+    }
+    this.tweens.add({ targets: t, alpha: 0, scale: 1.3, duration: 300, onComplete: () => t.destroy() });
+    // …and off they run, waving their little arms
+    anim(['run0', 'run1'], 11);
+    plops.forEach((p) => p.setFlipX(true));
+    await Promise.all(plops.map((p, i) => this.tween({ targets: p, x: ARENA_W + 160 + i * 60, duration: 800 + i * 90, delay: i * 60, ease: 'Quad.easeIn' })));
+    ev.remove();
+    plops.forEach((p) => p.destroy());
+    shadows.forEach((s2) => s2.destroy());
+    await this.callout('WORLD 2<br>PLOP INVASION<small>coming soon…</small>', 'title', 2400);
   }
 
   private async kingWins() {

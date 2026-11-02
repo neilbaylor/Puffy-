@@ -45,6 +45,7 @@ export function primeMusic() {
 function play(t: Track) {
   stopMusic();
   const a = el(t);
+  a.playbackRate = 1;
   a.muted = isMuted();
   a.currentTime = 0;
   a.play().catch(() => {});
@@ -68,6 +69,11 @@ export function playLevelMusic(level = 1) {
   a.play().catch(() => {});
 }
 export const playHoops = () => play('hoops');
+
+/** Speed the current track up (or back down), e.g. 1.5× for sudden death. */
+export function setMusicRate(rate: number) {
+  for (const a of Object.values(tracks)) if (a && !a.paused) a.playbackRate = rate;
+}
 
 /** Fade the current track out over `ms`. */
 export function fadeOutMusic(ms = 600) {

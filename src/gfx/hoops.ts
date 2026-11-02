@@ -12,8 +12,27 @@ const st = () => STYLES.polished;
 
 // ───────────────────────────── King Puff Ball (frame 130 × 150, feet at y 146) ──
 
-export type KingFrame = 'idle0' | 'idle1' | 'shoot' | 'laugh0' | 'laugh1' | 'sad' | 'run0' | 'run1';
-export const KING_FRAMES: KingFrame[] = ['idle0', 'idle1', 'shoot', 'laugh0', 'laugh1', 'sad', 'run0', 'run1'];
+export type KingFrame = 'idle0' | 'idle1' | 'shoot' | 'laugh0' | 'laugh1' | 'sad' | 'run0' | 'run1' | 'talk';
+export const KING_FRAMES: KingFrame[] = ['idle0', 'idle1', 'shoot', 'laugh0', 'laugh1', 'sad', 'run0', 'run1', 'talk'];
+/** Where the bottom-centre of the King's crown sits in his frame, per frame (frame px). */
+export const kingCrownAt = (f: string) => ({ x: 66, y: 48 + (f === 'idle1' || f === 'laugh1' || f === 'run1' ? -3 : 0) });
+/** The crown on its own (so it can fall off): 64 × 44, bottom-centre at (32, 40). */
+export function drawKingCrown(ctx: Ctx, cx: number, by: number) {
+  const S = st();
+  const crownY = by - 6;
+  const crown: Pt[] = [
+    [cx - 28, crownY + 6],
+    [cx - 26, crownY - 26],
+    [cx - 14, crownY - 6],
+    [cx, crownY - 32],
+    [cx + 14, crownY - 6],
+    [cx + 26, crownY - 26],
+    [cx + 28, crownY + 6],
+  ];
+  S.shape(ctx, crown, GOLD, 1540, { lw: 1.2, light: [cx - 10, crownY - 16] });
+  for (const [gx, gy] of [[-22, -8], [0, -12], [22, -8]] as const)
+    S.shape(ctx, ellipsePts(cx + gx, crownY + gy, 4, 4.6, 0, 14), { base: '#ff7a2e', shade: '#c9461a', light: '#ffc08a' }, 1541 + gx, { lw: 0.7 });
+}
 export const KING_W = 130;
 export const KING_H = 150;
 
@@ -24,7 +43,7 @@ const EYE: Fill = { base: '#ffffff', shade: '#e8e0d4', light: '#ffffff' };
 const TOOTH: Fill = { base: '#fffaf0', shade: '#e3d8c6', light: '#ffffff' };
 
 /** King Puff Ball, facing left (toward the hoop when he stands on the right). */
-export function drawKing(ctx: Ctx, ox: number, oy: number, f: KingFrame) {
+export function drawKing(ctx: Ctx, ox: number, oy: number, f: KingFrame, withCrown = true) {
   const S = st();
   const ground = oy + 146;
   const cx = ox + 66;
@@ -56,20 +75,8 @@ export function drawKing(ctx: Ctx, ox: number, oy: number, f: KingFrame) {
   // body: fluffy puffball
   S.shape(ctx, fluffPts(cx, cy, rx, ry, 10, 0.07, 0.4), KING, 1530, { light: [cx - 14, cy - 16], lw: 1.4 });
 
-  // crown: three gold points with orange gems
-  const crownY = cy - ry + 6;
-  const crown: Pt[] = [
-    [cx - 28, crownY + 6],
-    [cx - 26, crownY - 26],
-    [cx - 14, crownY - 6],
-    [cx, crownY - 32],
-    [cx + 14, crownY - 6],
-    [cx + 26, crownY - 26],
-    [cx + 28, crownY + 6],
-  ];
-  S.shape(ctx, crown, GOLD, 1540, { lw: 1.2, light: [cx - 10, crownY - 16] });
-  for (const [gx, gy] of [[-22, -8], [0, -12], [22, -8]] as const)
-    S.shape(ctx, ellipsePts(cx + gx, crownY + gy, 4, 4.6, 0, 14), { base: '#ff7a2e', shade: '#c9461a', light: '#ffc08a' }, 1541 + gx, { lw: 0.7 });
+  // crown: three gold points with orange gems (a separate sprite in the game, so it can fall off)
+  if (withCrown) drawKingCrown(ctx, cx, cy - ry + 12);
 
   // eyes: one big, one smaller, angry V brow (like the sketch)
   const sad = f === 'sad' || run;
@@ -101,8 +108,8 @@ export function drawKing(ctx: Ctx, ox: number, oy: number, f: KingFrame) {
   // mouth: toothy grin / wide open (shoot, laugh) / wobbly (sad)
   const mx = cx - 2;
   const my = cy + 12;
-  if (f === 'shoot' || laugh) {
-    const open = f === 'shoot' ? 15 : 18;
+  if (f === 'shoot' || laugh || f === 'talk') {
+    const open = f === 'shoot' ? 15 : f === 'talk' ? 11 : 18;
     const mouth = ellipsePts(mx, my + 2, 20, open, 0, 36);
     S.shape(ctx, mouth, { base: '#5e1a2a', shade: '#33091a', light: '#8e2f45' }, 1580, { lw: 1.2 });
     ctx.save();
@@ -247,6 +254,22 @@ export interface ArenaStyle {
   logo: string;
   /** Net cord colours, cycled strand by strand. */
   net: number[];
+  /** Where things are in this building (so the two arenas don't look like the same room). */
+  layout: ArenaLayout;
+}
+
+export interface ArenaLayout {
+  /** Left edge of the jumbotron screen (stage x). */
+  jumboX: number;
+  /** Left edge of the first championship banner. */
+  bannerX: number;
+  /** Upper-deck crowd: first row y, aisles; lower bowl aisles; crowd seeds. */
+  upperY0: number;
+  aislesU: number[];
+  aislesL: number[];
+  seeds: [number, number];
+  /** The broadcast camera's home framing: offset, zoom and a slight roll. */
+  cam: { dx: number; dy: number; zoom: number; rot: number };
 }
 
 /** Part 1: King Puff Ball's Basketball Palace (royal purple and gold). */
@@ -284,6 +307,7 @@ export const PALACE: ArenaStyle = {
   padBottom: '#0f0d1a',
   logo: '#e8b931',
   net: [0xfbfbf8],
+  layout: { jumboX: 158, bannerX: 1110, upperY0: -46, aislesU: [-40, 340, 1120, 1390], aislesL: [90, 470, 1270], seeds: [4242, 5151], cam: { dx: 0, dy: 0, zoom: 1, rot: 0 } },
 };
 
 /** Part 2: the Summit Dome up the mountain (ice blue, navy and red; striped net). */
@@ -321,12 +345,16 @@ export const SUMMIT: ArenaStyle = {
   padBottom: '#0a1c2c',
   logo: '#cfeeff',
   net: [0xe8463f, 0xfbfbf8],
+  // centre-hung jumbotron, banners on the left, a lower upper deck with different aisles,
+  // and a camera set lower and further to the side
+  layout: { jumboX: 428, bannerX: -140, upperY0: -18, aislesU: [120, 660, 1240], aislesL: [260, 930], seeds: [777, 9191], cam: { dx: 70, dy: 34, zoom: 1.07, rot: -0.012 } },
 };
 
 /** The style the arena drawing functions use right now (set before drawing). */
 let AS: ArenaStyle = PALACE;
 export function setArenaStyle(s: ArenaStyle) {
   AS = s;
+  JUMBO.x = s.layout.jumboX;
   BOARD_SEGS = adSegments(262, 0);
   RIBBON_SEGS = adSegments(318, 2);
 }
@@ -1018,8 +1046,9 @@ const SIGNS = ['GO KING!', 'PUFF!', '#1 FAN', 'KING ME', 'D-FENSE'];
 export function drawCrowd(ctx: Ctx, excited = false) {
   ctx.save();
   ctx.translate(STAGE_OX, STAGE_OY);
-  drawTier(ctx, UPPER, rng(4242), excited);
-  drawTier(ctx, LOWER, rng(5151), excited);
+  const lay = AS.layout;
+  drawTier(ctx, { ...UPPER, y0: lay.upperY0, aisles: lay.aislesU, rows: Math.round(17 * (118 - lay.upperY0) / 164) }, rng(lay.seeds[0]), excited);
+  drawTier(ctx, { ...LOWER, aisles: lay.aislesL }, rng(lay.seeds[1]), excited);
   ctx.restore();
 }
 
@@ -1628,8 +1657,8 @@ export function drawRibbonScreen(ctx: Ctx, t: number, msg: { text: string; color
 }
 
 function drawJumbotron(ctx: Ctx) {
-  const x0 = 150;
-  const x1 = 590;
+  const x0 = JUMBO.x - 8;
+  const x1 = JUMBO.x + JUMBO.w + 8;
   const y0 = -32;
   const y1 = 92;
   ctx.strokeStyle = '#2b2835';
@@ -1729,9 +1758,10 @@ function drawBanners(ctx: Ctx) {
   const lines = AS.banners;
   ctx.strokeStyle = '#2b2835';
   ctx.lineWidth = 2;
-  seg(ctx, [1090, T + 8], [1420, T + 8]);
+  const b0 = AS.layout.bannerX;
+  seg(ctx, [b0 - 20, T + 8], [b0 + 310, T + 8]);
   lines.forEach((ls, i) => {
-    const bx = 1110 + i * 105;
+    const bx = b0 + i * 105;
     const by = T + 10;
     const w = 72;
     const h = 104;

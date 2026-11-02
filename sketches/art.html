@@ -1341,13 +1341,29 @@ section { display: grid; gap: 14px; }
 
   // src/gfx/hoops.ts
   var st = () => STYLES.polished;
-  var KING_FRAMES = ["idle0", "idle1", "shoot", "laugh0", "laugh1", "sad", "run0", "run1"];
+  var KING_FRAMES = ["idle0", "idle1", "shoot", "laugh0", "laugh1", "sad", "run0", "run1", "talk"];
+  function drawKingCrown(ctx, cx, by) {
+    const S = st();
+    const crownY = by - 6;
+    const crown = [
+      [cx - 28, crownY + 6],
+      [cx - 26, crownY - 26],
+      [cx - 14, crownY - 6],
+      [cx, crownY - 32],
+      [cx + 14, crownY - 6],
+      [cx + 26, crownY - 26],
+      [cx + 28, crownY + 6]
+    ];
+    S.shape(ctx, crown, GOLD, 1540, { lw: 1.2, light: [cx - 10, crownY - 16] });
+    for (const [gx, gy] of [[-22, -8], [0, -12], [22, -8]])
+      S.shape(ctx, ellipsePts(cx + gx, crownY + gy, 4, 4.6, 0, 14), { base: "#ff7a2e", shade: "#c9461a", light: "#ffc08a" }, 1541 + gx, { lw: 0.7 });
+  }
   var KING = { base: "#f28a2e", shade: "#c55a16", light: "#ffc07a" };
   var KING_LIMB = { base: "#e7791f", shade: "#b04d10", light: "#ffae62" };
   var GOLD = { base: "#ffd23f", shade: "#d9a316", light: "#fff2a8" };
   var EYE2 = { base: "#ffffff", shade: "#e8e0d4", light: "#ffffff" };
   var TOOTH2 = { base: "#fffaf0", shade: "#e3d8c6", light: "#ffffff" };
-  function drawKing(ctx, ox, oy, f) {
+  function drawKing(ctx, ox, oy, f, withCrown = true) {
     const S = st();
     const ground = oy + 146;
     const cx = ox + 66;
@@ -1372,19 +1388,7 @@ section { display: grid; gap: 14px; }
     S.shape(ctx, paddlePts(cx + rx - 8, cy - 2, 30, 13, armA), KING_LIMB, 1520, { lw: 1.1 });
     S.shape(ctx, paddlePts(cx - rx + 8, cy - 2, 30, 13, armB), KING_LIMB, 1521, { lw: 1.1 });
     S.shape(ctx, fluffPts(cx, cy, rx, ry, 10, 0.07, 0.4), KING, 1530, { light: [cx - 14, cy - 16], lw: 1.4 });
-    const crownY = cy - ry + 6;
-    const crown = [
-      [cx - 28, crownY + 6],
-      [cx - 26, crownY - 26],
-      [cx - 14, crownY - 6],
-      [cx, crownY - 32],
-      [cx + 14, crownY - 6],
-      [cx + 26, crownY - 26],
-      [cx + 28, crownY + 6]
-    ];
-    S.shape(ctx, crown, GOLD, 1540, { lw: 1.2, light: [cx - 10, crownY - 16] });
-    for (const [gx, gy] of [[-22, -8], [0, -12], [22, -8]])
-      S.shape(ctx, ellipsePts(cx + gx, crownY + gy, 4, 4.6, 0, 14), { base: "#ff7a2e", shade: "#c9461a", light: "#ffc08a" }, 1541 + gx, { lw: 0.7 });
+    if (withCrown) drawKingCrown(ctx, cx, cy - ry + 12);
     const sad = f === "sad" || run;
     if (laugh) {
       for (const [ex, w] of [[cx - 16, 11], [cx + 12, 9]])
@@ -1412,8 +1416,8 @@ section { display: grid; gap: 14px; }
     }
     const mx = cx - 2;
     const my = cy + 12;
-    if (f === "shoot" || laugh) {
-      const open = f === "shoot" ? 15 : 18;
+    if (f === "shoot" || laugh || f === "talk") {
+      const open = f === "shoot" ? 15 : f === "talk" ? 11 : 18;
       const mouth = ellipsePts(mx, my + 2, 20, open, 0, 36);
       S.shape(ctx, mouth, { base: "#5e1a2a", shade: "#33091a", light: "#8e2f45" }, 1580, { lw: 1.2 });
       ctx.save();
@@ -1520,11 +1524,13 @@ section { display: grid; gap: 14px; }
     padTop: "#24203a",
     padBottom: "#0f0d1a",
     logo: "#e8b931",
-    net: [16514040]
+    net: [16514040],
+    layout: { jumboX: 158, bannerX: 1110, upperY0: -46, aislesU: [-40, 340, 1120, 1390], aislesL: [90, 470, 1270], seeds: [4242, 5151], cam: { dx: 0, dy: 0, zoom: 1, rot: 0 } }
   };
   var AS = PALACE;
   function setArenaStyle(s) {
     AS = s;
+    JUMBO.x = s.layout.jumboX;
     BOARD_SEGS = adSegments(262, 0);
     RIBBON_SEGS = adSegments(318, 2);
   }
@@ -2075,8 +2081,9 @@ section { display: grid; gap: 14px; }
   function drawCrowd(ctx, excited = false) {
     ctx.save();
     ctx.translate(STAGE_OX, STAGE_OY);
-    drawTier(ctx, UPPER, rng(4242), excited);
-    drawTier(ctx, LOWER, rng(5151), excited);
+    const lay = AS.layout;
+    drawTier(ctx, { ...UPPER, y0: lay.upperY0, aisles: lay.aislesU, rows: Math.round(17 * (118 - lay.upperY0) / 164) }, rng(lay.seeds[0]), excited);
+    drawTier(ctx, { ...LOWER, aisles: lay.aislesL }, rng(lay.seeds[1]), excited);
     ctx.restore();
   }
   function drawTier(dst, tier, r, excited) {
@@ -2253,10 +2260,11 @@ section { display: grid; gap: 14px; }
     ledBoard(ctx, BOARD_Y0, BOARD_Y1, BOARD_SEGS, 19);
     ctx.restore();
   }
+  var JUMBO = { x: 158, y: -24, w: 424, h: 108 };
   var RIBBON = { x: L, y: RIBBON_Y0, w: R - L, h: RIBBON_Y1 - RIBBON_Y0 };
   function drawJumbotron(ctx) {
-    const x0 = 150;
-    const x1 = 590;
+    const x0 = JUMBO.x - 8;
+    const x1 = JUMBO.x + JUMBO.w + 8;
     const y0 = -32;
     const y1 = 92;
     ctx.strokeStyle = "#2b2835";
@@ -2350,9 +2358,10 @@ section { display: grid; gap: 14px; }
     const lines = AS.banners;
     ctx.strokeStyle = "#2b2835";
     ctx.lineWidth = 2;
-    seg(ctx, [1090, T + 8], [1420, T + 8]);
+    const b0 = AS.layout.bannerX;
+    seg(ctx, [b0 - 20, T + 8], [b0 + 310, T + 8]);
     lines.forEach((ls, i) => {
-      const bx = 1110 + i * 105;
+      const bx = b0 + i * 105;
       const by = T + 10;
       const w = 72;
       const h = 104;

@@ -822,51 +822,119 @@ body {
   top: calc(10px + var(--safe-t));
   right: calc(12px + var(--safe-r));
   display: grid;
-  gap: 4px;
-  padding: 8px 14px;
-  border-radius: 16px;
-  background: #1c0f3ad9;
-  border: 3px solid #ffd23f;
-  box-shadow: 0 4px 0 #0008;
+  gap: 0;
+  overflow: hidden;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #241048f0, #120726f0);
+  border: 2px solid #ffd23f;
+  box-shadow: 0 5px 0 #0009, 0 0 22px #ffd23f33, inset 0 1px 0 #ffffff30;
+  font-family: var(--display);
+  animation: bug-in 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+.hoops-score.sudden {
+  border-color: #ff5a6e;
+  box-shadow: 0 5px 0 #0009, 0 0 26px #ff5a6e66, inset 0 1px 0 #ffffff30;
+  animation: bug-in 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both, bug-pulse 0.9s ease-in-out infinite;
+}
+@keyframes bug-in {
+  from { transform: translateY(-120%) scale(0.9); opacity: 0; }
+}
+@keyframes bug-pulse {
+  50% { box-shadow: 0 5px 0 #0009, 0 0 40px #ff5a6eaa, inset 0 1px 0 #ffffff30; }
+}
+.hs-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 12px 3px 10px;
+  background: linear-gradient(90deg, #ffd23f, #ffb627);
+  color: #2a1040;
+  font-size: clamp(10px, 1.9vmin, 13px);
+  letter-spacing: 0.14em;
+}
+.hs-head span {
+  margin-left: auto;
+  padding-left: 14px;
+  letter-spacing: 0.08em;
+}
+.hs-head span b { font-weight: 400; color: #c8102e; }
+.hs-head .live {
+  width: 0.62em;
+  height: 0.62em;
+  border-radius: 50%;
+  background: #e8102e;
+  box-shadow: 0 0 0 2px #fff6;
+  animation: blink 1s steps(2) infinite;
+}
+.hoops-score .sd {
+  color: #c8102e;
+  animation: blink 0.6s steps(2) infinite;
 }
 .hs-row {
   display: grid;
-  grid-template-columns: 9.5em auto 1.6em;
+  grid-template-columns: 6px 8.6em auto 2.1em;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
+  padding: 5px 10px 5px 0;
   font-size: clamp(13px, 2.6vmin, 19px);
+  color: #fff;
+  letter-spacing: 0.02em;
+  text-shadow: 0 2px 0 #0007;
 }
+.hs-row + .hs-row { border-top: 1px solid #ffffff1c; }
+.hs-row .tab {
+  align-self: stretch;
+  background: linear-gradient(180deg, #7fe7ff, #1aa6e0);
+}
+.hs-row.king .tab { background: linear-gradient(180deg, #ffe58a, #e8a91c); }
 .hs-row b {
   font-weight: 400;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.hs-row.king b {
-  color: #ffd23f;
+.hs-row.king b { color: #ffe58a; }
+.hs-row.lead b::after {
+  content: ' ◂';
+  color: #8fff8a;
+  font-size: 0.8em;
 }
 .hs-row em {
   font-style: normal;
-  text-align: right;
-  font-size: 1.3em;
-  color: #ffd23f;
+  text-align: center;
+  font-size: 1.35em;
+  line-height: 1.25;
+  border-radius: 7px;
+  background: #00000055;
+  box-shadow: inset 0 0 0 1.5px #ffffff22;
+  color: #fff;
+}
+.hs-row.king em { color: #ffd23f; }
+.hs-row em.bump { animation: score-bump 0.6s cubic-bezier(0.2, 1.6, 0.4, 1); }
+@keyframes score-bump {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.55); background: #8fff8a66; }
+  100% { transform: scale(1); }
 }
 .hs-row .dots {
   display: flex;
-  gap: 5px;
+  gap: 4px;
 }
 .hs-row .dots i {
-  width: 1em;
-  height: 1em;
+  width: 0.85em;
+  height: 0.85em;
   border-radius: 50%;
-  border: 2px solid #ffffff88;
-  background: #ffffff18;
+  border: 2px solid #ffffff55;
+  background: #ffffff12;
 }
 .hs-row .dots i.in {
-  background: radial-gradient(circle at 35% 30%, #ffb87a, #f2802e 60%, #c2531a);
-  border-color: #fff;
+  background: radial-gradient(circle at 35% 30%, #c8ffb0, #4dd46a 60%, #1f8a3a);
+  border-color: #eaffe0;
+  box-shadow: 0 0 8px #4dff7a88;
 }
 .hs-row .dots i.out {
-  background: #ff5a4f55;
-  border-color: #ff5a4f;
+  background: radial-gradient(circle at 35% 30%, #ffb0b0, #e8463f 60%, #9a1e1a);
+  border-color: #ffd0d0;
   position: relative;
 }
 .hs-row .dots i.out::after {
@@ -875,14 +943,25 @@ body {
   inset: 0;
   display: grid;
   place-items: center;
-  font: 900 0.8em/1 var(--body);
+  font: 900 0.7em/1 var(--body);
   color: #fff;
 }
-.hoops-score .sd {
-  justify-self: center;
-  font-size: 12px;
-  letter-spacing: 0.12em;
-  color: #ff8fb3;
+.hs-row .dots i.new { animation: dot-pop 0.5s cubic-bezier(0.2, 1.8, 0.4, 1); }
+@keyframes dot-pop {
+  from { transform: scale(0.1); }
+}
+/* a glossy light sweep across the bug every few seconds */
+.hoops-score .sheen {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 35%, #ffffff30 48%, transparent 60%);
+  transform: translateX(-120%);
+  animation: bug-sheen 6s ease-in-out 1s infinite;
+}
+@keyframes bug-sheen {
+  0%, 70% { transform: translateX(-120%); }
+  85%, 100% { transform: translateX(120%); }
 }
 
 /* the Power / Aim meters, drawn like the sketch: red bar, green sweet spot, black marker */
