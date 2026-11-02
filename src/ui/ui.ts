@@ -433,7 +433,7 @@ export class UI {
     const cards = el.querySelector('.cards')!;
     CHARACTERS.forEach((c, i) => {
       const bar = (n: number) => `<i style="--n:${n}"></i>`;
-      const card = h(`<button class="card" role="radio" data-i="${i}" style="--c:${c.colors.main};--cs:${c.colors.shade}">
+      const card = h(`<button class="card" role="radio" data-i="${i}" data-hero="${c.id}" style="--c:${c.colors.main};--cs:${c.colors.shade}">
         <canvas width="320" height="320"></canvas>
         <div class="card-name" aria-label="${c.name}">${waveWords(c.name)}</div>
         <div class="card-tag">${c.tagline}</div>
@@ -655,8 +655,10 @@ export class UI {
     const t0 = performance.now();
     const step = () => {
       const t = hop && typeof hop.currentTime === 'number' ? hop.currentTime : performance.now() - t0;
-      show(t < 105 ? 'idle0' : t < 330 ? 'jump' : t < 540 ? 'fall' : 'idle0');
-      if (card.isConnected && hop?.playState !== 'finished' && t < 760) this.cheerRaf = requestAnimationFrame(step);
+      // (Scruffy does a little backflip, so he's up in the air a bit longer)
+      const [up, down, end] = ch.id === 'scruffy' ? [470, 660, 900] : [330, 540, 760];
+      show(t < 105 ? 'idle0' : t < up ? 'jump' : t < down ? 'fall' : 'idle0');
+      if (card.isConnected && hop?.playState !== 'finished' && t < end) this.cheerRaf = requestAnimationFrame(step);
       else {
         show('idle0');
         card.classList.remove('cheer');

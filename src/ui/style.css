@@ -1761,3 +1761,22 @@ kbd {
 
 /* the end-of-level hero is the live one from the pick-a-player cards (its own standing animation) */
 .results-hero canvas.live { animation: none; }
+
+/* Scruffy's celebration: crouch, spring up into a little backflip, squashy landing */
+.card.cheer[data-hero='scruffy'] canvas {
+  transform-origin: 50% 80%;
+  animation: card-flip 0.88s linear;
+}
+@keyframes card-flip {
+  0% { transform: translateY(0) rotate(0) scale(1, 1); }
+  12% { transform: translateY(0) rotate(0) scale(1.1, 0.88); animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1); }
+  30% { transform: translateY(-15%) rotate(-70deg) scale(0.95, 1.06); animation-timing-function: linear; }
+  52% { transform: translateY(-21%) rotate(-230deg) scale(1, 1); animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5); }
+  73% { transform: translateY(0) rotate(-360deg) scale(1.02, 0.98); animation-timing-function: ease-out; }
+  82% { transform: translateY(0) rotate(-360deg) scale(1.12, 0.86); animation-timing-function: ease-in-out; }
+  91% { transform: translateY(0) rotate(-360deg) scale(0.97, 1.03); }
+  100% { transform: translateY(0) rotate(-360deg) scale(1, 1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card.cheer[data-hero='scruffy'] canvas { animation: none; }
+}
