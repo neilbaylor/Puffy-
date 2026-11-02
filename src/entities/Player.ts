@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { DEPTH, MAX_FALL_SPEED } from '../config';
 import type { CharacterDef } from '../data/characters';
 import { sfx } from '../core/sfx';
-import { ART_RES } from '../gfx/draw';
+import { ART_RES, WALK_FRAMES } from '../gfx/draw';
 import { emptyInput, type InputSource, type InputState } from '../input/types';
 import type { GameScene } from '../scenes/GameScene';
 
@@ -235,8 +235,8 @@ export class Player {
       else if (this.eating > 0) frame = this.eating > 0.12 ? (Math.floor(this.eating * 10) % 2 ? 'eat0' : 'eat1') : 'idle0';
       else if (!this.onGround) frame = b.velocity.y < 0 ? 'jump' : 'fall';
       else if (speed > 15) {
-        this.animTime += dt * (4 + speed / 22);
-        frame = `walk${Math.floor(this.animTime) % 4}`;
+        this.animTime += dt * (8 + speed / 11);
+        frame = `walk${Math.floor(this.animTime) % WALK_FRAMES}`;
         if (this.running && Math.random() < 0.25) this.scene.fx.dust(this.x - this.facing * 8, this.bottom, 1);
       } else {
         this.animTime += dt * 1.6;

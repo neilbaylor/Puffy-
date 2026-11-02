@@ -248,16 +248,10 @@ section { display: grid; gap: 14px; }
       armFront = 0.62;
     }
     if (pose.startsWith("walk")) {
-      const f = +pose.slice(4);
-      [legL, legR, liftL, liftR] = [
-        [7, -6, 0, 3],
-        [3, -2, 0, 0],
-        [-6, 7, 3, 0],
-        [-2, 3, 0, 0]
-      ][f];
-      bob = f % 2 ? -1.5 : 0;
-      armBack = f < 2 ? -1.1 : -0.3;
-      armFront = f < 2 ? 0.1 : 0.8;
+      const g = gait(+pose.slice(4), 6.5, 3.2);
+      [legL, legR, liftL, liftR, bob] = [g.legL, g.legR, g.liftL, g.liftR, g.bob];
+      armBack = -0.7 - 0.4 * g.swing;
+      armFront = 0.45 + 0.35 * g.swing;
     }
     let puffed = false;
     if (pose === "jump") {
@@ -393,17 +387,11 @@ section { display: grid; gap: 14px; }
       earRot = -1;
     }
     if (pose.startsWith("walk")) {
-      const f = +pose.slice(4);
-      [legL, legR, liftL, liftR] = [
-        [5, -4, 0, 2],
-        [2, -1, 0, 0],
-        [-4, 5, 2, 0],
-        [-1, 2, 0, 0]
-      ][f];
-      bob = f % 2 ? -1.5 : 0;
-      armBack = f < 2 ? 0.9 : 0.1;
-      armFront = f < 2 ? -0.6 : 0.3;
-      earRot = f < 2 ? -1.25 : -0.95;
+      const g = gait(+pose.slice(4), 4.8, 2.4);
+      [legL, legR, liftL, liftR, bob] = [g.legL, g.legR, g.liftL, g.liftR, g.bob];
+      armBack = 0.5 + 0.4 * g.swing;
+      armFront = -0.15 - 0.45 * g.swing;
+      earRot = -1.1 - 0.15 * g.swing - 0.12 * Math.abs(Math.sin(+pose.slice(4) / 8 * Math.PI * 2));
     }
     if (pose === "jump") {
       [legL, legR, liftL, liftR] = [-2, 4, 4, 2];
@@ -517,15 +505,9 @@ section { display: grid; gap: 14px; }
       flex = 0.15;
     }
     if (pose.startsWith("walk")) {
-      const f = +pose.slice(4);
-      [legL, legR, liftL, liftR] = [
-        [6, -5, 0, 3],
-        [2, -2, 0, 0],
-        [-5, 6, 3, 0],
-        [-2, 2, 0, 0]
-      ][f];
-      bob = f % 2 ? -1.5 : 0;
-      flex = f < 2 ? 0.25 : 0;
+      const g = gait(+pose.slice(4), 5.8, 3.2, 1.8);
+      [legL, legR, liftL, liftR, bob] = [g.legL, g.legR, g.liftL, g.liftR, g.bob];
+      flex = 0.12 + 0.13 * g.swing;
     }
     if (pose === "jump") {
       [legL, legR, liftL, liftR] = [-3, 4, 5, 2];
@@ -773,6 +755,20 @@ section { display: grid; gap: 14px; }
       t = Math.imul(t ^ t >>> 15, t | 1);
       t ^= t + Math.imul(t ^ t >>> 7, t | 61);
       return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  var WALK_FRAMES = 8;
+  function gait(f, stride, lift, bobAmt = 1.6) {
+    const ph = f / WALK_FRAMES * Math.PI * 2;
+    const c = Math.cos(ph);
+    const sn = Math.sin(ph);
+    return {
+      legL: stride * c,
+      legR: -stride * c,
+      liftL: lift * Math.max(0, -sn),
+      liftR: lift * Math.max(0, sn),
+      bob: -bobAmt * Math.abs(sn),
+      swing: c
     };
   }
 

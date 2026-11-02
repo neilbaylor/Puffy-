@@ -1233,7 +1233,7 @@ export class HoopsScene extends Phaser.Scene {
     // art: heroes face right, the King faces left
     const goingRight = to.x > spr.x;
     spr.setFlipX(isHero ? !goingRight : goingRight);
-    if (isHero) this.heroAnim = { frames: ['walk0', 'walk1', 'walk2', 'walk3'], fps: 10 };
+    if (isHero) this.heroAnim = { frames: ['walk0', 'walk1', 'walk2', 'walk3', 'walk4', 'walk5', 'walk6', 'walk7'], fps: 18 };
     else this.kingAnim = { frames: ['run0', 'run1'], fps: 6 };
     await this.tween({
       targets: spr,

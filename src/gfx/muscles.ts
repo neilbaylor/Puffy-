@@ -5,6 +5,7 @@
  * He flexes one arm and carries the bazooka with the other.
  */
 import type { Ctx, Pose } from './draw';
+import { gait } from './draw';
 import { ellipsePts, petalPts, roundRectPts, type Fill, type Pt, type Style } from './handdrawn';
 import { drawBazooka } from './bazooka';
 
@@ -60,15 +61,9 @@ function drawMusclesPose(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style
     flex = 0.15;
   }
   if (pose.startsWith('walk')) {
-    const f = +pose.slice(4);
-    [legL, legR, liftL, liftR] = [
-      [6, -5, 0, 3],
-      [2, -2, 0, 0],
-      [-5, 6, 3, 0],
-      [-2, 2, 0, 0],
-    ][f];
-    bob = f % 2 ? -1.5 : 0;
-    flex = f < 2 ? 0.25 : 0;
+    const g = gait(+pose.slice(4), 5.8, 3.2, 1.8);
+    [legL, legR, liftL, liftR, bob] = [g.legL, g.legR, g.liftL, g.liftR, g.bob];
+    flex = 0.12 + 0.13 * g.swing;
   }
   if (pose === 'jump') {
     [legL, legR, liftL, liftR] = [-3, 4, 5, 2];

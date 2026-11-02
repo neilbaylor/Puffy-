@@ -64,8 +64,30 @@ export function roundRect(
 // Characters
 // ─────────────────────────────────────────────────────────────
 
-export type Pose = 'idle0' | 'idle1' | 'walk0' | 'walk1' | 'walk2' | 'walk3' | 'jump' | 'fall' | 'hurt' | 'shoot' | 'eat0' | 'eat1';
-export const POSES: Pose[] = ['idle0', 'idle1', 'walk0', 'walk1', 'walk2', 'walk3', 'jump', 'fall', 'hurt', 'shoot', 'eat0', 'eat1'];
+export type Pose = 'idle0' | 'idle1' | `walk${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7}` | 'jump' | 'fall' | 'hurt' | 'shoot' | 'eat0' | 'eat1';
+/** Walk cycle length (frames). */
+export const WALK_FRAMES = 8;
+export const POSES: Pose[] = ['idle0', 'idle1', 'walk0', 'walk1', 'walk2', 'walk3', 'walk4', 'walk5', 'walk6', 'walk7', 'jump', 'fall', 'hurt', 'shoot', 'eat0', 'eat1'];
+
+/**
+ * One smooth walk cycle from a single phase (frame f of WALK_FRAMES): the legs
+ * swing opposite each other, the leg swinging forward lifts mid-stride, the
+ * body dips as each foot lands and rises as the legs pass, and `swing` (−1…1)
+ * is for counter-swinging arms.
+ */
+export function gait(f: number, stride: number, lift: number, bobAmt = 1.6) {
+  const ph = (f / WALK_FRAMES) * Math.PI * 2;
+  const c = Math.cos(ph);
+  const sn = Math.sin(ph);
+  return {
+    legL: stride * c,
+    legR: -stride * c,
+    liftL: lift * Math.max(0, -sn),
+    liftR: lift * Math.max(0, sn),
+    bob: -bobAmt * Math.abs(sn),
+    swing: c,
+  };
+}
 export const CHAR_W = 56;
 export const CHAR_H = 56;
 

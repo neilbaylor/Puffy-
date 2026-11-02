@@ -4,6 +4,7 @@
  * tiny arms and short legs with round feet. Same hand-drawn styles as Puffy.
  */
 import type { Ctx, Pose } from './draw';
+import { gait } from './draw';
 import { ellipsePts, paddlePts, type Fill, type Pt, type Style } from './handdrawn';
 import { drawBazooka } from './bazooka';
 
@@ -50,17 +51,11 @@ function drawScruffyPose(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style
     earRot = -1.0;
   }
   if (pose.startsWith('walk')) {
-    const f = +pose.slice(4);
-    [legL, legR, liftL, liftR] = [
-      [5, -4, 0, 2],
-      [2, -1, 0, 0],
-      [-4, 5, 2, 0],
-      [-1, 2, 0, 0],
-    ][f];
-    bob = f % 2 ? -1.5 : 0;
-    armBack = f < 2 ? 0.9 : 0.1;
-    armFront = f < 2 ? -0.6 : 0.3;
-    earRot = f < 2 ? -1.25 : -0.95;
+    const g = gait(+pose.slice(4), 4.8, 2.4);
+    [legL, legR, liftL, liftR, bob] = [g.legL, g.legR, g.liftL, g.liftR, g.bob];
+    armBack = 0.5 + 0.4 * g.swing;
+    armFront = -0.15 - 0.45 * g.swing;
+    earRot = -1.1 - 0.15 * g.swing - 0.12 * Math.abs(Math.sin((+pose.slice(4) / 8) * Math.PI * 2)); // ears flop with each step
   }
   if (pose === 'jump') {
     [legL, legR, liftL, liftR] = [-2, 4, 4, 2];

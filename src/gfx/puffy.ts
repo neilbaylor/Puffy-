@@ -7,6 +7,7 @@
  * same Puffy can be shown in every look-development option.
  */
 import type { Ctx, Pose } from './draw';
+import { gait } from './draw';
 import { drawBazooka } from './bazooka';
 import { ellipsePts, paddlePts, type Fill, type Pt, type Style } from './handdrawn';
 
@@ -53,16 +54,10 @@ function drawPuffyPose(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style, 
     armFront = 0.62;
   }
   if (pose.startsWith('walk')) {
-    const f = +pose.slice(4);
-    [legL, legR, liftL, liftR] = [
-      [7, -6, 0, 3],
-      [3, -2, 0, 0],
-      [-6, 7, 3, 0],
-      [-2, 3, 0, 0],
-    ][f];
-    bob = f % 2 ? -1.5 : 0;
-    armBack = f < 2 ? -1.1 : -0.3;
-    armFront = f < 2 ? 0.1 : 0.8;
+    const g = gait(+pose.slice(4), 6.5, 3.2);
+    [legL, legR, liftL, liftR, bob] = [g.legL, g.legR, g.liftL, g.liftR, g.bob];
+    armBack = -0.7 - 0.4 * g.swing;
+    armFront = 0.45 + 0.35 * g.swing;
   }
   // Puffy puffs up when he's in the air: rounder, fuller body
   let puffed = false;

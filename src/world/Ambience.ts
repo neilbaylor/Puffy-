@@ -50,45 +50,79 @@ function makeTextures(scene: Phaser.Scene) {
     const t = scene.textures.addImage(key, c as unknown as HTMLImageElement)!;
     frames?.forEach((f) => t.add(f.name, 0, f.x, 0, f.w, h));
   };
-  // a bird: two frames (wings up / wings down), drawn white so it can be tinted
+  // a bird (2× resolution): wings up / wings level / wings down, drawn white with an
+  // ink outline so it can be tinted and still read against the sky
   mk(
     'amb-bird',
-    100,
-    34,
+    300,
+    68,
     (ctx) => {
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-      for (const [ox, up] of [[0, 1], [50, -1]] as const) {
-        const cx = ox + 25;
-        const cy = 17;
+      for (const [ox, up] of [[0, 1], [100, 0.15], [200, -0.8]] as const) {
+        const cx = ox + 50;
+        const cy = 36;
+        const wing = (dir: number) => {
+          const tipX = cx + dir * 40;
+          const tipY = cy - up * 26 + (up < 0 ? 0 : 4);
+          ctx.beginPath();
+          ctx.moveTo(cx + dir * 4, cy - 4);
+          ctx.quadraticCurveTo(cx + dir * 18, cy - up * 22 - 8, tipX, tipY);
+          ctx.quadraticCurveTo(cx + dir * 22, cy - up * 10 + 2, cx + dir * 6, cy + 4);
+          ctx.closePath();
+        };
+        const shapeAll = () => {
+          // body + head + tail
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, 16, 7.5, -0.05, 0, Math.PI * 2);
+          ctx.moveTo(cx + 22, cy - 3);
+          ctx.arc(cx + 15, cy - 3, 6.5, 0, Math.PI * 2);
+          ctx.moveTo(cx - 12, cy);
+          ctx.lineTo(cx - 28, cy - 6);
+          ctx.lineTo(cx - 22, cy + 1);
+          ctx.lineTo(cx - 28, cy + 7);
+          ctx.closePath();
+        };
+        // ink outline first (thick), then white fill on top
+        ctx.strokeStyle = 'rgba(40,30,60,0.85)';
+        ctx.lineWidth = 4;
+        for (const d of [-1, 1]) {
+          wing(d);
+          ctx.stroke();
+        }
+        shapeAll();
+        ctx.stroke();
         ctx.fillStyle = '#fff';
-        ctx.beginPath();
-        ctx.ellipse(cx, cy, 7, 3.6, 0, 0, Math.PI * 2);
+        for (const d of [-1, 1]) {
+          wing(d);
+          ctx.fill();
+        }
+        shapeAll();
         ctx.fill();
+        // beak and eye
+        ctx.fillStyle = '#ffb347';
         ctx.beginPath();
-        ctx.arc(cx + 7, cy - 1.5, 3, 0, Math.PI * 2);
+        ctx.moveTo(cx + 21, cy - 5);
+        ctx.lineTo(cx + 28, cy - 2);
+        ctx.lineTo(cx + 21, cy - 0.5);
         ctx.fill();
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 3.4;
+        ctx.fillStyle = '#2a1e2e';
         ctx.beginPath();
-        ctx.moveTo(cx - 13, cy - up * 11);
-        ctx.quadraticCurveTo(cx - 6, cy - up * 6, cx - 1, cy);
-        ctx.quadraticCurveTo(cx + 5, cy - up * 7, cx + 12, cy - up * 12);
-        ctx.stroke();
-        // dark wing tips (the tint keeps them darker than the body)
-        ctx.strokeStyle = 'rgba(0,0,0,0.55)';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(cx - 13, cy - up * 11);
-        ctx.lineTo(cx - 9, cy - up * 8.5);
-        ctx.moveTo(cx + 12, cy - up * 12);
-        ctx.lineTo(cx + 8.5, cy - up * 9.5);
-        ctx.stroke();
+        ctx.arc(cx + 17, cy - 5, 1.6, 0, Math.PI * 2);
+        ctx.fill();
+        // darker wing tips
+        ctx.fillStyle = 'rgba(60,50,80,0.45)';
+        for (const d of [-1, 1]) {
+          ctx.beginPath();
+          ctx.arc(cx + d * 34, cy - up * 22 + (up < 0 ? 0 : 4), 4, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
     },
     [
-      { name: 'up', x: 0, w: 50 },
-      { name: 'down', x: 50, w: 50 },
+      { name: 'up', x: 0, w: 100 },
+      { name: 'mid', x: 100, w: 100 },
+      { name: 'down', x: 200, w: 100 },
     ],
   );
   // a butterfly: wings open / closed
@@ -246,7 +280,7 @@ export class Ambience {
       const y0 = view.top + view.height * (0.1 + Math.random() * 0.25);
       const depthK = 0.45 + Math.random() * 0.35; // farther birds are smaller and slower
       for (let i = 0; i < n; i++) {
-        const img = this.scene.add.image(0, 0, 'amb-bird', 'up').setDepth(DEPTH.clouds + 2).setTint(this.arctic ? (i % 2 ? 0xffffff : 0xf2f4fa) : i % 3 === 0 ? 0x5a4a6a : 0x6e5c80);
+        const img = this.scene.add.image(0, 0, 'amb-bird', 'up').setDepth(DEPTH.clouds + 2).setTint(this.arctic ? (i % 2 ? 0xffffff : 0xeef3fb) : [0x8fc8ff, 0xffb3c6, 0xffe17a, 0xb9f0d0][(i + Math.floor(y0)) % 4]);
         this.birds.push({
           img,
           x: dir > 0 ? -60 - i * 26 : view.width + 60 + i * 26,
@@ -262,10 +296,11 @@ export class Ambience {
       b.x += b.vx * dt;
       b.ph += dt;
       const glide = Math.sin(b.ph * 0.9) > 0.55; // they glide for a moment now and then
-      b.img.setFrame(glide ? 'up' : Math.floor(b.ph * b.flap) % 2 ? 'up' : 'down');
+      const fi = Math.floor(b.ph * b.flap * 2) % 4;
+      b.img.setFrame(glide ? 'mid' : ['up', 'mid', 'down', 'mid'][fi]);
       b.img
         .setPosition(view.left + b.x, view.top + b.y + Math.sin(b.ph * 1.7) * 6)
-        .setScale(0.42 * b.depthK)
+        .setScale(0.36 * b.depthK)
         .setFlipX(b.vx < 0)
         .setAlpha(this.arctic ? 0.95 : 0.8);
       const gone = b.x < -120 || b.x > view.width + 120;
