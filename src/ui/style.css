@@ -2002,3 +2002,5 @@ kbd {
 .battle-lobby.full .bl-start,
 .battle-lobby.full .bl-sub { display: none; }
 .battle-lobby.full .bl-status { font-size: clamp(18px, 4.4vh, 26px); max-width: 22em; }
+/* the end-of-level hero is the live one from the pick-a-player cards (its own standing animation) */
+.results-hero canvas.live { animation: none; }
