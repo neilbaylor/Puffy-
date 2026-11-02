@@ -503,8 +503,8 @@ export class BattleSim {
     p.hp -= damage;
     p.lastHitBy = by;
     const away = Math.sign(p.x - fromX) || 1;
-    // big heroes are harder to push about
-    const heavy = p.power === POWER.grow ? 0.6 : 1;
+    // big heroes are harder to push about (grown, or Big Muscles)
+    const heavy = (p.power === POWER.grow ? 0.6 : 1) * (charOf(p.hero).knockback ?? 1);
     p.vx = away * 280 * knock * heavy;
     p.vy = -400 * knock * heavy;
     p.onGround = false;
