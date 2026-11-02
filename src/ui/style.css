@@ -885,6 +885,8 @@ html.rotating body {
 .rotate-hero canvas {
   width: 104px;
   height: 104px;
+  /* a touch lower, so he sits in the middle of the phone */
+  translate: 0 7px;
   transform-origin: 50% 90%;
   /* a bouncy little idle: squash, stretch and sway */
   animation: hero-bob 0.9s ease-in-out infinite;
