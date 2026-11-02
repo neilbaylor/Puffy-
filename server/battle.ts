@@ -14,7 +14,8 @@ import { buildArena } from '../src/shared/battle/arena';
 import { BattleSim, DT, TICK_HZ } from '../src/shared/battle/sim';
 import { MAX_BATTLERS, packPlayer, type ClientMsg, type Phase, type RoomPlayer, type RoomState, type ServerMsg, type SnapPrize } from '../src/shared/battle/protocol';
 
-const COUNTDOWN_SECS = 3;
+/** (BATTLE_COUNTDOWN lengthens it, for taking screenshots) */
+const COUNTDOWN_SECS = Number(process.env.BATTLE_COUNTDOWN) > 0 ? Number(process.env.BATTLE_COUNTDOWN) : 3;
 const RESULTS_SECS = 8;
 /** A dropped player keeps their place this long (phones drop the connection when backgrounded). */
 const REJOIN_SECS = 30;
