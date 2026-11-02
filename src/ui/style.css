@@ -2009,7 +2009,7 @@ kbd {
    Two animations at once: the hop (up / down / squash) and the spin (its own easing). */
 .card.cheer[data-hero='scruffy'] canvas {
   transform-origin: 50% 80%;
-  animation: flip-hop 0.75s linear, flip-spin 0.75s linear;
+  animation: flip-hop 0.84s linear, flip-spin 0.84s linear;
 }
 @keyframes flip-hop {
   /* (translate / scale as their own properties: the hop stays straight up and down while he spins) */

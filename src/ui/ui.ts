@@ -683,7 +683,7 @@ export class UI {
     const step = () => {
       const t = hop && typeof hop.currentTime === 'number' ? hop.currentTime : performance.now() - t0;
       // (Scruffy does a little backflip, so he's up in the air a bit longer)
-      const [up, down, end] = ch.id === 'scruffy' ? [315, 510, 770] : [330, 540, 760];
+      const [up, down, end] = ch.id === 'scruffy' ? [355, 570, 860] : [330, 540, 760];
       show(t < 105 ? 'idle0' : t < up ? 'jump' : t < down ? 'fall' : 'idle0');
       if (card.isConnected && hop?.playState !== 'finished' && t < end) this.cheerRaf = requestAnimationFrame(step);
       else {
