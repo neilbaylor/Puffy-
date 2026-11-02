@@ -467,7 +467,7 @@ export class Giant extends Enemy {
           this.timer = 0.6;
           this.chargeCooldown = 3.8 + Math.random() * 1.6;
           b.setVelocityX(0);
-          this.gs.cameras.main.shake(140, 0.006);
+          this.gs.shakeFrom(this.x, b.bottom, 140, 0.006);
         }
         break;
       }
@@ -522,7 +522,7 @@ export class Giant extends Enemy {
     this.mode = 'walk';
     this.timer = 1.1 + Math.random() * 0.8;
     b.setVelocityX(0);
-    this.gs.cameras.main.shake(slam ? 320 : 200, slam ? 0.02 : 0.01);
+    this.gs.shakeFrom(this.x, b.bottom, slam ? 320 : 200, slam ? 0.02 : 0.01);
     this.gs.fx.dust(b.left + 10, b.bottom, slam ? 14 : 8);
     this.gs.fx.dust(b.right - 10, b.bottom, slam ? 14 : 8);
     if (slam) this.gs.fx.shockwave(this.x, b.bottom, 70);

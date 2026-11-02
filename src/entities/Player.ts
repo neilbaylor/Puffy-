@@ -3,6 +3,7 @@ import { DEPTH, MAX_FALL_SPEED } from '../config';
 import type { CharacterDef } from '../data/characters';
 import { sfx } from '../core/sfx';
 import { ART_RES, WALK_FRAMES } from '../gfx/draw';
+import { FaceClock } from '../gfx/face';
 import { emptyInput, type InputSource, type InputState } from '../input/types';
 import type { GameScene } from '../scenes/GameScene';
 
@@ -62,6 +63,7 @@ export class Player {
   private launchSpeed = 0;
   /** Sprite scale for this hero. */
   private S: number;
+  private face = new FaceClock();
   /** Eating a nuggie: seconds left of the munch animation. */
   private eating = 0;
 
@@ -242,7 +244,12 @@ export class Player {
         this.animTime += dt * 1.6;
         frame = `idle${Math.floor(this.animTime) % 2}`;
       }
-      this.view.setFrame(frame);
+      // standing about, they now and then blink, glance around, smile or chatter
+      this.face.tick(dt);
+      const fk = frame.startsWith('idle') ? this.face.key : null;
+      if (fk) this.view.setTexture(`char-${this.char.id}-face`, fk);
+      else if (this.view.texture.key !== `char-${this.char.id}`) this.view.setTexture(`char-${this.char.id}`, frame);
+      else this.view.setFrame(frame);
       this.view.setAlpha(this.invulnerable ? (Math.floor(this.scene.time.now / 70) % 2 ? 0.4 : 1) : 1);
     }
     this.drawMeter();

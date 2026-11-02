@@ -137,13 +137,44 @@ function drawEating(ctx: Ctx, ox: number, oy: number, id: string, chew: boolean,
   }
 }
 
-/** Big lobby picture: feet on the bottom edge, heroes drawn at their real relative sizes. */
+/** How far each hero's standing drawing reaches left and right of their middle (units), measured once. */
+const heroSpan = new Map<string, [number, number]>();
+function spanOf(ch: CharacterDef): [number, number] {
+  let sp = heroSpan.get(ch.id);
+  if (sp) return sp;
+  const R = 4;
+  const M = 24; // room either side for the bazooka
+  const { c, ctx } = canvas((CHAR_W + M * 2) * R, CHAR_H * R);
+  ctx.scale(R, R);
+  drawCharacter(ctx, M, 0, ch, 'idle0');
+  const data = ctx.getImageData(0, 0, c.width, c.height).data;
+  let x0 = c.width;
+  let x1 = 0;
+  for (let y = 0; y < c.height; y += 2)
+    for (let x = 0; x < c.width; x += 2)
+      if (data[(y * c.width + x) * 4 + 3] > 24) {
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+      }
+  sp = [x0 / R - M - 27, x1 / R - M - 27];
+  heroSpan.set(ch.id, sp);
+  return sp;
+}
+
+/**
+ * Big lobby picture: feet on the bottom edge, heroes drawn at their real
+ * relative sizes, centred on the whole drawing (bazooka included) and made
+ * smaller if they'd otherwise poke out of the side of the card.
+ */
 export function drawHeroCard(target: HTMLCanvasElement, ch: CharacterDef, pose: Pose = 'idle0', f?: Face) {
   const ctx = target.getContext('2d')!;
   ctx.clearRect(0, 0, target.width, target.height);
-  const s = (target.height / (56 * 1.32)) * ch.scale;
+  const [l, r] = spanOf(ch);
+  const mid = (l + r) / 2;
+  const half = (r - l) / 2;
+  const s = Math.min((target.height / (56 * 1.32)) * ch.scale, (target.width * 0.48) / half);
   ctx.save();
-  ctx.translate(target.width / 2, target.height * 0.985);
+  ctx.translate(target.width / 2 - mid * s, target.height * 0.985);
   ctx.scale(s, s);
   drawCharacter(ctx, -27, -54, ch, pose, f);
   ctx.restore();
@@ -157,18 +188,19 @@ export function drawHeroCard(target: HTMLCanvasElement, ch: CharacterDef, pose: 
 /** Each hero + pose's drawn outline, measured once (so redrawing a new face is cheap). */
 const portraitBox = new Map<string, [number, number, number, number]>();
 
-export function drawPortrait(target: HTMLCanvasElement, ch: CharacterDef, pose: Pose = 'idle0', f?: Face) {
+export function drawPortrait(target: HTMLCanvasElement, ch: CharacterDef, pose: Pose = 'idle0', f?: Face, boxPose: Pose = pose) {
   const R = 4;
   const { c: tmp, ctx: t } = canvas(CHAR_W * R, CHAR_H * R);
   t.scale(R, R);
   drawCharacter(t, 0, 0, ch, pose, f);
   // find the drawing's bounding box (with the neutral face, once per hero + pose)
-  const key = `${ch.id}:${pose}`;
+  // (frames of one animation share the box of `boxPose`, so they don't jump in size)
+  const key = `${ch.id}:${boxPose}`;
   let box = portraitBox.get(key);
   if (!box) {
     const { c: m, ctx: mc } = canvas(CHAR_W * R, CHAR_H * R);
     mc.scale(R, R);
-    drawCharacter(mc, 0, 0, ch, pose);
+    drawCharacter(mc, 0, 0, ch, boxPose);
     const data = mc.getImageData(0, 0, m.width, m.height).data;
     let x0 = m.width, y0 = m.height, x1 = 0, y1 = 0;
     for (let y = 0; y < m.height; y += 2)

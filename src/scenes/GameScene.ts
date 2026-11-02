@@ -146,7 +146,7 @@ export class GameScene extends Phaser.Scene {
   private auras: Aura[] = [];
   private rootbeers: RootBeer[] = [];
   private pendingAura: { at: number; p: Player }[] = [];
-  private waves: { img: Phaser.GameObjects.Image; glow: Phaser.GameObjects.Image; dir: number; speed: number; life: number; y: number; t: number }[] = [];
+  private waves: { img: Phaser.GameObjects.Image; glow: Phaser.GameObjects.Image; dir: number; speed: number; life: number; y: number; t: number; vy: number }[] = [];
   private gRootbeer!: Group;
   private checkpoints: Checkpoint[] = [];
   private goal?: Goal;
@@ -678,13 +678,29 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** A giant's landing shockwave: rolls along the ground; jump over it. */
+  /**
+   * Shake the camera for something heavy happening at (x, y): full strength
+   * when it's right there on screen, weaker the further it is from you, and
+   * hardly at all once it's well off screen.
+   */
+  shakeFrom(x: number, y: number, ms: number, intensity: number) {
+    const p = this.players.find((q) => q.alive) ?? this.players[0];
+    const view = this.cameras.main.worldView;
+    const onScreen = x > view.x - 20 && x < view.right + 20 && y > view.y - 40 && y < view.bottom + 60;
+    const d = p ? Math.hypot(p.x - x, (p.y - y) * 0.7) : 0;
+    let k = Phaser.Math.Clamp(1.12 - d / 650, 0, 1);
+    if (!onScreen) k *= 0.35;
+    if (k < 0.06) return;
+    this.cameras.main.shake(ms * (0.6 + 0.4 * k), intensity * k);
+  }
+
   spawnShockwave(x: number, groundY: number, dir: number, speed: number) {
     // a rolling wall of fire (flickering hand-drawn flames over an orange glow)
     const glow = this.add.image(x, groundY - 16, 'glow').setTint(0xff7a2a).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.75).setScale(1.6, 1.1).setDepth(DEPTH_WAVE - 0.1);
     const img = this.add.image(x, groundY + 3, 'flame', 'f0').setOrigin(0.5, 1).setScale(0.1 * FLAME_S, FLAME_S).setFlipX(dir < 0).setDepth(DEPTH_WAVE);
     this.tweens.add({ targets: img, scaleX: FLAME_S, duration: 140, ease: 'Back.easeOut' });
     this.fx.flameBurst(x, groundY);
-    this.waves.push({ img, glow, dir, speed, life: 1.5 + FLAME_FADE * 0.85, y: groundY, t: Math.random() });
+    this.waves.push({ img, glow, dir, speed, life: 1.5 + FLAME_FADE * 0.85, y: groundY, t: Math.random(), vy: 0 });
   }
 
   private updateWaves(dt: number) {
@@ -693,7 +709,25 @@ export class GameScene extends Phaser.Scene {
       w.t += dt;
       // the last stretch of a flame's life: it shrinks, slows, sputters and smokes
       const vigor = Phaser.Math.Clamp(w.life / FLAME_FADE, 0, 1);
-      w.img.x += w.dir * w.speed * dt * (0.35 + 0.65 * vigor);
+      // it rolls along the ground, and falls (with gravity) off ledges and into holes
+      const grounded = w.vy === 0 && this.level.isSolidAt(w.img.x, w.y + 6);
+      w.img.x += w.dir * w.speed * dt * (0.35 + 0.65 * vigor) * (grounded ? 1 : 0.75);
+      if (!grounded) {
+        w.vy = Math.min(900, w.vy + 1600 * dt);
+        const ny = w.y + w.vy * dt;
+        const landY = Math.floor(ny / TILE) * TILE;
+        if (this.level.isSolidAt(w.img.x, ny) && !this.level.isSolidAt(w.img.x, landY - 4)) {
+          w.y = landY;
+          w.vy = 0;
+          this.fx.flameBurst(w.img.x, w.y);
+        } else w.y = ny;
+        if (w.y > this.level.heightPx + 60) {
+          w.img.destroy();
+          w.glow.destroy();
+          return false;
+        }
+      }
+      w.img.y = w.y + 3;
       // full flames loop through 8 frames; as it burns out it breaks up into small
       // sputtering flickers over glowing coals
       const dying = vigor < 0.42;
@@ -704,9 +738,9 @@ export class GameScene extends Phaser.Scene {
       w.img.setAlpha(dying ? 0.7 + 0.3 * (vigor / 0.42) : 1);
       w.glow.setPosition(w.img.x, w.y - 16).setAlpha((0.6 + Math.sin(w.t * 31) * 0.15) * vigor).setScale(1.6 * (0.5 + 0.5 * vigor), 1.1 * (0.5 + 0.5 * vigor));
       const front = w.img.x + w.dir * 20;
-      const groundAhead = this.level.isSolidAt(front, w.y + 6) && !this.level.isSolidAt(front, w.y - 8);
       this.fx.flameTrail(w.img.x, w.y, w.dir, vigor);
-      if (!groundAhead && w.life > FLAME_FADE) w.life = FLAME_FADE; // reached an edge: start dying there
+      // ran into a wall: it burns out there
+      if (this.level.isSolidAt(front, w.y - 8) && w.life > FLAME_FADE) w.life = FLAME_FADE;
       if (w.life <= 0) {
         // the last flicker sinks into a curl of smoke and a few embers, leaving a scorch mark
         this.fx.flameDie(w.img.x, w.y);

@@ -12,6 +12,7 @@ import { drawHockeyNet, drawPuck, drawRinkLines, drawStick } from './hockey';
 import { MOUNTAIN_LOOKS, drawMountainFar, drawMountainMid, drawMountainNear, type MountainLook } from './mountain';
 import { FLAME_FRAMES, FLAME_H, FLAME_W, drawDyingFlame, drawFlame, drawScorch } from './flame';
 import { ART_RES, ART_STYLE, CHAR_H, CHAR_W, POSES, canvas, drawCharacter, ellipse, type Ctx } from './draw';
+import { FACE_FRAMES, faceFromKey } from './face';
 import { STYLES } from './handdrawn';
 import {
   DEFAULT_PALETTE,
@@ -121,6 +122,9 @@ function makeCharacters(scene: Phaser.Scene) {
   // a little extra room either side (the bazooka tip pokes out of the 56-unit cell)
   const M = 8;
   for (const ch of CHARACTERS) sheet(scene, `char-${ch.id}`, CHAR_W + M * 2, CHAR_H, POSES, (ctx, p) => drawCharacter(ctx, M, 0, ch, p));
+  // the standing pose with each of the little faces they pull now and then in the game
+  for (const ch of CHARACTERS)
+    sheet(scene, `char-${ch.id}-face`, CHAR_W + M * 2, CHAR_H, FACE_FRAMES, (ctx, f) => drawCharacter(ctx, M, 0, ch, 'idle0', faceFromKey(f)));
 }
 
 function makeBaddies(scene: Phaser.Scene) {

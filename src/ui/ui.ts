@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { CHARACTERS, characterById } from '../data/characters';
 import type { Session } from '../core/session';
-import { fadeOutMusic, playLevelClear, playLevelMusic, playLevelSong, primeMusic, setMusicMuted, stopMusic } from '../core/music';
+import { fadeOutMusic, playLevelClear, playLevelMusic, playLevelSong, playMenuMusic, primeMusic, setMusicMuted, stopMusic } from '../core/music';
 import { isMuted, setMuted, sfx, unlockAudio } from '../core/sfx';
 import { drawHeroCard, drawPortrait, renderPoseSet } from '../gfx/draw';
 import { NEUTRAL_FACE, type Face } from '../gfx/face';
@@ -58,7 +58,7 @@ function controlsHtml(compact = false) {
     [`${kc('←')}${kc('→')} <small>or</small> ${kc('A')}${kc('D')}`, 'move'],
     [`${kc('↑')} <small>or</small> ${kc('W')}`, compact ? 'jump (again in the air: double jump)' : 'jump — press again in the air for a double jump'],
     [`${kc('Space')} <small>or</small> 🖱️ <small>click</small>`, 'fire the bazooka'],
-    [`hold ${kc('Shift')}`, 'run (uses stamina)'],
+    [`${kc('Shift')}`, 'hold to run (uses stamina)'],
     [`${kc('Esc')}`, 'pause'],
   ];
   return `<div class="controls${compact ? ' compact' : ''}">${rows.map(([k, what]) => `<span class="ctl"><span class="keys">${k}</span><em>${what}</em></span>`).join('')}</div>`;
@@ -88,6 +88,10 @@ function waveText(text: string) {
     })
     .join('<b class="sep">•</b>');
 }
+
+/** Speaker icons for the sound toggle. */
+const SPEAKER_ON = `<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>`;
+const SPEAKER_OFF = `<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M16 9.5l5 5M21 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>`;
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 
@@ -185,6 +189,7 @@ export class UI {
   private pickRaf = 0;
   private subtitleTimer = 0;
   private hudFace: FaceLife | null = null;
+  private hudIdle = 0;
   private selected = 0;
   private introEl: HTMLElement | null = null;
   /** Which level to start (1-based); you can pick once you've beaten a level. */
@@ -413,8 +418,9 @@ export class UI {
     this.hud.hidden = true;
     this.banner.hidden = true;
     this.touch.hide();
-    stopMusic();
-    const el = h(`<div class="screen start">
+    // the start screen's song (phones only let it start once you've touched the screen)
+    playMenuMusic();
+    const el = h(`<div class="screen start${progress.beaten >= 1 ? '' : ' no-levels'}">
       <header class="start-head">
         <div class="logo"><span>P</span><span>U</span><span>F</span><span>F</span><span>Y</span></div>
         <p class="world-name" aria-label="${levelInfo(this.level).world} · ${levelName(this.level)}">${waveText(`${levelInfo(this.level).world} · ${levelName(this.level)}`)}</p>
@@ -429,6 +435,7 @@ export class UI {
           : ''
       }
       <button class="icon-btn fs-btn" data-act="fs" aria-label="Full screen" hidden>⛶</button>
+      <button class="icon-btn mute-btn" data-act="mute" aria-label="Sound on or off"></button>
       <p class="version">v${VERSION}</p>
       <div class="start-foot">
         <button class="btn btn-big btn-go" data-act="play">Play</button>
@@ -451,14 +458,6 @@ export class UI {
       </button>`);
       const cv = card.querySelector('canvas')!;
       drawHeroCard(cv, c, 'idle0');
-      // now and then they look around, blink, smile or chatter (each on their own)
-      new FaceLife(
-        (f) => {
-          if (!card.classList.contains('cheer')) drawHeroCard(cv, c, 'idle0', f);
-        },
-        () => this.screen === el && el.isConnected,
-        { mouth: true },
-      );
       // select the moment a finger touches the card (a tap can trigger full screen and
       // shift the layout before the finger lifts); tapping the picked card again plays
       let pickedOnDown = false;
@@ -479,6 +478,15 @@ export class UI {
       cards.appendChild(card);
     });
     el.querySelector('[data-act=play]')!.addEventListener('click', () => this.play());
+    // the picked hero now and then blinks, glances around, smiles or chatters
+    new FaceLife(
+      (f) => {
+        const card = el.querySelectorAll<HTMLElement>('.card')[this.selected];
+        if (card && !card.classList.contains('cheer')) drawHeroCard(card.querySelector('canvas')!, CHARACTERS[this.selected], 'idle0', f);
+      },
+      () => this.screen === el && el.isConnected,
+      { mouth: true },
+    );
     const syncLevels = () => {
       el.querySelectorAll<HTMLButtonElement>('.lvl').forEach((b) => b.classList.toggle('picked', Number(b.dataset.lvl) === this.level));
       const wn = el.querySelector<HTMLElement>('.world-name')!;
@@ -526,6 +534,29 @@ export class UI {
       }),
     );
     syncLevels();
+    // first touch / key anywhere on the start screen: audio is allowed now, start the song
+    const wake = () => {
+      unlockAudio();
+      primeMusic();
+      if (this.screen === el) playMenuMusic();
+      el.removeEventListener('pointerdown', wake, true);
+      window.removeEventListener('keydown', wake, true);
+    };
+    el.addEventListener('pointerdown', wake, true);
+    window.addEventListener('keydown', wake, true);
+    // a small sound on/off toggle, top left
+    const muteBtn = el.querySelector<HTMLButtonElement>('[data-act=mute]')!;
+    const syncMute = () => {
+      muteBtn.innerHTML = isMuted() ? SPEAKER_OFF : SPEAKER_ON;
+      muteBtn.classList.toggle('off', isMuted());
+    };
+    syncMute();
+    muteBtn.addEventListener('click', () => {
+      setMuted(!isMuted());
+      setMusicMuted(isMuted());
+      syncMute();
+      if (!isMuted()) playMenuMusic();
+    });
     const fsBtn = el.querySelector<HTMLButtonElement>('[data-act=fs]')!;
     const syncFs = () => (fsBtn.hidden = !canFullscreen() || isFullscreen() || isStandalone());
     syncFs();
@@ -565,9 +596,15 @@ export class UI {
   }
 
   private select(i: number, quiet = false) {
+    const prev = this.selected;
     this.selected = i;
     const el = this.screen;
     if (!el) return;
+    // the hero we moved away from goes back to a plain face
+    if (prev !== i) {
+      const pc = el.querySelectorAll<HTMLElement>('.card')[prev]?.querySelector('canvas');
+      if (pc) drawHeroCard(pc, CHARACTERS[prev], 'idle0');
+    }
     el.querySelectorAll<HTMLElement>('.card').forEach((c, k) => {
       c.classList.toggle('picked', k === i);
       c.setAttribute('aria-checked', String(k === i));
@@ -672,6 +709,7 @@ export class UI {
 
   private startGame(session: Session, checkpoint = -1) {
     sfx.select();
+    stopMusic(); // (the start screen's song)
     this.introEl?.remove();
     this.introEl = null;
     this.session = session;
@@ -688,11 +726,22 @@ export class UI {
     this.hud.hidden = false;
     const hero = characterById(this.session.players[0]?.characterId ?? 'puffy');
     const cv = this.hud.querySelector('canvas')!;
-    drawPortrait(cv, hero);
-    // a very subtle bit of life: a slow breath (CSS) and the odd blink or glance
+    // the hero's own standing animation (the same two frames as in the game, at the
+    // same pace), plus the odd blink or glance
     this.hudFace?.stop();
+    clearInterval(this.hudIdle);
     const session = this.session;
-    this.hudFace = new FaceLife((f) => drawPortrait(cv, hero, 'idle0', f), () => !this.hud.hidden && this.session === session, { mouth: false, calm: true });
+    let pose: 'idle0' | 'idle1' = 'idle0';
+    let face: Face | undefined;
+    const draw = () => drawPortrait(cv, hero, pose, face, 'idle0');
+    draw();
+    const alive = () => !this.hud.hidden && this.session === session;
+    this.hudFace = new FaceLife((f) => ((face = f), draw()), alive, { mouth: false, calm: true });
+    this.hudIdle = window.setInterval(() => {
+      if (!alive()) return clearInterval(this.hudIdle);
+      pose = pose === 'idle0' ? 'idle1' : 'idle0';
+      draw();
+    }, 625);
     if (usingTouch()) this.touch.show();
     else this.touch.hide();
   }

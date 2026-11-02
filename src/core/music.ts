@@ -1,6 +1,7 @@
 import levelClearUrl from '../assets/level-clear.m4a';
 import hoopsUrl from '../assets/hoops.m4a';
 import mountainUrl from '../assets/mountain-climb.m4a';
+import menuUrl from '../assets/game-ready.m4a';
 import { isMuted } from './sfx';
 
 /**
@@ -8,8 +9,10 @@ import { isMuted } from './sfx';
  * browsers only allow audio started by a tap, so `primeMusic()` runs on the
  * first tap to "unlock" every track; after that the game can start them.
  */
-type Track = 'levelClear' | 'hoops' | 'mountain';
-const urls: Record<Track, string> = { levelClear: levelClearUrl, hoops: hoopsUrl, mountain: mountainUrl };
+type Track = 'levelClear' | 'hoops' | 'mountain' | 'menu';
+const urls: Record<Track, string> = { levelClear: levelClearUrl, hoops: hoopsUrl, mountain: mountainUrl, menu: menuUrl };
+/** The track that should be playing (priming must not pause it). */
+let wanted: HTMLAudioElement | null = null;
 const tracks: Partial<Record<Track, HTMLAudioElement>> = {};
 let primed = false;
 
@@ -29,9 +32,14 @@ export function primeMusic() {
   primed = true;
   for (const t of Object.keys(urls) as Track[]) {
     const a = el(t);
+    if (a === wanted && !a.paused) continue;
     a.muted = true;
     a.play()
       .then(() => {
+        if (a === wanted) {
+          a.muted = isMuted();
+          return;
+        }
         a.pause();
         a.currentTime = 0;
         a.muted = false;
@@ -45,6 +53,7 @@ export function primeMusic() {
 function play(t: Track) {
   stopMusic();
   const a = el(t);
+  wanted = a;
   a.playbackRate = 1;
   a.muted = isMuted();
   a.currentTime = 0;
@@ -62,6 +71,7 @@ export const playLevelSong = (level = 1) => play(levelTrack(level));
 /** The level track: loops during play. Keeps going (no restart) if it's already on. */
 export function playLevelMusic(level = 1) {
   const a = el(levelTrack(level));
+  wanted = a;
   for (const [k, t] of Object.entries(tracks)) if (t && t !== a && !t.paused && k !== levelTrack(level)) t.pause();
   a.muted = isMuted();
   if (!a.paused) return;
@@ -69,6 +79,17 @@ export function playLevelMusic(level = 1) {
   a.play().catch(() => {});
 }
 export const playHoops = () => play('hoops');
+
+/** The start screen's song ("Game Ready"): loops; keeps going if it's already on. */
+export function playMenuMusic() {
+  const a = el('menu');
+  wanted = a;
+  for (const t of Object.values(tracks)) if (t && t !== a && !t.paused) t.pause();
+  a.muted = isMuted();
+  a.volume = 0.8;
+  if (!a.paused) return;
+  a.play().catch(() => {});
+}
 
 /** Speed the current track up (or back down), e.g. 1.5× for sudden death. */
 export function setMusicRate(rate: number) {
@@ -95,6 +116,7 @@ export function fadeOutMusic(ms = 600) {
 }
 
 export function stopMusic() {
+  wanted = null;
   for (const a of Object.values(tracks)) a?.pause();
 }
 

@@ -228,6 +228,9 @@ section { display: grid; gap: 14px; }
   var NEUTRAL_FACE = { lookX: 0, lookY: 0, blink: false, mouth: "rest" };
   var current = NEUTRAL_FACE;
   var face = () => current;
+  var EYES = ["n", "blink", "back", "up"];
+  var MOUTHS = ["rest", "smile", "o", "open"];
+  var FACE_FRAMES = EYES.flatMap((e) => MOUTHS.map((m) => `${e}-${m}`)).filter((k) => k !== "n-rest");
 
   // src/gfx/puffy.ts
   var PUFFY = {
