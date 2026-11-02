@@ -120,7 +120,14 @@ export class UI {
     this.banner = h(`<div class="banner" hidden></div>`);
     this.root.appendChild(this.banner);
     this.touch = new TouchControls(this.root);
-    this.rotate = h(`<div class="rotate" hidden><div class="rotate-phone"></div><p>Turn your device sideways to play</p></div>`);
+    this.rotate = h(`<div class="rotate" hidden>
+      <i class="rc rc1"></i><i class="rc rc2"></i><i class="rc rc3"></i>
+      <div class="logo"><span>P</span><span>U</span><span>F</span><span>F</span><span>Y</span></div>
+      <div class="rotate-stage"><div class="rotate-phone"><canvas width="200" height="200"></canvas></div></div>
+      <p>Turn your phone sideways to play!</p>
+      <div class="rotate-hill"></div>
+    </div>`);
+    drawPortrait(this.rotate.querySelector('canvas')!, CHARACTERS[0], 'idle0');
     this.root.appendChild(this.rotate);
     this.selected = Math.max(0, CHARACTERS.findIndex((c) => c.id === store.get('puffy.hero')));
 
@@ -185,6 +192,8 @@ export class UI {
     const checkOrientation = () => {
       const portrait = window.innerHeight > window.innerWidth;
       this.rotate.hidden = !(portrait && isTouchDevice());
+      // the page behind matches the prompt, so no strip of sky shows under it (iOS home screen)
+      document.documentElement.classList.toggle('rotating', !this.rotate.hidden);
     };
     window.addEventListener('resize', checkOrientation);
     checkOrientation();
