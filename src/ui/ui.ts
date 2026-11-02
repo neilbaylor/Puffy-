@@ -880,7 +880,6 @@ export class UI {
   private showResults(r: ResultState) {
     this.touch.hide();
     // beating a level unlocks picking where to start
-    const firstTime = progress.beaten < (r.level ?? 1);
     progress.markBeaten(r.level ?? 1);
     playLevelClear();
     const nextInfo = LEVELS.find((l) => l.id === (r.level ?? 1) + 1);
@@ -896,7 +895,6 @@ export class UI {
         <div class="results-body">
           <p class="eyebrow">${levelName(r.level ?? this.level)}</p>
           <h2>Level clear!</h2>
-          ${firstTime ? '<p class="unlock-note">New: pick which level to start from on the start screen!</p>' : ''}
           <dl class="stat-list">
             <dt>Lives left <i class="life-ico"></i></dt><dd>${r.lives}</dd>
             <dt>Aura carried <i class="aura-ico"></i></dt><dd>${r.aura}</dd>
