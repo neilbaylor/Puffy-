@@ -50,6 +50,19 @@ const store = {
  * All menus and the HUD are plain DOM over the canvas: crisp text at any
  * pixel density and easy safe-area handling on notched phones and tablets.
  */
+/** Keyboard + mouse controls, as little key caps (shown on computers without a touch screen). */
+const kc = (k: string) => `<kbd>${k}</kbd>`;
+function controlsHtml(compact = false) {
+  const rows: [string, string][] = [
+    [`${kc('←')}${kc('→')} <small>or</small> ${kc('A')}${kc('D')}`, 'move'],
+    [`${kc('Space')} <small>or</small> ${kc('↑')}`, compact ? 'jump (again in the air: double jump)' : 'jump — press again in the air for a double jump'],
+    [`${kc('F')} <small>or</small> 🖱️ <small>click</small>`, 'fire the bazooka'],
+    [`hold ${kc('Shift')}`, 'run (uses stamina)'],
+    [`${kc('Esc')}`, 'pause'],
+  ];
+  return `<div class="controls${compact ? ' compact' : ''}">${rows.map(([k, what]) => `<span class="ctl"><span class="keys">${k}</span><em>${what}</em></span>`).join('')}</div>`;
+}
+
 /** Letters as spans for the subtitle's rolling wave (words spaced out, dots as separators). */
 function waveText(text: string) {
   let i = 0;
@@ -162,6 +175,13 @@ export class UI {
       this.introEl.classList.add('on');
     });
     game.events.on('level-intro-end', () => {
+      if (!isTouchDevice()) {
+        // a quick reminder of the keys, fading away after a few seconds
+        const tip = h(`<div class="ctl-tip">${controlsHtml(true)}</div>`);
+        this.root.appendChild(tip);
+        setTimeout(() => tip.classList.add('off'), 6500);
+        setTimeout(() => tip.remove(), 7300);
+      }
       const el = this.introEl;
       this.introEl = null;
       if (el) {
@@ -259,6 +279,7 @@ export class UI {
       <p class="version">v${VERSION}</p>
       <div class="start-foot">
         <button class="btn btn-big" data-act="play">Play</button>
+        ${isTouchDevice() ? '' : controlsHtml(true)}
       </div>
     </div>`);
     const cards = el.querySelector('.cards')!;
@@ -456,6 +477,7 @@ export class UI {
         <button class="btn btn-alt" data-act="restart">Restart level</button>
         <button class="btn btn-alt" data-act="hero">Pick another player</button>
         <button class="btn btn-alt" data-act="sound">${isMuted() ? 'Sound: off' : 'Sound: on'}</button>
+        ${isTouchDevice() ? '' : `<h3 class="ctl-title">Controls</h3>${controlsHtml()}`}
       </div>
     </div>`);
     const act = (a: string, fn: () => void) => el.querySelector(`[data-act=${a}]`)!.addEventListener('click', fn);

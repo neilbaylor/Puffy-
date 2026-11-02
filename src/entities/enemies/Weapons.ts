@@ -66,6 +66,8 @@ export class Weapon {
 
   update(dt: number, active: boolean) {
     this.t += dt;
+    // hurt twice, the chainsaw guy loses his temper and THROWS it at you
+    if (this.kind === 'saw' && this.owner.hp <= 1 && active) return this.throwSaw();
     const o = this.owner;
     const f = this.facing;
     const hand = this.hand;
@@ -161,6 +163,30 @@ export class Weapon {
     }
   }
 
+  /** RAAH! The spinning chainsaw is hurled at you in an arc; he fights on bare-handed. */
+  private throwSaw() {
+    const o = this.owner;
+    const f = this.facing;
+    const hand = this.hand;
+    const tgt = this.gs.nearestPlayer(o.x, o.y);
+    const tx = tgt ? tgt.x : hand.x + f * 250;
+    const ty = tgt ? tgt.body.center.y : hand.y;
+    const G = 700;
+    const dist = Math.abs(tx - hand.x);
+    const T = Phaser.Math.Clamp(dist / 420, 0.35, 0.85);
+    let vx = (tx - hand.x) / T;
+    if (Math.abs(vx) < 120) vx = (Math.sign(tx - hand.x) || f) * 120;
+    const vy = (ty - hand.y - 0.5 * G * T * T) / T;
+    new ThrownSaw(this.gs, hand.x + f * 20, hand.y, vx, vy, G, this.k);
+    this.gs.fx.popText(o.x, o.body.top - 18, 'RAAH!', '#ff5a3c', 22);
+    sfx.saw();
+    sfx.whoosh();
+    this.busy = false;
+    this.charge = 0;
+    this.img.destroy();
+    o.weapon = null;
+  }
+
   /** Fire a fuzzy pom-pom from the muzzle. */
   private fire() {
     const f = this.facing;
@@ -230,6 +256,68 @@ class PomPom {
   private poof() {
     this.gs.fx.dust(this.img.x, this.img.y + 4, 5);
     this.gone();
+  }
+
+  private gone() {
+    this.gs.events.off(Phaser.Scenes.Events.UPDATE, this.onUpdate);
+    if (this.img.scene) this.img.destroy();
+  }
+}
+
+/** A thrown chainsaw: spins through the air buzzing, hurts on contact, sticks in the ground. */
+class ThrownSaw {
+  private img: Phaser.GameObjects.Image;
+  private t = 0;
+  private stuck = 0;
+  private readonly onUpdate: (time: number, delta: number) => void;
+
+  constructor(
+    private gs: GameScene,
+    x: number,
+    y: number,
+    private vx: number,
+    private vy: number,
+    private g: number,
+    k: number,
+  ) {
+    this.img = gs.add.image(x, y, 'w-saw', 's0').setScale(k / W_RES).setDepth(26).setFlipX(vx > 0);
+    this.onUpdate = (_t, delta) => this.step(Math.min(delta / 1000, 0.05));
+    gs.events.on(Phaser.Scenes.Events.UPDATE, this.onUpdate);
+    gs.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.gone());
+  }
+
+  private step(dt: number) {
+    const img = this.img;
+    if (!img.scene) return this.gone();
+    this.t += dt;
+    img.setFrame(Math.floor(this.t * 30) % 2 ? 's0' : 's1');
+    if (this.stuck > 0) {
+      // buzzing away, stuck in the ground, then it fades
+      this.stuck -= dt;
+      img.x += Math.sin(this.t * 90) * 0.4;
+      if (this.stuck < 0.6) img.setAlpha(Math.max(0, this.stuck / 0.6));
+      if (this.stuck <= 0) this.gone();
+      return;
+    }
+    this.vy += this.g * dt;
+    img.x += this.vx * dt;
+    img.y += this.vy * dt;
+    img.rotation += dt * 16 * Math.sign(this.vx);
+    if (Math.random() < 0.5) this.gs.fx.sparkle(img.x, img.y, 1);
+    for (const p of this.gs.players) {
+      if (!p.alive) continue;
+      const pb = p.body;
+      if (img.x + 16 < pb.left || img.x - 16 > pb.right || img.y + 12 < pb.top || img.y - 12 > pb.bottom) continue;
+      this.gs.hitPlayer(p, img.x - Math.sign(this.vx) * 30);
+    }
+    if (this.gs.level.isSolidAt(img.x, img.y + 8)) {
+      // THUNK — it bites into the ground, blade first
+      this.stuck = 1.6;
+      img.setRotation(Math.sign(this.vx) * 1.2);
+      this.gs.fx.dust(img.x, img.y + 8, 8);
+      this.gs.cameras.main.shake(90, 0.004);
+      sfx.thud();
+    } else if (this.t > 3 || img.y > this.gs.level.heightPx + 50) this.gone();
   }
 
   private gone() {

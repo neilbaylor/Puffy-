@@ -15,7 +15,7 @@ const st = () => STYLES.polished;
 export type KingFrame = 'idle0' | 'idle1' | 'shoot' | 'laugh0' | 'laugh1' | 'sad' | 'run0' | 'run1' | 'talk' | 'bend' | 'hold' | 'adjust0' | 'adjust1';
 export const KING_FRAMES: KingFrame[] = ['idle0', 'idle1', 'shoot', 'laugh0', 'laugh1', 'sad', 'run0', 'run1', 'talk', 'bend', 'hold', 'adjust0', 'adjust1'];
 /** Lean (radians, about his feet) for the frames where he bends over. */
-const KING_LEAN: Partial<Record<string, number>> = { bend: -0.32 };
+const KING_LEAN: Partial<Record<string, number>> = { bend: -0.32, laugh0: 0.13, laugh1: -0.16 };
 const leanPt = (f: string, x: number, y: number) => {
   const a = KING_LEAN[f] ?? 0;
   if (!a) return { x, y };
@@ -103,13 +103,14 @@ export function drawKing(ctx: Ctx, ox: number, oy: number, f: KingFrame, withCro
   let armA = laugh ? 0.9 : f === 'sad' || run ? -2.2 : f === 'shoot' ? -0.2 : -0.75 + bob * 0.04;
   let armB = laugh ? Math.PI - 0.9 : f === 'sad' || run ? Math.PI + 2.2 : f === 'shoot' ? Math.PI + 0.2 : Math.PI + 0.75 - bob * 0.04;
   // handling the crown: reaching down for it, holding it up high, both hands fixing it on
+  if (f === 'laugh1') [armA, armB] = [-0.95, Math.PI + 0.95]; // arms flung up and out, doubled over
   if (f === 'bend') [armA, armB] = [-0.4, Math.PI - 0.95];
   if (f === 'hold') [armA, armB] = [-0.9, Math.PI + 1.38];
   if (f === 'adjust0') [armA, armB] = [-1.15, Math.PI + 1.15];
   if (f === 'adjust1') [armA, armB] = [-1.3, Math.PI + 1.3];
   // when he handles his crown the arms come round in front of him, so you see his hands
-  const handsFront = f === 'bend' || f === 'hold' || f === 'adjust0' || f === 'adjust1';
-  const armAFront = f === 'adjust0' || f === 'adjust1';
+  const handsFront = f === 'bend' || f === 'hold' || f === 'adjust0' || f === 'adjust1' || f === 'laugh1';
+  const armAFront = f === 'adjust0' || f === 'adjust1' || f === 'laugh1';
   if (!armAFront) S.shape(ctx, paddlePts(cx + rx - 8, cy - 2, 30, 13, armA), KING_LIMB, 1520, { lw: 1.1 });
   if (!handsFront) S.shape(ctx, paddlePts(cx - rx + 8, cy - 2, 30, 13, armB), KING_LIMB, 1521, { lw: 1.1 });
 
@@ -123,9 +124,17 @@ export function drawKing(ctx: Ctx, ox: number, oy: number, f: KingFrame, withCro
 
   // eyes: one big, one smaller, angry V brow (like the sketch)
   const sad = f === 'sad' || run;
-  if (laugh) {
+  if (f === 'laugh0') {
+    // head thrown back: happy upside-down-U eyes
     for (const [ex, w] of [[cx - 16, 11], [cx + 12, 9]] as const)
       S.line(ctx, [[ex - w, cy - 10], [ex, cy - 18], [ex + w, cy - 10]], 1550 + ex, 1.5);
+  } else if (f === 'laugh1') {
+    // doubled over: eyes squeezed shut >< with tears flying off
+    for (const [ex, d] of [[cx - 15, 1], [cx + 12, -1]] as const) {
+      S.line(ctx, [[ex - 8 * d, cy - 18], [ex + 2 * d, cy - 13], [ex - 8 * d, cy - 8]], 1552 + ex, 1.6);
+    }
+    for (const [tx, ty, r] of [[cx - 31, cy - 18, 4.4], [cx - 39, cy - 6, 3.4], [cx + 27, cy - 20, 3.8], [cx + 34, cy - 9, 2.8]] as const)
+      S.shape(ctx, [[tx, ty - r * 1.6], [tx + r, ty], [tx, ty + r], [tx - r, ty]], { base: '#8fd8ff', shade: '#4fa8e0', light: '#ffffff' }, 1556 + tx, { lw: 0.6, plain: true });
   } else {
     for (const [ex, ey, er, s] of [[cx - 16, cy - 12, 13, 1], [cx + 13, cy - 13, 10, 2]] as const) {
       S.shape(ctx, ellipsePts(ex, ey, er, er * 1.05, 0, 28), EYE, 1560 + s, { lw: 1.1 });
@@ -152,7 +161,7 @@ export function drawKing(ctx: Ctx, ox: number, oy: number, f: KingFrame, withCro
   const mx = cx - 2;
   const my = cy + 12;
   if (f === 'shoot' || laugh || f === 'talk') {
-    const open = f === 'shoot' ? 15 : f === 'talk' ? 11 : 18;
+    const open = f === 'shoot' ? 15 : f === 'talk' ? 11 : f === 'laugh1' ? 12 : 20;
     const mouth = ellipsePts(mx, my + 2, 20, open, 0, 36);
     S.shape(ctx, mouth, { base: '#5e1a2a', shade: '#33091a', light: '#8e2f45' }, 1580, { lw: 1.2 });
     ctx.save();

@@ -16,8 +16,24 @@ export function installKeyboard(): void {
     if (BLOCK_DEFAULT.has(e.code)) e.preventDefault();
   });
   window.addEventListener('keyup', (e) => down.delete(e.code));
-  window.addEventListener('blur', () => down.clear());
+  window.addEventListener('blur', () => {
+    down.clear();
+    mouseFire = false;
+  });
+  // on a computer, clicking the game (not the buttons) fires the bazooka
+  window.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'mouse' || e.button !== 0) return;
+    const t = e.target as HTMLElement | null;
+    if (t && t.closest('button, .screen, .panel, .hud, .hoops')) return;
+    mouseFire = true;
+  });
+  window.addEventListener('pointerup', (e) => {
+    if (e.pointerType === 'mouse') mouseFire = false;
+  });
 }
+
+/** Left mouse button held over the game. */
+let mouseFire = false;
 
 const any = (codes: string[]) => codes.some((c) => down.has(c));
 
@@ -43,7 +59,7 @@ class KeyboardSource implements InputSource {
       left: any(l.left),
       right: any(l.right),
       jump: any(l.jump),
-      fire: any(l.fire),
+      fire: any(l.fire) || (this.id === 'kb' && mouseFire),
       run: any(l.run),
     };
   }
@@ -52,7 +68,7 @@ class KeyboardSource implements InputSource {
   }
 }
 
-/** Single-player keyboard: arrows or WASD to move, Space/W/↑ jump, F/J/X fire, Shift run. */
+/** Single-player keyboard (+ mouse): arrows or WASD to move, Space/W/↑ jump, F/J/X or click to fire, Shift run. */
 export const soloKeyboard: InputSource = new KeyboardSource('kb', 'Keyboard', '←/→ or A/D move · Space jump · F fire · Shift run', {
   left: ['ArrowLeft', 'KeyA'],
   right: ['ArrowRight', 'KeyD'],

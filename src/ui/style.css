@@ -1514,3 +1514,78 @@ html.rotating body {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* ───────────── keyboard + mouse controls (computers) ───────────── */
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 14px;
+  font: 800 13px/1.2 var(--body);
+  color: var(--ink);
+}
+.controls .ctl {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.controls .keys small {
+  font-weight: 700;
+  opacity: 0.6;
+}
+.controls em {
+  font-style: normal;
+}
+kbd {
+  display: inline-block;
+  min-width: 1.7em;
+  padding: 2px 6px 1px;
+  margin: 0 1px;
+  border-radius: 6px;
+  background: #fffaf0;
+  border: 2px solid var(--ink);
+  box-shadow: 0 2px 0 var(--ink);
+  font: 800 12px/1.3 var(--body);
+  text-align: center;
+  color: var(--ink);
+}
+.controls.compact {
+  margin-top: 6px;
+  padding: 6px 12px;
+  border-radius: 14px;
+  background: #fff8ecd9;
+  border: 2px solid var(--ink);
+  font-size: 11.5px;
+}
+.controls.compact kbd {
+  font-size: 11px;
+}
+.panel .controls {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 2px auto 0;
+}
+.ctl-title {
+  margin: 10px 0 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 20px;
+}
+.ctl-tip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(18px + var(--safe-b));
+  transform: translateX(-50%);
+  z-index: 5;
+  pointer-events: none;
+  transition: opacity 0.7s, transform 0.7s;
+  animation: tip-in 0.5s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+.ctl-tip.off {
+  opacity: 0;
+  transform: translateX(-50%) translateY(20px);
+}
+@keyframes tip-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(30px); }
+}
