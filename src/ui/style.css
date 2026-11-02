@@ -257,7 +257,8 @@ body {
 }
 .card canvas {
   width: auto;
-  height: clamp(96px, 34vmin, 270px);
+  /* (capped by the screen height too, so the Play button always fits below) */
+  height: max(96px, min(30vmin, 250px, calc(100vh - 590px)));
   max-width: 100%;
   min-height: 0;
   flex-shrink: 1;
@@ -320,10 +321,10 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  /* sits a little lower now the hint line is gone */
-  margin-bottom: calc(-1 * clamp(2px, 1.2vmin, 10px));
-  transform: translateY(clamp(2px, 1vmin, 8px));
 }
+/* a small, even margin under Play (it used to be nudged past the padding and
+   could hang off the bottom of tablets) */
+.start { padding-bottom: calc(clamp(10px, 2vmin, 18px) + var(--safe-b)); }
 .keys-hint {
   margin: 0;
   font-size: 12px;
@@ -338,6 +339,9 @@ body {
   font-size: 22px;
 }
 /* short screens (phones in landscape): squeeze the start screen */
+/* breathing room between the hero cards and the Part 1 / Part 2 buttons */
+.start .levels { margin-top: clamp(8px, 2.6vmin, 26px); }
+
 @media (max-height: 500px) {
   .bars { display: none; }
   .card-tag { display: none; }
@@ -346,14 +350,14 @@ body {
      (the cards take up the slack), with only a small margin under Play */
   .start { justify-content: flex-start; gap: 0; padding-top: calc(clamp(10px, 8.5vh, 40px) + var(--safe-t)); padding-bottom: calc(clamp(6px, 3vh, 14px) + var(--safe-b)); }
   .start .cards { margin-top: clamp(8px, 3.6vh, 18px); }
-  .start .levels { margin-top: clamp(9px, 3.8vh, 18px); }
+  .start .levels { margin-top: clamp(14px, 6vh, 28px); }
   .start .start-foot { margin-top: clamp(6px, 2.4vh, 12px); }
   .logo { font-size: clamp(30px, 11vh, 52px); }
   .world-name { font-size: clamp(11px, 3.6vh, 16px); }
   /* shorter cards: the heroes are drawn smaller so everything fits under the title */
   .cards { flex: 0 1 auto; width: min(100%, 760px); }
   .card { padding: 4px 8px 8px; border-radius: 16px; box-shadow: 0 4px 0 var(--ink); }
-  .card canvas { height: max(70px, min(30vh, 40vmin, calc(100vh - 270px - var(--safe-t) - var(--safe-b)))); }
+  .card canvas { height: max(70px, min(30vh, 40vmin, calc(100vh - 282px - var(--safe-t) - var(--safe-b)))); }
   /* a little headroom for the logo's hopping letters */
   .start-head { margin-top: clamp(4px, 2.5vh, 12px); }
   .card-name { font-size: clamp(15px, 5vh, 22px); }
@@ -391,7 +395,7 @@ body {
   flex-direction: row;
   align-items: center;
   gap: clamp(10px, 3vmin, 28px);
-  max-width: min(100%, 640px);
+  max-width: min(100%, 720px);
 }
 .results-hero canvas {
   width: clamp(90px, 26vmin, 180px);
@@ -1706,4 +1710,21 @@ kbd {
   .results .stat-list dd:nth-of-type(odd) { margin-right: 10px; }
   .results .row { flex-wrap: nowrap; margin-top: 6px; }
   .results .row .btn { white-space: nowrap; padding-left: 16px; padding-right: 16px; }
+}
+
+/* the end-of-level panel: the hero on the left with "Pick player" under them */
+.results-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.btn-small {
+  font-size: clamp(14px, 2.6vmin, 18px);
+  padding: 7px 14px 6px;
+  white-space: nowrap;
+}
+@media (max-height: 500px) {
+  .results-hero canvas { width: clamp(80px, 24vh, 130px); }
 }
