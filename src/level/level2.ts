@@ -156,7 +156,8 @@ export function buildLevel2(): LevelData {
   L.spawn('para', 290, 52, { kind: 'bigpuff' });
   L.ground(293, 329, 53);
   L.spawn('puffball', 297, 53);
-  L.spawn('bigpuff', 301, 53);
+  L.spawn('checkpoint', 296, 53); // one last checkpoint after the pillar hops
+  L.spawn('bigpuff', 303, 53);
   L.spawn('tree', 306, 53, { h: 58, pine: true });
   L.spawn('goal', 322, 53);
   L.spawn('tree', 327, 53, { h: 66, pine: true });

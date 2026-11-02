@@ -336,6 +336,9 @@ export class Giant extends Enemy {
   private timer = 1.0;
   private chargeCooldown = 1.8;
   private underFor = 0;
+  private chaseT = 0;
+  private givenUp = false;
+  private home = 0;
   private pips: Phaser.GameObjects.Graphics;
   private readonly maxHp = 5;
 
@@ -351,6 +354,7 @@ export class Giant extends Enemy {
 
   wake() {
     super.wake();
+    this.home = this.x;
     sfx.roar();
   }
 
@@ -363,6 +367,31 @@ export class Giant extends Enemy {
 
     switch (this.mode) {
       case 'walk': {
+        // he won't chase you forever: after ~10 s of you staying away he gives up,
+        // ambles back to his spot and waits there (until you come close again)
+        const far = !target || Math.abs(target.x - this.x) > 240 || Math.abs(target.bottom - b.bottom) > 160;
+        this.chaseT = far ? this.chaseT + dt : Math.max(0, this.chaseT - dt * 3);
+        if (!this.givenUp && this.chaseT > 10) {
+          this.givenUp = true;
+          this.gs.fx.popText(this.x, b.top - 20, 'pfff…', '#ffffff', 20);
+        } else if (this.givenUp && !far) {
+          this.givenUp = false;
+          this.chaseT = 0;
+          sfx.roar();
+        }
+        if (this.givenUp) {
+          const toHome = this.home - this.x;
+          if (Math.abs(toHome) > 16) {
+            this.dir = Math.sign(toHome);
+            b.setVelocityX(this.dir * 48);
+            this.setFrame(Math.floor(this.t * 4) % 2 ? 'w1' : 'w0');
+          } else {
+            b.setVelocityX(0);
+            this.setFrame('w0');
+            if (target) this.dir = Math.sign(target.x - this.x) || this.dir;
+          }
+          break;
+        }
         if (target && Math.abs(target.x - this.x) > 20) this.dir = Math.sign(target.x - this.x);
         const aheadX = this.dir > 0 ? b.right + 4 : b.left - 4;
         const groundAhead = this.gs.level.isSolidAt(aheadX, b.bottom + 6);

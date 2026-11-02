@@ -96,6 +96,14 @@ body {
 .btn-alt {
   background: var(--paper);
 }
+/* "Next level" — the main action after a level: green, with a gentle pulse */
+.btn-next {
+  background: linear-gradient(180deg, #8ff07a, #4fcf5a);
+  animation: next-pulse 1.4s ease-in-out infinite;
+}
+@keyframes next-pulse {
+  50% { transform: scale(1.05); filter: brightness(1.08); }
+}
 .btn-big {
   font-size: clamp(22px, 4.6vmin, 34px);
   padding: 12px 44px 10px;
@@ -1049,8 +1057,8 @@ html.rotating body {
 /* the Power / Aim meters, drawn like the sketch: red bar, green sweet spot, black marker */
 .hoops-meters {
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  /* on the King's side (bottom right), so it never covers your hero while you shoot */
+  right: calc(14px + var(--safe-r));
   bottom: calc(14px + var(--safe-b));
   width: min(40vw, 400px);
   display: grid;

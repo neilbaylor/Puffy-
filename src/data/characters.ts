@@ -70,7 +70,7 @@ export const CHARACTERS: CharacterDef[] = [
     name: 'Scruffy',
     tagline: 'Small & speedy',
     colors: { main: '#f7953a', shade: '#cf6b1c', light: '#ffc98a', accent: '#fff3e2' },
-    scale: 0.78,
+    scale: 0.86, // 10% bigger than he was
     hitW: 16,
     hitH: 22,
     muzzleY: 8,

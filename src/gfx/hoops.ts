@@ -12,10 +12,35 @@ const st = () => STYLES.polished;
 
 // ───────────────────────────── King Puff Ball (frame 130 × 150, feet at y 146) ──
 
-export type KingFrame = 'idle0' | 'idle1' | 'shoot' | 'laugh0' | 'laugh1' | 'sad' | 'run0' | 'run1' | 'talk';
-export const KING_FRAMES: KingFrame[] = ['idle0', 'idle1', 'shoot', 'laugh0', 'laugh1', 'sad', 'run0', 'run1', 'talk'];
+export type KingFrame = 'idle0' | 'idle1' | 'shoot' | 'laugh0' | 'laugh1' | 'sad' | 'run0' | 'run1' | 'talk' | 'bend' | 'hold' | 'adjust0' | 'adjust1';
+export const KING_FRAMES: KingFrame[] = ['idle0', 'idle1', 'shoot', 'laugh0', 'laugh1', 'sad', 'run0', 'run1', 'talk', 'bend', 'hold', 'adjust0', 'adjust1'];
+/** Lean (radians, about his feet) for the frames where he bends over. */
+const KING_LEAN: Partial<Record<string, number>> = { bend: -0.32 };
+const leanPt = (f: string, x: number, y: number) => {
+  const a = KING_LEAN[f] ?? 0;
+  if (!a) return { x, y };
+  const dx = x - 66;
+  const dy = y - 146;
+  return { x: 66 + dx * Math.cos(a) - dy * Math.sin(a), y: 146 + dx * Math.sin(a) + dy * Math.cos(a) };
+};
+/** The King's front hand (frame px) in the crown-handling frames. */
+export function kingHandAt(f: string) {
+  const armB = f === 'bend' ? Math.PI - 0.95 : f === 'hold' ? Math.PI + 1.38 : Math.PI + 1.15;
+  const p = { x: 66 - 40 + 8 + Math.cos(armB) * 30, y: 74 - 2 + Math.sin(armB) * 30 };
+  return leanPt(f, p.x, p.y);
+}
 /** Where the bottom-centre of the King's crown sits in his frame, per frame (frame px). */
-export const kingCrownAt = (f: string) => ({ x: 66, y: 48 + (f === 'idle1' || f === 'laugh1' || f === 'run1' ? -3 : 0) });
+export const kingCrownAt = (f: string) => {
+  if (f === 'hold') {
+    const h = kingHandAt('hold');
+    return { x: h.x + 2, y: h.y - 2 };
+  }
+  if (f === 'bend') {
+    const h = kingHandAt('bend');
+    return { x: h.x, y: h.y + 4 };
+  }
+  return leanPt(f, 66, 48 + (f === 'idle1' || f === 'laugh1' || f === 'run1' || f === 'adjust1' ? -3 : 0));
+};
 /** The crown on its own (so it can fall off): 64 × 44, bottom-centre at (32, 40). */
 export function drawKingCrown(ctx: Ctx, cx: number, by: number) {
   const S = st();
@@ -45,11 +70,19 @@ const TOOTH: Fill = { base: '#fffaf0', shade: '#e3d8c6', light: '#ffffff' };
 /** King Puff Ball, facing left (toward the hoop when he stands on the right). */
 export function drawKing(ctx: Ctx, ox: number, oy: number, f: KingFrame, withCrown = true) {
   const S = st();
+  // bending over: the whole King leans forward about his feet
+  const lean = KING_LEAN[f] ?? 0;
+  if (lean) {
+    ctx.save();
+    ctx.translate(ox + 66, oy + 146);
+    ctx.rotate(lean);
+    ctx.translate(-(ox + 66), -(oy + 146));
+  }
   const ground = oy + 146;
   const cx = ox + 66;
   const laugh = f.startsWith('laugh');
   const run = f.startsWith('run');
-  const bob = f === 'idle1' || f === 'laugh1' || f === 'run1' ? -3 : 0;
+  const bob = f === 'idle1' || f === 'laugh1' || f === 'run1' || f === 'adjust1' ? -3 : 0;
   const rx = 40;
   const ry = 38;
   const cy = ground - 34 - ry + bob;
@@ -67,13 +100,23 @@ export function drawKing(ctx: Ctx, ox: number, oy: number, f: KingFrame, withCro
   leg(-14, step, run && step > 0 ? 6 : 0, 1510);
 
   // arms: up and waving (idle), clutching belly (laugh), flailing (sad/run)
-  const armA = laugh ? 0.9 : f === 'sad' || run ? -2.2 : f === 'shoot' ? -0.2 : -0.75 + bob * 0.04;
-  const armB = laugh ? Math.PI - 0.9 : f === 'sad' || run ? Math.PI + 2.2 : f === 'shoot' ? Math.PI + 0.2 : Math.PI + 0.75 - bob * 0.04;
-  S.shape(ctx, paddlePts(cx + rx - 8, cy - 2, 30, 13, armA), KING_LIMB, 1520, { lw: 1.1 });
-  S.shape(ctx, paddlePts(cx - rx + 8, cy - 2, 30, 13, armB), KING_LIMB, 1521, { lw: 1.1 });
+  let armA = laugh ? 0.9 : f === 'sad' || run ? -2.2 : f === 'shoot' ? -0.2 : -0.75 + bob * 0.04;
+  let armB = laugh ? Math.PI - 0.9 : f === 'sad' || run ? Math.PI + 2.2 : f === 'shoot' ? Math.PI + 0.2 : Math.PI + 0.75 - bob * 0.04;
+  // handling the crown: reaching down for it, holding it up high, both hands fixing it on
+  if (f === 'bend') [armA, armB] = [-0.4, Math.PI - 0.95];
+  if (f === 'hold') [armA, armB] = [-0.9, Math.PI + 1.38];
+  if (f === 'adjust0') [armA, armB] = [-1.15, Math.PI + 1.15];
+  if (f === 'adjust1') [armA, armB] = [-1.3, Math.PI + 1.3];
+  // when he handles his crown the arms come round in front of him, so you see his hands
+  const handsFront = f === 'bend' || f === 'hold' || f === 'adjust0' || f === 'adjust1';
+  const armAFront = f === 'adjust0' || f === 'adjust1';
+  if (!armAFront) S.shape(ctx, paddlePts(cx + rx - 8, cy - 2, 30, 13, armA), KING_LIMB, 1520, { lw: 1.1 });
+  if (!handsFront) S.shape(ctx, paddlePts(cx - rx + 8, cy - 2, 30, 13, armB), KING_LIMB, 1521, { lw: 1.1 });
 
   // body: fluffy puffball
   S.shape(ctx, fluffPts(cx, cy, rx, ry, 10, 0.07, 0.4), KING, 1530, { light: [cx - 14, cy - 16], lw: 1.4 });
+  if (handsFront) S.shape(ctx, paddlePts(cx - rx + 8, cy - 2, 30, 13, armB), KING_LIMB, 1521, { lw: 1.1 });
+  if (armAFront) S.shape(ctx, paddlePts(cx + rx - 8, cy - 2, 30, 13, armA), KING_LIMB, 1520, { lw: 1.1 });
 
   // crown: three gold points with orange gems (a separate sprite in the game, so it can fall off)
   if (withCrown) drawKingCrown(ctx, cx, cy - ry + 12);
@@ -130,6 +173,7 @@ export function drawKing(ctx: Ctx, ox: number, oy: number, f: KingFrame, withCro
     for (let i = 0; i <= 10; i++) zig.push([mx - 18 + i * 3.6, my + 3 + (i % 2 ? 6 : 0) + Math.sin((i / 10) * Math.PI) * 3]);
     S.line(ctx, zig, 1581, 0.8);
   }
+  if (lean) ctx.restore();
 }
 
 // ───────────────────────────── ball ──

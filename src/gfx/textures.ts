@@ -6,11 +6,11 @@ import { BIGPUFF_H, BIGPUFF_W, GIANT_H, GIANT_W, PUFFBALL_H, PUFFBALL_W, drawBig
 import { drawMuzzleFlash, drawRocket } from './bazooka';
 import { drawSoccerBall, drawSoccerGoal } from './soccer';
 import { GOAT_FRAMES, GOAT_H, GOAT_W, drawGoat, drawSpit } from './goat';
-import { BLASTER, SAW, drawBlaster, drawBullet, drawChainsaw, drawFlailBall } from './weapons';
+import { BLASTER, SAW, W_RES, drawBlaster, drawBullet, drawChainsaw, drawFlailBall } from './weapons';
 import { drawParachute } from './parachute';
 import { drawHockeyNet, drawPuck, drawRinkLines, drawStick } from './hockey';
 import { MOUNTAIN_LOOKS, drawMountainFar, drawMountainMid, drawMountainNear, type MountainLook } from './mountain';
-import { FLAME_FRAMES, FLAME_H, FLAME_W, drawFlame } from './flame';
+import { FLAME_FRAMES, FLAME_H, FLAME_W, drawDyingFlame, drawFlame, drawScorch } from './flame';
 import { ART_RES, ART_STYLE, CHAR_H, CHAR_W, POSES, canvas, drawCharacter, ellipse, type Ctx } from './draw';
 import { STYLES } from './handdrawn';
 import {
@@ -131,10 +131,10 @@ function makeBaddies(scene: Phaser.Scene) {
   sheet(scene, 'goat', GOAT_W, GOAT_H, GOAT_FRAMES, (ctx, f) => drawGoat(ctx, 0, 0, f, st));
   addCanvas(scene, 'spit', hires(36, 14, ART_RES, (ctx) => drawSpit(ctx, 24, 7, st)));
   // the armed bad guys' weapons
-  addCanvas(scene, 'w-blaster', hires(BLASTER.w, BLASTER.h, ART_RES, (ctx) => drawBlaster(ctx, st)));
-  sheet(scene, 'w-saw', SAW.w, SAW.h, ['s0', 's1'] as const, (ctx, f) => drawChainsaw(ctx, st, f === 's0' ? 0 : 1));
-  sheet(scene, 'w-ball', 30, 30, ['open', 'shut'] as const, (ctx, f) => drawFlailBall(ctx, st, f === 'open'));
-  addCanvas(scene, 'w-bullet', hires(18, 18, ART_RES, (ctx) => drawBullet(ctx, st)));
+  addCanvas(scene, 'w-blaster', hires(BLASTER.w, BLASTER.h, W_RES, (ctx) => drawBlaster(ctx, st)));
+  sheet(scene, 'w-saw', SAW.w, SAW.h, ['s0', 's1'] as const, (ctx, f) => drawChainsaw(ctx, st, f === 's0' ? 0 : 1), W_RES);
+  sheet(scene, 'w-ball', 30, 30, ['open', 'shut'] as const, (ctx, f) => drawFlailBall(ctx, st, f === 'open'), W_RES);
+  addCanvas(scene, 'w-bullet', hires(18, 18, W_RES, (ctx) => drawBullet(ctx, st)));
 }
 
 function makeItems(scene: Phaser.Scene, pal: WorldPalette) {
@@ -166,7 +166,8 @@ function makeItems(scene: Phaser.Scene, pal: WorldPalette) {
       st.line(ctx, [[26, 28], [36, 20], [44, 19]], 2103, 0.7, '#fff6c8');
     }),
   );
-  sheet(scene, 'flame', FLAME_W, FLAME_H, FLAME_FRAMES, (ctx, f) => drawFlame(ctx, +f[1]));
+  sheet(scene, 'flame', FLAME_W, FLAME_H, FLAME_FRAMES, (ctx, f) => (f[0] === 'd' ? drawDyingFlame(ctx, +f[1]) : drawFlame(ctx, +f[1])));
+  addCanvas(scene, 'scorch', hires(64, 16, PROP_RES, (ctx) => drawScorch(ctx)));
   addCanvas(scene, 'chute', hires(64, 60, ART_RES, (ctx) => drawParachute(ctx)));
   addCanvas(scene, 'hstick', hires(40, 40, ART_RES, (ctx) => drawStick(ctx)));
   addCanvas(scene, 'puck', hires(18, 14, ART_RES, (ctx) => drawPuck(ctx, 9, 8, PUCK_R_ART)));

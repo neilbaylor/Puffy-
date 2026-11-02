@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { sfx } from '../../core/sfx';
 import { ART_RES } from '../../gfx/draw';
-import { BLASTER, SAW } from '../../gfx/weapons';
+import { BLASTER, SAW, W_RES } from '../../gfx/weapons';
 import type { GameScene } from '../../scenes/GameScene';
 import type { Enemy } from './Enemy';
 
@@ -18,7 +18,7 @@ import type { Enemy } from './Enemy';
 export type WeaponKind = 'gun' | 'saw' | 'flail';
 
 /** Where each bad guy's front hand is (frame units from the sprite centre, facing left). */
-const HAND = { small: { x: -17, y: 5 }, big: { x: -30, y: -9 } };
+const HAND = { small: { x: -17, y: 5 }, big: { x: -31, y: 3 } };
 
 export class Weapon {
   private img: Phaser.GameObjects.Image;
@@ -47,10 +47,10 @@ export class Weapon {
     const key = kind === 'gun' ? 'w-blaster' : kind === 'saw' ? 'w-saw' : 'w-ball';
     if (kind === 'flail') {
       this.chain = gs.add.graphics().setDepth(owner.depth + 0.15);
-      this.ball = gs.add.image(owner.x, owner.y, 'w-ball', 'open').setScale(this.k / ART_RES).setDepth(owner.depth + 0.2);
+      this.ball = gs.add.image(owner.x, owner.y, 'w-ball', 'open').setScale(this.k / W_RES).setDepth(owner.depth + 0.2);
       this.img = gs.add.image(owner.x, owner.y, 'w-ball', 'open').setVisible(false);
     } else {
-      this.img = gs.add.image(owner.x, owner.y, key, kind === 'saw' ? 's0' : undefined).setScale(this.k / ART_RES).setDepth(owner.depth + 0.1);
+      this.img = gs.add.image(owner.x, owner.y, key, kind === 'saw' ? 's0' : undefined).setScale(this.k / W_RES).setDepth(owner.depth + 0.1);
     }
     this.cd = 1 + Math.random();
   }
@@ -204,7 +204,7 @@ class PomPom {
     y: number,
     private vx: number,
   ) {
-    this.img = gs.add.image(x, y, 'w-bullet').setScale(1 / ART_RES).setDepth(25);
+    this.img = gs.add.image(x, y, 'w-bullet').setScale(1 / W_RES).setDepth(25);
     this.onUpdate = (_t, delta) => this.step(Math.min(delta / 1000, 0.05));
     gs.events.on(Phaser.Scenes.Events.UPDATE, this.onUpdate);
     gs.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.gone());

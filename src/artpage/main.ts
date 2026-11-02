@@ -12,6 +12,8 @@ import { drawNuggie, drawRootBeer } from '../gfx/collectibles';
 import { KING_FRAMES, drawArena, drawArenaFront, drawCrowd, drawBackboard, drawBall, drawKing, drawRimBack, drawRimFront, HOOP, STAGE_OX, STAGE_OY } from '../gfx/hoops';
 import { drawPuffyStyled } from '../gfx/puffy';
 import { MOUNTAIN_LOOKS, drawClimbMap, drawMountainScene } from './part2';
+import { BLASTER, SAW, drawBlaster, drawBullet, drawChainsaw, drawFlailBall } from '../gfx/weapons';
+import { PLOP_FRAMES, PLOP_H, PLOP_W, drawPlop } from '../gfx/plops';
 import { GOAT_FRAMES, GOAT_W, drawGoat } from '../gfx/goat';
 import { drawScruffyStyled } from '../gfx/scruffy';
 import {
@@ -192,6 +194,76 @@ function propSheet(c: HTMLCanvasElement, pal: WorldPalette) {
   drawPuffTree(ctx, 628, 146, 52, pal, 113);
 }
 
+/** A bad guy holding a weapon: the weapon is drawn at his front hand (frame units). */
+function armed(ctx: Ctx, kind: 'small' | 'big', weapon: 'gun' | 'saw' | 'flail') {
+  if (kind === 'small') drawPuffball(ctx, 0, 0, 'w0', ST);
+  else drawBigPuff(ctx, 0, 0, weapon === 'saw' ? 'm0' : 'w0', ST);
+  const hand = kind === 'small' ? { x: 7, y: 29 } : { x: 5, y: 47 };
+  const k = weapon === 'gun' ? (kind === 'small' ? 0.52 : 0.8) : weapon === 'saw' ? 0.82 : 0.9;
+  ctx.save();
+  ctx.translate(hand.x, hand.y);
+  ctx.scale(k, k);
+  if (weapon === 'gun') {
+    ctx.translate(-BLASTER.gx, -BLASTER.gy);
+    drawBlaster(ctx, ST);
+  } else if (weapon === 'saw') {
+    ctx.translate(-SAW.gx, -SAW.gy);
+    drawChainsaw(ctx, ST, 0);
+  } else {
+    ctx.restore();
+    ctx.save();
+    // the chain, then the chomping ball out to the side
+    const bx = hand.x - 34;
+    const by = hand.y + 14;
+    for (let i = 1; i < 6; i++) {
+      const u = i / 6;
+      ctx.fillStyle = '#3a3844';
+      ctx.beginPath();
+      ctx.arc(hand.x + (bx - hand.x) * u, hand.y + (by - hand.y) * u + Math.sin(u * Math.PI) * 3, 2.6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#9a98a2';
+      ctx.beginPath();
+      ctx.arc(hand.x + (bx - hand.x) * u, hand.y + (by - hand.y) * u + Math.sin(u * Math.PI) * 3, 1.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.translate(bx - 15 * k, by - 15 * k);
+    ctx.scale(k, k);
+    drawFlailBall(ctx, ST, true);
+  }
+  ctx.restore();
+}
+
+function armedSheet(c: HTMLCanvasElement) {
+  const S = 2;
+  c.width = Math.round((PUFFBALL_W + BIGPUFF_W * 3 + 120) * S + 60);
+  c.height = Math.round(100 * S);
+  const ctx = c.getContext('2d')!;
+  const foot = 96 * S;
+  at(ctx, 30 * S, foot - 46 * S, S, () => armed(ctx, 'small', 'gun'));
+  at(ctx, (PUFFBALL_W + 70) * S, foot - 86 * S, S, () => armed(ctx, 'big', 'flail'));
+  at(ctx, (PUFFBALL_W + BIGPUFF_W + 110) * S, foot - 86 * S, S, () => armed(ctx, 'big', 'gun'));
+  at(ctx, (PUFFBALL_W + BIGPUFF_W * 2 + 150) * S, foot - 86 * S, S, () => armed(ctx, 'big', 'saw'));
+}
+
+function weaponSheet(c: HTMLCanvasElement) {
+  const S = 3;
+  c.width = Math.round((BLASTER.w + SAW.w * 2 + 30 * 2 + 18 + 60) * S);
+  c.height = Math.round(44 * S);
+  const ctx = c.getContext('2d')!;
+  let x = 6;
+  at(ctx, x * S, 4 * S, S, () => drawBlaster(ctx, ST));
+  x += BLASTER.w + 8;
+  at(ctx, x * S, 4 * S, S, () => drawChainsaw(ctx, ST, 0));
+  x += SAW.w + 8;
+  at(ctx, x * S, 4 * S, S, () => drawChainsaw(ctx, ST, 1));
+  x += SAW.w + 8;
+  at(ctx, x * S, 6 * S, S, () => drawFlailBall(ctx, ST, true));
+  x += 34;
+  at(ctx, x * S, 6 * S, S, () => drawFlailBall(ctx, ST, false));
+  x += 34;
+  at(ctx, x * S, 12 * S, S, () => drawBullet(ctx, ST));
+}
+
 async function paint() {
   try {
     await Promise.race([document.fonts.load('21px "Lilita One"'), new Promise((r) => setTimeout(r, 1200))]);
@@ -254,6 +326,19 @@ async function paint() {
     ctx.restore();
     at(ctx, 360, 520, 2.6, () => drawPuffyStyled(ctx, 0, 0, 'shoot', ST));
     at(ctx, 1010 - 66 * 1.45, 650 - 146 * 1.45, 1.45, () => drawKing(ctx, 0, 0, 'idle0'));
+  }
+  const am = document.querySelector<HTMLCanvasElement>('canvas[data-sheet=armed]');
+  if (am) armedSheet(am);
+  const wp = document.querySelector<HTMLCanvasElement>('canvas[data-sheet=weapons]');
+  if (wp) weaponSheet(wp);
+  const pl = document.querySelector<HTMLCanvasElement>('canvas[data-sheet=plops]');
+  if (pl) {
+    const S = 1.7;
+    const frames = [...PLOP_FRAMES, 'yell0'] as const;
+    pl.width = Math.round(frames.length * PLOP_W * S + 20);
+    pl.height = Math.round(PLOP_H * S + 10);
+    const ctx = pl.getContext('2d')!;
+    frames.forEach((f, i) => at(ctx, 10 + i * PLOP_W * S, 5, S, () => drawPlop(ctx, 0, 0, f, ST, i === frames.length - 1)));
   }
   const ps = document.querySelector<HTMLCanvasElement>('canvas[data-sheet=props]');
   if (ps) propSheet(ps, PALETTES.meadow);

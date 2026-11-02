@@ -542,6 +542,8 @@ export class UI {
     const firstTime = progress.beaten < (r.level ?? 1);
     progress.markBeaten(r.level ?? 1);
     playLevelClear();
+    const nextInfo = LEVELS.find((l) => l.id === (r.level ?? 1) + 1);
+    const next = nextInfo && nextInfo.build ? nextInfo : null;
     const mins = Math.floor(r.seconds / 60);
     const secs = String(r.seconds % 60).padStart(2, '0');
     const el = h(`<div class="screen modal">
@@ -562,13 +564,21 @@ export class UI {
             <dt>Time</dt><dd>${mins}:${secs}</dd>
           </dl>
           <div class="row">
-            <button class="btn" data-act="again">Play again</button>
+            ${next ? `<button class="btn btn-next" data-act="next">Next: ${next.part} ▶</button>` : ''}
+            <button class="btn ${next ? 'btn-alt' : ''}" data-act="again">Play again</button>
             <button class="btn btn-alt" data-act="hero">Pick player</button>
           </div>
         </div>
       </div>
     </div>`);
     drawPortrait(el.querySelector('canvas')!, characterById(r.charId), 'jump');
+    // the default (and the big button) is on to the next level, when there is one
+    const goNext = () => {
+      if (!next) return this.startGame(this.session);
+      this.level = next.id;
+      this.startGame(this.session);
+    };
+    el.querySelector('[data-act=next]')?.addEventListener('click', goNext);
     el.querySelector('[data-act=again]')!.addEventListener('click', () => this.startGame(this.session));
     el.querySelector('[data-act=hero]')!.addEventListener('click', () => this.quitToStart());
     this.setScreen(el);
@@ -576,7 +586,7 @@ export class UI {
       if (this.screen !== el) return window.removeEventListener('keydown', onKey);
       if (e.code === 'Enter') {
         window.removeEventListener('keydown', onKey);
-        this.startGame(this.session);
+        goNext();
       }
     };
     setTimeout(() => window.addEventListener('keydown', onKey), 600);

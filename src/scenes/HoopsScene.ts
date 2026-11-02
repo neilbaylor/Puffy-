@@ -3,7 +3,7 @@ import { characterById } from '../data/characters';
 import type { Session } from '../core/session';
 import { fadeOutMusic, playHoops, setMusicRate } from '../core/music';
 import { sfx } from '../core/sfx';
-import { ART_RES, canvas } from '../gfx/draw';
+import { ART_RES, CHAR_H, canvas } from '../gfx/draw';
 import {
   ARENA_H,
   ARENA_W,
@@ -28,6 +28,7 @@ import {
   drawKing,
   drawKingCrown,
   kingCrownAt,
+  kingHandAt,
   drawRimBack,
   drawRimFrontTube,
   drawSoftShadow,
@@ -301,6 +302,9 @@ export class HoopsScene extends Phaser.Scene {
     this.nextHop = 2500 + Math.random() * 2000;
     this.kingTalkUntil = 0;
     this.heroCrowned = false;
+    this.crownBusy = false;
+    this.heroHop = { h: 0 };
+    this.nextHeroHop = 2500;
     this.confettiFx = new Confetti(this, 12, () => ARENA_H, [STAGE_OY + 360, ARENA_H - 30]);
     // faint mirror images in the glossy floor
     this.heroRefl = this.add.sprite(0, 0, `char-${ch.id}`, 'idle0').setOrigin(0.5, 1).setFlipY(true).setAlpha(0.16).setDepth(4);
@@ -404,19 +408,36 @@ export class HoopsScene extends Phaser.Scene {
         fz *= 1.03;
       }
     }
-    const z = this.baseZoom * fz;
+    let z = this.baseZoom * fz;
+    // the wide shot always keeps the whole jumbotron (and everyone's feet) in view:
+    // on long phone screens that means pulling back a little and framing a touch higher
+    const jTop = A(0, JUMBO.y).y - 16;
+    const feet = A(0, Math.max(SPOTS.hero.y, SPOTS.king.y)).y + 34;
+    if (wide) z = Math.min(z, this.scale.height / (feet - jTop), Math.max(this.scale.width / ARENA_W, this.scale.height / ARENA_H));
     const target = snap ? z : cam.zoom + (z - cam.zoom) * 0.06;
     cam.setZoom(target);
     const vw = this.scale.width / target;
     const vh = this.scale.height / target;
-    const x = Phaser.Math.Clamp(fx, vw / 2, ARENA_W - vw / 2);
-    const y = Phaser.Math.Clamp(fy, vh / 2, ARENA_H - vh / 2);
+    let x = Phaser.Math.Clamp(fx, vw / 2, ARENA_W - vw / 2);
+    let y = Phaser.Math.Clamp(fy, vh / 2, ARENA_H - vh / 2);
+    if (wide) {
+      const jx0 = A(JUMBO.x, 0).x - 12;
+      const jx1 = A(JUMBO.x + JUMBO.w, 0).x + 12;
+      y = Phaser.Math.Clamp(Phaser.Math.Clamp(y, Math.min(feet - vh / 2, jTop + vh / 2), jTop + vh / 2), vh / 2, ARENA_H - vh / 2);
+      x = Phaser.Math.Clamp(Phaser.Math.Clamp(x, jx1 - vw / 2, jx0 + vw / 2), vw / 2, ARENA_W - vw / 2);
+    }
     if (snap) cam.centerOn(x, y);
     else {
       const cx = cam.midPoint.x + (x - cam.midPoint.x) * 0.06;
       const cy = cam.midPoint.y + (y - cam.midPoint.y) * 0.06;
       cam.centerOn(cx, cy);
     }
+  }
+
+  /** A smooth camera move (no cut) to a new framing; resolves when it arrives. */
+  private glide(x: number, y: number, zoom: number, ms: number) {
+    this.tweens.killTweensOf(this.camFocus);
+    return this.tween({ targets: this.camFocus, x, y, zoom, duration: this.skipping ? 1 : ms, ease: 'Sine.easeInOut' });
   }
 
   /** A hard camera cut (with a white flash). */
@@ -493,6 +514,7 @@ export class HoopsScene extends Phaser.Scene {
     if (this.clock < this.kingTalkUntil && (kf === 'idle0' || kf === 'idle1')) kf = Math.floor(this.clock / 110) % 2 ? 'talk' : 'idle0';
     this.king.setFrame(kf);
     this.updateKingLife(dt);
+    this.updateHeroLife();
     const h = this.heroAnim;
     this.hero.setFrame(h.frames[Math.floor((this.clock / 1000) * h.fps) % h.frames.length]);
     this.mirror(this.heroRefl, this.hero);
@@ -581,8 +603,13 @@ export class HoopsScene extends Phaser.Scene {
     const k = this.king;
     const idle = this.kingAnim.frames[0] === 'idle0' && this.king.visible;
     if (idle && this.clock > this.nextHop && this.kingHop.h === 0 && !this.tweens.isTweening(this.kingHop)) {
-      this.nextHop = this.clock + 2600 + Math.random() * 3200;
-      const big = Math.random() < 0.35;
+      this.nextHop = this.clock + 1500 + Math.random() * 2200;
+      const big = Math.random() < 0.45;
+      // now and then he spins round mid-hop to wave at his fans
+      if (big && Math.random() < 0.35) {
+        this.time.delayedCall(110, () => this.king.setFlipX(!this.king.flipX));
+        this.time.delayedCall(330, () => this.king.setFlipX(!this.king.flipX));
+      }
       this.tweens.add({
         targets: this.kingHop,
         h: big ? 34 : 16,
@@ -641,52 +668,90 @@ export class HoopsScene extends Phaser.Scene {
     }
   }
 
-  /** Oops — the crown slips off, bounces on the floor; he grabs it and straightens it. */
+  /**
+   * Oops — the crown slips off and bounces on the floor. He looks down at it,
+   * hops over, bends down and grabs it, holds it up high, plonks it back on
+   * with both hands (crooked), wiggles it straight — *ahem* — and hops back.
+   */
+  private crownBusy = false;
   private crownFall() {
     const cs = this.crownState;
-    if (cs.mode !== 'on' || !this.king.visible) return;
+    if (cs.mode !== 'on' || !this.king.visible || this.crownBusy) return;
+    this.crownBusy = true;
     cs.mode = 'loose';
     cs.falls++;
     cs.x = this.crown.x;
     cs.y = this.crown.y;
     const side = Math.random() < 0.5 ? -1 : 1;
-    cs.vx = side * (90 + Math.random() * 80);
+    cs.vx = side * (80 + Math.random() * 60);
     cs.vy = -380;
     cs.rot = this.crown.rotation;
     cs.vr = side * 9;
     cs.bounces = 0;
-    sfx.whoosh?.();
-    const prev = this.kingAnim;
-    this.kingAnim = { frames: ['sad'], fps: 1 };
+    sfx.whoosh();
     this.kingTalkUntil = 0;
-    // after it settles he snatches it back up and plonks it on, crooked, then fixes it
-    this.time.delayedCall(1150, () => {
-      if (cs.mode !== 'loose') return;
-      cs.mode = 'back';
-      this.kingAnim = { frames: ['shoot'], fps: 1 };
-      const k = this.king;
-      const at = kingCrownAt('shoot');
-      const flip = k.flipX ? -1 : 1;
-      const hx = k.x + (at.x - KING_W / 2) * KING_RES * k.scaleX * flip;
-      const hy = k.y + (at.y - KING_H) * KING_RES * k.scaleY;
-      this.tweens.add({
-        targets: this.crown,
-        x: hx,
-        y: hy,
-        rotation: 0.5,
-        duration: 320,
-        ease: 'Back.easeOut',
-        onComplete: () => {
-          cs.mode = 'on';
-          cs.tilt = 0.45 * (Math.random() < 0.5 ? -1 : 1);
-          this.kingAnim = prev.frames[0] === 'sad' ? { frames: ['idle0', 'idle1'], fps: 2.5 } : prev;
-          // the little adjust: wiggle it straight
-          this.tweens.add({ targets: cs, tilt: { from: cs.tilt, to: 0 }, duration: 520, ease: 'Elastic.easeOut' });
-          const t = this.add.text(hx, hy - 80, '*ahem*', { fontFamily: '"Lilita One", sans-serif', fontSize: '26px', color: '#ffe58a', stroke: '#2a1030', strokeThickness: 6 }).setOrigin(0.5).setDepth(12);
-          this.tweens.add({ targets: t, y: hy - 120, alpha: 0, delay: 500, duration: 700, onComplete: () => t.destroy() });
-        },
-      });
-    });
+    void this.crownPickup();
+  }
+
+  private async crownPickup() {
+    const k = this.king;
+    const cs = this.crownState;
+    const home = { x: k.x, flip: k.flipX };
+    const anim = (frames: string[], fps = 1) => (this.kingAnim = { frames, fps });
+    anim(['sad']);
+    await this.wait(900); // watches it bounce away
+    if (!k.visible) return void (this.crownBusy = false);
+    // face it and hop over so his hand lands right on it
+    const faceRight = cs.x > k.x;
+    k.setFlipX(faceRight);
+    const hand = kingHandAt('bend');
+    const reach = (hand.x - KING_W / 2) * KING_RES * k.scaleX * (faceRight ? -1 : 1);
+    anim(['run0', 'run1'], 9);
+    await this.tween({ targets: k, x: cs.x - reach, duration: 420, ease: 'Sine.easeInOut' });
+    // bend down and grab it
+    anim(['bend']);
+    await this.wait(260);
+    cs.mode = 'on';
+    cs.tilt = -0.5;
+    sfx.bump();
+    await this.wait(260);
+    // hold it up high (it glints)
+    anim(['hold']);
+    cs.tilt = 0.2;
+    await this.wait(120);
+    this.confettiFx.burst(this.crown.x, this.crown.y - 20, 8, { power: 220, glitter: 1, colors: [0xffd23f, 0xffffff] });
+    await this.wait(380);
+    // both hands: plonk it on (crooked), wiggle it straight
+    anim(['adjust0', 'adjust1'], 8);
+    cs.tilt = 0.45 * (Math.random() < 0.5 ? -1 : 1);
+    this.tweens.add({ targets: cs, tilt: 0, duration: 650, ease: 'Elastic.easeOut' });
+    await this.wait(650);
+    anim(['idle0', 'idle1'], 2.5);
+    const t = this.add.text(this.crown.x, this.crown.y - 60, '*ahem*', { fontFamily: '"Lilita One", sans-serif', fontSize: '26px', color: '#ffe58a', stroke: '#2a1030', strokeThickness: 6 }).setOrigin(0.5).setDepth(12);
+    this.tweens.add({ targets: t, y: t.y - 40, alpha: 0, delay: 500, duration: 700, onComplete: () => t.destroy() });
+    // back to his spot
+    if (Math.abs(k.x - home.x) > 4) {
+      k.setFlipX(home.x > k.x);
+      anim(['run0', 'run1'], 9);
+      await this.tween({ targets: k, x: home.x, duration: 420, ease: 'Sine.easeInOut' });
+    }
+    k.setFlipX(home.flip);
+    anim(['idle0', 'idle1'], 2.5);
+    this.crownBusy = false;
+  }
+
+  /** The hero can't keep still either: little hops while waiting. */
+  private heroHop = { h: 0 };
+  private nextHeroHop = 2000;
+  private updateHeroLife() {
+    const h = this.hero;
+    const idle = this.heroAnim.frames[0] === 'idle0' && !this.meter && !this.flight && !this.inIntro;
+    if (idle && this.clock > this.nextHeroHop && !this.tweens.isTweening(this.heroHop)) {
+      this.nextHeroHop = this.clock + 1800 + Math.random() * 2600;
+      const two = Math.random() < 0.4;
+      this.tweens.add({ targets: this.heroHop, h: two ? 14 : 22, duration: two ? 130 : 180, yoyo: true, repeat: two ? 1 : 0, ease: 'Quad.easeOut', onComplete: () => (this.heroHop.h = 0) });
+    }
+    h.setOrigin(0.5, 1 + this.heroHop.h / (CHAR_H * ART_RES));
   }
 
   private updateLighting() {
@@ -949,37 +1014,43 @@ export class HoopsScene extends Phaser.Scene {
     this.aimSpot(1, A(260, 200).x, A(260, 200).y, 0.9, 0.7, 1500, 'Sine.easeInOut');
     this.tweens.add({ targets: this.camFocus, zoom: 1.28, duration: 2600, ease: 'Sine.easeInOut' });
     await this.iwait(1500);
-    // both spots land on the King
+    // both spots land on the King, and the camera glides in to him
     this.aimSpot(0, kp.x - 20, kp.y - 70, 1.25, 1.35, 600);
     this.aimSpot(1, kp.x + 10, kp.y - 90, 1.1, 1.2, 700);
-    await this.iwait(650);
+    await this.glide(kp.x - 10, kp.y - 150, 2.3, 950);
     if (!this.skipping) {
-      this.cut(kp.x - 10, kp.y - 150, 2.5, false);
+      // a little hop… then he speaks: two lines, mouth moving, his name banner in between
+      this.tweens.add({ targets: this.kingHop, h: 26, duration: 200, yoyo: true, ease: 'Quad.easeOut', onComplete: () => (this.kingHop.h = 0) });
+      sfx.bump();
+      await this.iwait(450);
+      void this.callout(this.hard ? '“YOU again?!”' : '“Welcome to MY palace!”', 'speech', 1500);
+      await this.iwait(1500);
       this.lowerThird('KING PUFF BALL', this.hard ? 'Summit champion · back for revenge' : 'Palace champion · unbeaten at home');
-      this.kingAnim = { frames: ['laugh0', 'laugh1'], fps: 6 };
-      sfx.laugh();
-      void this.callout(this.hard ? '“You again?! This time<br><b>I WIN</b>!”' : '“Think you can beat<br><b>THE KING</b>?”', 'speech', 1700);
+      void this.callout(this.hard ? '“This time<br><b>I WIN</b>!”' : '“Think you can beat<br><b>THE KING</b>?”', 'speech', 1700);
       await this.iwait(1700);
+      this.kingAnim = { frames: ['laugh0', 'laugh1'], fps: 7 };
+      sfx.laugh();
+      await this.iwait(800);
       this.lowerThird(null);
       this.kingAnim = { frames: ['idle0', 'idle1'], fps: 2.5 };
     }
-    // LIGHTS ON
+    // LIGHTS ON — and the camera pulls back to take in the whole arena
     this.lightsOn();
     this.spots.forEach((sp) => (sp.on = false));
     this.jumboShow({ kind: 'title' }, 4000);
     if (!this.skipping) {
-      this.cut(800, 430, 1.08);
-      await this.iwait(1100);
-      // the hoop, slow push-in
-      this.cut(rim.x, rim.y + 20, 2.0);
-      this.camFocus.zoom = 2.4;
+      await this.glide(800, 430, 1.05, 800);
+      await this.iwait(600);
+      // over to the hoop…
       sfx.drum();
-      await this.iwait(1000);
-      // our hero
-      this.cut(hp.x, hp.y - 90, 2.3);
+      await this.glide(rim.x, rim.y + 30, 1.9, 900);
+      await this.iwait(400);
+      // …and across to our hero, who hops for joy
       this.lowerThird(ch.name.toUpperCase(), 'The challenger');
       this.heroAnim = { frames: ['jump', 'idle0'], fps: 4 };
-      await this.iwait(1300);
+      this.tweens.add({ targets: this.heroHop, h: 24, duration: 170, yoyo: true, repeat: 2, ease: 'Quad.easeOut', onComplete: () => (this.heroHop.h = 0) });
+      await this.glide(hp.x, hp.y - 90, 2.1, 900);
+      await this.iwait(900);
     }
     // back to the game: everything in its final state (also after a skip)
     this.inIntro = false;
@@ -1116,6 +1187,7 @@ export class HoopsScene extends Phaser.Scene {
     if (this.score.king.length > 0) await this.walkToSpot('king');
     const kk = this.king.scaleY / this.kingScale;
     const kp = { x: this.king.x, y: this.king.y - 6 };
+    while (this.crownBusy) await this.wait(100);
     await this.callout('King Puff Ball shoots…', 'turn king', 900);
     this.kingAnim = { frames: ['idle0', 'idle1'], fps: 5 };
     await this.wait(500);

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { GRAVITY, MAX_FALL_SPEED, MIN_VIEW_W, TILE, VIEW_H } from '../config';
+import { DEPTH, GRAVITY, MAX_FALL_SPEED, MIN_VIEW_W, TILE, VIEW_H } from '../config';
+import { PROP_RES } from '../gfx/textures';
 import { characterById } from '../data/characters';
 import type { Session } from '../core/session';
 import { lives, loseLife, resetLives } from '../core/lives';
@@ -179,7 +180,8 @@ export class GameScene extends Phaser.Scene {
     this.waves = [];
     this.checkpoints = [];
     this.goal = undefined;
-    this.aura = 0;
+    // restarting at a checkpoint gives you one nuggie to start with
+    this.aura = this.retry ? 1 : 0;
     this.ended = false;
     this.cineZoom = 1;
     this.lastHud = '';
@@ -664,19 +666,24 @@ export class GameScene extends Phaser.Scene {
       // the last stretch of a flame's life: it shrinks, slows, sputters and smokes
       const vigor = Phaser.Math.Clamp(w.life / FLAME_FADE, 0, 1);
       w.img.x += w.dir * w.speed * dt * (0.35 + 0.65 * vigor);
-      w.img.setFrame(`f${Math.floor(w.t * (8 + 6 * vigor)) % 4}`);
-      const sputter = vigor < 1 ? (Math.random() < 0.25 ? 0.75 : 1) : 1;
-      w.img.scaleY = FLAME_S * (0.25 + 0.75 * vigor) * (1 + Math.sin(w.t * 23) * 0.06) * sputter;
-      w.img.scaleX = FLAME_S * (0.55 + 0.45 * vigor);
-      w.img.setAlpha(0.45 + 0.55 * vigor);
+      // full flames loop through 8 frames; as it burns out it breaks up into small
+      // sputtering flickers over glowing coals
+      const dying = vigor < 0.55;
+      w.img.setFrame(dying ? `d${Math.floor(w.t * 9) % 4}` : `f${Math.floor(w.t * (14 + 8 * vigor)) % 8}`);
+      const sputter = vigor < 1 ? (Math.random() < 0.2 ? 0.82 : 1) : 1;
+      w.img.scaleY = FLAME_S * (dying ? 0.8 + 0.6 * vigor : 0.55 + 0.45 * vigor) * (1 + Math.sin(w.t * 23) * 0.05) * sputter;
+      w.img.scaleX = FLAME_S * (dying ? 0.9 : 0.7 + 0.3 * vigor);
+      w.img.setAlpha(dying ? 0.6 + 0.4 * (vigor / 0.55) : 1);
       w.glow.setPosition(w.img.x, w.y - 16).setAlpha((0.6 + Math.sin(w.t * 31) * 0.15) * vigor).setScale(1.6 * (0.5 + 0.5 * vigor), 1.1 * (0.5 + 0.5 * vigor));
       const front = w.img.x + w.dir * 20;
       const groundAhead = this.level.isSolidAt(front, w.y + 6) && !this.level.isSolidAt(front, w.y - 8);
       this.fx.flameTrail(w.img.x, w.y, w.dir, vigor);
       if (!groundAhead && w.life > FLAME_FADE) w.life = FLAME_FADE; // reached an edge: start dying there
       if (w.life <= 0) {
-        // the last flicker sinks into a curl of smoke and a few embers
+        // the last flicker sinks into a curl of smoke and a few embers, leaving a scorch mark
         this.fx.flameDie(w.img.x, w.y);
+        const mark = this.add.image(w.img.x, w.y + 1, 'scorch').setScale(1 / PROP_RES).setDepth(DEPTH.tiles + 0.55).setAlpha(0.9);
+        this.tweens.add({ targets: mark, alpha: 0, delay: 1500, duration: 2500, onComplete: () => mark.destroy() });
         this.tweens.add({ targets: w.img, scaleY: 0.02, scaleX: FLAME_S * 0.4, alpha: 0, duration: 800, ease: 'Sine.easeIn', onComplete: () => w.img.destroy() });
         this.tweens.add({ targets: w.glow, alpha: 0, duration: 600, onComplete: () => w.glow.destroy() });
         return false;

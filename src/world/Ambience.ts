@@ -125,37 +125,101 @@ function makeTextures(scene: Phaser.Scene) {
       { name: 'down', x: 200, w: 100 },
     ],
   );
-  // a butterfly: wings open / closed
+  // a butterfly (3× resolution, seen from above): proper fore- and hind-wings with a soft
+  // darker edge, a couple of eye-spots and fine veins, a slim body and curled antennae.
+  // Three frames: open, half and shut. Drawn white so it can be tinted gently.
   mk(
     'amb-fly',
-    56,
-    24,
+    270,
+    78,
     (ctx) => {
-      for (const [ox, open] of [[0, 1], [28, 0.25]] as const) {
-        const cx = ox + 14;
-        const cy = 12;
-        ctx.fillStyle = '#fff';
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      for (const [ox, open] of [[0, 1], [90, 0.55], [180, 0.12]] as const) {
+        const cx = ox + 45;
+        const cy = 40;
+        const wing = (s: number, fore: boolean) => {
+          const w = (fore ? 30 : 22) * open + 3;
+          const h = fore ? 26 : 19;
+          const y = fore ? cy - 4 : cy + 6;
+          ctx.beginPath();
+          ctx.moveTo(cx + s * 2, y);
+          if (fore) {
+            ctx.bezierCurveTo(cx + s * w * 0.4, y - h * 1.05, cx + s * w * 1.05, y - h * 0.9, cx + s * w, y - h * 0.25);
+            ctx.bezierCurveTo(cx + s * w * 0.95, y + 2, cx + s * w * 0.5, y + 6, cx + s * 2, y + 3);
+          } else {
+            ctx.bezierCurveTo(cx + s * w * 0.6, y - 2, cx + s * w * 1.05, y + h * 0.45, cx + s * w * 0.7, y + h * 0.95);
+            ctx.bezierCurveTo(cx + s * w * 0.4, y + h * 1.1, cx + s * 4, y + h * 0.6, cx + s * 2, y + 2);
+          }
+          ctx.closePath();
+        };
         for (const s of [-1, 1]) {
-          ctx.beginPath();
-          ctx.ellipse(cx + s * 5.5 * open, cy - 3, 6 * open + 1.2, 6, s * 0.5, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.beginPath();
-          ctx.ellipse(cx + s * 4 * open, cy + 4, 4.2 * open + 1, 4, -s * 0.4, 0, Math.PI * 2);
-          ctx.fill();
+          for (const fore of [false, true]) {
+            // white wing with a soft grey edge (the tint keeps it subtle)
+            wing(s, fore);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+            ctx.save();
+            wing(s, fore);
+            ctx.clip();
+            const g = ctx.createRadialGradient(cx, cy, 6, cx, cy, fore ? 34 : 26);
+            g.addColorStop(0, 'rgba(0,0,0,0)');
+            g.addColorStop(0.7, 'rgba(0,0,0,0.04)');
+            g.addColorStop(1, 'rgba(40,30,60,0.32)');
+            ctx.fillStyle = g;
+            ctx.fillRect(ox, 0, 90, 78);
+            // veins
+            ctx.strokeStyle = 'rgba(40,30,60,0.18)';
+            ctx.lineWidth = 0.9;
+            for (let k = 0; k < 3; k++) {
+              ctx.beginPath();
+              ctx.moveTo(cx + s * 3, fore ? cy - 2 : cy + 6);
+              ctx.lineTo(cx + s * (8 + k * 9) * open + s * 2, fore ? cy - 18 + k * 6 : cy + 12 + k * 4);
+              ctx.stroke();
+            }
+            ctx.restore();
+            wing(s, fore);
+            ctx.strokeStyle = 'rgba(40,30,60,0.55)';
+            ctx.lineWidth = 1.6;
+            ctx.stroke();
+          }
+          // an eye-spot on each forewing
+          if (open > 0.3) {
+            ctx.fillStyle = 'rgba(40,30,60,0.4)';
+            ctx.beginPath();
+            ctx.ellipse(cx + s * 17 * open, cy - 15, 3.6 * open, 3.6, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = 'rgba(255,255,255,0.95)';
+            ctx.beginPath();
+            ctx.ellipse(cx + s * 17 * open, cy - 15.5, 1.4 * open, 1.4, 0, 0, Math.PI * 2);
+            ctx.fill();
+          }
         }
-        ctx.fillStyle = 'rgba(0,0,0,0.45)';
-        ctx.fillRect(cx - 0.9, cy - 6, 1.8, 13);
-        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        // body + antennae
+        ctx.fillStyle = 'rgba(50,38,60,0.9)';
+        ctx.beginPath();
+        ctx.ellipse(cx, cy + 4, 2.4, 13, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(cx, cy - 10, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(50,38,60,0.85)';
+        ctx.lineWidth = 1.2;
         for (const s of [-1, 1]) {
           ctx.beginPath();
-          ctx.arc(cx + s * 6 * open, cy - 4, 1.6 * open + 0.4, 0, Math.PI * 2);
+          ctx.moveTo(cx + s, cy - 12);
+          ctx.quadraticCurveTo(cx + s * 6, cy - 24, cx + s * 9, cy - 25);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(cx + s * 9.5, cy - 25, 1.4, 0, Math.PI * 2);
           ctx.fill();
         }
       }
     },
     [
-      { name: 'open', x: 0, w: 28 },
-      { name: 'shut', x: 28, w: 28 },
+      { name: 'open', x: 0, w: 90 },
+      { name: 'half', x: 90, w: 90 },
+      { name: 'shut', x: 180, w: 90 },
     ],
   );
   // a soft contact shadow
@@ -313,8 +377,9 @@ export class Ambience {
       const x = view.left + view.width * (0.1 + Math.random() * 0.8);
       const gy = this.groundBelow(x, view.top + 10, view.height);
       if (gy !== null && gy < view.top + view.height - 20) {
-        const cols = this.arctic ? [0xcfe8ff, 0xffffff, 0xa8d4ff, 0xe6f2ff] : [0xffd23f, 0xff8fb3, 0xff9a3c, 0x8fd0ff, 0xc9a2ff];
-        const img = this.scene.add.image(x, gy - 40, 'amb-fly', 'open').setDepth(DEPTH.decor + 1).setScale(0.5).setTint(cols[Math.floor(Math.random() * cols.length)]).setAlpha(0);
+        // soft, gentle colours (cabbage whites, pale lemons, faded lilac and peach)
+        const cols = this.arctic ? [0xffffff, 0xeef5ff, 0xdcecff, 0xf4f8ff] : [0xffffff, 0xfff4c8, 0xf0e6ff, 0xffe8da, 0xe8f4ff, 0xfffbe8];
+        const img = this.scene.add.image(x, gy - 40, 'amb-fly', 'open').setDepth(DEPTH.decor + 1).setScale(0.24).setTint(cols[Math.floor(Math.random() * cols.length)]).setAlpha(0);
         this.flies.push({ img, x, y: gy - 30 - Math.random() * 50, home: gy, vx: (Math.random() < 0.5 ? -1 : 1) * (14 + Math.random() * 18), ph: Math.random() * 6, t: 0, life: 10 + Math.random() * 10 });
       }
     }
@@ -325,10 +390,10 @@ export class Ambience {
       const gy = this.groundBelow(f.x, f.y - 60, 260);
       if (gy !== null) f.home += (gy - f.home) * Math.min(1, dt * 2);
       f.y += ((f.home - 40 + Math.sin(f.ph * 0.8) * 22) - f.y) * Math.min(1, dt * 1.5);
-      const flap = Math.floor(f.ph * 14) % 2;
+      const fi = Math.floor(f.ph * 18) % 4;
       const fade = Math.min(1, f.t, f.life - f.t);
       f.img
-        .setFrame(flap ? 'open' : 'shut')
+        .setFrame(['open', 'half', 'shut', 'half'][fi])
         .setPosition(f.x, f.y + Math.sin(f.ph * 9) * 2.5)
         .setAlpha(Math.max(0, fade) * 0.95)
         .setRotation(Math.sin(f.ph * 2) * 0.25);
