@@ -1762,20 +1762,25 @@ kbd {
 /* the end-of-level hero is the live one from the pick-a-player cards (its own standing animation) */
 .results-hero canvas.live { animation: none; }
 
-/* Scruffy's celebration: crouch, spring up into a little backflip, squashy landing */
+/* Scruffy's celebration: crouch, spring up, a quick smooth backflip at the top, squashy landing.
+   Two animations at once: the hop (up / down / squash) and the spin (its own easing). */
 .card.cheer[data-hero='scruffy'] canvas {
   transform-origin: 50% 80%;
-  animation: card-flip 0.75s linear;
+  animation: flip-hop 0.75s linear, flip-spin 0.75s linear;
 }
-@keyframes card-flip {
-  0% { transform: translateY(0) rotate(0) scale(1, 1); }
-  12% { transform: translateY(0) rotate(0) scale(1.1, 0.88); animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1); }
-  30% { transform: translateY(-15%) rotate(-70deg) scale(0.95, 1.06); animation-timing-function: linear; }
-  52% { transform: translateY(-21%) rotate(-230deg) scale(1, 1); animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5); }
-  73% { transform: translateY(0) rotate(-360deg) scale(1.02, 0.98); animation-timing-function: ease-out; }
-  82% { transform: translateY(0) rotate(-360deg) scale(1.12, 0.86); animation-timing-function: ease-in-out; }
-  91% { transform: translateY(0) rotate(-360deg) scale(0.97, 1.03); }
-  100% { transform: translateY(0) rotate(-360deg) scale(1, 1); }
+@keyframes flip-hop {
+  /* (translate / scale as their own properties: the hop stays straight up and down while he spins) */
+  0% { translate: 0 0; scale: 1 1; }
+  13% { translate: 0 0; scale: 1.1 0.88; animation-timing-function: cubic-bezier(0.15, 0.75, 0.35, 1); }
+  42% { translate: 0 -22%; scale: 0.97 1.04; animation-timing-function: cubic-bezier(0.55, 0, 0.85, 0.35); }
+  68% { translate: 0 0; scale: 1 1; animation-timing-function: cubic-bezier(0.3, 0.6, 0.4, 1); }
+  77% { translate: 0 0; scale: 1.12 0.87; animation-timing-function: ease-in-out; }
+  88% { translate: 0 0; scale: 0.97 1.03; animation-timing-function: ease-in-out; }
+  100% { translate: 0 0; scale: 1 1; }
+}
+@keyframes flip-spin {
+  0%, 17% { rotate: 0deg; animation-timing-function: cubic-bezier(0.45, 0.05, 0.4, 1); }
+  58%, 100% { rotate: -360deg; }
 }
 @media (prefers-reduced-motion: reduce) {
   .card.cheer[data-hero='scruffy'] canvas { animation: none; }
