@@ -38,7 +38,7 @@ export function withFace(f: Face | undefined, draw: () => void) {
 
 export type Eyes = 'n' | 'blink' | 'back' | 'up';
 const EYES: Eyes[] = ['n', 'blink', 'back', 'up'];
-const MOUTHS: Mouth[] = ['rest', 'smile', 'o', 'open'];
+const MOUTHS: Mouth[] = ['rest', 'o', 'open'];
 
 /** Frame names for every eyes × mouth combination (the plain face is the normal idle frame). */
 export const FACE_FRAMES: string[] = EYES.flatMap((e) => MOUTHS.map((m) => `${e}-${m}`)).filter((k) => k !== 'n-rest');
@@ -87,23 +87,25 @@ export class FaceClock {
       }
     }
     if (this.mouthT <= 0 && !this.mouthQ.length) {
+      // mostly breathing: the mouth opens a little and closes again; now and
+      // then a big open mouth, or a quick chatter
       const r = Math.random();
       let t = 0;
-      if (r < 0.35) {
-        t = rnd(0.9, 1.9);
-        this.mouthQ.push([0, 'smile'], [t, 'rest']);
-      } else if (r < 0.6) {
-        t = rnd(0.45, 0.9);
+      if (r < 0.7) {
+        t = rnd(0.55, 0.9);
         this.mouthQ.push([0, 'o'], [t, 'rest']);
+      } else if (r < 0.9) {
+        t = rnd(0.7, 1.1);
+        this.mouthQ.push([0, 'o'], [0.12, 'open'], [t - 0.12, 'o'], [t, 'rest']);
       } else {
-        const n = 3 + Math.floor(Math.random() * 4);
+        const n = 3 + Math.floor(Math.random() * 3);
         for (let i = 0; i < n; i++) {
           this.mouthQ.push([t, i % 2 === 0 ? 'open' : 'rest']);
           t += rnd(0.11, 0.18);
         }
         this.mouthQ.push([t, 'rest']);
       }
-      this.mouthT = t + rnd(2.2, 5.8);
+      this.mouthT = t + rnd(1.8, 3.6);
     }
   }
 
