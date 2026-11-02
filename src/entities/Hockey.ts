@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import { DEPTH, TILE } from '../config';
 import { sfx } from '../core/sfx';
 import { ART_RES } from '../gfx/draw';
+import { RINK, drawRinkBack, drawRinkIce } from '../gfx/rink';
+import { addCanvas, hires } from '../gfx/textures';
 import type { GameScene } from '../scenes/GameScene';
 import type { Player } from './Player';
 import { SoccerBig, SoccerPuff, type Coach, type SoccerMember } from './Soccer';
@@ -46,8 +48,15 @@ export class HockeyMatch implements Coach {
     this.left = cx - half;
     this.right = cx + half;
     this.ground = ground;
-    // rink lines on the ice, nets at both ends
-    gs.add.image(this.left, ground - 1, 'rinklines').setOrigin(0, 0).setScale(1 / 2).setDisplaySize(half * 2, 7).setDepth(DEPTH.decor + 1);
+    // the mini arena: grandstand, glass, boards and lights behind; the marked ice sheet in front
+    const rinkW = half * 2;
+    const W = rinkW + RINK.END * 2;
+    const back = `rink-back-${rinkW}`;
+    const ice = `rink-ice-${rinkW}`;
+    if (!gs.textures.exists(back)) addCanvas(gs, back, hires(W, RINK.ABOVE + RINK.BELOW, 2, (ctx) => drawRinkBack(ctx, rinkW)));
+    if (!gs.textures.exists(ice)) addCanvas(gs, ice, hires(W, RINK.ICE_UP + RINK.ICE_DOWN, 2, (ctx) => drawRinkIce(ctx, rinkW)));
+    gs.add.image(this.left - RINK.END, ground, back).setOrigin(0, RINK.ABOVE / (RINK.ABOVE + RINK.BELOW)).setScale(1 / 2).setDepth(DEPTH.decor - 1);
+    gs.add.image(this.left - RINK.END, ground, ice).setOrigin(0, RINK.ICE_UP / (RINK.ICE_UP + RINK.ICE_DOWN)).setScale(1 / 2).setDepth(DEPTH.tiles + 0.5);
     gs.add.image(this.left - 4, ground + 1, 'hockeynet').setOrigin(4 / 64, 40 / 44).setScale(1 / 2).setDepth(DEPTH.decor);
     gs.add.image(this.right + 4, ground + 1, 'hockeynet').setOrigin(4 / 64, 40 / 44).setScale(-1 / 2, 1 / 2).setDepth(DEPTH.decor);
 

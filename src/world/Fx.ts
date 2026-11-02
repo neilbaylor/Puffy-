@@ -17,6 +17,7 @@ export class Fx {
   private burnE: Emitter;
   private emberE: Emitter;
   private ashE: Emitter;
+  private goopE: Emitter;
 
   constructor(private scene: Phaser.Scene) {
     const mk = (tex: string, cfg: Phaser.Types.GameObjects.Particles.ParticleEmitterConfig, depth: number = DEPTH.fx) =>
@@ -111,6 +112,16 @@ export class Fx {
       tint: [0x6ff0d8, 0xe6fffa, 0x9ffbe8],
       blendMode: Phaser.BlendModes.ADD,
     });
+    // goat spit: little green-white droplets
+    this.goopE = mk('puff', {
+      speed: { min: 40, max: 170 },
+      angle: { min: 190, max: 350 },
+      lifespan: { min: 280, max: 520 },
+      scale: { start: 0.32, end: 0.06 },
+      alpha: { start: 0.95, end: 0 },
+      tint: [0xc8f26a, 0xe9ffc2, 0x9fd84a],
+      gravityY: 700,
+    }, DEPTH.projectiles);
     this.trailE = mk('puff', {
       speed: { min: 5, max: 25 },
       lifespan: 360,
@@ -122,6 +133,16 @@ export class Fx {
 
   dust(x: number, y: number, n = 6) {
     this.dustE.explode(n, x, y);
+  }
+
+  /** A glob of goat spit going splat. */
+  splat(x: number, y: number, n = 9) {
+    this.goopE.explode(n, x, y);
+  }
+
+  /** A drip or two flying off a spit glob in flight. */
+  drip(x: number, y: number) {
+    this.goopE.explode(1, x, y);
   }
 
   trail(x: number, y: number) {

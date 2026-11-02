@@ -125,6 +125,11 @@ export const sfx = {
     [523, 659, 784].forEach((f, i) => tone({ type: 'triangle', from: f, dur: 0.14, vol: 0.06, delay: i * 0.08 }));
   },
   groan: () => tone({ type: 'sawtooth', from: 220, to: 120, dur: 0.6, vol: 0.06 }),
+  /** A silly "meh-eh-eh-eh!" as a goat keels over. */
+  bleat: () =>
+    [0, 1, 2, 3, 4].forEach((i) =>
+      tone({ type: 'sawtooth', from: (i % 2 ? 520 : 600) - i * 30, to: (i % 2 ? 600 : 520) - i * 34, dur: 0.075, vol: 0.05, delay: 0.05 + i * 0.075 }),
+    ),
   spit: () => {
     noise(0.12, 0.3, 1800, 500);
     tone({ type: 'sine', from: 400, to: 900, dur: 0.12, vol: 0.12 });

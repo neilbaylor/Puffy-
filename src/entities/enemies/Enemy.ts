@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { DEPTH, MAX_FALL_SPEED } from '../../config';
 import { sfx } from '../../core/sfx';
 import { ART_RES } from '../../gfx/draw';
+import { GOAT_H, GOAT_MOUTH, GOAT_W } from '../../gfx/goat';
 import type { EnemyKind } from '../../level/builder';
 import type { GameScene } from '../../scenes/GameScene';
 import type { Player } from '../Player';
@@ -230,7 +231,7 @@ export class Giant extends Enemy {
   private dir = -1;
   private mode: 'walk' | 'crouch' | 'air' | 'slamWindup' | 'slam' | 'chargeWindup' | 'charge' = 'walk';
   private timer = 1.0;
-  private chargeCooldown = 2.2;
+  private chargeCooldown = 1.8;
   private underFor = 0;
   private pips: Phaser.GameObjects.Graphics;
   private readonly maxHp = 5;
@@ -262,14 +263,14 @@ export class Giant extends Enemy {
         if (target && Math.abs(target.x - this.x) > 20) this.dir = Math.sign(target.x - this.x);
         const aheadX = this.dir > 0 ? b.right + 4 : b.left - 4;
         const groundAhead = this.gs.level.isSolidAt(aheadX, b.bottom + 6);
-        b.setVelocityX(groundAhead && !(this.dir < 0 ? b.blocked.left : b.blocked.right) ? this.dir * 60 : 0);
+        b.setVelocityX(groundAhead && !(this.dir < 0 ? b.blocked.left : b.blocked.right) ? this.dir * 66 : 0);
         this.setFrame(Math.floor(this.t * 5) % 2 ? 'w1' : 'w0');
         const dx = target ? Math.abs(target.x - this.x) : Infinity;
         const sameLevel = target ? Math.abs(target.bottom - b.bottom) < 48 : false;
         if (target && onGround && this.chargeCooldown <= 0 && dx < 300 && dx > 70 && sameLevel) {
           // wind up, then charge!
           this.mode = 'chargeWindup';
-          this.timer = 0.62; // a longer, clearer warning
+          this.timer = 0.55; // a clear warning
           b.setVelocityX(-this.dir * 40);
           sfx.roar();
           this.gs.fx.popText(this.x, b.top - 26, '!!', '#ff5a3c', 26);
@@ -291,13 +292,13 @@ export class Giant extends Enemy {
       case 'charge': {
         const aheadX = this.dir > 0 ? b.right + 6 : b.left - 6;
         const stop = !this.gs.level.isSolidAt(aheadX, b.bottom + 6) || (this.dir < 0 ? b.blocked.left : b.blocked.right);
-        b.setVelocityX(stop ? 0 : this.dir * 270);
+        b.setVelocityX(stop ? 0 : this.dir * 290);
         this.setFrame(Math.floor(this.t * 12) % 2 ? 'w1' : 'w0');
         if (Math.random() < 0.5) this.gs.fx.dust(this.dir > 0 ? b.left + 8 : b.right - 8, b.bottom, 1);
         if (this.timer <= 0 || stop) {
           this.mode = 'walk';
           this.timer = 0.6;
-          this.chargeCooldown = 4.5 + Math.random() * 2;
+          this.chargeCooldown = 3.8 + Math.random() * 1.6;
           b.setVelocityX(0);
           this.gs.cameras.main.shake(140, 0.006);
         }
@@ -352,15 +353,15 @@ export class Giant extends Enemy {
   private land(slam: boolean) {
     const b = this.body;
     this.mode = 'walk';
-    this.timer = 1.3 + Math.random() * 0.9;
+    this.timer = 1.1 + Math.random() * 0.8;
     b.setVelocityX(0);
     this.gs.cameras.main.shake(slam ? 320 : 200, slam ? 0.02 : 0.01);
     this.gs.fx.dust(b.left + 10, b.bottom, slam ? 14 : 8);
     this.gs.fx.dust(b.right - 10, b.bottom, slam ? 14 : 8);
     if (slam) this.gs.fx.shockwave(this.x, b.bottom, 70);
     // every landing sends a shockwave rolling along the ground both ways: jump it!
-    this.gs.spawnShockwave(b.left + 6, b.bottom, -1, slam ? 250 : 200);
-    this.gs.spawnShockwave(b.right - 6, b.bottom, 1, slam ? 250 : 200);
+    this.gs.spawnShockwave(b.left + 6, b.bottom, -1, slam ? 275 : 220);
+    this.gs.spawnShockwave(b.right - 6, b.bottom, 1, slam ? 275 : 220);
     sfx.thud();
   }
 
@@ -394,23 +395,22 @@ export class Giant extends Enemy {
 
 /**
  * Mountain goat (Part 2, from the sketch). Trots along its ledge (turning back
- * at edges). When it spots you on its level it paws the ground — "!" — then
- * charges horns-first; if it smacks into a wall it's left dizzy for a moment.
- * Its spiky back hurts to land on, so it can't be stomped: two shots, or jump
- * over the charge.
+ * at edges). When it spots you it rears back with puffed-out cheeks — "!" —
+ * then PTOO! lobs a glob of spit at you in an arc. Jump on it or shoot it once
+ * and it keels over onto its back, hooves in the air.
  */
 export class Goat extends Enemy {
   readonly kind: EnemyKind = 'goat';
   private dir = -1;
-  private mode: 'walk' | 'windup' | 'charge' | 'stun' = 'walk';
+  private mode: 'walk' | 'windup' | 'spit' = 'walk';
   private timer = 0;
-  private cooldown = 1;
+  private cooldown = 1.2;
 
   constructor(gs: GameScene, x: number, y: number) {
     super(gs, x, y, 'goat', 'w0');
     hiRes(this, 40, 38, 12, 24);
-    this.hp = 2;
-    this.stompable = false;
+    this.hp = 1;
+    this.stompable = true;
   }
 
   tick(dt: number) {
@@ -425,58 +425,180 @@ export class Goat extends Enemy {
         b.setVelocityX(this.dir * 42);
         this.setFrame(Math.floor(this.t * 6) % 2 ? 'w1' : 'w0');
         const dx = target ? target.x - this.x : 0;
-        const sameLevel = target ? Math.abs(target.bottom - b.bottom) < 40 : false;
-        if (target && this.cooldown <= 0 && b.blocked.down && sameLevel && Math.abs(dx) < 260 && Math.abs(dx) > 30) {
+        const dy = target ? target.y - this.y : 0;
+        if (target && target.alive && this.cooldown <= 0 && b.blocked.down && Math.abs(dx) < 330 && Math.abs(dx) > 26 && dy > -170 && dy < 120) {
           this.dir = Math.sign(dx);
           this.mode = 'windup';
-          this.timer = 0.6;
+          this.timer = 0.5;
           b.setVelocityX(0);
-          this.gs.fx.popText(this.x, b.top - 14, '!', '#ff5a3c', 22);
+          this.gs.fx.popText(this.x, b.top - 14, '!', '#9fd84a', 22);
           sfx.bump();
         }
         break;
       }
       case 'windup':
-        // paws the ground
-        this.setFrame(Math.floor(this.t * 12) % 2 ? 'w1' : 'w0');
-        if (Math.random() < 0.3) this.gs.fx.dust(this.dir > 0 ? b.left + 6 : b.right - 6, b.bottom, 1);
+        // rears back, cheeks puffed (with a little shiver)
+        this.setFrame('sp0');
+        b.setVelocityX(0);
+        this.setX(this.x + Math.sin(this.t * 70) * 0.5);
+        if (target) this.dir = Math.sign(target.x - this.x) || this.dir;
         if (this.timer <= 0) {
-          this.mode = 'charge';
-          this.timer = 1.4;
+          this.mode = 'spit';
+          this.timer = 0.32;
+          this.spit(target);
         }
         break;
-      case 'charge': {
-        const wall = this.dir < 0 ? b.blocked.left : b.blocked.right;
-        const edge = b.blocked.down && !ahead(this.dir);
-        b.setVelocityX(edge ? 0 : this.dir * 290);
-        this.setFrame(Math.floor(this.t * 12) % 2 ? 'c1' : 'c0');
-        if (Math.random() < 0.5) this.gs.fx.dust(this.dir > 0 ? b.left + 6 : b.right - 6, b.bottom, 1);
-        if (wall) {
-          // BONK
-          this.mode = 'stun';
-          this.timer = 1.1;
-          b.setVelocity(-this.dir * 80, -160);
-          this.gs.cameras.main.shake(100, 0.004);
-          this.gs.fx.stars(this.x - this.dir * -16, b.top + 6, 5);
-          sfx.thud();
-        } else if (edge || this.timer <= 0) {
-          this.mode = 'walk';
-          this.cooldown = 1.8;
-          b.setVelocityX(0);
-        }
-        break;
-      }
-      case 'stun':
-        this.setFrame('stun');
-        if (b.blocked.down) b.setVelocityX(0);
+      case 'spit':
+        this.setFrame('sp1');
+        b.setVelocityX(0);
         if (this.timer <= 0) {
           this.mode = 'walk';
-          this.cooldown = 1.5;
-          this.dir *= -1;
+          this.cooldown = 1.9 + Math.random() * 0.8;
         }
         break;
     }
     this.setFlipX(this.dir > 0);
+  }
+
+  /** PTOO! An arcing glob aimed at where you are right now. */
+  private spit(target: Player | null) {
+    const sx = this.x + this.dir * (GOAT_W / 2 - GOAT_MOUTH.x);
+    const sy = this.y + (GOAT_MOUTH.y - GOAT_H / 2);
+    const tx = target ? target.x : sx + this.dir * 200;
+    const ty = target ? target.body.center.y : sy;
+    const G = 760;
+    const dist = Math.abs(tx - sx);
+    const T = Phaser.Math.Clamp(dist / 330, 0.38, 0.95);
+    let vx = (tx - sx) / T;
+    if (Math.sign(vx) !== this.dir) vx = this.dir * 60;
+    const vy = (ty - sy - 0.5 * G * T * T) / T;
+    new SpitGlob(this.gs, sx, sy, vx, vy, G);
+    sfx.spit();
+    this.gs.fx.drip(sx, sy);
+  }
+
+  kill(how: DeathKind) {
+    if (this.dead || how === 'fall') {
+      super.kill(how);
+      return;
+    }
+    // keels over onto its back, hooves up, legs kicking — silly, not sad
+    this.dead = true;
+    this.body.enable = false;
+    this.clearTint();
+    const gs = this.gs;
+    if (how === 'stomp') sfx.stomp();
+    else sfx.bump();
+    sfx.bleat();
+    gs.fx.stars(this.x, this.y - 10, 7);
+    gs.fx.fluffBurst(this.x, this.y, 0.35);
+    const flip = this.flipX;
+    this.setFrame('flop0').setFlipX(flip).setDepth(DEPTH.fx - 1);
+    const baseY = this.y;
+    const pop = how === 'stomp' ? 26 : 48;
+    // boing up with a spin, land on its back, wobble...
+    gs.tweens.add({
+      targets: this,
+      y: baseY - pop,
+      angle: how === 'stomp' ? 0 : (flip ? 1 : -1) * 360,
+      duration: 260,
+      ease: 'Quad.easeOut',
+      onComplete: () => {
+        this.setAngle(0);
+        gs.tweens.add({
+          targets: this,
+          y: baseY,
+          duration: 220,
+          ease: 'Bounce.easeOut',
+          onComplete: () => {
+            gs.fx.dust(this.x, baseY + 30, 5);
+            // the rock-a-bye wobble on its round back
+            gs.tweens.add({ targets: this, angle: { from: -9, to: 9 }, yoyo: true, repeat: 2, duration: 170, ease: 'Sine.easeInOut' });
+            // ...legs kicking in the air
+            let k = 0;
+            const kicker = gs.time.addEvent({
+              delay: 110,
+              repeat: 9,
+              callback: () => {
+                if (!this.scene) return kicker.remove();
+                this.setFrame(++k % 2 ? 'flop1' : 'flop0');
+                if (k === 4) gs.fx.stars(this.x + (flip ? 14 : -14), baseY + 14, 4);
+              },
+            });
+            gs.tweens.add({
+              targets: this,
+              alpha: 0,
+              delay: 1250,
+              duration: 380,
+              onComplete: () => this.destroy(),
+            });
+          },
+        });
+      },
+    });
+  }
+}
+
+/** A flying glob of goat spit: arcs under gravity, splats on the ground or on you. */
+class SpitGlob {
+  private img: Phaser.GameObjects.Image;
+  private life = 2.2;
+  private dripT = 0;
+  private readonly onUpdate: (time: number, delta: number) => void;
+
+  constructor(
+    private gs: GameScene,
+    x: number,
+    y: number,
+    private vx: number,
+    private vy: number,
+    private g: number,
+  ) {
+    this.img = gs.add.image(x, y, 'spit').setOrigin(24 / 36, 0.5).setScale(1.5 / ART_RES).setDepth(DEPTH.projectiles);
+    this.onUpdate = (_t, delta) => this.step(Math.min(delta / 1000, 0.05));
+    gs.events.on(Phaser.Scenes.Events.UPDATE, this.onUpdate);
+    gs.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.gone());
+  }
+
+  private step(dt: number) {
+    const img = this.img;
+    if (!img.scene) return this.gone();
+    this.life -= dt;
+    this.vy += this.g * dt;
+    img.x += this.vx * dt;
+    img.y += this.vy * dt;
+    img.setRotation(Math.atan2(this.vy, this.vx));
+    const wob = 1 + Math.sin(this.life * 40) * 0.08;
+    img.setScale((1.5 * wob) / ART_RES, (1.5 * (2 - wob)) / ART_RES);
+    this.dripT -= dt;
+    if (this.dripT <= 0) {
+      this.dripT = 0.07;
+      this.gs.fx.drip(img.x - Math.cos(img.rotation) * 8, img.y - Math.sin(img.rotation) * 8);
+    }
+    // hit a hero?
+    for (const p of this.gs.players) {
+      if (!p.alive) continue;
+      const pb = p.body;
+      if (img.x + 7 < pb.left || img.x - 7 > pb.right || img.y + 7 < pb.top || img.y - 7 > pb.bottom) continue;
+      this.gs.hitPlayer(p, img.x - Math.sign(this.vx) * 20);
+      return this.splat();
+    }
+    if (this.gs.level.isSolidAt(img.x, img.y + 3) || this.life <= 0 || img.y > this.gs.level.heightPx + 50) this.splat();
+  }
+
+  private splat() {
+    const { x, y } = this.img;
+    this.gs.fx.splat(x, y);
+    // a flattened goop puddle that fades
+    const puddle = this.gs.add.image(x, y, 'spit').setOrigin(24 / 36, 0.5).setScale(2 / ART_RES, 0.6 / ART_RES).setDepth(DEPTH.projectiles - 1);
+    this.gs.tweens.add({ targets: puddle, alpha: 0, scaleX: 2.6 / ART_RES, delay: 250, duration: 500, onComplete: () => puddle.destroy() });
+    sfx.dribble(0.4);
+    this.gone();
+  }
+
+  private gone() {
+    this.gs.events.off(Phaser.Scenes.Events.UPDATE, this.onUpdate);
+    if (this.img.scene) this.img.destroy();
   }
 }
 

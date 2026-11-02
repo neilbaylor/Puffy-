@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import { DEPTH, TILE } from '../config';
 import { sfx } from '../core/sfx';
 import { ART_RES } from '../gfx/draw';
+import { PITCH, drawPitchBack, drawPitchFront } from '../gfx/pitch';
+import { addCanvas, hires } from '../gfx/textures';
 import type { GameScene } from '../scenes/GameScene';
 import { BigPuff, Puffball } from './enemies/Enemy';
 import type { Player } from './Player';
@@ -63,10 +65,18 @@ export class SoccerMatch implements Coach {
     this.kickVX = big ? 330 : 390;
     this.kickVY = big ? -260 : -230;
     this.wait = opts.wait ?? 0;
-    // a goal at each end of the pitch
-    if (opts.goals !== false)
-      for (const gx of [this.left - 56, this.right - 2])
-        gs.add.image(gx, ground + 1, 'soccergoal').setOrigin(4 / 76, 54 / 56).setScale(1 / 2).setDepth(DEPTH.decor);
+    // a proper pitch: striped turf, lines, goals + corner flags in front; ad boards + floodlights behind
+    if (opts.goals !== false) {
+      const pitchW = half * 2 + 56;
+      const W = pitchW + PITCH.END * 2;
+      const x0 = this.left - 28 - PITCH.END;
+      const front = `pitch-front-${pitchW}`;
+      const back = `pitch-back-${pitchW}`;
+      if (!gs.textures.exists(front)) addCanvas(gs, front, hires(W, PITCH.FRONT_UP + PITCH.FRONT_DOWN, 2, (ctx) => drawPitchFront(ctx, pitchW)));
+      if (!gs.textures.exists(back)) addCanvas(gs, back, hires(W, PITCH.BACK_UP + 2, 2, (ctx) => drawPitchBack(ctx, pitchW)));
+      gs.add.image(x0, ground, back).setOrigin(0, PITCH.BACK_UP / (PITCH.BACK_UP + 2)).setScale(1 / 2).setDepth(DEPTH.decor - 1);
+      gs.add.image(x0, ground, front).setOrigin(0, PITCH.FRONT_UP / (PITCH.FRONT_UP + PITCH.FRONT_DOWN)).setScale(1 / 2).setDepth(DEPTH.tiles + 0.5);
+    }
 
     // spread the team over the pitch (a two-player team stands in between the others)
     const n = opts.team.length;

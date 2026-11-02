@@ -8,8 +8,10 @@
 import type { Ctx } from './draw';
 import { ellipsePts, type Fill, type Pt, type Style } from './handdrawn';
 
-export type GoatFrame = 'w0' | 'w1' | 'c0' | 'c1' | 'stun';
-export const GOAT_FRAMES: GoatFrame[] = ['w0', 'w1', 'c0', 'c1', 'stun'];
+export type GoatFrame = 'w0' | 'w1' | 'c0' | 'c1' | 'stun' | 'sp0' | 'sp1' | 'flop0' | 'flop1';
+export const GOAT_FRAMES: GoatFrame[] = ['w0', 'w1', 'c0', 'c1', 'stun', 'sp0', 'sp1', 'flop0', 'flop1'];
+/** Where the spit leaves the mouth in the 'sp1' frame (frame px, art facing left). */
+export const GOAT_MOUTH = { x: 9, y: 29 };
 export const GOAT_W = 64;
 export const GOAT_H = 64;
 
@@ -83,10 +85,13 @@ function coatPts(cx: number, cy: number, rx: number, ry: number, spikes: number,
 }
 
 export function drawGoat(ctx: Ctx, ox: number, oy: number, frame: GoatFrame, st: Style) {
+  if (frame === 'flop0' || frame === 'flop1') return drawFlop(ctx, ox, oy, frame === 'flop1', st);
   const ground = oy + 62;
+  const rear = frame === 'sp0'; // head reared back, cheeks full of spit
+  const spit = frame === 'sp1'; // head thrust forward: PTOO!
   const charge = frame === 'c0' || frame === 'c1';
   const stun = frame === 'stun';
-  const step = frame === 'w0' || frame === 'c0' ? 1 : -1;
+  const step = frame === 'w0' || frame === 'c0' || rear ? 1 : -1;
   const lean = charge ? 1 : 0; // head down, body forward
   const bodyX = ox + 38 + lean * 2;
   const bodyY = ground - 25 + (charge ? 2 : 0) + (stun ? 1 : 0);
@@ -109,8 +114,8 @@ export function drawGoat(ctx: Ctx, ox: number, oy: number, frame: GoatFrame, st:
     st.line(ctx, [[bodyX + a, bodyY + b], [bodyX + c, bodyY + d]], 420 + a, 0.7, COAT.light);
 
   // neck
-  const headX = ox + 15 - lean * 3;
-  const headY = charge ? ground - 31 : ground - 40;
+  const headX = ox + 15 - lean * 3 + (rear ? 5 : 0) - (spit ? 4 : 0);
+  const headY = charge ? ground - 31 : ground - 40 - (rear ? 4 : 0) + (spit ? 1 : 0);
   const neck: Pt[] = [
     [bodyX - 13, bodyY - 4],
     [(bodyX - 13 + headX) / 2 + 1, (bodyY - 4 + headY) / 2 + 2],
@@ -125,13 +130,40 @@ export function drawGoat(ctx: Ctx, ox: number, oy: number, frame: GoatFrame, st:
 
   // horns (behind the head), head, face
   const hr = 10.5;
-  const hTilt = charge ? -0.5 : 0;
+  const hTilt = charge ? -0.5 : rear ? 0.35 : spit ? -0.2 : 0;
   ctx.save();
   ctx.translate(headX, headY);
   ctx.rotate(hTilt);
   horn(ctx, st, -5, -hr + 4, -1, 13, 440);
   horn(ctx, st, 5, -hr + 4, 1, 13, 445);
   st.shape(ctx, ellipsePts(0, 0, hr, hr * 0.98, 0, 36), HEAD, 450, { light: [-4, -5] });
+  if (rear) {
+    // puffed-out cheeks, squeezed eyes: here it comes...
+    st.shape(ctx, ellipsePts(-7.5, 4, 4.6, 3.8, 0, 20), HEAD, 452, { lw: 0.8, light: [-9, 2] });
+    ctx.fillStyle = 'rgba(255,120,150,0.45)';
+    ctx.beginPath();
+    ctx.ellipse(-7.5, 4.5, 2.6, 1.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    st.line(ctx, [[-7, -3.5], [-4.2, -1.6], [-1.6, -3.4]], 461, 0.9);
+    st.line(ctx, [[1.8, -3.8], [4.6, -1.8], [7.4, -3.8]], 466, 0.9);
+    st.line(ctx, [[-3.5, 6], [-1.6, 6.6]], 481, 0.8);
+    ctx.restore();
+    return;
+  }
+  if (spit) {
+    // big googly eyes, round "O" mouth and a fleck of spit
+    const er = 4.6;
+    for (const [ex, ey, r] of [[-4.2, -2.6, er * 0.95], [4.6, -3, er * 1.1]] as const) {
+      st.shape(ctx, ellipsePts(ex, ey, r, r * 1.05, 0, 24), EYE, 462 + ex, { lw: 0.8, plain: true });
+      ctx.fillStyle = st.ink;
+      ctx.beginPath();
+      ctx.arc(ex - 1.2, ey + 0.4, r * 0.28, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    st.shape(ctx, ellipsePts(-3, 5.4, 2.6, 2.2, 0, 16), { base: '#5a2a3a', shade: '#3a1826', light: '#7a3a4e' }, 483, { lw: 0.8, plain: true });
+    ctx.restore();
+    return;
+  }
   // googly eyes: one bigger than the other, pupils looking slightly different ways
   const eye = (ex: number, ey: number, er: number, px: number, py: number, seed: number) => {
     st.shape(ctx, ellipsePts(ex, ey, er, er * 1.05, 0, 24), EYE, seed, { lw: 0.8, plain: true });
@@ -165,4 +197,93 @@ export function drawGoat(ctx: Ctx, ox: number, oy: number, frame: GoatFrame, st:
     // speed lines behind
     for (const dy of [-8, 0, 7]) st.line(ctx, [[ox + 58, bodyY + dy], [ox + 63, bodyY + dy]], 490 + dy, 0.7, '#ffffffcc');
   }
+}
+
+/**
+ * Defeated: flopped on its back with all four hooves sticking up in the air,
+ * X-ed out eyes and the tongue lolling out. flop1 = the legs mid-kick.
+ */
+function drawFlop(ctx: Ctx, ox: number, oy: number, kick: boolean, st: Style) {
+  const ground = oy + 62;
+  const bodyX = ox + 36;
+  const bodyY = ground - 13;
+  // the coat, upside down (spikes squashed into the ground)
+  ctx.save();
+  ctx.translate(bodyX, bodyY);
+  ctx.rotate(Math.PI);
+  st.shape(ctx, coatPts(0, 0, 17.5, 10, 13, 0.4), COAT, 410, { lw: 1, light: [4, 6] });
+  ctx.restore();
+  // pale belly
+  st.shape(ctx, ellipsePts(bodyX, bodyY - 6, 12, 4.2, 0, 24), { base: '#8d8898', shade: '#6d6878', light: '#b4afbe' }, 412, { lw: 0.8, plain: true });
+  // four stiff legs straight up, hooves curled, splayed a little (and kicking)
+  const legs: [number, number, number][] = [
+    [-13, -0.5, 0],
+    [-5, -0.18, 1],
+    [5, 0.18, 2],
+    [13, 0.5, 3],
+  ];
+  for (const [dx, lean, i] of legs) {
+    const k = kick ? (i % 2 ? 2.4 : -2.4) : 0;
+    const bx = bodyX + dx;
+    const by = bodyY - 8;
+    const len = 15 + (i % 2) * 2;
+    const tx = bx + Math.sin(lean) * len + k;
+    const ty = by - Math.cos(lean) * len + Math.abs(k) * 0.4;
+    const pts: Pt[] = [
+      [bx, by],
+      [(bx + tx) / 2 + k * 0.3, (by + ty) / 2],
+      [tx, ty],
+    ];
+    st.line(ctx, pts, 500 + i, 4.6);
+    st.line(ctx, pts, 500 + i, 3, LEG.base);
+    // little split hoof at the top
+    st.shape(ctx, ellipsePts(tx, ty - 1.6, 3.4, 2.5, lean, 14), { base: '#3a3344', shade: '#221d2a', light: '#5a5266' }, 510 + i, { lw: 0.7, plain: true });
+    st.line(ctx, [[tx, ty - 3.2], [tx, ty - 0.4]], 520 + i, 0.6, '#8f86a0');
+  }
+  // the head flopped over on its side, lying by the ground
+  const headX = ox + 13;
+  const headY = ground - 10;
+  const hr = 10;
+  const neck: Pt[] = [
+    [bodyX - 14, bodyY - 1],
+    [headX + 8, headY - 1],
+  ];
+  st.line(ctx, neck, 530, 7);
+  st.line(ctx, neck, 530, 5.2, LEG.base);
+  ctx.save();
+  ctx.translate(headX, headY);
+  ctx.rotate(-1.9);
+  horn(ctx, st, -5, -hr + 4, -1, 12, 440);
+  horn(ctx, st, 5, -hr + 4, 1, 12, 445);
+  st.shape(ctx, ellipsePts(0, 0, hr, hr * 0.98, 0, 36), HEAD, 450, { light: [-4, -5] });
+  // X X eyes
+  for (const [ex, ey] of [[-4.2, -2.2], [4.4, -2.4]] as const) {
+    st.line(ctx, [[ex - 2.6, ey - 2.6], [ex + 2.6, ey + 2.6]], 540 + ex, 1);
+    st.line(ctx, [[ex + 2.6, ey - 2.6], [ex - 2.6, ey + 2.6]], 545 + ex, 1);
+  }
+  // goofy open mouth with the tongue hanging out
+  st.line(ctx, [[-3.5, 5], [0, 6.2], [3.5, 5]], 550, 0.85);
+  st.shape(ctx, [[-0.4, 5.6], [3.2, 5.4], [3.8, 9], [2.4, 11.4], [0.4, 10.6], [-0.6, 8]], { base: '#ff7aa2', shade: '#e0507e', light: '#ffb0c8' }, 555, { lw: 0.7 });
+  st.line(ctx, [[1.6, 6.4], [1.7, 9.4]], 556, 0.5, '#c23a66');
+  ctx.restore();
+}
+
+/** A glob of goat spit, flying RIGHT (rotate it to the direction of travel). Centre at (cx, cy). */
+export function drawSpit(ctx: Ctx, cx: number, cy: number, st: Style) {
+  const GOOP: Fill = { base: '#c8f26a', shade: '#8cc63a', light: '#f2ffd6' };
+  // a teardrop: round front, a drippy tail behind
+  const pts: Pt[] = [];
+  for (let i = 0; i <= 24; i++) {
+    const a = -Math.PI / 2 + (i / 24) * Math.PI;
+    pts.push([cx + 1 + Math.cos(a) * 5.2, cy + Math.sin(a) * 4.6]);
+  }
+  pts.push([cx - 4, cy + 3.2], [cx - 7, cy + 1.6], [cx - 10, cy + 0.4], [cx - 7.6, cy - 1], [cx - 4.4, cy - 3.6]);
+  st.shape(ctx, pts, GOOP, 600, { lw: 0.8, light: [cx + 2, cy - 2] });
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.beginPath();
+  ctx.ellipse(cx + 2.4, cy - 1.8, 1.6, 1, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+  // a couple of trailing droplets
+  st.shape(ctx, ellipsePts(cx - 12.5, cy + 2.4, 1.4, 1.2, 0, 10), GOOP, 601, { lw: 0.6, plain: true });
+  st.shape(ctx, ellipsePts(cx - 15.5, cy - 0.8, 0.9, 0.8, 0, 10), GOOP, 602, { lw: 0.5, plain: true });
 }

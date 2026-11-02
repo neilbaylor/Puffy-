@@ -1234,15 +1234,150 @@ export const JUMBO = { x: 158, y: -24, w: 424, h: 108 };
 
 export type JumboContent =
   | { kind: 'title' }
-  | { kind: 'score'; you: number; king: number; name: string; sudden: boolean }
+  | {
+      kind: 'score';
+      you: number;
+      king: number;
+      name: string;
+      sudden: boolean;
+      /** Each shot so far (true = made), and how many shots each in regulation. */
+      youShots?: boolean[];
+      kingShots?: boolean[];
+      regulation?: number;
+    }
   | { kind: 'big'; text: string; sub?: string; color: string; bg: string };
+
+// 7-segment LED digits: segments a b c d e f g
+const SEG_ON: Record<string, string> = {
+  '0': 'abcdef', '1': 'bc', '2': 'abged', '3': 'abgcd', '4': 'fgbc', '5': 'afgcd',
+  '6': 'afgedc', '7': 'abc', '8': 'abcdefg', '9': 'abcdfg', '-': 'g', ' ': '',
+};
+
+/** One glowing 7-segment digit, top-left at (x, y), w × h. Unlit segments show faintly. */
+function segDigit(ctx: Ctx, ch: string, x: number, y: number, w: number, h: number, on: string, off: string) {
+  const t = Math.max(2, w * 0.18); // segment thickness
+  const g = t * 0.18; // gap at the joints
+  const hm = y + h / 2;
+  const horiz = (yy: number): [number, number][] => [
+    [x + g + t * 0.5, yy], [x + g + t, yy - t / 2], [x + w - g - t, yy - t / 2],
+    [x + w - g - t * 0.5, yy], [x + w - g - t, yy + t / 2], [x + g + t, yy + t / 2],
+  ];
+  const vert = (xx: number, y0: number, y1: number): [number, number][] => [
+    [xx, y0 + g + t * 0.5], [xx + t / 2, y0 + g + t], [xx + t / 2, y1 - g - t],
+    [xx, y1 - g - t * 0.5], [xx - t / 2, y1 - g - t], [xx - t / 2, y0 + g + t],
+  ];
+  const segs: Record<string, [number, number][]> = {
+    a: horiz(y + t / 2),
+    g: horiz(hm),
+    d: horiz(y + h - t / 2),
+    f: vert(x + t / 2, y, hm),
+    b: vert(x + w - t / 2, y, hm),
+    e: vert(x + t / 2, hm, y + h),
+    c: vert(x + w - t / 2, hm, y + h),
+  };
+  const lit = SEG_ON[ch] ?? '';
+  for (const k of 'abcdefg') {
+    const isOn = lit.includes(k);
+    ctx.save();
+    // a slight italic slant, like a real scoreboard
+    ctx.transform(1, 0, -0.08, 1, (y + h / 2) * 0.08, 0);
+    ctx.fillStyle = isOn ? on : off;
+    if (isOn) {
+      ctx.shadowColor = on;
+      ctx.shadowBlur = 7;
+    }
+    poly(ctx, segs[k]);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+/** A two-digit LED score in a dark inset window centred at (cx, cy). */
+function ledScore(ctx: Ctx, n: number, cx: number, cy: number, col: string, dim: string) {
+  const dw = 21;
+  const dh = 36;
+  const gap = 6;
+  const bw = dw * 2 + gap + 16;
+  const bh = dh + 10;
+  ctx.fillStyle = '#05040a';
+  ctx.beginPath();
+  ctx.roundRect(cx - bw / 2, cy - bh / 2, bw, bh, 4);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  const str = String(Math.min(99, n)).padStart(2, ' ');
+  for (let i = 0; i < 2; i++) segDigit(ctx, str[i], cx - (dw * 2 + gap) / 2 + i * (dw + gap), cy - dh / 2, dw, dh, col, dim);
+}
+
+/** The scrolling news ticker along the bottom of the jumbotron. */
+function jumboTicker(ctx: Ctx, items: { text: string; color: string }[], t: number, y0: number, h: number, w: number) {
+  const bar = ctx.createLinearGradient(0, y0, 0, y0 + h);
+  bar.addColorStop(0, '#1c1430');
+  bar.addColorStop(1, '#0a0714');
+  ctx.fillStyle = bar;
+  ctx.fillRect(0, y0, w, h);
+  ctx.fillStyle = AS.ads[0].bg;
+  ctx.fillRect(0, y0, w, 1.5);
+  // the crawl
+  const tagW = 50;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(tagW, y0, w - tagW, h);
+  ctx.clip();
+  ctx.font = `400 12px ${DISPLAY_FONT}`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  const sep = '   ★   ';
+  const sepW = ctx.measureText(sep).width;
+  let total = 0;
+  const widths = items.map((it) => {
+    const tw = ctx.measureText(it.text).width;
+    total += tw + sepW;
+    return tw;
+  });
+  const off = tagW - ((t * 46) % total);
+  for (let x = off; x < w; x += total) {
+    let xx = x;
+    items.forEach((it, i) => {
+      ctx.fillStyle = it.color;
+      ctx.fillText(it.text, xx, y0 + h / 2 + 0.5);
+      xx += widths[i];
+      ctx.fillStyle = '#ffd23f';
+      ctx.fillText(sep, xx, y0 + h / 2 + 0.5);
+      xx += sepW;
+    });
+  }
+  // soft fades at both ends of the crawl
+  for (const [x0, x1] of [[tagW, tagW + 26], [w, w - 26]] as const) {
+    const f = ctx.createLinearGradient(x0, 0, x1, 0);
+    f.addColorStop(0, '#120c22');
+    f.addColorStop(1, 'rgba(18,12,34,0)');
+    ctx.fillStyle = f;
+    ctx.fillRect(Math.min(x0, x1), y0, 26, h);
+  }
+  ctx.restore();
+  // LIVE tag with a blinking dot
+  ctx.fillStyle = '#d0021b';
+  poly(ctx, [[0, y0], [tagW - 4, y0], [tagW + 4, y0 + h], [0, y0 + h]]);
+  ctx.fill();
+  ctx.fillStyle = Math.floor(t * 2) % 2 ? '#ffffff' : '#ff9a9a';
+  ctx.beginPath();
+  ctx.arc(10, y0 + h / 2, 3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.font = `400 12px ${DISPLAY_FONT}`;
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'left';
+  ctx.fillText('LIVE', 17, y0 + h / 2 + 0.5);
+}
 
 /** Live jumbotron content, drawn into a JUMBO.w × JUMBO.h canvas (scaled by the caller). */
 export function drawJumboScreen(ctx: Ctx, c: JumboContent, t = 0) {
   const { w, h } = JUMBO;
+  const TICK_H = 18;
   const bg = ctx.createLinearGradient(0, 0, w, h);
-  bg.addColorStop(0, c.kind === 'big' ? c.bg : '#101548');
-  bg.addColorStop(1, c.kind === 'big' ? '#12061f' : '#2a0c4a');
+  bg.addColorStop(0, c.kind === 'big' ? c.bg : '#0e1240');
+  bg.addColorStop(1, c.kind === 'big' ? '#12061f' : '#240a40');
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, w, h);
   ctx.textBaseline = 'middle';
@@ -1251,71 +1386,168 @@ export function drawJumboScreen(ctx: Ctx, c: JumboContent, t = 0) {
     for (let i = 0; i < 12; i++) {
       const a = (i / 12) * Math.PI * 2 + t * 0.4;
       poly(ctx, [
-        [62, 46],
-        [62 + Math.cos(a) * 140, 46 + Math.sin(a) * 140],
-        [62 + Math.cos(a + 0.2) * 140, 46 + Math.sin(a + 0.2) * 140],
+        [62, 44],
+        [62 + Math.cos(a) * 140, 44 + Math.sin(a) * 140],
+        [62 + Math.cos(a + 0.2) * 140, 44 + Math.sin(a + 0.2) * 140],
       ]);
       ctx.fill();
     }
     ctx.shadowColor = '#ffd23f';
     ctx.shadowBlur = 12;
     ctx.fillStyle = '#ffd23f';
-    poly(ctx, [[28, 66], [24, 28], [45, 44], [62, 20], [79, 44], [100, 28], [96, 66]]);
+    poly(ctx, [[28, 64], [24, 26], [45, 42], [62, 18], [79, 42], [100, 26], [96, 64]]);
     ctx.fill();
     ctx.font = `400 31px ${DISPLAY_FONT}`;
     ctx.textAlign = 'left';
     ctx.fillStyle = '#ffe58a';
-    ctx.fillText(AS.jumboTitle, 120, 34);
+    ctx.fillText(AS.jumboTitle, 120, 32);
     ctx.shadowBlur = 0;
     ctx.font = `800 13px Nunito, "Arial Black", sans-serif`;
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(AS.jumboSub, 122, 62, JUMBO.w - 130);
+    ctx.fillText(AS.jumboSub, 122, 60, JUMBO.w - 130);
   } else if (c.kind === 'score') {
+    const reg = c.regulation ?? 5;
+    const ys = c.youShots ?? [];
+    const ks = c.kingShots ?? [];
+    const n = Math.max(reg, ys.length, ks.length);
+    // header strip
+    const hdr = ctx.createLinearGradient(0, 0, 0, 15);
+    hdr.addColorStop(0, c.sudden ? '#a0001a' : '#2a2160');
+    hdr.addColorStop(1, c.sudden ? '#5a0010' : '#161036');
+    ctx.fillStyle = hdr;
+    ctx.fillRect(0, 0, w, 15);
     ctx.textAlign = 'center';
-    ctx.font = `400 13px ${DISPLAY_FONT}`;
-    ctx.fillStyle = '#ffd23f';
-    ctx.fillText(c.sudden ? 'SUDDEN DEATH' : 'FREE THROW SHOWDOWN', w / 2, 14);
-    for (const [x, label, n, col] of [
-      [w * 0.27, c.name.toUpperCase(), c.you, '#8fe8ff'],
-      [w * 0.73, 'KING', c.king, '#ffd23f'],
-    ] as const) {
-      ctx.font = `400 16px ${DISPLAY_FONT}`;
+    ctx.font = `400 12px ${DISPLAY_FONT}`;
+    ctx.fillStyle = c.sudden ? (Math.floor(t * 3) % 2 ? '#ffffff' : '#ffd23f') : '#ffd23f';
+    ctx.fillText(c.sudden ? '★ SUDDEN DEATH ★' : 'FREE THROW SHOWDOWN', w / 2, 8);
+    const panels = [
+      { x0: 6, name: c.name.toUpperCase(), n: c.you, shots: ys, col: '#7fe7ff', dim: 'rgba(127,231,255,0.07)', head: ['#1aa6e0', '#0b5e8c'], lead: c.you > c.king },
+      { x0: w - 6 - 160, name: 'KING PUFF BALL', n: c.king, shots: ks, col: '#ffd23f', dim: 'rgba(255,210,63,0.07)', head: ['#e8a91c', '#8a5a06'], lead: c.king > c.you },
+    ];
+    for (const p of panels) {
+      const pw = 160;
+      // panel body
+      ctx.fillStyle = 'rgba(255,255,255,0.05)';
+      ctx.beginPath();
+      ctx.roundRect(p.x0, 18, pw, h - TICK_H - 21, 5);
+      ctx.fill();
+      // team header
+      const hg = ctx.createLinearGradient(0, 18, 0, 32);
+      hg.addColorStop(0, p.head[0]);
+      hg.addColorStop(1, p.head[1]);
+      ctx.fillStyle = hg;
+      ctx.beginPath();
+      ctx.roundRect(p.x0, 18, pw, 14, [5, 5, 0, 0]);
+      ctx.fill();
+      ctx.font = `400 12px ${DISPLAY_FONT}`;
       ctx.fillStyle = '#ffffff';
-      ctx.fillText(label, x, 32);
-      ctx.font = `400 46px ${DISPLAY_FONT}`;
-      ctx.shadowColor = col;
-      ctx.shadowBlur = 10;
-      ctx.fillStyle = col;
-      ctx.fillText(String(n), x, 66);
-      ctx.shadowBlur = 0;
+      ctx.fillText(p.name, p.x0 + pw / 2, 25.5, pw - 10);
+      // big LED score
+      ledScore(ctx, p.n, p.x0 + 54, 56, p.col, p.dim);
+      if (p.lead) {
+        // the leader's panel glows
+        ctx.save();
+        ctx.globalAlpha = 0.55 + Math.sin(t * 5) * 0.3;
+        ctx.strokeStyle = p.col;
+        ctx.lineWidth = 1.5;
+        ctx.shadowColor = p.col;
+        ctx.shadowBlur = 6;
+        ctx.beginPath();
+        ctx.roundRect(p.x0 + 0.75, 18.75, pw - 1.5, h - TICK_H - 22.5, 5);
+        ctx.stroke();
+        ctx.restore();
+      }
+      // shot-by-shot lights (made = green, missed = red)
+      const per = Math.min(n, 10);
+      const rows = Math.ceil(per / 5);
+      const first = Math.max(0, Math.min(p.shots.length, n) - per);
+      for (let i = 0; i < per; i++) {
+        const shot = p.shots[first + i];
+        const cx = p.x0 + 102 + (i % 5) * 11.5;
+        const cy = 52 + Math.floor(i / 5) * 12 - (rows > 1 ? 6 : 0);
+        ctx.beginPath();
+        ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+        if (shot === undefined) {
+          ctx.fillStyle = 'rgba(255,255,255,0.12)';
+          ctx.fill();
+        } else {
+          ctx.save();
+          ctx.fillStyle = shot ? '#4dff7a' : '#ff4d5e';
+          ctx.shadowColor = shot ? '#4dff7a' : '#ff4d5e';
+          ctx.shadowBlur = 6;
+          ctx.fill();
+          ctx.restore();
+        }
+      }
+      ctx.font = `400 9px ${DISPLAY_FONT}`;
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.fillText('SHOTS', p.x0 + 125, rows > 1 ? 72 : 66);
     }
-    ctx.font = `400 22px ${DISPLAY_FONT}`;
+    // centre column: VS + which shot we're on
+    const done = Math.min(ys.length, ks.length);
+    const shot = c.sudden ? done + 1 : Math.min(done + 1, reg);
+    ctx.font = `400 18px ${DISPLAY_FONT}`;
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fillText('VS', w / 2, 36);
+    ctx.font = `400 9px ${DISPLAY_FONT}`;
     ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    ctx.fillText('–', w / 2, 64);
+    ctx.fillText('SHOT', w / 2, 54);
+    ctx.font = `400 15px ${DISPLAY_FONT}`;
+    ctx.fillStyle = c.sudden ? '#ff6a7a' : '#ffffff';
+    ctx.fillText(c.sudden ? `SD ${shot - reg}` : `${shot}/${reg}`, w / 2, 68);
   } else {
     ctx.textAlign = 'center';
-    ctx.font = `400 ${c.sub ? 44 : 54}px ${DISPLAY_FONT}`;
+    // bursting rays behind the big call
+    ctx.save();
+    ctx.globalAlpha = 0.14;
+    ctx.fillStyle = c.color;
+    const cy = (h - TICK_H) / 2;
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2 + t * 0.8;
+      poly(ctx, [
+        [w / 2, cy],
+        [w / 2 + Math.cos(a) * 300, cy + Math.sin(a) * 300],
+        [w / 2 + Math.cos(a + 0.18) * 300, cy + Math.sin(a + 0.18) * 300],
+      ]);
+      ctx.fill();
+    }
+    ctx.restore();
+    const pulse = 1 + Math.sin(t * 9) * 0.03;
+    ctx.save();
+    ctx.translate(w / 2, c.sub ? 34 : cy - 2);
+    ctx.scale(pulse, pulse);
+    ctx.font = `400 ${c.sub ? 42 : 52}px ${DISPLAY_FONT}`;
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+    ctx.strokeText(c.text, 0, 0, w - 24);
     ctx.shadowColor = c.color;
     ctx.shadowBlur = 16;
     ctx.fillStyle = c.color;
-    ctx.fillText(c.text, w / 2, c.sub ? 38 : h / 2 - 6, w - 20);
-    ctx.shadowBlur = 0;
+    ctx.fillText(c.text, 0, 0, w - 24);
+    ctx.restore();
     if (c.sub) {
-      ctx.font = `400 16px ${DISPLAY_FONT}`;
+      ctx.font = `400 15px ${DISPLAY_FONT}`;
       ctx.fillStyle = '#ffffff';
-      ctx.fillText(c.sub, w / 2, 76, w - 20);
+      ctx.fillText(c.sub, w / 2, 70, w - 20);
     }
   }
   // ticker
-  ctx.fillStyle = '#b3001b';
-  ctx.fillRect(0, h - 20, w, 20);
-  ctx.font = `400 13px ${DISPLAY_FONT}`;
-  ctx.fillStyle = '#ffffff';
-  ctx.textAlign = 'left';
-  const tick = 'FREE THROW SHOWDOWN  ★  5 SHOTS EACH  ★  SUDDEN DEATH  ★  ';
-  const tw = ctx.measureText(tick).width;
-  const off = -((t * 60) % tw);
-  for (let x = off; x < w; x += tw) ctx.fillText(tick, x, h - 9.5);
+  const items =
+    c.kind === 'score'
+      ? [
+          { text: `${c.name.toUpperCase()} ${c.you}  ·  KING ${c.king}`, color: '#ffffff' },
+          { text: AS.jumboTitle + ' ' + AS.words[1], color: '#ffd23f' },
+          { text: c.sudden ? 'SUDDEN DEATH — EVERY SHOT COUNTS' : '5 SHOTS EACH', color: '#7fe7ff' },
+          ...AS.ads.slice(0, 3).map((a) => ({ text: a.text, color: '#ffffff' })),
+        ]
+      : [
+          { text: 'FREE THROW SHOWDOWN', color: '#ffffff' },
+          { text: AS.jumboTitle + ' ' + AS.words[1], color: '#ffd23f' },
+          { text: '5 SHOTS EACH', color: '#7fe7ff' },
+          ...AS.ads.slice(0, 3).map((a) => ({ text: a.text, color: '#ffffff' })),
+        ];
+  jumboTicker(ctx, items, t, h - TICK_H, TICK_H, w);
   // LED pixels + glare
   ctx.fillStyle = 'rgba(0,0,0,0.16)';
   for (let x = 0; x < w; x += 2.6) ctx.fillRect(x, 0, 0.7, h);
@@ -1325,6 +1557,74 @@ export function drawJumboScreen(ctx: Ctx, c: JumboContent, t = 0) {
   glare.addColorStop(1, 'rgba(255,255,255,0)');
   ctx.fillStyle = glare;
   ctx.fillRect(0, 0, w, h);
+}
+
+/** The LED ribbon between the decks, in stage coordinates (the scene animates it). */
+export const RIBBON = { x: L, y: RIBBON_Y0, w: R - L, h: RIBBON_Y1 - RIBBON_Y0 };
+
+/**
+ * The ribbon board as a live, scrolling LED marquee: sponsor panels glide
+ * past, and big moments ("KOBE!") race across the whole ribbon.
+ */
+export function drawRibbonScreen(ctx: Ctx, t: number, msg: { text: string; color: string; bg: string; t0: number } | null) {
+  const { w, h } = RIBBON;
+  ctx.fillStyle = '#060509';
+  ctx.fillRect(0, 0, w, h);
+  const age = msg ? t - msg.t0 : Infinity;
+  if (msg && age < 2.6) {
+    // a full-width takeover: the message chases across, repeated, on a pulsing field
+    const bgc = ctx.createLinearGradient(0, 0, w, 0);
+    bgc.addColorStop(0, msg.bg);
+    bgc.addColorStop(0.5, Math.floor(t * 6) % 2 ? msg.bg : '#000000');
+    bgc.addColorStop(1, msg.bg);
+    ctx.fillStyle = bgc;
+    ctx.fillRect(0, 0, w, h);
+    ctx.font = `400 14px ${DISPLAY_FONT}`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    const unit = `${msg.text}  ★  `;
+    const uw = ctx.measureText(unit).width;
+    const off = -((t * 260) % uw);
+    ctx.shadowColor = msg.color;
+    ctx.shadowBlur = 6;
+    ctx.fillStyle = msg.color;
+    for (let x = off; x < w; x += uw) ctx.fillText(unit, x, h / 2 + 1);
+    ctx.shadowBlur = 0;
+  } else {
+    // sponsor panels sliding by
+    const segW = 230;
+    const off = -((t * 28) % (segW * AS.ads.length));
+    let i = 0;
+    for (let x = off; x < w; x += segW, i++) {
+      if (x + segW < 0) continue;
+      const ad = AS.ads[i % AS.ads.length];
+      ctx.fillStyle = ad.bg;
+      ctx.fillRect(x + 1.5, 0, segW - 3, h);
+      const sheen = ctx.createLinearGradient(0, 0, 0, h);
+      sheen.addColorStop(0, 'rgba(255,255,255,0.22)');
+      sheen.addColorStop(0.5, 'rgba(255,255,255,0)');
+      sheen.addColorStop(1, 'rgba(0,0,0,0.18)');
+      ctx.fillStyle = sheen;
+      ctx.fillRect(x + 1.5, 0, segW - 3, h);
+      ctx.font = `400 12px ${DISPLAY_FONT}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = ad.fg;
+      ctx.fillText(ad.text, x + segW / 2, h / 2 + 1, segW - 18);
+    }
+    // a light sweep running along it now and then
+    const sx = ((t * 400) % (w * 2.5)) - w * 0.25;
+    const sw = ctx.createLinearGradient(sx - 60, 0, sx + 60, 0);
+    sw.addColorStop(0, 'rgba(255,255,255,0)');
+    sw.addColorStop(0.5, 'rgba(255,255,255,0.28)');
+    sw.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = sw;
+    ctx.fillRect(sx - 60, 0, 120, h);
+  }
+  // LED pixel grid
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  for (let x = 0; x < w; x += 2.6) ctx.fillRect(x, 0, 0.7, h);
+  for (let y = 0; y < h; y += 2.6) ctx.fillRect(0, y, w, 0.7);
 }
 
 function drawJumbotron(ctx: Ctx) {

@@ -11,6 +11,8 @@ import {
   FRONT_H,
   HOOP,
   JUMBO,
+  RIBBON,
+  drawRibbonScreen,
   KING_FRAMES,
   KING_H,
   KING_W,
@@ -144,6 +146,9 @@ export class HoopsScene extends Phaser.Scene {
   private jumbo: JumboContent = { kind: 'title' };
   private jumboUntil = 0;
   private jumboNext = 0;
+  // the LED ribbon marquee between the decks
+  private ribbonTex!: Phaser.Textures.CanvasTexture;
+  private ribbonMsg: { text: string; color: string; bg: string; t0: number } | null = null;
   // ball motion trail
   private ghosts: Phaser.GameObjects.Image[] = [];
   private trail: { x: number; y: number; s: number }[] = [];
@@ -288,6 +293,10 @@ export class HoopsScene extends Phaser.Scene {
     this.jumboTex = (this.textures.exists('jumbo') ? this.textures.get('jumbo') : this.textures.createCanvas('jumbo', JUMBO.w * JR, JUMBO.h * JR)) as Phaser.Textures.CanvasTexture;
     const jp = A(JUMBO.x, JUMBO.y);
     this.add.image(jp.x, jp.y, 'jumbo').setOrigin(0, 0).setScale(1 / JR).setDepth(11.6);
+    this.ribbonTex = (this.textures.exists('ribbon') ? this.textures.get('ribbon') : this.textures.createCanvas('ribbon', RIBBON.w * JR, RIBBON.h * JR)) as Phaser.Textures.CanvasTexture;
+    const rp = A(RIBBON.x, RIBBON.y);
+    this.add.image(rp.x, rp.y, 'ribbon').setOrigin(0, 0).setScale(1 / JR).setDepth(2.05);
+    this.ribbonMsg = null;
     this.drawJumbo();
 
     this.dom = document.createElement('div');
@@ -545,12 +554,22 @@ export class HoopsScene extends Phaser.Scene {
   }
 
   private scoreJumbo(): JumboContent {
-    return { kind: 'score', you: this.total('you'), king: this.total('king'), name: characterById(this.hd.charId).name, sudden: this.score.you.length > REGULATION };
+    return {
+      kind: 'score',
+      you: this.total('you'),
+      king: this.total('king'),
+      name: characterById(this.hd.charId).name,
+      sudden: this.score.you.length > REGULATION,
+      youShots: [...this.score.you],
+      kingShots: [...this.score.king],
+      regulation: REGULATION,
+    };
   }
 
   /** Show something on the jumbotron (for `ms`, then back to the score). */
   private jumboShow(c: JumboContent, ms = 1500) {
     this.jumbo = c;
+    if (c.kind === 'big') this.ribbonMsg = { text: c.text, color: c.color, bg: c.bg, t0: this.clock / 1000 };
     this.jumboUntil = this.clock + ms;
     this.drawJumbo();
   }
@@ -560,6 +579,10 @@ export class HoopsScene extends Phaser.Scene {
     ctx.setTransform(2, 0, 0, 2, 0, 0);
     drawJumboScreen(ctx, this.jumbo, this.clock / 1000);
     this.jumboTex.refresh();
+    const rctx = this.ribbonTex.getContext();
+    rctx.setTransform(2, 0, 0, 2, 0, 0);
+    drawRibbonScreen(rctx, this.clock / 1000, this.ribbonMsg);
+    this.ribbonTex.refresh();
   }
 
   private letterbox(on: boolean) {
@@ -835,8 +858,8 @@ export class HoopsScene extends Phaser.Scene {
       this.heroAnim = { frames: ['jump', 'idle0'], fps: 5 };
       this.kingAnim = { frames: ['sad', 'idle0'], fps: 3 };
       this.cheer();
-      this.jumboShow({ kind: 'big', text: o === 'swish' ? 'SWISH!' : 'BUCKET!', sub: `${this.total('you')} – ${this.total('king')}`, color: '#8fff8a', bg: '#0b5e2a' });
-      await this.callout(o === 'swish' ? 'SWISH!' : 'IN!', 'good', 1000);
+      this.jumboShow({ kind: 'big', text: o === 'swish' ? 'KOBE!' : 'BUCKET!', sub: `${this.total('you')} – ${this.total('king')}`, color: '#8fff8a', bg: '#0b5e2a' });
+      await this.callout(o === 'swish' ? 'KOBE!' : 'IN!', 'good', 1000);
     } else {
       this.heroAnim = { frames: ['hurt'], fps: 1 };
       this.kingAnim = { frames: ['laugh0', 'laugh1'], fps: 6 };

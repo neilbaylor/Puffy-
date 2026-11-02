@@ -5,7 +5,7 @@ import { TILE_COUNT } from '../level/tiles';
 import { BIGPUFF_H, BIGPUFF_W, GIANT_H, GIANT_W, PUFFBALL_H, PUFFBALL_W, drawBigPuff, drawGiant, drawPuffball } from './baddies';
 import { drawMuzzleFlash, drawRocket } from './bazooka';
 import { drawSoccerBall, drawSoccerGoal } from './soccer';
-import { GOAT_FRAMES, GOAT_H, GOAT_W, drawGoat } from './goat';
+import { GOAT_FRAMES, GOAT_H, GOAT_W, drawGoat, drawSpit } from './goat';
 import { drawParachute } from './parachute';
 import { drawHockeyNet, drawPuck, drawRinkLines, drawStick } from './hockey';
 import { MOUNTAIN_LOOKS, drawMountainFar, drawMountainMid, drawMountainNear, type MountainLook } from './mountain';
@@ -103,6 +103,7 @@ function makeBaddies(scene: Phaser.Scene) {
   sheet(scene, 'bigpuff', BIGPUFF_W, BIGPUFF_H, ['w0', 'w1', 'm0', 'm1'] as const, (ctx, f) => drawBigPuff(ctx, 0, 0, f, st));
   sheet(scene, 'giant', GIANT_W, GIANT_H, ['w0', 'w1', 'crouch', 'air', 'slam'] as const, (ctx, f) => drawGiant(ctx, 0, 0, f, st), 2.5);
   sheet(scene, 'goat', GOAT_W, GOAT_H, GOAT_FRAMES, (ctx, f) => drawGoat(ctx, 0, 0, f, st));
+  addCanvas(scene, 'spit', hires(36, 14, ART_RES, (ctx) => drawSpit(ctx, 24, 7, st)));
 }
 
 function makeItems(scene: Phaser.Scene, pal: WorldPalette) {
