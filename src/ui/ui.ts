@@ -315,6 +315,8 @@ export class UI {
       }
       this.showHud();
       this.showBanner('GO!', 900);
+      // the phone was turned upright during the flyover: pause as soon as it's over
+      if (window.innerHeight > window.innerWidth && isTouchDevice()) this.pause();
     });
     game.events.on('hud', (s: HudState) => this.renderHud(s));
     game.events.on('hoops-start', () => {
@@ -336,8 +338,9 @@ export class UI {
     const checkOrientation = () => {
       const portrait = window.innerHeight > window.innerWidth;
       const upright = portrait && isTouchDevice();
-      // turned the phone upright mid-level: pause the game for them
-      if (upright && this.rotate.hidden && this.gameScene && !this.screen) this.pause();
+      // turned the phone upright mid-level: pause the game for them (not during the
+      // level's flyover: that plays on, and pauses when it ends if still upright)
+      if (upright && this.rotate.hidden && this.gameScene && !this.screen && !this.introEl) this.pause();
       // basketball has no pause menu: it just freezes while the phone is upright
       const sc = this.game.scene;
       if (upright && sc.isActive('Hoops')) sc.pause('Hoops');
