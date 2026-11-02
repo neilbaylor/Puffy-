@@ -27,6 +27,10 @@ import {
   drawRimBack,
   drawRimFrontTube,
   drawSoftShadow,
+  PALACE,
+  SUMMIT,
+  setArenaStyle,
+  type ArenaStyle,
   drawSpotBrush,
   drawSpotlight,
   drawJumboScreen,
@@ -55,6 +59,8 @@ type Outcome = 'swish' | 'rimIn' | 'rimOut' | 'short' | 'long' | 'wide';
 
 /** King Puff Ball makes about this share of his shots. */
 const KING_MAKE = 0.45;
+/** Part 2's rematch is a little harder: the King shoots better, the meters move a bit faster. */
+const HARDER = { kingMake: 0.52, speed: 1.08, zone: 0.012 };
 const REGULATION = 5;
 
 /** Where each player shoots from (stage coords, feet): they walk to a new one before every shot. */
@@ -177,8 +183,20 @@ export class HoopsScene extends Phaser.Scene {
 
   // ───────────────────────────────────────────── setup ──
 
+  /** Part 1 plays in the Palace, Part 2 in the Summit Dome. */
+  private get style(): ArenaStyle {
+    return (this.hd.level ?? 1) === 2 ? SUMMIT : PALACE;
+  }
+  private get hard() {
+    return (this.hd.level ?? 1) === 2;
+  }
+  private k(key: string) {
+    return `${key}:${this.style.id}`;
+  }
+
   private makeTextures() {
-    if (!this.textures.exists('arena')) addCanvas(this, 'arena', hires(ARENA_W, ARENA_H, ARENA_RES, (ctx) => drawArena(ctx)));
+    setArenaStyle(this.style);
+    if (!this.textures.exists(this.k('arena'))) addCanvas(this, this.k('arena'), hires(ARENA_W, ARENA_H, ARENA_RES, (ctx) => drawArena(ctx)));
     if (!this.textures.exists('king')) {
       const { c, ctx } = canvas(Math.ceil(KING_W * KING_FRAMES.length * KING_RES), Math.ceil(KING_H * KING_RES));
       ctx.scale(KING_RES, KING_RES);
@@ -190,14 +208,14 @@ export class HoopsScene extends Phaser.Scene {
       });
       addCanvas(this, 'king', c, (t) => KING_FRAMES.forEach((f, i) => t.add(f, 0, Math.round(i * KING_W * KING_RES), 0, Math.round(KING_W * KING_RES), Math.round(KING_H * KING_RES))));
     }
-    if (!this.textures.exists('crowd')) addCanvas(this, 'crowd', hires(ARENA_W, CROWD_H, ARENA_RES, (ctx) => drawCrowd(ctx, false)));
-    if (!this.textures.exists('crowd2')) addCanvas(this, 'crowd2', hires(ARENA_W, CROWD_H, ARENA_RES, (ctx) => drawCrowd(ctx, true)));
-    if (!this.textures.exists('arenafront')) addCanvas(this, 'arenafront', hires(ARENA_W, FRONT_H, ARENA_RES, (ctx) => drawArenaFront(ctx)));
+    if (!this.textures.exists(this.k('crowd'))) addCanvas(this, this.k('crowd'), hires(ARENA_W, CROWD_H, ARENA_RES, (ctx) => drawCrowd(ctx, false)));
+    if (!this.textures.exists(this.k('crowd2'))) addCanvas(this, this.k('crowd2'), hires(ARENA_W, CROWD_H, ARENA_RES, (ctx) => drawCrowd(ctx, true)));
+    if (!this.textures.exists(this.k('arenafront'))) addCanvas(this, this.k('arenafront'), hires(ARENA_W, FRONT_H, ARENA_RES, (ctx) => drawArenaFront(ctx)));
     if (!this.textures.exists('camflash')) addCanvas(this, 'camflash', hires(48, 48, 1, (ctx) => drawCameraFlash(ctx, 24)));
     if (!this.textures.exists('hball')) addCanvas(this, 'hball', hires(52, 52, 3, (ctx) => drawBall(ctx, 26, 26, 24)));
-    if (!this.textures.exists('backboard')) {
+    if (!this.textures.exists(this.k('backboard'))) {
       // drawn in stage coordinates around the hoop, then cropped
-      addCanvas(this, 'backboard', hires(320, 420, 3, (ctx) => {
+      addCanvas(this, this.k('backboard'), hires(320, 420, 3, (ctx) => {
         ctx.translate(160 - HOOP.rimX, 220 - HOOP.rimY);
         drawBackboard(ctx);
         drawRimBack(ctx, false);
@@ -214,16 +232,16 @@ export class HoopsScene extends Phaser.Scene {
     const ch = characterById(this.hd.charId);
     this.cameras.main.setBackgroundColor('#140a26');
 
-    this.add.image(0, 0, 'arena').setOrigin(0, 0).setScale(1 / ARENA_RES).setDepth(0);
-    this.crowd = this.add.image(0, 0, 'crowd').setOrigin(0, 0).setScale(1 / ARENA_RES).setDepth(1);
-    this.add.image(0, 0, 'arenafront').setOrigin(0, 0).setScale(1 / ARENA_RES).setDepth(2);
+    this.add.image(0, 0, this.k('arena')).setOrigin(0, 0).setScale(1 / ARENA_RES).setDepth(0);
+    this.crowd = this.add.image(0, 0, this.k('crowd')).setOrigin(0, 0).setScale(1 / ARENA_RES).setDepth(1);
+    this.add.image(0, 0, this.k('arenafront')).setOrigin(0, 0).setScale(1 / ARENA_RES).setDepth(2);
     // the crowd sways a little all the time
     this.tweens.add({ targets: this.crowd, y: 1.2, duration: 800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     this.flashIn = 300;
     this.excitedUntil = 0;
 
     const bb = A(HOOP.rimX, HOOP.rimY);
-    this.board = this.add.image(bb.x, bb.y, 'backboard').setOrigin(0.5, 220 / 420).setScale(1 / 3).setDepth(5);
+    this.board = this.add.image(bb.x, bb.y, this.k('backboard')).setOrigin(0.5, 220 / 420).setScale(1 / 3).setDepth(5);
 
     // spotlights
     for (const sp of [SPOTS.hero, SPOTS.king]) {
@@ -251,7 +269,7 @@ export class HoopsScene extends Phaser.Scene {
     this.ballShadow = this.add.image(0, 0, 'softshadow').setDisplaySize(48, 14).setDepth(6).setVisible(false);
     for (let i = 0; i < 4; i++) this.ghosts.push(this.add.image(0, 0, 'hball').setDepth(8.9).setVisible(false).setAlpha(0.3 - i * 0.07));
     this.ball = this.add.image(0, 0, 'hball').setScale(1 / 3).setDepth(9).setVisible(false);
-    this.netSim = new NetSim(HOOP.rimRX, HOOP.rimRY);
+    this.netSim = new NetSim(HOOP.rimRX, HOOP.rimRY, 46, this.style.net);
     this.netBack = this.add.graphics().setDepth(8.7);
     this.netFront = this.add.graphics().setDepth(10);
     this.rimFront = this.add.image(bb.x, bb.y, 'rimf').setOrigin(0.5, 16 / 40).setScale(1 / 3).setDepth(10.5);
@@ -415,7 +433,7 @@ export class HoopsScene extends Phaser.Scene {
 
     // the crowd: on its feet after a basket, and camera flashes popping all the time
     const excited = this.clock < this.excitedUntil;
-    const want = excited && Math.floor(this.clock / 170) % 3 !== 2 ? 'crowd2' : 'crowd';
+    const want = this.k(excited && Math.floor(this.clock / 170) % 3 !== 2 ? 'crowd2' : 'crowd');
     if (this.crowd.texture.key !== want) this.crowd.setTexture(want);
     this.flashIn -= dt;
     if (this.flashIn <= 0) {
@@ -573,6 +591,34 @@ export class HoopsScene extends Phaser.Scene {
     this.flashIn = 0;
   }
 
+  /** Part 2's ending: the King explodes into a cloud of confetti. */
+  private burstKing() {
+    const k = this.king;
+    const cx = k.x;
+    const cy = k.y - k.displayHeight * 0.5;
+    sfx.explode();
+    this.cameras.main.flash(300, 255, 245, 220);
+    this.cameras.main.shake(400, 0.012);
+    k.setVisible(false);
+    this.kingRefl.setVisible(false);
+    this.kingShadow.setVisible(false);
+    const cols = [0xffd23f, 0xff8f5c, 0xffffff, 0xe8463f, 0x2fd0c0, 0xff8fb3, 0x7a2ec2];
+    for (let i = 0; i < 220; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 220 + Math.random() * 620;
+      const c = this.add.rectangle(cx, cy, 5 + Math.random() * 4, 8 + Math.random() * 6, cols[i % cols.length]).setDepth(12).setAngle(Math.random() * 360);
+      const tx = cx + Math.cos(a) * sp;
+      const ty = cy + Math.sin(a) * sp * 0.7 - 120;
+      this.tweens.add({ targets: c, x: tx, y: ty, duration: 600 + Math.random() * 300, ease: 'Quad.easeOut' });
+      this.tweens.add({ targets: c, y: ty + 700, x: tx + (Math.random() - 0.5) * 160, delay: 600, duration: 2400 + Math.random() * 1600, ease: 'Sine.easeIn', onComplete: () => c.destroy() });
+      this.tweens.add({ targets: c, scaleX: -1, duration: 150 + Math.random() * 200, yoyo: true, repeat: -1 });
+    }
+    // and his crown pops off and spins away
+    const crown = this.add.image(cx, cy - 60, 'star').setTint(0xffd23f).setScale(1.2).setDepth(12.5);
+    this.tweens.add({ targets: crown, y: cy - 340, angle: 720, duration: 900, ease: 'Quad.easeOut' });
+    this.tweens.add({ targets: crown, y: cy + 600, delay: 900, duration: 1400, ease: 'Quad.easeIn', onComplete: () => crown.destroy() });
+  }
+
   /** Paper confetti: flips, flutters and drifts down in front of everything. */
   private confetti(n: number) {
     const cols = [0xffd23f, 0x7a2ec2, 0xffffff, 0xe8463f, 0x2fd0c0, 0xff8fb3];
@@ -624,7 +670,11 @@ export class HoopsScene extends Phaser.Scene {
   private async intro(kp: { x: number; y: number }, hp: { x: number; y: number }, rim: { x: number; y: number }) {
     const ch = characterById(this.hd.charId);
     this.inIntro = true;
-    stingerTitle(`<div><div class="crown"></div><small>KING PUFF BALL'S</small><strong>BASKETBALL<br>PALACE</strong><em>FREE THROW SHOWDOWN</em></div>`);
+    stingerTitle(
+      this.hard
+        ? `<div><div class="crown"></div><small>KING PUFF BALL'S</small><strong>SUMMIT<br>DOME</strong><em>THE REMATCH</em></div>`
+        : `<div><div class="crown"></div><small>KING PUFF BALL'S</small><strong>BASKETBALL<br>PALACE</strong><em>FREE THROW SHOWDOWN</em></div>`,
+    );
     sfx.drum();
     // lights down; two spotlights hunt through the crowd
     this.setDark(0.9, 0);
@@ -645,10 +695,10 @@ export class HoopsScene extends Phaser.Scene {
     await this.iwait(650);
     if (!this.skipping) {
       this.cut(kp.x - 10, kp.y - 150, 2.5, false);
-      this.lowerThird('KING PUFF BALL', 'Palace champion · unbeaten at home');
+      this.lowerThird('KING PUFF BALL', this.hard ? 'Summit champion · back for revenge' : 'Palace champion · unbeaten at home');
       this.kingAnim = { frames: ['laugh0', 'laugh1'], fps: 6 };
       sfx.laugh();
-      void this.callout('“Think you can beat<br><b>THE KING</b>?”', 'speech', 1700);
+      void this.callout(this.hard ? '“You again?! This time<br><b>I WIN</b>!”' : '“Think you can beat<br><b>THE KING</b>?”', 'speech', 1700);
       await this.iwait(1700);
       this.lowerThird(null);
       this.kingAnim = { frames: ['idle0', 'idle1'], fps: 2.5 };
@@ -685,7 +735,7 @@ export class HoopsScene extends Phaser.Scene {
     this.camFocus = { x: 800, y: 450, zoom: 1 };
     this.renderScore();
     this.jumboShow(this.scoreJumbo(), 0);
-    await this.callout('FREE THROW<br>SHOWDOWN!<small>5 shots each · most baskets wins</small>', 'title', 1800);
+    await this.callout(this.hard ? 'THE<br>REMATCH!<small>5 shots each · the King is sharper this time</small>' : 'FREE THROW<br>SHOWDOWN!<small>5 shots each · most baskets wins</small>', 'title', 1800);
   }
 
   private total(who: 'you' | 'king') {
@@ -715,7 +765,7 @@ export class HoopsScene extends Phaser.Scene {
     el.classList.add('active');
     el.classList.remove('locked');
     // a fresh green zone each time (narrower as the contest goes on)
-    const w = Math.max(0.11, 0.17 - Math.min(this.score.you.length, REGULATION - 1) * 0.01);
+    const w = Math.max(0.1, 0.17 - Math.min(this.score.you.length, REGULATION - 1) * 0.01 - (this.hard ? HARDER.zone : 0));
     const c = 0.2 + Math.random() * 0.6;
     const zone: [number, number] = [c - w / 2, c + w / 2];
     const z = el.querySelector<HTMLElement>('.hm-zone')!;
@@ -746,7 +796,7 @@ export class HoopsScene extends Phaser.Scene {
     const hp = { x: this.hero.x, y: this.hero.y - 4 };
     const n = this.score.you.length;
     await this.callout(n >= REGULATION ? 'Your shot!<small>Sudden death</small>' : `Your shot!<small>${n + 1} of ${REGULATION}</small>`, 'turn', 900);
-    const speed = 1.15 + Math.min(n, REGULATION - 1) * 0.12; // sudden death doesn't speed up further
+    const speed = (1.15 + Math.min(n, REGULATION - 1) * 0.12) * (this.hard ? HARDER.speed : 1); // sudden death doesn't speed up further
     const p = await this.lockMeter('power', speed);
     const a = await this.lockMeter('aim', speed * 1.1);
     await this.wait(250);
@@ -811,7 +861,7 @@ export class HoopsScene extends Phaser.Scene {
     await this.wait(500);
     const r = Math.random();
     let o: Outcome;
-    if (r < KING_MAKE) o = Math.random() < 0.5 ? 'swish' : 'rimIn';
+    if (r < (this.hard ? HARDER.kingMake : KING_MAKE)) o = Math.random() < 0.5 ? 'swish' : 'rimIn';
     else {
       const misses: Outcome[] = ['rimOut', 'rimOut', 'short', 'long', 'wide'];
       o = misses[Math.floor(Math.random() * misses.length)];
@@ -1049,13 +1099,24 @@ export class HoopsScene extends Phaser.Scene {
     this.cut(kp.x - 40, kp.y - 120, 1.9);
     this.kingAnim = { frames: ['sad'], fps: 1 };
     await this.callout('“NOOOO!”', 'speech', 1100);
-    // the King runs out of the arena
-    this.kingAnim = { frames: ['run0', 'run1'], fps: 10 };
-    this.camFocus = { x: 800, y: 450, zoom: 1 };
-    this.king.setFlipX(true);
-    this.cheer(1.5);
-    this.jumboShow({ kind: 'big', text: 'NEW CHAMP!', sub: `${characterById(this.hd.charId).name} beats the King ${this.total('you')} – ${this.total('king')}`, color: '#ffd23f', bg: '#3d1478' }, 1e9);
-    await this.tween({ targets: this.king, x: ARENA_W + 220, duration: 1500, ease: 'Quad.easeIn' });
+    this.jumboShow({ kind: 'big', text: this.hard ? 'KING DESTROYED!' : 'NEW CHAMP!', sub: `${characterById(this.hd.charId).name} beats the King ${this.total('you')} – ${this.total('king')}`, color: '#ffd23f', bg: this.hard ? '#0b2a44' : '#3d1478' }, 1e9);
+    if (this.hard) {
+      // the King swells up, shakes… and BURSTS into confetti
+      this.kingAnim = { frames: ['sad', 'laugh1'], fps: 14 };
+      sfx.drum();
+      await this.tween({ targets: this.king, scaleX: this.king.scaleX * 1.35, scaleY: this.king.scaleY * 1.25, duration: 700, ease: 'Quad.easeIn', onUpdate: () => this.king.setX(kp.x + (Math.random() - 0.5) * 8) });
+      this.burstKing();
+      this.camFocus = { x: 800, y: 450, zoom: 1 };
+      this.cheer(1.6);
+      await this.wait(900);
+    } else {
+      // the King runs out of the arena
+      this.kingAnim = { frames: ['run0', 'run1'], fps: 10 };
+      this.camFocus = { x: 800, y: 450, zoom: 1 };
+      this.king.setFlipX(true);
+      this.cheer(1.5);
+      await this.tween({ targets: this.king, x: ARENA_W + 220, duration: 1500, ease: 'Quad.easeIn' });
+    }
     // the house lights dip and a spotlight finds the champion; confetti everywhere
     const hpw = { x: this.hero.x, y: this.hero.y - 4 };
     this.setDark(0.45, 400);

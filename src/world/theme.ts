@@ -3,15 +3,18 @@ import { PALETTES, seaColor } from '../gfx/world';
 /**
  * The look of Puff Ball Planet drifts slowly while you play, like the day
  * passing: Puff Ball Planet → Candy clouds → Golden hour → Meadow morning →
- * back again. Each look holds for 35 seconds, then the next one fades in over
- * 17 seconds. One clock for the whole game: it never resets (not on a
- * restart, not on a new run) and keeps going on the start screen too.
+ * back again (Part 2 cycles its three mountain looks the same way). Each look
+ * holds for 20 seconds, then the next one fades in over 10 seconds. One clock
+ * for the whole game: it never resets (not on a restart, not on a new run) and
+ * keeps going on the start screen too.
  */
 export const THEMES = ['puff', 'candy', 'golden', 'meadow'] as const;
-export type ThemeId = (typeof THEMES)[number];
+/** Part 2's looks: the three mountain moods. */
+export const MOUNTAIN_THEMES = ['m-pastel', 'm-frost', 'm-sunset'] as const;
+export type ThemeId = (typeof THEMES)[number] | (typeof MOUNTAIN_THEMES)[number];
 
-const HOLD = 35;
-const BLEND = 17;
+const HOLD = 20;
+const BLEND = 10;
 
 export const themeClock = { t: 0 };
 
@@ -24,14 +27,18 @@ export interface ThemeMix {
   w: number;
 }
 
-export function themeMix(t: number): ThemeMix {
+export function themeMix(t: number, themes: readonly ThemeId[] = THEMES): ThemeMix {
   const period = HOLD + BLEND;
-  const tt = ((t % (period * THEMES.length)) + period * THEMES.length) % (period * THEMES.length);
+  const n = themes.length;
+  const tt = ((t % (period * n)) + period * n) % (period * n);
   const i = Math.floor(tt / period);
   const local = tt - i * period;
   const k = local < HOLD ? 0 : (local - HOLD) / BLEND;
-  return { a: THEMES[i], b: THEMES[(i + 1) % THEMES.length], w: k * k * (3 - 2 * k) };
+  return { a: themes[i], b: themes[(i + 1) % n], w: k * k * (3 - 2 * k) };
 }
+
+/** The looks a level cycles through. */
+export const themesFor = (level: number): readonly ThemeId[] => (level === 2 ? MOUNTAIN_THEMES : THEMES);
 
 /** A soft colour grade for the foreground (terrain, trees, flowers) in each look. */
 const TINT: Record<ThemeId, number> = {
@@ -39,6 +46,9 @@ const TINT: Record<ThemeId, number> = {
   meadow: 0xf2fff0,
   candy: 0xfff0fa,
   golden: 0xffe3c4,
+  'm-pastel': 0xfdf4ff,
+  'm-frost': 0xeef6ff,
+  'm-sunset': 0xffe6cc,
 };
 
 export const lerpRgb = (x: number, y: number, w: number) => {

@@ -25,7 +25,7 @@ const SPOT_DIST = 210;
  * behind the ball and boots it at you. Jump it (or shoot it to pop it; land
  * on it and you bounce off). After the kick the whole team charges.
  */
-export class SoccerMatch {
+export class SoccerMatch implements Coach {
   readonly ball: Phaser.Physics.Arcade.Image;
   private puffs: SoccerMember[] = [];
   /** Ball radius, kick speed and hop. */
@@ -263,13 +263,21 @@ export class SoccerMatch {
   }
 }
 
-/** A player on a soccer team. */
+/** A player on a soccer (or hockey) team. */
 export type SoccerMember = SoccerPuff | SoccerBig;
 
+/** Whatever runs the game: tells each player where to stand and what to look at. */
+export interface Coach {
+  targetFor(p: SoccerMember): number | null;
+  lookX(p: SoccerMember): number;
+  /** Optional: how fast players jog (default 90, 150 when alerted). */
+  jog?: number;
+}
+
 /** Shared "playing soccer" behaviour: jog to the ball or back to your spot, watch the ball. */
-function playTick(e: SoccerMember, match: SoccerMatch, mode: 'play' | 'alert', kickT: number, t: number, frames: [string, string]) {
+export function playTick(e: SoccerMember, match: Coach, mode: 'play' | 'alert', kickT: number, t: number, frames: [string, string]) {
   const tx = match.targetFor(e);
-  const fast = mode === 'alert' ? 150 : 90;
+  const fast = mode === 'alert' ? 150 : match.jog ?? 90;
   const vx = tx !== null && Math.abs(tx - e.x) > 4 ? Phaser.Math.Clamp((tx - e.x) * 5, -fast, fast) : 0;
   e.body.setVelocityX(vx);
   e.setFlipX(match.lookX(e) > e.x);
@@ -287,7 +295,7 @@ export class SoccerPuff extends Puffball {
     gs: GameScene,
     x: number,
     y: number,
-    private match: SoccerMatch,
+    private match: Coach,
   ) {
     super(gs, x, y);
     this.home = x;
@@ -330,7 +338,7 @@ export class SoccerBig extends BigPuff {
     gs: GameScene,
     x: number,
     y: number,
-    private match: SoccerMatch,
+    private match: Coach,
   ) {
     super(gs, x, y);
     this.home = x;

@@ -11,86 +11,16 @@ import { drawNuggie, drawRootBeer } from '../gfx/collectibles';
 import { drawPuffyStyled } from '../gfx/puffy';
 import { drawScruffyStyled } from '../gfx/scruffy';
 import { drawGoat } from '../gfx/goat';
-import { PALETTES, drawBloom, drawCloudLayer, drawTerrainPiece, roundPoly, traceCells, type TerrainKind, type WorldPalette } from '../gfx/world';
+import { MOUNTAIN_LOOKS, type MountainLook } from '../gfx/mountain';
+import { drawBloom, drawCloudLayer, drawTerrainPiece, roundPoly, traceCells, type TerrainKind, type WorldPalette } from '../gfx/world';
 
 const ST = STYLES.polished;
 const T = 32;
 const FONT = '"Lilita One", "Arial Black", sans-serif';
 
-export interface MountainLook {
-  id: string;
-  name: string;
-  blurb: string;
-  pal: WorldPalette;
-  /** Far, mid and near mountain ranges (base colours) and snow on the peaks. */
-  ranges: [string, string, string];
-  snow: string;
-  extras: 'waterfall' | 'snowfall' | 'dust';
-}
+export { MOUNTAIN_LOOKS };
 
-const base = PALETTES.puff;
-const fill = (b: string, s: string, l: string): Fill => ({ base: b, shade: s, light: l });
-
-export const MOUNTAIN_LOOKS: MountainLook[] = [
-  {
-    id: 'pastel',
-    name: 'Marshmallow Mountain',
-    blurb: 'The same candy world as Part 1, stood on end: lilac rock, puff-moss ledges dusted with snow, soda waterfalls and the ringed planet behind the peaks.',
-    pal: {
-      ...base,
-      sky: ['#78c6ff', '#c4e6ff', '#ffe6f2'],
-      soilTop: '#dccbee',
-      soilDeep: '#a28bc0',
-      strata: '#8f76ad',
-      grass: fill('#f4fbff', '#cfe0f2', '#ffffff'),
-      rock: fill('#b7aade', '#8a7fbf', '#e6e0ff'),
-      canopies: [fill('#a8ecda', '#62c4aa', '#e0fff6'), fill('#ffb0cc', '#e27c9c', '#ffe0ea')],
-    },
-    ranges: ['#d8d0f2', '#b9abe0', '#9a88c9'],
-    snow: '#ffffff',
-    extras: 'waterfall',
-  },
-  {
-    id: 'frost',
-    name: 'Frosty Puff Peaks',
-    blurb: 'Higher and colder: icy blue rock, thick puff-snow on every ledge, frosted pines and snow drifting down. Ice ledges could be slippery.',
-    pal: {
-      ...base,
-      sky: ['#4f9fe6', '#b8ddff', '#f2fbff'],
-      cloud: fill('#ffffff', '#dbe9f8', '#ffffff'),
-      soilTop: '#c9d9ee',
-      soilDeep: '#7f97bb',
-      strata: '#6c84a8',
-      grass: fill('#ffffff', '#d6e6f7', '#ffffff'),
-      rock: fill('#a7c4e6', '#7593bd', '#e3f0ff'),
-      canopies: [fill('#7fcfb8', '#4a9e8a', '#c8f2e6')],
-      farInk: '#7f9cc6',
-    },
-    ranges: ['#d6e6f8', '#b0c9e8', '#8aa7cf'],
-    snow: '#ffffff',
-    extras: 'snowfall',
-  },
-  {
-    id: 'sunset',
-    name: 'Sunset Crags',
-    blurb: 'Warm canyon cliffs at golden hour: orange rock, dry golden grass, wooden ladders and rope bridges, dust drifting in the light.',
-    pal: {
-      ...base,
-      sky: ['#ff8f6e', '#ffc79c', '#fff0d4'],
-      cloud: fill('#fff6ec', '#f7d4c0', '#ffffff'),
-      soilTop: '#e7a06c',
-      soilDeep: '#a8603c',
-      strata: '#8c4c2e',
-      grass: fill('#e8c25a', '#b8902e', '#fbe7a0'),
-      rock: fill('#cf8f6e', '#a0624a', '#f2c8b0'),
-      canopies: [fill('#f2a640', '#c9781e', '#ffd99a'), fill('#e8705a', '#b8463a', '#ffb4a4')],
-      farInk: '#c98b82',
-    },
-    ranges: ['#f4c6b0', '#e29a80', '#c07258'],
-    snow: '#fff4e6',
-    extras: 'dust',
-  },
-];
+const fill = (b: string, sh: string, l: string): Fill => ({ base: b, shade: sh, light: l });
 
 function at(ctx: Ctx, x: number, y: number, s: number, fn: () => void, flip = false) {
   ctx.save();

@@ -3,11 +3,14 @@ import { DEPTH, TILE } from '../config';
 import { rng } from '../gfx/draw';
 import type { Pt } from '../gfx/handdrawn';
 import { PROP_RES, addCanvas, hires } from '../gfx/textures';
-import { DEFAULT_PALETTE, drawCloudPlatform, drawPuffTree, drawTerrainPiece, roundPoly, traceCells, type TerrainKind } from '../gfx/world';
+import { DEFAULT_PALETTE, PALETTES, drawCloudPlatform, drawPuffTree, drawTerrainPiece, roundPoly, traceCells, type TerrainKind, type WorldPalette } from '../gfx/world';
+import { drawPine } from '../gfx/mountain';
 import type { Cell, LevelData } from '../level/builder';
 import { ONE_WAY_TILES, SOLID_TILES } from '../level/tiles';
 
 const PAD = 34; // room around each terrain piece for grass blades / roots
+/** Terrain pieces are cut into chunks no wider than this (world px), to stay under mobile texture limits. */
+const CHUNK = 1600;
 
 /**
  * Builds the level: an invisible tilemap for collision, plus the hand-drawn
@@ -70,6 +73,22 @@ export class LevelView {
     for (const o of this.scenery) if (o.active) o.setTint(color);
   }
 
+  /** The terrain palette at world x (Part 2's zones; Part 1 is all Puff Ball Planet). */
+  paletteAt(worldX: number): WorldPalette {
+    const z = this.data.zones?.find((zz) => worldX >= zz.x0 * TILE && worldX < (zz.x1 + 1) * TILE);
+    return (z && PALETTES[z.pal]) || DEFAULT_PALETTE;
+  }
+
+  /** Top of the ground in column at world x (for framing the camera), or the level bottom. */
+  surfaceY(worldX: number): number {
+    const x = Math.floor(worldX / TILE);
+    for (let y = 0; y < this.data.height; y++) {
+      const c = this.cell(x, y);
+      if (c === 'ground' || c === 'rock') return y * TILE;
+    }
+    return this.heightPx;
+  }
+
   isSolidAt(worldX: number, worldY: number): boolean {
     const t = this.layer.getTileAtWorldXY(worldX, worldY);
     return !!t && (SOLID_TILES.includes(t.index) || ONE_WAY_TILES.includes(t.index));
@@ -122,21 +141,27 @@ export class LevelView {
           x1 = Math.max(x1, px);
           y1 = Math.max(y1, py);
         }
-        const key = `terrain-${d.name}-${kind}-${piece++}`;
-        const w = x1 - x0 + PAD * 2;
+        const pal = this.paletteAt((x0 + x1) / 2);
+        const pieceId = piece++;
         const h = y1 - y0 + PAD * 2;
-        if (!this.scene.textures.exists(key)) {
-          const c = hires(w, h, PROP_RES, (ctx) => {
-            ctx.translate(PAD - x0, PAD - y0);
-            drawTerrainPiece(ctx, { kind, outline, pal: DEFAULT_PALETTE, seed: Math.round(x0 + y0), floorY: this.heightPx });
-          });
-          addCanvas(this.scene, key, c);
+        // the whole piece is drawn into each chunk (clipped by the chunk's canvas), so the
+        // chunks join seamlessly; each one stays small enough for phones and tablets
+        for (let cx0 = x0, ci = 0; cx0 < x1; cx0 += CHUNK, ci++) {
+          const cw = Math.min(CHUNK, x1 - cx0);
+          const key = `terrain-${d.name}-${kind}-${pieceId}-${ci}`;
+          if (!this.scene.textures.exists(key)) {
+            const c = hires(cw + PAD * 2, h, PROP_RES, (ctx) => {
+              ctx.translate(PAD - cx0, PAD - y0);
+              drawTerrainPiece(ctx, { kind, outline, pal, seed: Math.round(x0 + y0), floorY: this.heightPx });
+            });
+            addCanvas(this.scene, key, c);
+          }
+          this.scene.add
+            .image(cx0 - PAD, y0 - PAD, key)
+            .setOrigin(0, 0)
+            .setScale(1 / PROP_RES)
+            .setDepth(DEPTH.tiles);
         }
-        this.scene.add
-          .image(x0 - PAD, y0 - PAD, key)
-          .setOrigin(0, 0)
-          .setScale(1 / PROP_RES)
-          .setDepth(DEPTH.tiles);
       }
   }
 
@@ -191,7 +216,13 @@ export class LevelView {
         const h = Number(s.opts?.h ?? 60);
         const key = `tree-${d.name}-${i}`;
         if (!this.scene.textures.exists(key))
-          addCanvas(this.scene, key, hires(96, h + 50, PROP_RES, (ctx) => drawPuffTree(ctx, 48, h + 46, h, DEFAULT_PALETTE, 100 + i * 13)));
+          addCanvas(
+            this.scene,
+            key,
+            hires(96, h + 50, PROP_RES, (ctx) =>
+              s.opts?.pine ? drawPine(ctx, 48, h + 46, h, this.paletteAt(s.x * TILE), '#ffffff', 100 + i * 13) : drawPuffTree(ctx, 48, h + 46, h, this.paletteAt(s.x * TILE), 100 + i * 13),
+            ),
+          );
         const img = this.scene.add
           .image(s.x * TILE + TILE / 2, (s.y + 1) * TILE + 4, key)
           .setOrigin(0.5, 1)
@@ -211,6 +242,7 @@ export class LevelView {
       const wx = x * TILE + TILE / 2 + (r() - 0.5) * 16;
       const wy = y * TILE + 3;
       const roll = r();
+      if (this.paletteAt(wx).flowers.length < 2) continue; // no flowers in the snow or on the ice
       if (roll < 0.28) {
         const img = this.scene.add.image(wx, wy, 'flower', `f${Math.floor(r() * 4)}`).setOrigin(0.5, 1).setScale(1 / PROP_RES).setDepth(DEPTH.decor);
         this.sway.push({ img, amp: 7, speed: 1.6 + r() * 0.6, ph: wx * 0.013 });

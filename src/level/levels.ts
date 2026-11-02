@@ -1,5 +1,6 @@
 import type { LevelData } from './builder';
 import { buildLevel1 } from './level1';
+import { buildLevel2 } from './level2';
 
 export interface LevelInfo {
   /** 1-based level number. */
@@ -12,7 +13,7 @@ export interface LevelInfo {
 
 export const LEVELS: LevelInfo[] = [
   { id: 1, title: 'Puff Ball Planet', part: 'Part 1', build: buildLevel1 },
-  { id: 2, title: 'Puff Ball Planet', part: 'Part 2', build: null },
+  { id: 2, title: 'Puff Ball Planet', part: 'Part 2', build: buildLevel2 },
 ];
 
 export const levelInfo = (id: number) => LEVELS.find((l) => l.id === id) ?? LEVELS[0];

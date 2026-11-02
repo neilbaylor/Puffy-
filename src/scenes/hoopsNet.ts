@@ -27,13 +27,15 @@ const N = 18;
 export class NetSim {
   private pts: NetPoint[] = [];
   private links: [number, number, number][] = [];
-  private drawLinks: [number, number][] = [];
+  private drawLinks: [number, number, number][] = [];
   private tails: number[] = [];
 
   constructor(
     private readonly R: number,
     private readonly ry: number,
     depth = 46,
+    /** Cord colours, alternating strand by strand (one colour = a plain white net). */
+    private readonly colors: number[] = [0xfbfbf8],
   ) {
     const bottomR = R * 0.5;
     const idx = (k: number, i: number) => k * N + (((i % N) + N) % N);
@@ -60,7 +62,7 @@ export class NetSim {
           const a = idx(k, i);
           const b = idx(k + 1, j);
           this.links.push([a, b, dist(a, b)]);
-          this.drawLinks.push([a, b]);
+          this.drawLinks.push([a, b, i]);
         }
         // hidden ring links keep each row round
         const a = idx(k + 1, i);
@@ -147,19 +149,21 @@ export class NetSim {
     const sy = (p: NetPoint) => oy + p.y + p.z * (this.ry / this.R);
     back.clear();
     front.clear();
-    const fronts: [NetPoint, NetPoint, number][] = [];
-    back.lineStyle(1.1, 0x9a96a8, 0.7);
-    for (const [a, b] of this.drawLinks) {
+    const fronts: [NetPoint, NetPoint, number, number][] = [];
+    const shade = (c: number, k: number) => (Math.round(((c >> 16) & 255) * k) << 16) | (Math.round(((c >> 8) & 255) * k) << 8) | Math.round((c & 255) * k);
+    for (const [a, b, i] of this.drawLinks) {
       const p = this.pts[a];
       const q = this.pts[b];
-      if (p.z + q.z < 0) back.lineBetween(sx(p), sy(p), sx(q), sy(q));
-      else fronts.push([p, q, (p.hy + q.hy) / 2]);
+      const col = this.colors[Math.floor(i / 2) % this.colors.length];
+      if (p.z + q.z < 0) {
+        back.lineStyle(1.1, shade(col, 0.62), 0.7);
+        back.lineBetween(sx(p), sy(p), sx(q), sy(q));
+      } else fronts.push([p, q, (p.hy + q.hy) / 2, col]);
     }
     front.lineStyle(2.4, 0x3e3850, 0.4);
     for (const [p, q] of fronts) front.lineBetween(sx(p) + 0.5, sy(p) + 0.6, sx(q) + 0.5, sy(q) + 0.6);
-    for (const [p, q, d] of fronts) {
-      const g = Math.round(250 - (d / 50) * 34);
-      front.lineStyle(1.5, (g << 16) | ((g - 2) << 8) | (g - 6), 1);
+    for (const [p, q, d, col] of fronts) {
+      front.lineStyle(1.5, shade(col, 1 - (d / 50) * 0.14), 1);
       front.lineBetween(sx(p), sy(p), sx(q), sy(q));
     }
     for (const i of this.tails) {

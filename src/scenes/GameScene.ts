@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GRAVITY, MIN_VIEW_W, TILE, VIEW_H } from '../config';
+import { GRAVITY, MAX_FALL_SPEED, MIN_VIEW_W, TILE, VIEW_H } from '../config';
 import { characterById } from '../data/characters';
 import type { Session } from '../core/session';
 import { lives, loseLife, resetLives } from '../core/lives';
@@ -9,6 +9,7 @@ import { Aura, Checkpoint, Goal, RootBeer } from '../entities/Pickups';
 import { Player } from '../entities/Player';
 import { Rocket } from '../entities/Rocket';
 import { SoccerMatch } from '../entities/Soccer';
+import { HockeyMatch } from '../entities/Hockey';
 import { soloSource, sourceById } from '../input/devices';
 import type { EnemyKind } from '../level/builder';
 import { levelInfo } from '../level/levels';
@@ -18,7 +19,7 @@ import { Background, type View } from '../world/Background';
 import type { HoopsData } from './HoopsScene';
 import { Fx } from '../world/Fx';
 import { stingerCover } from '../ui/stinger';
-import { mixTint, themeClock, themeMix } from '../world/theme';
+import { mixTint, themeClock, themeMix, themesFor } from '../world/theme';
 import { LevelView } from '../world/LevelView';
 
 export interface GameData {
@@ -107,6 +108,10 @@ export class GameScene extends Phaser.Scene {
 
   players: Player[] = [];
   private matches: SoccerMatch[] = [];
+  private hockey: HockeyMatch[] = [];
+  /** Bad guys waiting to drop in by parachute (they fall when you get near), and the ones in the air. */
+  private paraWaiting: { kind: EnemyKind; x: number }[] = [];
+  private paras: { e: Enemy; chute: Phaser.GameObjects.Image; t: number }[] = [];
   private enemies: Enemy[] = [];
   private rockets: Rocket[] = [];
   private auras: Aura[] = [];
@@ -158,6 +163,9 @@ export class GameScene extends Phaser.Scene {
     }
     this.players = [];
     this.matches = [];
+    this.hockey = [];
+    this.paraWaiting = [];
+    this.paras = [];
     this.enemies = [];
     this.rockets = [];
     this.auras = [];
@@ -226,6 +234,12 @@ export class GameScene extends Phaser.Scene {
           break;
         case 'tree':
           break;
+        case 'hockey':
+          this.hockey.push(new HockeyMatch(this, cx, surface(s.y), Number(s.opts?.w ?? 16), String(s.opts?.team ?? 'pppb')));
+          break;
+        case 'para':
+          this.paraWaiting.push({ kind: (s.opts?.kind as EnemyKind) ?? 'puffball', x: cx });
+          break;
         case 'soccer':
           this.matches.push(
             new SoccerMatch(this, cx, surface(s.y), Number(s.opts?.w ?? 10), {
@@ -283,6 +297,8 @@ export class GameScene extends Phaser.Scene {
     this.camTop = heightPx - VIEW_H;
     this.updateCamera(0, true);
     this.intro = null;
+    this.introTop = null;
+    this.landBlend = 0;
     if (!this.retry) this.startIntro(start.x);
     this.cameras.main.fadeIn(this.retry ? 250 : 400, 255, 248, 236);
 
@@ -294,6 +310,40 @@ export class GameScene extends Phaser.Scene {
   private addAura(a: Aura) {
     this.auras.push(a);
     this.gAuras.add(a);
+  }
+
+  /** Drop bad guys in by parachute as you approach, and float them down. */
+  private updateParachutes(dt: number) {
+    const right = this.view.left + this.view.width;
+    this.paraWaiting = this.paraWaiting.filter((w) => {
+      if (right < w.x - 60) return true;
+      const e = createEnemy(this, w.kind, w.x, this.view.top - 70);
+      this.enemies.push(e);
+      this.gEnemies.add(e);
+      e.wake();
+      e.body.setMaxVelocityY(75);
+      const big = w.kind !== 'puffball';
+      const chute = this.add.image(e.x, e.body.top, 'chute').setOrigin(0.5, 58 / 60).setScale((big ? 1.5 : 1.05) / 3).setDepth(e.depth - 0.5);
+      this.paras.push({ e, chute, t: Math.random() * 6 });
+      return false;
+    });
+    this.paras = this.paras.filter((p) => {
+      p.t += dt;
+      const landed = !p.e.active || p.e.dead || p.e.body.blocked.down;
+      if (landed) {
+        // let go: the chute floats off and fades
+        if (p.e.active) {
+          p.e.body.setMaxVelocityY(MAX_FALL_SPEED);
+          p.e.setRotation(0);
+        }
+        this.tweens.add({ targets: p.chute, y: p.chute.y - 60, x: p.chute.x + 30, angle: 40, alpha: 0, duration: 900, ease: 'Sine.easeOut', onComplete: () => p.chute.destroy() });
+        return false;
+      }
+      const sway = Math.sin(p.t * 2.2);
+      p.chute.setPosition(p.e.x, p.e.body.top + 2).setRotation(sway * 0.12);
+      p.e.setRotation(sway * 0.08);
+      return true;
+    });
   }
 
   /** Spawn an enemy standing on the ground at `groundY` (used by level spawns and for testing). */
@@ -353,6 +403,8 @@ export class GameScene extends Phaser.Scene {
     this.settleAura();
     this.updateWaves(dt);
     for (const m of this.matches) m.update(dt);
+    for (const h of this.hockey) h.update(dt);
+    this.updateParachutes(dt);
 
     themeClock.t += dt;
     this.applyTheme();
@@ -395,6 +447,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   private introSkip: (() => void) | null = null;
+  private introTop: number | null = null;
+  /** Once the landing has blended onto the hero it stays there (even while zooming back out). */
+  private landBlend = 0;
 
   /** Push in on the hero, then hand over the controls. */
   private landIntro(startX: number) {
@@ -405,12 +460,12 @@ export class GameScene extends Phaser.Scene {
     this.tweens.killTweensOf(I);
     this.tweens.add({
       targets: I,
-      x: startX + 30,
-      zoom: 1.45,
+      x: startX + 20,
+      zoom: 1.32,
       rot: 0,
       lift: 0,
-      duration: 950,
-      ease: 'Cubic.easeInOut',
+      duration: 700,
+      ease: 'Sine.easeInOut',
       onComplete: () => {
         const p = this.players[0];
         if (p) p.view.setFrame('jump');
@@ -419,9 +474,9 @@ export class GameScene extends Phaser.Scene {
           targets: I,
           zoom: 1,
           x: startX,
-          duration: 520,
-          delay: 260,
-          ease: 'Sine.easeInOut',
+          duration: 380,
+          delay: 110,
+          ease: 'Sine.easeOut',
           onComplete: () => this.endIntro(),
         });
       },
@@ -447,11 +502,19 @@ export class GameScene extends Phaser.Scene {
     const vh = this.scale.height / zoom;
     const { widthPx, heightPx } = this.level;
     const x = Phaser.Math.Clamp(I.x, vw / 2, Math.max(vw / 2, widthPx - vw / 2));
-    // ride above the ground; close up, frame the hero like normal play
+    // ride above the terrain (it climbs on the mountain); as we land, blend smoothly into
+    // the normal framing on the hero so nothing jumps at the hand-over
+    const clampTop = (t: number) => Phaser.Math.Clamp(t, Math.min(0, heightPx - vh), heightPx - vh);
+    const surf = (this.level.surfaceY(x - vw * 0.25) + this.level.surfaceY(x) + this.level.surfaceY(x + vw * 0.25)) / 3;
+    const terrainTop = clampTop(surf - vh * 0.66);
+    this.introTop = this.introTop === null ? terrainTop : this.introTop + (terrainTop - this.introTop) * (1 - Math.exp(-dt * 3));
     const p = this.players[0];
-    const heroTop = p ? p.bottom - vh * 0.62 : heightPx - vh;
-    const ground = Math.min(heroTop, heightPx - vh);
-    const top = (I.zoom > 0.95 ? heroTop : ground) - I.lift;
+    const heroTop = clampTop(p ? p.bottom - vh * 0.62 : heightPx - vh);
+    if (I.phase === 'land') {
+      const k = Phaser.Math.Clamp((I.zoom - 0.82) / (1.32 - 0.82), 0, 1);
+      this.landBlend = Math.max(this.landBlend, k * k * (3 - 2 * k)); // never goes back once on the hero
+    }
+    const top = this.introTop + (heroTop - this.introTop) * this.landBlend - I.lift;
     cam.setZoom(zoom);
     cam.setRotation(I.rot);
     cam.centerOn(x, top + vh / 2);
@@ -828,7 +891,7 @@ export class GameScene extends Phaser.Scene {
 
   /** The scenery drifts slowly between looks while you play. */
   private applyTheme() {
-    const m = themeMix(themeClock.t);
+    const m = themeMix(themeClock.t, themesFor(this.levelId));
     this.bg.setTheme(m);
     this.level.setTint(mixTint(m));
   }

@@ -70,8 +70,12 @@ src/
 - **Lives:** 4 tries per run. The HUD heart counts the spare ones (3 → 0); fainting restarts at the last
   checkpoint, and fainting at 0 (or losing to King Puff Ball at 0) is game over: back to the start of the level.
 - **Second jump:** press jump again in mid air for a smaller hop (about half a jump). Stomping gives it back.
-- **Looks drift while you play:** Puff Ball Planet → Candy clouds → Golden hour → Meadow morning → back,
-  each held 35 s then cross-faded over 17 s (`src/world/theme.ts`).
+- **Looks drift while you play:** Part 1: Puff Ball Planet → Candy clouds → Golden hour → Meadow morning;
+  Part 2: Marshmallow Mountain → Frosty Puff Peaks → Sunset Crags. Each held 20 s then cross-faded over
+  10 s (`src/world/theme.ts`).
+- **Levels:** Part 1 (`src/level/level1.ts`) and Part 2, the mountain climb (`src/level/level2.ts`): green
+  valleys, snowy cliffs, a frozen pond with a hockey ambush, parachuting bad guys, mountain goats, three
+  checkpoints with Giants, and a harder rematch with the King in the Summit Dome.
 - **Aura:** eat floating nuggies for aura; a hit with aura costs your aura instead of a life.
 - **Music:** `Level_Clear` loops during play (it keeps going through checkpoint restarts); `Hoops_Arcade` plays in the palace.
 - **Online-ready input:** every player is driven by an `InputSource` returning 5 booleans

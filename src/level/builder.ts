@@ -11,7 +11,7 @@ export type Cell = 'ground' | 'rock' | 'boulder' | 'bramble' | 'cloud' | null;
 export type EnemyKind = 'puffball' | 'bigpuff' | 'giant' | 'goat';
 
 export interface Spawn {
-  type: EnemyKind | 'aura' | 'rootbeer' | 'checkpoint' | 'goal' | 'player' | 'tree' | 'soccer';
+  type: EnemyKind | 'aura' | 'rootbeer' | 'checkpoint' | 'goal' | 'player' | 'tree' | 'soccer' | 'hockey' | 'para';
   x: number; // tile column (may be fractional for aura / trees)
   y: number; // tile row the thing occupies
   opts?: Record<string, number | string | boolean>;
@@ -20,6 +20,8 @@ export interface Spawn {
 export interface LevelData {
   name: string;
   world: string;
+  /** Terrain looks by column range (Part 2: snowy rock, green valley, frozen pond). */
+  zones?: { x0: number; x1: number; pal: string }[];
   width: number;
   height: number;
   tiles: number[][];
@@ -30,6 +32,13 @@ export interface LevelData {
 export class LevelBuilder {
   readonly cells: Cell[][];
   readonly spawns: Spawn[] = [];
+  readonly zones: { x0: number; x1: number; pal: string }[] = [];
+
+  /** Columns x0..x1 use terrain palette `pal` (by piece centre). */
+  zone(x0: number, x1: number, pal: string) {
+    this.zones.push({ x0, x1, pal });
+    return this;
+  }
 
   constructor(
     readonly name: string,
@@ -133,6 +142,7 @@ export class LevelBuilder {
     return {
       name: this.name,
       world: this.world,
+      zones: this.zones.length ? this.zones : undefined,
       width: this.width,
       height: this.height,
       tiles: this.cells.map((row) => row.map((c) => (c ? idx[c] : T.EMPTY))),

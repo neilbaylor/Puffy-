@@ -6,6 +6,9 @@ import { BIGPUFF_H, BIGPUFF_W, GIANT_H, GIANT_W, PUFFBALL_H, PUFFBALL_W, drawBig
 import { drawMuzzleFlash, drawRocket } from './bazooka';
 import { drawSoccerBall, drawSoccerGoal } from './soccer';
 import { GOAT_FRAMES, GOAT_H, GOAT_W, drawGoat } from './goat';
+import { drawParachute } from './parachute';
+import { drawHockeyNet, drawPuck, drawRinkLines, drawStick } from './hockey';
+import { MOUNTAIN_LOOKS, drawMountainFar, drawMountainMid, drawMountainNear, type MountainLook } from './mountain';
 import { FLAME_FRAMES, FLAME_H, FLAME_W, drawFlame } from './flame';
 import { ART_RES, ART_STYLE, CHAR_H, CHAR_W, POSES, canvas, drawCharacter, ellipse, type Ctx } from './draw';
 import { STYLES } from './handdrawn';
@@ -132,6 +135,11 @@ function makeItems(scene: Phaser.Scene, pal: WorldPalette) {
     }),
   );
   sheet(scene, 'flame', FLAME_W, FLAME_H, FLAME_FRAMES, (ctx, f) => drawFlame(ctx, +f[1]));
+  addCanvas(scene, 'chute', hires(64, 60, ART_RES, (ctx) => drawParachute(ctx)));
+  addCanvas(scene, 'hstick', hires(40, 40, ART_RES, (ctx) => drawStick(ctx)));
+  addCanvas(scene, 'puck', hires(18, 14, ART_RES, (ctx) => drawPuck(ctx, 9, 8, PUCK_R_ART)));
+  addCanvas(scene, 'hockeynet', hires(64, 44, PROP_RES, (ctx) => drawHockeyNet(ctx, 4, 40, 44, 30)));
+  addCanvas(scene, 'rinklines', hires(400, 7, 2, (ctx) => drawRinkLines(ctx, 400, 1)));
   addCanvas(scene, 'nuggie', hires(40, 34, ART_RES, (ctx) => drawNuggie(ctx, 20, 17, 11)));
   addCanvas(scene, 'rootbeer', hires(30, 40, ART_RES, (ctx) => drawRootBeer(ctx, 15, 38, 34)));
   addCanvas(scene, 'rocket', hires(30, 16, ART_RES, (ctx) => drawRocket(ctx, st, 15, 8)));
@@ -230,6 +238,8 @@ function makeItems(scene: Phaser.Scene, pal: WorldPalette) {
   }
 }
 
+const PUCK_R_ART = 7;
+
 /** Parallax layers, each horizontally tileable, drawn at BG_RES. Heights are world px. */
 export const BG_LAYERS = {
   far: { w: 1024, h: 220 },
@@ -257,6 +267,16 @@ function makeBackgrounds(scene: Phaser.Scene, pal: WorldPalette) {
   addCanvas(scene, k('near'), padV(hires(L.near.w, L.near.h, BG_RES, (ctx) => drawNearLayer(ctx, L.near.w, L.near.h, pal))));
 }
 
+/** Part 2's backgrounds for one mountain look (same layer sizes as Part 1's). */
+function makeMountainBackgrounds(scene: Phaser.Scene, look: MountainLook) {
+  const k = (layer: Parameters<typeof bgKey>[0]) => bgKey(layer, look.pal.id);
+  addCanvas(scene, k('sky'), hires(4, 512, 1, (ctx) => drawSky(ctx, 4, 512, look.pal)));
+  const L = BG_LAYERS;
+  addCanvas(scene, k('far'), padV(hires(L.far.w, L.far.h, BG_RES, (ctx) => drawMountainFar(ctx, L.far.w, L.far.h, look))));
+  addCanvas(scene, k('hills'), padV(hires(L.hills.w, L.hills.h, BG_RES, (ctx) => drawMountainMid(ctx, L.hills.w, L.hills.h, look))));
+  addCanvas(scene, k('near'), padV(hires(L.near.w, L.near.h, BG_RES, (ctx) => drawMountainNear(ctx, L.near.w, L.near.h, look))));
+}
+
 /**
  * The same work as generateTextures, split into steps so the boot can draw one
  * per frame behind the start screen (the screen appears right away).
@@ -268,6 +288,7 @@ export function textureSteps(scene: Phaser.Scene, pal: WorldPalette = DEFAULT_PA
     { name: 'baddies', run: () => makeBaddies(scene) },
     { name: 'items', run: () => makeItems(scene, pal) },
     ...['puff', 'meadow', 'candy', 'golden'].map((id) => ({ name: `bg-${id}`, run: () => makeBackgrounds(scene, PALETTES[id]) })),
+    ...MOUNTAIN_LOOKS.map((look) => ({ name: `bg-${look.pal.id}`, run: () => makeMountainBackgrounds(scene, look) })),
   ];
 }
 
@@ -277,4 +298,5 @@ export function generateTextures(scene: Phaser.Scene, pal: WorldPalette = DEFAUL
   makeBaddies(scene);
   makeItems(scene, pal);
   for (const id of ['puff', 'meadow', 'candy', 'golden']) makeBackgrounds(scene, PALETTES[id]);
+  for (const look of MOUNTAIN_LOOKS) makeMountainBackgrounds(scene, look);
 }

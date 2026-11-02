@@ -212,6 +212,125 @@ export function drawSpotBrush(ctx: Ctx, d: number) {
   ctx.fillRect(0, 0, d, d);
 }
 
+// ───────────────────────────── arena styles (one per showdown) ──
+
+interface Ad {
+  text: string;
+  bg: string;
+  fg: string;
+}
+
+export interface ArenaStyle {
+  id: string;
+  /** Bowl gradient from the rafters down to the court. */
+  bowl: [string, string, string, string];
+  tierUpper: string;
+  tierLower: string;
+  seatUpper: string;
+  seatLower: string;
+  shirts: string[];
+  wood: string[];
+  apron: string;
+  lane: string;
+  words: [string, string];
+  wordColor: string;
+  ads: Ad[];
+  jumboTitle: string;
+  jumboSub: string;
+  banners: [string, string][];
+  bannerTop: string;
+  bannerBottom: string;
+  /** Backboard border and the stanchion pad. */
+  frame: string;
+  padTop: string;
+  padBottom: string;
+  logo: string;
+  /** Net cord colours, cycled strand by strand. */
+  net: number[];
+}
+
+/** Part 1: King Puff Ball's Basketball Palace (royal purple and gold). */
+export const PALACE: ArenaStyle = {
+  id: 'palace',
+  bowl: ['#030207', '#0a0613', '#170c27', '#241238'],
+  tierUpper: '#140a20',
+  tierLower: '#21112f',
+  seatUpper: '#4a1f3e',
+  seatLower: '#6a2440',
+  shirts: ['#4b1d8f', '#4b1d8f', '#5a2aa6', '#ffc629', '#ffc629', '#f4f1ea', '#f4f1ea', '#1b1b22', '#c8102e', '#2f6fd6', '#8a8f9c', '#0b7c78'],
+  wood: ['#c98c50', '#d19659', '#be8047', '#d7a165', '#c4874c', '#cc9256', '#b97b43', '#d39b5e'],
+  apron: 'rgba(46,18,86,0.86)',
+  lane: 'rgba(78,30,150,0.9)',
+  words: ['KING PUFF BALL', 'PALACE'],
+  wordColor: 'rgba(255,210,63,0.85)',
+  ads: [
+    { text: 'PUFF COLA', bg: '#c8102e', fg: '#ffffff' },
+    { text: 'MADE BY HENRY & NEIL', bg: '#ffc629', fg: '#4a1f05' },
+    { text: 'KING PUFF BALL PALACE', bg: '#3d1478', fg: '#ffd23f' },
+    { text: 'ROOT BEER · ICE COLD', bg: '#5a2a10', fg: '#ffe2b0' },
+    { text: 'PUFF BALL PLANET', bg: '#0b7c78', fg: '#eafffb' },
+  ],
+  jumboTitle: 'KING PUFF BALL',
+  jumboSub: 'B A S K E T B A L L   P A L A C E',
+  banners: [
+    ['WORLD 1', 'CHAMPS'],
+    ['PUFF', 'CUP'],
+    ['KING', 'OF HOOPS'],
+  ],
+  bannerTop: '#2a1052',
+  bannerBottom: '#3e1878',
+  frame: '#f7f7f4',
+  padTop: '#24203a',
+  padBottom: '#0f0d1a',
+  logo: '#e8b931',
+  net: [0xfbfbf8],
+};
+
+/** Part 2: the Summit Dome up the mountain (ice blue, navy and red; striped net). */
+export const SUMMIT: ArenaStyle = {
+  id: 'summit',
+  bowl: ['#010509', '#04101a', '#0a2232', '#103448'],
+  tierUpper: '#081620',
+  tierLower: '#0e2636',
+  seatUpper: '#1b3f5c',
+  seatLower: '#245476',
+  shirts: ['#0f8f9a', '#0f8f9a', '#18b0b8', '#ffffff', '#ffffff', '#c8102e', '#c8102e', '#1b2a44', '#9aa8b8', '#2f6fd6', '#ffd23f', '#e6f4ff'],
+  wood: ['#d3ab7a', '#dbb484', '#c9a070', '#e0bc8c', '#cea676', '#d7b080', '#c49a6a', '#ddb889'],
+  apron: 'rgba(12,38,66,0.88)',
+  lane: 'rgba(12,128,142,0.9)',
+  words: ['SUMMIT', 'DOME'],
+  wordColor: 'rgba(200,236,255,0.85)',
+  ads: [
+    { text: 'SNOW CONE CO.', bg: '#2f9be0', fg: '#ffffff' },
+    { text: 'MADE BY HENRY & NEIL', bg: '#ffc629', fg: '#4a1f05' },
+    { text: 'SUMMIT DOME', bg: '#0c7f8e', fg: '#eafffb' },
+    { text: 'GOAT MILK · FRESH', bg: '#f4f8fc', fg: '#123a55' },
+    { text: 'PUCK PALACE', bg: '#c8102e', fg: '#ffffff' },
+  ],
+  jumboTitle: 'KING PUFF BALL',
+  jumboSub: 'S U M M I T   D O M E   ·   R E M A T C H',
+  banners: [
+    ['PART 2', 'FINAL'],
+    ['SUMMIT', 'CUP'],
+    ['KING', 'OF PEAKS'],
+  ],
+  bannerTop: '#0b2a44',
+  bannerBottom: '#14466a',
+  frame: '#4fd6ff',
+  padTop: '#163a56',
+  padBottom: '#0a1c2c',
+  logo: '#cfeeff',
+  net: [0xe8463f, 0xfbfbf8],
+};
+
+/** The style the arena drawing functions use right now (set before drawing). */
+let AS: ArenaStyle = PALACE;
+export function setArenaStyle(s: ArenaStyle) {
+  AS = s;
+  BOARD_SEGS = adSegments(262, 0);
+  RIBBON_SEGS = adSegments(318, 2);
+}
+
 // ───────────────────────────── shared helpers ──
 
 function poly(ctx: Ctx, pts: Pt[]) {
@@ -358,8 +477,8 @@ function drawStanchion(ctx: Ctx, x: number) {
   ]);
   ctx.fill();
   const front = ctx.createLinearGradient(0, fy - fh, 0, fy);
-  front.addColorStop(0, '#24203a');
-  front.addColorStop(1, '#0f0d1a');
+  front.addColorStop(0, AS.padTop);
+  front.addColorStop(1, AS.padBottom);
   ctx.fillStyle = front;
   ctx.beginPath();
   ctx.roundRect(x - fw, fy - fh, fw * 2, fh, [3, 3, 1, 1]);
@@ -370,8 +489,8 @@ function drawStanchion(ctx: Ctx, x: number) {
   seg(ctx, [x - fw + 2, fy - fh + 1], [x + fw - 2, fy - fh + 1]);
   ctx.strokeStyle = 'rgba(0,0,0,0.35)';
   for (const dx of [-fw / 3, fw / 3]) seg(ctx, [x + dx, fy - fh + 3], [x + dx, fy - 2]);
-  // gold crown logo on the pad
-  ctx.fillStyle = '#e8b931';
+  // crown logo on the pad
+  ctx.fillStyle = AS.logo;
   const cy = fy - fh * 0.5;
   poly(ctx, [
     [x - 13, cy + 7],
@@ -441,7 +560,7 @@ function drawBoard(ctx: Ctx, x: number, y: number) {
   ctx.strokeStyle = '#121118';
   ctx.lineWidth = 4.6;
   ctx.strokeRect(x - W, top, W * 2, bottom - top);
-  ctx.strokeStyle = '#f7f7f4';
+  ctx.strokeStyle = AS.frame;
   ctx.lineWidth = 2.6;
   ctx.strokeRect(x - W + 0.8, top + 0.8, W * 2 - 1.6, bottom - top - 1.6);
   // shooter's square
@@ -600,19 +719,7 @@ export const SPOTS = {
   king: { x: 1010, y: 650 },
 };
 
-// LED advertising (all made-up Puff Ball Planet brands)
-interface Ad {
-  text: string;
-  bg: string;
-  fg: string;
-}
-const ADS: Ad[] = [
-  { text: 'PUFF COLA', bg: '#c8102e', fg: '#ffffff' },
-  { text: 'MADE BY HENRY & NEIL', bg: '#ffc629', fg: '#4a1f05' },
-  { text: 'KING PUFF BALL PALACE', bg: '#3d1478', fg: '#ffd23f' },
-  { text: 'ROOT BEER · ICE COLD', bg: '#5a2a10', fg: '#ffe2b0' },
-  { text: 'PUFF BALL PLANET', bg: '#0b7c78', fg: '#eafffb' },
-];
+// LED advertising (all made-up Puff Ball Planet brands; per arena style)
 interface AdSeg {
   x0: number;
   x1: number;
@@ -621,17 +728,17 @@ interface AdSeg {
 function adSegments(w: number, start: number): AdSeg[] {
   const out: AdSeg[] = [];
   let i = start;
-  for (let x = L; x < R; x += w) out.push({ x0: x, x1: x + w, ad: ADS[i++ % ADS.length] });
+  for (let x = L; x < R; x += w) out.push({ x0: x, x1: x + w, ad: AS.ads[i++ % AS.ads.length] });
   return out;
 }
 /** Courtside LED boards along the baseline (also reflected in the floor). */
 const BOARD_Y0 = 297;
 const BOARD_Y1 = HORIZON + 1;
-const BOARD_SEGS = adSegments(262, 0);
+let BOARD_SEGS: AdSeg[] = [];
 /** The LED ribbon between the upper and lower decks. */
 const RIBBON_Y0 = 114;
 const RIBBON_Y1 = 131;
-const RIBBON_SEGS = adSegments(318, 2);
+let RIBBON_SEGS: AdSeg[] = [];
 
 function ledBoard(ctx: Ctx, y0: number, y1: number, segs: AdSeg[], fontPx: number) {
   ctx.fillStyle = '#060509';
@@ -685,10 +792,10 @@ export function drawArena(ctx: Ctx) {
 
   // the bowl: almost black up in the rafters, warmer toward the court
   const bowl = ctx.createLinearGradient(0, T, 0, HORIZON);
-  bowl.addColorStop(0, '#030207');
-  bowl.addColorStop(0.3, '#0a0613');
-  bowl.addColorStop(0.65, '#170c27');
-  bowl.addColorStop(1, '#241238');
+  bowl.addColorStop(0, AS.bowl[0]);
+  bowl.addColorStop(0.3, AS.bowl[1]);
+  bowl.addColorStop(0.65, AS.bowl[2]);
+  bowl.addColorStop(1, AS.bowl[3]);
   ctx.fillStyle = bowl;
   ctx.fillRect(L, T, R - L, HORIZON - T + 2);
 
@@ -715,9 +822,9 @@ export function drawArena(ctx: Ctx) {
     ctx.fill();
   }
   // seating tiers behind the crowd
-  ctx.fillStyle = '#140a20';
+  ctx.fillStyle = AS.tierUpper;
   ctx.fillRect(L, -58, R - L, 176);
-  ctx.fillStyle = '#21112f';
+  ctx.fillStyle = AS.tierLower;
   ctx.fillRect(L, 140, R - L, 160);
 
   drawFloor(ctx);
@@ -736,7 +843,7 @@ function drawFloor(ctx: Ctx) {
   ctx.fillRect(L, HORIZON, R - L, B - HORIZON);
 
   // maple planks running toward the hoop, each made of boards of slightly different tone
-  const tones = ['#c98c50', '#d19659', '#be8047', '#d7a165', '#c4874c', '#cc9256', '#b97b43', '#d39b5e'];
+  const tones = AS.wood;
   const PW = 0.75;
   for (let u = -84; u < 48; u += PW) {
     ctx.fillStyle = tones[Math.floor(r() * tones.length)];
@@ -775,7 +882,7 @@ function drawFloor(ctx: Ctx) {
   for (let u = -84; u <= 48; u += PW) seg(ctx, P(u, VB), P(u, VF));
 
   // out of bounds: royal purple paint over the wood (the grain still shows)
-  ctx.fillStyle = 'rgba(46,18,86,0.86)';
+  ctx.fillStyle = AS.apron;
   ctx.beginPath();
   ctx.rect(L, HORIZON, R - L, B - HORIZON);
   const court: Pt[] = [P(-25, 0), P(25, 0), P(25, VF), P(-25, VF)];
@@ -783,7 +890,7 @@ function drawFloor(ctx: Ctx) {
   ctx.closePath();
   ctx.fill('evenodd');
   // the lane
-  ctx.fillStyle = 'rgba(78,30,150,0.9)';
+  ctx.fillStyle = AS.lane;
   poly(ctx, [P(-8, 0), P(8, 0), P(8, 19), P(-8, 19)]);
   ctx.fill();
   // painted words behind the baseline, laid flat on the floor
@@ -795,12 +902,12 @@ function drawFloor(ctx: Ctx) {
     ctx.font = `400 34px ${DISPLAY_FONT}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = 'rgba(255,210,63,0.85)';
+    ctx.fillStyle = AS.wordColor;
     ctx.fillText(text, 0, 0);
     ctx.restore();
   };
-  word('KING PUFF BALL', -15);
-  word('PALACE', 13);
+  word(AS.words[0], -15);
+  word(AS.words[1], 13);
 
   // court lines
   ctx.fillStyle = '#f5f0e4';
@@ -898,7 +1005,7 @@ const UPPER: Tier = { y0: -46, y1: 118, rows: 17, s0: 3.6, s1: 4.7, q: 0.6, ligh
 const LOWER: Tier = { y0: 166, y1: 302, rows: 8, s0: 6.6, s1: 9.6, q: 0.8, light0: 0.36, light1: 0.64, aisles: [90, 470, 1270], aisleW: 26, seat: '#6a2440', near: true };
 
 const SKINS = ['#f2a65a', '#f7c690', '#ffb3c6', '#e8a46c', '#f08a3c', '#ffd4a8', '#a8e6d4', '#f5b78a', '#d98c55'];
-const SHIRTS = ['#4b1d8f', '#4b1d8f', '#5a2aa6', '#ffc629', '#ffc629', '#f4f1ea', '#f4f1ea', '#1b1b22', '#c8102e', '#2f6fd6', '#8a8f9c', '#0b7c78'];
+
 const SIGNS = ['GO KING!', 'PUFF!', '#1 FAN', 'KING ME', 'D-FENSE'];
 
 /**
@@ -930,7 +1037,7 @@ function drawTier(dst: Ctx, tier: Tier, r: () => number, excited: boolean) {
     const y = tier.y0 + (tier.y1 - tier.y0) * t;
     const light = tier.light0 + (tier.light1 - tier.light0) * t;
     // the row of seat backs (shows where seats are empty)
-    ctx.fillStyle = lit(tier.seat, light * 0.85);
+    ctx.fillStyle = lit(tier.near ? AS.seatLower : AS.seatUpper, light * 0.85);
     ctx.fillRect(L, y - s * 0.55, R - L, s * 1.5);
     ctx.fillStyle = lit('#ffffff', light * 0.25, 0.25);
     ctx.fillRect(L, y - s * 0.55, R - L, Math.max(0.6, s * 0.12));
@@ -972,7 +1079,7 @@ function fan(
   const standing = excited && v.stand < 0.75;
   const yy = y - (standing ? s * 0.45 : 0) + (v.jit - 0.5) * s * 0.3;
   const skin = SKINS[Math.floor(v.skin * SKINS.length)];
-  const shirt = SHIRTS[Math.floor(v.shirt * SHIRTS.length)];
+  const shirt = AS.shirts[Math.floor(v.shirt * AS.shirts.length)];
   const k = light * (0.9 + v.hue * 0.2);
   const hx = x + (v.lean - 0.5) * s * 0.35;
   const hy = yy - s * 1.55;
@@ -1158,11 +1265,11 @@ export function drawJumboScreen(ctx: Ctx, c: JumboContent, t = 0) {
     ctx.font = `400 31px ${DISPLAY_FONT}`;
     ctx.textAlign = 'left';
     ctx.fillStyle = '#ffe58a';
-    ctx.fillText('KING PUFF BALL', 120, 34);
+    ctx.fillText(AS.jumboTitle, 120, 34);
     ctx.shadowBlur = 0;
     ctx.font = `800 13px Nunito, "Arial Black", sans-serif`;
     ctx.fillStyle = '#ffffff';
-    ctx.fillText('B A S K E T B A L L   P A L A C E', 122, 62);
+    ctx.fillText(AS.jumboSub, 122, 62, JUMBO.w - 130);
   } else if (c.kind === 'score') {
     ctx.textAlign = 'center';
     ctx.font = `400 13px ${DISPLAY_FONT}`;
@@ -1294,11 +1401,11 @@ function drawJumbotron(ctx: Ctx) {
   ctx.shadowColor = '#ffd23f';
   ctx.shadowBlur = 10;
   ctx.fillStyle = '#ffe58a';
-  ctx.fillText('KING PUFF BALL', sx0 + 120, sy0 + 30);
+  ctx.fillText(AS.jumboTitle, sx0 + 120, sy0 + 30);
   ctx.shadowBlur = 0;
   ctx.font = `800 13px Nunito, "Arial Black", sans-serif`;
   ctx.fillStyle = '#ffffff';
-  ctx.fillText('B A S K E T B A L L   P A L A C E', sx0 + 122, sy0 + 58);
+  ctx.fillText(AS.jumboSub, sx0 + 122, sy0 + 58, sx1 - sx0 - 130);
   // ticker
   ctx.fillStyle = '#b3001b';
   ctx.fillRect(sx0, sy1 - 20, sx1 - sx0, 20);
@@ -1319,11 +1426,7 @@ function drawJumbotron(ctx: Ctx) {
 }
 
 function drawBanners(ctx: Ctx) {
-  const lines = [
-    ['WORLD 1', 'CHAMPS'],
-    ['PUFF', 'CUP'],
-    ['KING', 'OF HOOPS'],
-  ];
+  const lines = AS.banners;
   ctx.strokeStyle = '#2b2835';
   ctx.lineWidth = 2;
   seg(ctx, [1090, T + 8], [1420, T + 8]);
@@ -1333,8 +1436,8 @@ function drawBanners(ctx: Ctx) {
     const w = 72;
     const h = 104;
     const g = ctx.createLinearGradient(0, by, 0, by + h);
-    g.addColorStop(0, '#2a1052');
-    g.addColorStop(1, '#3e1878');
+    g.addColorStop(0, AS.bannerTop);
+    g.addColorStop(1, AS.bannerBottom);
     ctx.fillStyle = g;
     poly(ctx, [
       [bx, by],
@@ -1399,3 +1502,5 @@ export function drawCameraFlash(ctx: Ctx, r: number) {
   ctx.fillRect(r - r * 0.9, r - 0.6, r * 1.8, 1.2);
   ctx.fillRect(r - 0.6, r - r * 0.9, 1.2, r * 1.8);
 }
+
+setArenaStyle(PALACE);
