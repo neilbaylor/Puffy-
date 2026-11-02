@@ -54,11 +54,13 @@ const store = {
  */
 /** Keyboard + mouse controls, as little key caps (shown on computers without a touch screen). */
 const kc = (k: string) => `<kbd>${k}</kbd>`;
+/** A little mouse (the emoji doesn't show on every computer). */
+const MOUSE = `<svg class="mouse-ico" viewBox="0 0 14 20" width="11" height="16" aria-hidden="true"><rect x="1.2" y="1.2" width="11.6" height="17.6" rx="5.8" fill="#fff" stroke="currentColor" stroke-width="1.8"/><path d="M7 1.6v5.4M1.6 7h10.8" stroke="currentColor" stroke-width="1.4"/><rect x="1.9" y="1.9" width="5" height="5" rx="2" fill="#ffd23f"/></svg>`;
 function controlsHtml(compact = false) {
   const rows: [string, string][] = [
     [`${kc('←')}${kc('→')} <small>or</small> ${kc('A')}${kc('D')}`, 'move'],
     [`${kc('↑')} <small>or</small> ${kc('W')}`, compact ? 'jump (again in the air: double jump)' : 'jump — press again in the air for a double jump'],
-    [`${kc('Space')} <small>or</small> 🖱️ <small>click</small>`, 'fire the bazooka'],
+    [`${kc('Space')} <small>or</small> ${MOUSE} <small>click</small>`, 'fire the bazooka'],
     [`${kc('Shift')}`, 'hold to run (uses stamina)'],
     [`${kc('Esc')}`, 'pause'],
   ];
