@@ -16,6 +16,7 @@ import { T } from '../level/tiles';
 import { Background, type View } from '../world/Background';
 import type { HoopsData } from './HoopsScene';
 import { Fx } from '../world/Fx';
+import { stingerCover } from '../ui/stinger';
 import { mixTint, themeClock, themeMix } from '../world/theme';
 import { LevelView } from '../world/LevelView';
 
@@ -213,7 +214,14 @@ export class GameScene extends Phaser.Scene {
         case 'tree':
           break;
         case 'soccer':
-          this.matches.push(new SoccerMatch(this, cx, surface(s.y), Number(s.opts?.w ?? 10)));
+          this.matches.push(
+            new SoccerMatch(this, cx, surface(s.y), Number(s.opts?.w ?? 10), {
+              team: String(s.opts?.team ?? 'ppp'),
+              big: !!s.opts?.big,
+              goals: s.opts?.goals !== false,
+              wait: Number(s.opts?.wait ?? 0),
+            }),
+          );
           break;
         default:
           this.addEnemy(createEnemy(this, s.type as EnemyKind, cx, surface(s.y) - 40), surface(s.y));
@@ -237,6 +245,8 @@ export class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.gRockets, layer, (r) => (r as Rocket).explode());
     this.physics.add.overlap(this.gPlayers, this.gEnemies, (h, e) => this.onPlayerEnemy(h as Phaser.GameObjects.GameObject, e as Enemy));
     this.physics.add.overlap(this.gRockets, this.gEnemies, (r) => (r as Rocket).explode());
+    // games sharing a pitch spot you together
+    for (const m of this.matches) for (const o of this.matches) if (o !== m && Math.abs(o.centerX - m.centerX) < 1) m.partners.push(o);
     for (const m of this.matches)
       this.physics.add.overlap(this.gRockets, m.ball, (r) => {
         (r as Rocket).explode();
@@ -657,9 +667,10 @@ export class GameScene extends Phaser.Scene {
         this.cameras.main.shake(1300, 0.006);
       },
       onComplete: () => {
-        this.cameras.main.flash(250, 255, 240, 200);
-        this.cameras.main.fadeOut(380, 20, 10, 38);
-        this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () =>
+        // broadcast stinger: bars sweep across, the palace is revealed underneath
+        this.cameras.main.flash(200, 255, 240, 200);
+        sfx.whoosh();
+        void stingerCover().then(() =>
           this.scene.start('Hoops', { session: this.session, charId: p.char.id, checkpoint: this.lastCheckpoint, result: res } satisfies HoopsData),
         );
       },

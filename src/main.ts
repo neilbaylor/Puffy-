@@ -34,13 +34,13 @@ function measureRefreshMs(): Promise<number> {
     let last = 0;
     const done = () => {
       gaps.sort((a, b) => a - b);
-      resolve(gaps.length >= 8 ? gaps[Math.floor(gaps.length / 2)] : 1000 / 60);
+      resolve(gaps.length >= 6 ? gaps[Math.floor(gaps.length / 2)] : 1000 / 60);
     };
-    const timeout = setTimeout(done, 1500); // e.g. opened in a background tab
+    const timeout = setTimeout(done, 700); // e.g. opened in a background tab
     const tick = (t: number) => {
       if (last) gaps.push(t - last);
       last = t;
-      if (gaps.length < 30) requestAnimationFrame(tick);
+      if (gaps.length < 12) requestAnimationFrame(tick);
       else {
         clearTimeout(timeout);
         done();

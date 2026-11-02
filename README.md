@@ -26,7 +26,8 @@ The repo is ready for [Railway](https://railway.com): `railway.json` tells it to
 4. Open that link on the phone or tablet.
 
 Railway redeploys automatically on every push to that branch, so each saved (pushed) change goes live
-a minute or two later.
+a minute or two later. The start screen shows the build number (bottom-left, e.g. `v0.01`); it goes up
+by 0.01 with every deploy (`src/version.ts`), so you can tell at a glance whether the new build is live.
 
 Full screen (no address bar): the game asks the browser for full screen on the first tap.
 - **Android** (Chrome etc.) and **iPad** (Safari): works in the browser itself.

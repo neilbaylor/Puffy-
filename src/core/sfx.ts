@@ -79,6 +79,11 @@ export const sfx = {
     tone({ type: 'sine', from: 160, to: 60, dur: 0.1, vol: 0.25 * k });
     noise(0.06, 0.18 * k, 1800, 400);
   },
+  /** A rising swoosh (the broadcast wipe). */
+  whoosh: () => {
+    noise(0.5, 0.28, 400, 4200);
+    tone({ type: 'sine', from: 90, to: 260, dur: 0.45, vol: 0.12 });
+  },
   /** Referee whistle: they've spotted you. */
   whistle: () => {
     tone({ type: 'square', from: 2300, to: 2500, dur: 0.12, vol: 0.05 });

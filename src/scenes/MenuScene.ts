@@ -14,11 +14,12 @@ export class MenuScene extends Phaser.Scene {
     super('Menu');
   }
 
-  create() {
+  create(data?: { silent?: boolean }) {
     this.level = new LevelView(this, buildLevel1());
     this.bg = new Background(this, this.level.heightPx - VIEW_H);
     this.x = 0;
-    this.game.events.emit('menu');
+    // the boot already put the start screen up; coming back from a game shows it again
+    if (!data?.silent) this.game.events.emit('menu');
   }
 
   update(_t: number, deltaMs: number) {

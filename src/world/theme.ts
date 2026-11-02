@@ -41,7 +41,7 @@ const TINT: Record<ThemeId, number> = {
   golden: 0xffe3c4,
 };
 
-const lerpRgb = (x: number, y: number, w: number) => {
+export const lerpRgb = (x: number, y: number, w: number) => {
   let out = 0;
   for (const s of [16, 8, 0]) {
     const a = (x >> s) & 255;
@@ -53,5 +53,5 @@ const lerpRgb = (x: number, y: number, w: number) => {
 
 export const mixTint = (m: ThemeMix) => lerpRgb(TINT[m.a], TINT[m.b], m.w);
 
-const hex = (h: string) => parseInt(h.slice(1), 16);
+export const hex = (h: string) => parseInt(h.slice(1), 16);
 export const mixSea = (m: ThemeMix) => lerpRgb(hex(seaColor(PALETTES[m.a])), hex(seaColor(PALETTES[m.b])), m.w);

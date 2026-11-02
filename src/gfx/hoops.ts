@@ -127,31 +127,91 @@ export function drawKing(ctx: Ctx, ox: number, oy: number, f: KingFrame) {
 
 // ───────────────────────────── ball ──
 
-/** Basketball, centre (cx, cy), radius r, rotated by `spin`. */
+/** A real-looking basketball: pebbled orange leather, black channels, a soft studio highlight. Rotated by `spin`. */
 export function drawBall(ctx: Ctx, cx: number, cy: number, r: number, spin = 0) {
-  const S = st();
-  S.shape(ctx, ellipsePts(cx, cy, r, r, 0, 40), { base: '#f2802e', shade: '#c2531a', light: '#ffb87a' }, 1601, { lw: 0.9, light: [cx - r * 0.4, cy - r * 0.45] });
+  // leather
+  const g = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.05, cx, cy, r * 1.05);
+  g.addColorStop(0, '#ffa55a');
+  g.addColorStop(0.45, '#ea6c22');
+  g.addColorStop(0.85, '#b9461a');
+  g.addColorStop(1, '#7c2c10');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
   ctx.save();
   ctx.beginPath();
-  ctx.arc(cx, cy, r - 0.5, 0, Math.PI * 2);
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.clip();
+  // pebble grain
+  const rr = rng(77);
+  for (let i = 0; i < r * r * 1.6; i++) {
+    const a = rr() * Math.PI * 2;
+    const d = Math.sqrt(rr()) * r;
+    ctx.fillStyle = rr() < 0.5 ? 'rgba(90,30,8,0.22)' : 'rgba(255,200,150,0.18)';
+    ctx.fillRect(cx + Math.cos(a) * d, cy + Math.sin(a) * d, r * 0.045, r * 0.045);
+  }
+  // channels (seams), curving round the sphere
   ctx.translate(cx, cy);
   ctx.rotate(spin);
-  ctx.strokeStyle = S.ink;
-  ctx.lineWidth = Math.max(1, r * 0.09);
+  ctx.strokeStyle = '#1e120c';
+  ctx.lineWidth = Math.max(1, r * 0.075);
+  ctx.lineCap = 'round';
   ctx.beginPath();
   ctx.moveTo(-r, 0);
-  ctx.lineTo(r, 0);
-  ctx.moveTo(0, -r);
-  ctx.lineTo(0, r);
+  ctx.bezierCurveTo(-r * 0.4, r * 0.12, r * 0.4, r * 0.12, r, 0);
+  ctx.moveTo(r * 0.08, -r);
+  ctx.bezierCurveTo(-r * 0.12, -r * 0.4, -r * 0.12, r * 0.4, r * 0.08, r);
   ctx.stroke();
-  for (const s of [-1, 1]) {
+  for (const sg of [-1, 1]) {
     ctx.beginPath();
-    ctx.ellipse(s * r * 1.05, 0, r * 0.62, r * 1.1, 0, 0, Math.PI * 2);
+    ctx.ellipse(sg * r * 1.12, 0, r * 0.62, r * 1.15, 0, 0, Math.PI * 2);
     ctx.stroke();
   }
   ctx.restore();
+  // rim shadow + studio highlight
+  const rim = ctx.createRadialGradient(cx, cy, r * 0.7, cx, cy, r);
+  rim.addColorStop(0, 'rgba(0,0,0,0)');
+  rim.addColorStop(1, 'rgba(40,10,0,0.35)');
+  ctx.fillStyle = rim;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+  const hl = ctx.createRadialGradient(cx - r * 0.38, cy - r * 0.45, 0, cx - r * 0.38, cy - r * 0.45, r * 0.45);
+  hl.addColorStop(0, 'rgba(255,240,220,0.75)');
+  hl.addColorStop(1, 'rgba(255,240,220,0)');
+  ctx.fillStyle = hl;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
 }
+
+/** A soft contact shadow (for floors), w × h. */
+export function drawSoftShadow(ctx: Ctx, w: number, h: number) {
+  ctx.save();
+  ctx.translate(w / 2, h / 2);
+  ctx.scale(1, h / w);
+  const g = ctx.createRadialGradient(0, 0, 0, 0, 0, w / 2);
+  g.addColorStop(0, 'rgba(0,0,0,0.6)');
+  g.addColorStop(0.5, 'rgba(0,0,0,0.32)');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(0, 0, w / 2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+/** A round pool of light, used to cut spotlights out of the dark arena. */
+export function drawSpotBrush(ctx: Ctx, d: number) {
+  const g = ctx.createRadialGradient(d / 2, d / 2, 0, d / 2, d / 2, d / 2);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.55, 'rgba(255,255,255,0.9)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, d, d);
+}
+
 // ───────────────────────────── shared helpers ──
 
 function poly(ctx: Ctx, pts: Pt[]) {
@@ -1023,11 +1083,109 @@ export function drawArenaFront(ctx: Ctx) {
   ctx.restore();
 }
 
+/** The jumbotron's screen in stage coordinates (the scene draws live content there). */
+export const JUMBO = { x: 158, y: -24, w: 424, h: 108 };
+
+export type JumboContent =
+  | { kind: 'title' }
+  | { kind: 'score'; you: number; king: number; name: string; sudden: boolean }
+  | { kind: 'big'; text: string; sub?: string; color: string; bg: string };
+
+/** Live jumbotron content, drawn into a JUMBO.w × JUMBO.h canvas (scaled by the caller). */
+export function drawJumboScreen(ctx: Ctx, c: JumboContent, t = 0) {
+  const { w, h } = JUMBO;
+  const bg = ctx.createLinearGradient(0, 0, w, h);
+  bg.addColorStop(0, c.kind === 'big' ? c.bg : '#101548');
+  bg.addColorStop(1, c.kind === 'big' ? '#12061f' : '#2a0c4a');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, w, h);
+  ctx.textBaseline = 'middle';
+  if (c.kind === 'title') {
+    ctx.fillStyle = 'rgba(255,210,63,0.12)';
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2 + t * 0.4;
+      poly(ctx, [
+        [62, 46],
+        [62 + Math.cos(a) * 140, 46 + Math.sin(a) * 140],
+        [62 + Math.cos(a + 0.2) * 140, 46 + Math.sin(a + 0.2) * 140],
+      ]);
+      ctx.fill();
+    }
+    ctx.shadowColor = '#ffd23f';
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = '#ffd23f';
+    poly(ctx, [[28, 66], [24, 28], [45, 44], [62, 20], [79, 44], [100, 28], [96, 66]]);
+    ctx.fill();
+    ctx.font = `400 31px ${DISPLAY_FONT}`;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#ffe58a';
+    ctx.fillText('KING PUFF BALL', 120, 34);
+    ctx.shadowBlur = 0;
+    ctx.font = `800 13px Nunito, "Arial Black", sans-serif`;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText('B A S K E T B A L L   P A L A C E', 122, 62);
+  } else if (c.kind === 'score') {
+    ctx.textAlign = 'center';
+    ctx.font = `400 13px ${DISPLAY_FONT}`;
+    ctx.fillStyle = '#ffd23f';
+    ctx.fillText(c.sudden ? 'SUDDEN DEATH' : 'FREE THROW SHOWDOWN', w / 2, 14);
+    for (const [x, label, n, col] of [
+      [w * 0.27, c.name.toUpperCase(), c.you, '#8fe8ff'],
+      [w * 0.73, 'KING', c.king, '#ffd23f'],
+    ] as const) {
+      ctx.font = `400 16px ${DISPLAY_FONT}`;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(label, x, 32);
+      ctx.font = `400 46px ${DISPLAY_FONT}`;
+      ctx.shadowColor = col;
+      ctx.shadowBlur = 10;
+      ctx.fillStyle = col;
+      ctx.fillText(String(n), x, 66);
+      ctx.shadowBlur = 0;
+    }
+    ctx.font = `400 22px ${DISPLAY_FONT}`;
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.fillText('–', w / 2, 64);
+  } else {
+    ctx.textAlign = 'center';
+    ctx.font = `400 ${c.sub ? 44 : 54}px ${DISPLAY_FONT}`;
+    ctx.shadowColor = c.color;
+    ctx.shadowBlur = 16;
+    ctx.fillStyle = c.color;
+    ctx.fillText(c.text, w / 2, c.sub ? 38 : h / 2 - 6, w - 20);
+    ctx.shadowBlur = 0;
+    if (c.sub) {
+      ctx.font = `400 16px ${DISPLAY_FONT}`;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(c.sub, w / 2, 76, w - 20);
+    }
+  }
+  // ticker
+  ctx.fillStyle = '#b3001b';
+  ctx.fillRect(0, h - 20, w, 20);
+  ctx.font = `400 13px ${DISPLAY_FONT}`;
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'left';
+  const tick = 'FREE THROW SHOWDOWN  ★  5 SHOTS EACH  ★  SUDDEN DEATH  ★  ';
+  const tw = ctx.measureText(tick).width;
+  const off = -((t * 60) % tw);
+  for (let x = off; x < w; x += tw) ctx.fillText(tick, x, h - 9.5);
+  // LED pixels + glare
+  ctx.fillStyle = 'rgba(0,0,0,0.16)';
+  for (let x = 0; x < w; x += 2.6) ctx.fillRect(x, 0, 0.7, h);
+  for (let y = 0; y < h; y += 2.6) ctx.fillRect(0, y, w, 0.7);
+  const glare = ctx.createLinearGradient(0, 0, 160, h);
+  glare.addColorStop(0, 'rgba(255,255,255,0.12)');
+  glare.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = glare;
+  ctx.fillRect(0, 0, w, h);
+}
+
 function drawJumbotron(ctx: Ctx) {
   const x0 = 150;
   const x1 = 590;
-  const y0 = -80;
-  const y1 = 44;
+  const y0 = -32;
+  const y1 = 92;
   ctx.strokeStyle = '#2b2835';
   ctx.lineWidth = 2;
   for (const cx of [x0 + 50, x1 - 50]) seg(ctx, [cx, T], [cx, y0]);

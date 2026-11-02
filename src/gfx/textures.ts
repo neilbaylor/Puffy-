@@ -16,7 +16,6 @@ import {
   drawBloom,
   drawBoulder,
   drawBramble,
-  drawCloudLayer,
   drawFarLayer,
   drawFlower,
   drawGate,
@@ -104,6 +103,7 @@ function makeItems(scene: Phaser.Scene, pal: WorldPalette) {
   const st = STYLES[ART_STYLE];
   addCanvas(scene, 'aura', hires(48, 48, ART_RES, (ctx) => drawAura(ctx, 24, 25, 10.5)));
   addCanvas(scene, 'soccerball', hires(28, 28, ART_RES, (ctx) => drawSoccerBall(ctx, 14, 14, 11)));
+  addCanvas(scene, 'soccerball-big', hires(44, 44, ART_RES, (ctx) => drawSoccerBall(ctx, 22, 22, 17)));
   addCanvas(scene, 'soccergoal', hires(76, 56, PROP_RES, (ctx) => drawSoccerGoal(ctx, 4, 54, 58, 38)));
   // giant's ground shockwave: a curling crest of dust (faces right)
   addCanvas(
@@ -116,9 +116,16 @@ function makeItems(scene: Phaser.Scene, pal: WorldPalette) {
         crest.push([4 + t * 48, 32 - Math.sin(t * Math.PI) ** 0.7 * 24 - (t > 0.55 ? (t - 0.55) * 14 : 0)]);
       }
       crest.push([52, 32]);
-      st.shape(ctx, crest, { base: '#fff4e2', shade: '#e3c9a8', light: '#ffffff' }, 2101, { lw: 1, light: [20, 12] });
-      st.line(ctx, [[14, 26], [24, 16], [34, 14]], 2102, 0.6, '#c9a27e');
-      st.line(ctx, [[26, 28], [36, 20], [44, 19]], 2103, 0.6, '#c9a27e');
+      // a hot orange energy wave with a yellow core, so it stands out on any background
+      ctx.save();
+      ctx.shadowColor = '#ff5a1f';
+      ctx.shadowBlur = 5;
+      st.shape(ctx, crest, { base: '#ff6a2a', shade: '#d23a12', light: '#ffd27a' }, 2101, { lw: 1.25, light: [20, 12] });
+      ctx.restore();
+      const core = crest.map(([x, y]) => [x, 32 - (32 - y) * 0.55] as [number, number]);
+      st.shape(ctx, core, { base: '#ffe066', shade: '#ffb02e', light: '#fffbe0' }, 2104, { lw: 0.5, plain: true });
+      st.line(ctx, [[14, 26], [24, 16], [34, 14]], 2102, 0.7, '#fff6c8');
+      st.line(ctx, [[26, 28], [36, 20], [44, 19]], 2103, 0.7, '#fff6c8');
     }),
   );
   addCanvas(scene, 'nuggie', hires(40, 34, ART_RES, (ctx) => drawNuggie(ctx, 20, 17, 11)));
@@ -242,9 +249,22 @@ function makeBackgrounds(scene: Phaser.Scene, pal: WorldPalette) {
   addCanvas(scene, k('sky'), hires(4, 512, 1, (ctx) => drawSky(ctx, 4, 512, pal)));
   const L = BG_LAYERS;
   addCanvas(scene, k('far'), padV(hires(L.far.w, L.far.h, BG_RES, (ctx) => drawFarLayer(ctx, L.far.w, L.far.h, pal))));
-  addCanvas(scene, k('clouds'), padV(hires(L.clouds.w, L.clouds.h, BG_RES, (ctx) => drawCloudLayer(ctx, L.clouds.w, L.clouds.h, pal))));
   addCanvas(scene, k('hills'), padV(hires(L.hills.w, L.hills.h, BG_RES, (ctx) => drawHillsLayer(ctx, L.hills.w, L.hills.h, pal))));
   addCanvas(scene, k('near'), padV(hires(L.near.w, L.near.h, BG_RES, (ctx) => drawNearLayer(ctx, L.near.w, L.near.h, pal))));
+}
+
+/**
+ * The same work as generateTextures, split into steps so the boot can draw one
+ * per frame behind the start screen (the screen appears right away).
+ */
+export function textureSteps(scene: Phaser.Scene, pal: WorldPalette = DEFAULT_PALETTE): { name: string; run: () => void }[] {
+  return [
+    { name: 'tiles', run: () => makeCollisionTiles(scene) },
+    { name: 'heroes', run: () => makeCharacters(scene) },
+    { name: 'baddies', run: () => makeBaddies(scene) },
+    { name: 'items', run: () => makeItems(scene, pal) },
+    ...['puff', 'meadow', 'candy', 'golden'].map((id) => ({ name: `bg-${id}`, run: () => makeBackgrounds(scene, PALETTES[id]) })),
+  ];
 }
 
 export function generateTextures(scene: Phaser.Scene, pal: WorldPalette = DEFAULT_PALETTE) {

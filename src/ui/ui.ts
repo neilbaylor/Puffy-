@@ -9,6 +9,8 @@ import { isKeyDown } from '../input/keyboard';
 import { isTouchDevice } from '../input/touch';
 import type { GameData, GameOverState, GameScene, HudState, ResultState } from '../scenes/GameScene';
 import { TouchControls } from './touchControls';
+import { drawNuggie } from '../gfx/collectibles';
+import { VERSION } from '../version';
 
 const h = (html: string) => {
   const t = document.createElement('template');
@@ -61,6 +63,18 @@ export class UI {
 
   constructor(private game: Phaser.Game) {
     this.root = document.getElementById('ui')!;
+    // the aura icon is a real nuggie, drawn once and shared by the HUD and results
+    try {
+      const c = document.createElement('canvas');
+      c.width = 80;
+      c.height = 68;
+      const ctx = c.getContext('2d')!;
+      ctx.scale(2, 2);
+      drawNuggie(ctx, 20, 17, 13, 0);
+      document.documentElement.style.setProperty('--nuggie-img', `url(${c.toDataURL()})`);
+    } catch {
+      /* falls back to the CSS icon */
+    }
     this.hud = h(`<div class="hud" hidden>
         <div class="hud-hero">
           <canvas width="72" height="72"></canvas>
@@ -170,6 +184,7 @@ export class UI {
       <h2>Pick your player</h2>
       <div class="cards" role="radiogroup" aria-label="Pick your player"></div>
       <button class="icon-btn fs-btn" data-act="fs" aria-label="Full screen" hidden>⛶</button>
+      <p class="version">v${VERSION}</p>
       <div class="start-foot">
         <button class="btn btn-big" data-act="play">Play</button>
         <p class="keys-hint">${isTouchDevice() ? 'Tap a hero, then Play' : '← → to choose · Enter to play'}</p>
@@ -266,6 +281,13 @@ export class UI {
   }
 
   private play() {
+    if (!this.game.registry.get('ready')) {
+      // the art is still being drawn (a second at most): start as soon as it's done
+      const btn = this.screen?.querySelector<HTMLButtonElement>('[data-act=play]');
+      if (btn) btn.textContent = 'Loading…';
+      this.game.events.once('assets-ready', () => this.play());
+      return;
+    }
     unlockAudio();
     primeMusic();
     this.goFullscreen();

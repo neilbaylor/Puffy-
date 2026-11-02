@@ -16,15 +16,17 @@ import { LevelBuilder, type LevelData } from './builder';
  *   151-169 Floating isles
  *   170-200 Boulder wall, then GIANT #3 guarding checkpoint 3
  *   201-218 Final run: hills, a running-jump gap
- *   219-253 Puff Park: Puffballs playing soccer. They spot you and kick the ball at you: jump it!
- *   254-273 Big Puff Ball hill, then a cloud hop over a pit
- *   274-299 Last stretch to the Puff Gate
+ *   219-282 Puff Park: two soccer games. They spot you and kick the ball at you: jump it!
+ *           Game 1: four Puffballs. Game 2 (longer pitch): three Puffballs with a ball,
+ *           plus two Big Puff Balls who kick a BIG ball a moment later. 3 balls in all.
+ *   283-303 Big Puff Ball hill, then a cloud hop over a pit
+ *   304-329 Last stretch to the Puff Gate
  *
  * Nuggie spots (each one gives +1 aura): only some have a nuggie each play.
  * Root beer: 7 rare bottles, mostly in tricky spots. They're banked for a future shop.
  */
 export function buildLevel1(): LevelData {
-  const L = new LevelBuilder('Puff Ball Planet', 'World 1', 300, 16);
+  const L = new LevelBuilder('Puff Ball Planet', 'World 1', 330, 16);
 
   // ── Meadow start ───────────────────────────────────────────
   L.ground(0, 34, 3);
@@ -122,30 +124,37 @@ export function buildLevel1(): LevelData {
   L.aura(209, 8);
   L.auraArc(215, 2, 7, 0); // over the gap: needs a running jump
 
-  // ── Puff Park: a soccer match (they kick the ball at you) ──
-  L.ground(219, 266, 3);
+  // ── Puff Park: two soccer games (they kick the balls at you) ──
+  L.ground(219, 296, 3);
   L.spawn('tree', 221.5, 3, { h: 58 });
-  L.spawn('soccer', 240, 3, { w: 14 });
-  L.aura(240, 8);
-  L.spawn('tree', 252, 3, { h: 70 });
+  // game 1: four Puffballs, one ball
+  L.spawn('soccer', 236, 3, { w: 14, team: 'pppp' });
+  L.aura(236, 8);
+  L.spawn('tree', 247.5, 3, { h: 70 });
+  // game 2: a longer pitch. Three Puffballs with a ball, and two Big Puff Balls
+  // with a big ball, kicked a moment after the first one
+  L.spawn('soccer', 266, 3, { w: 22, team: 'ppp' });
+  L.spawn('soccer', 266, 3, { w: 22, team: 'bb', big: true, goals: false, wait: 1.3 });
+  L.aura(262, 8);
+  L.spawn('tree', 281, 3, { h: 62 });
 
   // ── Big Puff Ball hill, cloud hop ──────────────────────────
-  L.spawn('bigpuff', 256, 3);
-  L.ground(259, 264, 4);
-  L.ground(261, 263, 5);
-  L.aura(262, 8.5);
-  L.pit(267, 273);
-  L.cloud(269, 3, 5);
-  L.aura(270.5, 7.5);
+  L.spawn('bigpuff', 286, 3);
+  L.ground(289, 294, 4);
+  L.ground(291, 293, 5);
+  L.aura(292, 8.5);
+  L.pit(297, 303);
+  L.cloud(299, 3, 5);
+  L.aura(300.5, 7.5);
 
   // ── Last stretch to the Puff Gate ──────────────────────────
-  L.ground(274, 299, 3);
-  L.spawn('puffball', 277, 3);
-  L.spawn('puffball', 280, 3);
-  L.spawn('bigpuff', 285, 3);
-  L.spawn('tree', 290, 3, { h: 62 });
-  L.spawn('goal', 294, 3);
-  L.spawn('tree', 297.5, 3, { h: 72 });
+  L.ground(304, 329, 3);
+  L.spawn('puffball', 307, 3);
+  L.spawn('puffball', 310, 3);
+  L.spawn('bigpuff', 315, 3);
+  L.spawn('tree', 320, 3, { h: 62 });
+  L.spawn('goal', 324, 3);
+  L.spawn('tree', 327.5, 3, { h: 72 });
 
   // ── Root beer (rare, often tucked away) ───────────────────
   L.rootbeer(28, 9); // on top of the meadow hill, needs a jump
@@ -155,7 +164,7 @@ export function buildLevel1(): LevelData {
   L.rootbeer(116, 12.4); // the risky high cloud over the brambles
   L.rootbeer(162, 13.2); // top of the floating isles
   L.rootbeer(209, 9.6); // final hill
-  L.rootbeer(270.5, 6); // high over the cloud hop (needs the second jump)
+  L.rootbeer(300.5, 6); // high over the cloud hop (needs the second jump)
 
   return L.build();
 }

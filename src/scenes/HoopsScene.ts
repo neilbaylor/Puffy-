@@ -10,6 +10,7 @@ import {
   CROWD_H,
   FRONT_H,
   HOOP,
+  JUMBO,
   KING_FRAMES,
   KING_H,
   KING_W,
@@ -25,8 +26,13 @@ import {
   drawKing,
   drawRimBack,
   drawRimFront,
+  drawSoftShadow,
+  drawSpotBrush,
   drawSpotlight,
+  drawJumboScreen,
+  type JumboContent,
 } from '../gfx/hoops';
+import { stingerReveal, stingerTitle } from '../ui/stinger';
 import { addCanvas, hires } from '../gfx/textures';
 import { gamepadSources } from '../input/gamepad';
 import { isKeyDown } from '../input/keyboard';
@@ -45,7 +51,7 @@ export interface HoopsData {
 type Outcome = 'swish' | 'rimIn' | 'rimOut' | 'short' | 'long' | 'wide';
 
 /** King Puff Ball makes about this share of his shots. */
-const KING_MAKE = 0.35;
+const KING_MAKE = 0.45;
 const REGULATION = 5;
 
 const ARENA_RES = 1.25;
@@ -63,7 +69,7 @@ export class HoopsScene extends Phaser.Scene {
   private hero!: Phaser.GameObjects.Sprite;
   private king!: Phaser.GameObjects.Sprite;
   private ball!: Phaser.GameObjects.Image;
-  private ballShadow!: Phaser.GameObjects.Ellipse;
+  private ballShadow!: Phaser.GameObjects.Image;
   private net!: Phaser.GameObjects.Image;
   private heroScale = 1;
   private clock = 0;
@@ -84,6 +90,23 @@ export class HoopsScene extends Phaser.Scene {
   private crowd!: Phaser.GameObjects.Image;
   private camFocus = { x: 800, y: 450, zoom: 1 };
   private heroRefl!: Phaser.GameObjects.Sprite;
+  // lighting: the arena can go dark, with spotlights cut out of the darkness
+  private darkRT!: Phaser.GameObjects.RenderTexture;
+  private brush!: Phaser.GameObjects.Image;
+  private dark = { level: 0 };
+  private spots: { x: number; y: number; sx: number; sy: number; on: boolean; src: { x: number; y: number }; beam: Phaser.GameObjects.Image }[] = [];
+  // the live jumbotron
+  private jumboTex!: Phaser.Textures.CanvasTexture;
+  private jumbo: JumboContent = { kind: 'title' };
+  private jumboUntil = 0;
+  private jumboNext = 0;
+  // ball motion trail
+  private ghosts: Phaser.GameObjects.Image[] = [];
+  private trail: { x: number; y: number; s: number }[] = [];
+  // the intro can be skipped with a tap
+  private inIntro = false;
+  private skipping = false;
+  private calloutToken = 0;
   private kingRefl!: Phaser.GameObjects.Sprite;
   /** Countdown (ms) to the next camera flash in the crowd. */
   private flashIn = 300;
@@ -103,6 +126,15 @@ export class HoopsScene extends Phaser.Scene {
     this.score = { you: [], king: [] };
     this.tapped = false;
     this.prevKey = true;
+    this.dark = { level: 0 };
+    this.spots = [];
+    this.ghosts = [];
+    this.trail = [];
+    this.jumbo = { kind: 'title' };
+    this.jumboUntil = 0;
+    this.jumboNext = 0;
+    this.inIntro = false;
+    this.skipping = false;
   }
 
   // ───────────────────────────────────────────── setup ──
@@ -144,6 +176,8 @@ export class HoopsScene extends Phaser.Scene {
       });
     }
     if (!this.textures.exists('spot')) addCanvas(this, 'spot', hires(300, 700, 1, (ctx) => drawSpotlight(ctx, 300, 700)));
+    if (!this.textures.exists('softshadow')) addCanvas(this, 'softshadow', hires(128, 40, 1, (ctx) => drawSoftShadow(ctx, 128, 40)));
+    if (!this.textures.exists('spotbrush')) addCanvas(this, 'spotbrush', hires(256, 256, 1, (ctx) => drawSpotBrush(ctx, 256)));
   }
 
   create() {
@@ -172,8 +206,8 @@ export class HoopsScene extends Phaser.Scene {
     // characters, with floor shadows
     const hp = A(SPOTS.hero.x, SPOTS.hero.y);
     const kp = A(SPOTS.king.x, SPOTS.king.y);
-    this.add.ellipse(hp.x, hp.y + 2, 120 * ch.scale, 22, 0x000000, 0.25).setDepth(6);
-    this.add.ellipse(kp.x, kp.y + 2, 170, 28, 0x000000, 0.25).setDepth(6);
+    this.add.image(hp.x, hp.y + 2, 'softshadow').setDisplaySize(150 * ch.scale, 30).setDepth(6);
+    this.add.image(kp.x, kp.y + 3, 'softshadow').setDisplaySize(210, 40).setDepth(6);
     this.heroScale = (2.6 / ART_RES) * ch.scale;
     this.hero = this.add.sprite(hp.x, hp.y + 4, `char-${ch.id}`, 'idle0').setOrigin(0.5, 1).setScale(this.heroScale).setDepth(8);
     this.king = this.add.sprite(kp.x, kp.y + 6, 'king', 'idle0').setOrigin(0.5, 1).setScale(1.45 / KING_RES).setDepth(8);
@@ -182,9 +216,25 @@ export class HoopsScene extends Phaser.Scene {
     this.kingRefl = this.add.sprite(0, 0, 'king', 'idle0').setOrigin(0.5, 1).setFlipY(true).setAlpha(0.16).setDepth(4);
 
     // ball + its shadow on the floor
-    this.ballShadow = this.add.ellipse(0, 0, 40, 10, 0x000000, 0.28).setDepth(6).setVisible(false);
+    this.ballShadow = this.add.image(0, 0, 'softshadow').setDisplaySize(48, 14).setDepth(6).setVisible(false);
+    for (let i = 0; i < 4; i++) this.ghosts.push(this.add.image(0, 0, 'hball').setDepth(8.9).setVisible(false).setAlpha(0.3 - i * 0.07));
     this.ball = this.add.image(0, 0, 'hball').setScale(1 / 3).setDepth(9).setVisible(false);
     this.net = this.add.image(bb.x, bb.y, 'netf', 'n0').setOrigin(0.5, 16 / 100).setScale(0.5).setDepth(10);
+
+    // darkness with spotlights cut out of it, plus the visible beams from the rafters
+    this.darkRT = this.add.renderTexture(0, 0, ARENA_W, ARENA_H).setOrigin(0, 0).setDepth(11).setVisible(false);
+    this.brush = this.make.image({ key: 'spotbrush', add: false }).setOrigin(0.5);
+    for (const src of [A(230, -90), A(1330, -90)]) {
+      const beam = this.add.image(src.x, src.y, 'spot').setOrigin(0.5, 0).setBlendMode(Phaser.BlendModes.ADD).setDepth(11.4).setVisible(false);
+      this.spots.push({ x: src.x, y: 500, sx: 1, sy: 1, on: false, src, beam });
+    }
+
+    // the live jumbotron screen (glows even when the lights are down)
+    const JR = 2;
+    this.jumboTex = (this.textures.exists('jumbo') ? this.textures.get('jumbo') : this.textures.createCanvas('jumbo', JUMBO.w * JR, JUMBO.h * JR)) as Phaser.Textures.CanvasTexture;
+    const jp = A(JUMBO.x, JUMBO.y);
+    this.add.image(jp.x, jp.y, 'jumbo').setOrigin(0, 0).setScale(1 / JR).setDepth(11.6);
+    this.drawJumbo();
 
     this.dom = document.createElement('div');
     this.dom.className = 'hoops';
@@ -195,8 +245,9 @@ export class HoopsScene extends Phaser.Scene {
         <div class="hm" data-m="aim"><b>Aim</b><div class="hm-bar"><i class="hm-zone"></i><i class="hm-mark"></i></div></div>
         <p class="hm-hint">Tap to stop the marker in the green!</p>
       </div>
-      <div class="hoops-callout"></div>
-      <div class="hoops-curtain"></div>`;
+      <div class="hoops-lb"><i></i><i></i></div>
+      <div class="hoops-l3"><b></b><span></span></div>
+      <div class="hoops-callout"></div>`;
     document.getElementById('ui')!.appendChild(this.dom);
     window.addEventListener('pointerdown', this.tapListener);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -239,10 +290,11 @@ export class HoopsScene extends Phaser.Scene {
   }
 
   /** A hard camera cut (with a white flash). */
-  private cut(x: number, y: number, zoom: number) {
+  private cut(x: number, y: number, zoom: number, flash = true) {
+    this.tweens.killTweensOf(this.camFocus);
     this.camFocus = { x, y, zoom };
     this.fitCamera(true);
-    this.cameras.main.flash(160, 255, 255, 255);
+    if (flash) this.cameras.main.flash(110, 255, 255, 255);
   }
 
   private callout(text: string, cls = '', ms = 1100) {
@@ -250,12 +302,14 @@ export class HoopsScene extends Phaser.Scene {
     el.className = `hoops-callout show ${cls}`;
     el.innerHTML = text;
     void el.offsetWidth;
+    const token = ++this.calloutToken;
     return this.wait(ms).then(() => {
-      el.className = 'hoops-callout';
+      if (token === this.calloutToken) el.className = 'hoops-callout';
     });
   }
 
   private renderScore() {
+    if (this.jumbo.kind !== 'big') this.jumbo = this.scoreJumbo();
     const n = Math.max(REGULATION, this.score.you.length, this.score.king.length);
     const dots = (arr: boolean[]) =>
       Array.from({ length: n }, (_, i) => `<i class="${i < arr.length ? (arr[i] ? 'in' : 'out') : ''}"></i>`).join('');
@@ -307,6 +361,14 @@ export class HoopsScene extends Phaser.Scene {
       this.cameraFlash();
     }
 
+    this.updateLighting();
+    if (this.clock >= this.jumboNext) {
+      this.jumboNext = this.clock + 70;
+      if (this.jumbo.kind === 'big' && this.clock > this.jumboUntil) this.jumbo = this.scoreJumbo();
+      this.drawJumbo();
+    }
+    if (this.inIntro && !this.skipping && this.tapPressed()) this.skipping = true;
+
     // meters
     if (this.meter) {
       const m = this.meter;
@@ -333,11 +395,125 @@ export class HoopsScene extends Phaser.Scene {
       this.spin += dt * 0.012;
       this.ball.setPosition(x, y).setScale(s / 3).setRotation(this.spin);
       const fy = f.f0 + (f.f1 - f.f0) * t;
-      this.ballShadow.setPosition(x, fy).setSize(40 * s, 10 * s).setAlpha(0.25 * (1 - Math.min(1, (fy - y) / 500)));
+      this.ballShadow.setPosition(x, fy).setDisplaySize(48 * s, 14 * s).setAlpha(0.8 * (1 - Math.min(1, (fy - y) / 500)));
+      // motion trail
+      this.trail.unshift({ x, y, s });
+      this.trail.length = Math.min(this.trail.length, 13);
+      this.ghosts.forEach((g, i) => {
+        const tp = this.trail[(i + 1) * 3];
+        g.setVisible(!!tp);
+        if (tp) g.setPosition(tp.x, tp.y).setScale((tp.s / 3) * (1 - i * 0.06)).setRotation(this.spin - (i + 1) * 0.2);
+      });
       if (t >= 1) {
         this.flight = null;
+        this.trail = [];
+        this.ghosts.forEach((g) => g.setVisible(false));
         f.res();
       }
+    }
+  }
+
+  // ───────────────────────────────────────────── lighting, jumbotron, broadcast bits ──
+
+  /** Draw the darkness with spotlight pools cut out of it, and aim the beams. */
+  private updateLighting() {
+    const lv = this.dark.level;
+    const on = lv > 0.01;
+    this.darkRT.setVisible(on);
+    if (on) {
+      this.darkRT.clear();
+      this.darkRT.fill(0x05030b, lv);
+      for (const sp of this.spots) {
+        if (!sp.on) continue;
+        this.brush.setScale(sp.sx, sp.sy);
+        this.darkRT.erase(this.brush, sp.x, sp.y);
+      }
+    }
+    for (const sp of this.spots) {
+      const show = on && sp.on;
+      sp.beam.setVisible(show);
+      if (!show) continue;
+      const dx = sp.x - sp.src.x;
+      const dy = sp.y - sp.src.y;
+      sp.beam.setRotation(Math.atan2(-dx, dy));
+      sp.beam.setScale(0.45 + 0.3 * sp.sx, Math.hypot(dx, dy) / 700);
+      sp.beam.setAlpha(0.5 * Math.min(1, lv * 1.3));
+    }
+  }
+
+  /** Swing a spotlight to (x, y) (arena coords) with a pool size. */
+  private aimSpot(i: number, x: number, y: number, sx: number, sy: number, ms: number, ease = 'Cubic.easeInOut') {
+    const sp = this.spots[i];
+    sp.on = true;
+    if (ms <= 0) Object.assign(sp, { x, y, sx, sy });
+    else this.tweens.add({ targets: sp, x, y, sx, sy, duration: ms, ease });
+  }
+
+  private setDark(level: number, ms: number) {
+    this.tweens.killTweensOf(this.dark);
+    if (ms <= 0) this.dark.level = level;
+    else this.tweens.add({ targets: this.dark, level, duration: ms, ease: 'Sine.easeInOut' });
+  }
+
+  private scoreJumbo(): JumboContent {
+    return { kind: 'score', you: this.total('you'), king: this.total('king'), name: characterById(this.hd.charId).name, sudden: this.score.you.length > REGULATION };
+  }
+
+  /** Show something on the jumbotron (for `ms`, then back to the score). */
+  private jumboShow(c: JumboContent, ms = 1500) {
+    this.jumbo = c;
+    this.jumboUntil = this.clock + ms;
+    this.drawJumbo();
+  }
+
+  private drawJumbo() {
+    const ctx = this.jumboTex.getContext();
+    ctx.setTransform(2, 0, 0, 2, 0, 0);
+    drawJumboScreen(ctx, this.jumbo, this.clock / 1000);
+    this.jumboTex.refresh();
+  }
+
+  private letterbox(on: boolean) {
+    this.dom.querySelector('.hoops-lb')!.classList.toggle('on', on);
+  }
+
+  /** TV-style name caption in the corner (null hides it). */
+  private lowerThird(name: string | null, sub = '') {
+    const el = this.dom.querySelector<HTMLElement>('.hoops-l3')!;
+    if (!name) return el.classList.remove('show');
+    el.querySelector('b')!.textContent = name;
+    el.querySelector('span')!.textContent = sub;
+    el.classList.add('show');
+  }
+
+  /** A wait that ends early if the player taps to skip the intro. */
+  private async iwait(ms: number) {
+    const end = this.clock + ms;
+    while (this.clock < end && !this.skipping) await this.wait(Math.min(50, end - this.clock));
+  }
+
+  /** Arena lights slam on: boom, flash, roar, a storm of camera flashes. */
+  private lightsOn() {
+    sfx.drum();
+    sfx.cheer();
+    this.cameras.main.flash(260, 255, 250, 235);
+    this.setDark(0, 220);
+    this.excitedUntil = this.clock + 2200;
+    this.flashIn = 0;
+  }
+
+  /** Paper confetti: flips, flutters and drifts down in front of everything. */
+  private confetti(n: number) {
+    const cols = [0xffd23f, 0x7a2ec2, 0xffffff, 0xe8463f, 0x2fd0c0, 0xff8fb3];
+    const view = this.cameras.main.worldView;
+    for (let i = 0; i < n; i++) {
+      const x = view.x + Math.random() * view.width;
+      const c = this.add.rectangle(x, view.y - 20 - Math.random() * 200, 5 + Math.random() * 3, 9 + Math.random() * 4, cols[i % cols.length]).setDepth(12).setAngle(Math.random() * 360);
+      const fall = 2400 + Math.random() * 2200;
+      this.tweens.add({ targets: c, y: view.y + view.height + 40, duration: fall, ease: 'Linear', onComplete: () => c.destroy() });
+      this.tweens.add({ targets: c, x: x + (Math.random() - 0.5) * 120, duration: 600 + Math.random() * 500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      this.tweens.add({ targets: c, scaleX: -1, duration: 160 + Math.random() * 260, yoyo: true, repeat: -1 });
+      this.tweens.add({ targets: c, angle: c.angle + (Math.random() < 0.5 ? -360 : 360), duration: 900 + Math.random() * 900, repeat: -1 });
     }
   }
 
@@ -349,36 +525,7 @@ export class HoopsScene extends Phaser.Scene {
     const rim = A(HOOP.rimX, HOOP.rimY);
     playHoops();
 
-    // Title card over a curtain, then the camera cuts
-    const curtain = this.dom.querySelector<HTMLElement>('.hoops-curtain')!;
-    curtain.innerHTML = `<div><small>Suddenly…</small>King Puff Ball's<br>Basketball Palace</div>`;
-    curtain.classList.add('show');
-    sfx.drum();
-    await this.wait(1500);
-    curtain.classList.add('open');
-
-    // Cut 1: tight on the King
-    this.cut(kp.x - 10, kp.y - 150, 2.5);
-    this.kingAnim = { frames: ['laugh0', 'laugh1'], fps: 6 };
-    await this.wait(300);
-    curtain.classList.remove('show', 'open');
-    await this.callout('“Think you can beat<br><b>THE KING</b>?”', 'speech', 1500);
-    this.kingAnim = { frames: ['idle0', 'idle1'], fps: 2.5 };
-
-    // Cut 2: the hoop, slow push-in
-    this.cut(rim.x, rim.y + 20, 2.0);
-    this.camFocus.zoom = 2.4;
-    sfx.drum();
-    await this.wait(900);
-
-    // Cut 3: on our hero, then pull out wide
-    this.cut(hp.x, hp.y - 90, 2.3);
-    this.heroAnim = { frames: ['jump', 'idle0'], fps: 4 };
-    await this.wait(700);
-    this.heroAnim = { frames: ['idle0', 'idle1'], fps: 2 };
-    this.camFocus = { x: 800, y: 450, zoom: 1 };
-    this.renderScore();
-    await this.callout('FREE THROW<br>SHOWDOWN!<small>5 shots each · most baskets wins</small>', 'title', 1800);
+    await this.intro(kp, hp, rim);
 
     // The contest
     let round = 0;
@@ -396,6 +543,77 @@ export class HoopsScene extends Phaser.Scene {
     const won = this.total('you') > this.total('king');
     if (won) await this.youWin();
     else await this.kingWins();
+  }
+
+  /**
+   * The broadcast-style intro. The stinger is already covering the screen:
+   * title card, then the arena in darkness with spotlights sweeping the crowd,
+   * both spots land on the King, LIGHTS ON, the hoop, our hero. Tap to skip.
+   */
+  private async intro(kp: { x: number; y: number }, hp: { x: number; y: number }, rim: { x: number; y: number }) {
+    const ch = characterById(this.hd.charId);
+    this.inIntro = true;
+    stingerTitle(`<div><div class="crown"></div><small>KING PUFF BALL'S</small><strong>BASKETBALL<br>PALACE</strong><em>FREE THROW SHOWDOWN</em></div>`);
+    sfx.drum();
+    // lights down; two spotlights hunt through the crowd
+    this.setDark(0.9, 0);
+    this.aimSpot(0, A(200, 90).x, A(200, 90).y, 0.9, 0.7, 0);
+    this.aimSpot(1, A(1180, 40).x, A(1180, 40).y, 0.9, 0.7, 0);
+    this.letterbox(true);
+    this.camFocus = { x: 800, y: 420, zoom: 1.1 };
+    this.fitCamera(true);
+    await this.iwait(1300);
+    void stingerReveal();
+    this.aimSpot(0, A(1050, 150).x, A(1050, 150).y, 0.9, 0.7, 1500, 'Sine.easeInOut');
+    this.aimSpot(1, A(260, 200).x, A(260, 200).y, 0.9, 0.7, 1500, 'Sine.easeInOut');
+    this.tweens.add({ targets: this.camFocus, zoom: 1.28, duration: 2600, ease: 'Sine.easeInOut' });
+    await this.iwait(1500);
+    // both spots land on the King
+    this.aimSpot(0, kp.x - 20, kp.y - 70, 1.25, 1.35, 600);
+    this.aimSpot(1, kp.x + 10, kp.y - 90, 1.1, 1.2, 700);
+    await this.iwait(650);
+    if (!this.skipping) {
+      this.cut(kp.x - 10, kp.y - 150, 2.5, false);
+      this.lowerThird('KING PUFF BALL', 'Palace champion · unbeaten at home');
+      this.kingAnim = { frames: ['laugh0', 'laugh1'], fps: 6 };
+      sfx.laugh();
+      void this.callout('“Think you can beat<br><b>THE KING</b>?”', 'speech', 1700);
+      await this.iwait(1700);
+      this.lowerThird(null);
+      this.kingAnim = { frames: ['idle0', 'idle1'], fps: 2.5 };
+    }
+    // LIGHTS ON
+    this.lightsOn();
+    this.spots.forEach((sp) => (sp.on = false));
+    this.jumboShow({ kind: 'title' }, 4000);
+    if (!this.skipping) {
+      this.cut(800, 430, 1.08);
+      await this.iwait(1100);
+      // the hoop, slow push-in
+      this.cut(rim.x, rim.y + 20, 2.0);
+      this.camFocus.zoom = 2.4;
+      sfx.drum();
+      await this.iwait(1000);
+      // our hero
+      this.cut(hp.x, hp.y - 90, 2.3);
+      this.lowerThird(ch.name.toUpperCase(), 'The challenger');
+      this.heroAnim = { frames: ['jump', 'idle0'], fps: 4 };
+      await this.iwait(1300);
+    }
+    // back to the game: everything in its final state (also after a skip)
+    this.inIntro = false;
+    this.skipping = false;
+    this.tapped = false;
+    this.setDark(0, 0);
+    this.spots.forEach((sp) => (sp.on = false));
+    this.lowerThird(null);
+    this.letterbox(false);
+    this.kingAnim = { frames: ['idle0', 'idle1'], fps: 2.5 };
+    this.heroAnim = { frames: ['idle0', 'idle1'], fps: 2 };
+    this.camFocus = { x: 800, y: 450, zoom: 1 };
+    this.renderScore();
+    this.jumboShow(this.scoreJumbo(), 0);
+    await this.callout('FREE THROW<br>SHOWDOWN!<small>5 shots each · most baskets wins</small>', 'title', 1800);
   }
 
   private total(who: 'you' | 'king') {
@@ -425,7 +643,7 @@ export class HoopsScene extends Phaser.Scene {
     el.classList.add('active');
     el.classList.remove('locked');
     // a fresh green zone each time (narrower as the contest goes on)
-    const w = Math.max(0.11, 0.17 - this.score.you.length * 0.01);
+    const w = Math.max(0.11, 0.17 - Math.min(this.score.you.length, REGULATION - 1) * 0.01);
     const c = 0.2 + Math.random() * 0.6;
     const zone: [number, number] = [c - w / 2, c + w / 2];
     const z = el.querySelector<HTMLElement>('.hm-zone')!;
@@ -454,7 +672,7 @@ export class HoopsScene extends Phaser.Scene {
     this.camFocus = { x: 800, y: 450, zoom: 1 };
     const n = this.score.you.length;
     await this.callout(n >= REGULATION ? 'Your shot!<small>Sudden death</small>' : `Your shot!<small>${n + 1} of ${REGULATION}</small>`, 'turn', 900);
-    const speed = 1.15 + n * 0.12;
+    const speed = 1.15 + Math.min(n, REGULATION - 1) * 0.12; // sudden death doesn't speed up further
     const p = await this.lockMeter('power', speed);
     const a = await this.lockMeter('aim', speed * 1.1);
     await this.wait(250);
@@ -493,11 +711,13 @@ export class HoopsScene extends Phaser.Scene {
       this.heroAnim = { frames: ['jump', 'idle0'], fps: 5 };
       this.kingAnim = { frames: ['sad', 'idle0'], fps: 3 };
       this.cheer();
+      this.jumboShow({ kind: 'big', text: o === 'swish' ? 'SWISH!' : 'BUCKET!', sub: `${this.total('you')} – ${this.total('king')}`, color: '#8fff8a', bg: '#0b5e2a' });
       await this.callout(o === 'swish' ? 'SWISH!' : 'IN!', 'good', 1000);
     } else {
       this.heroAnim = { frames: ['hurt'], fps: 1 };
       this.kingAnim = { frames: ['laugh0', 'laugh1'], fps: 6 };
       sfx.groan();
+      this.jumboShow({ kind: 'big', text: o === 'rimOut' ? 'RIMMED OUT' : o === 'wide' || o === 'short' ? 'AIR BALL!' : 'BRICK!', color: '#ff8a80', bg: '#5a0b14' }, 1300);
       await this.callout(o === 'short' ? 'Too short!' : o === 'long' ? 'Too long!' : o === 'wide' ? 'Wide!' : 'Rimmed out!', 'bad', 1000);
     }
     this.heroAnim = { frames: ['idle0', 'idle1'], fps: 2 };
@@ -531,11 +751,13 @@ export class HoopsScene extends Phaser.Scene {
       this.kingAnim = { frames: ['laugh0', 'laugh1'], fps: 6 };
       this.heroAnim = { frames: ['hurt'], fps: 1 };
       sfx.groan();
+      this.jumboShow({ kind: 'big', text: 'KING SCORES', sub: `${this.total('you')} – ${this.total('king')}`, color: '#ffd23f', bg: '#4a2a00' });
       await this.callout('The King scores!', 'bad', 1000);
     } else {
       this.kingAnim = { frames: ['sad'], fps: 1 };
       this.heroAnim = { frames: ['jump', 'idle0'], fps: 5 };
       this.cheer(0.5);
+      this.jumboShow({ kind: 'big', text: 'NO GOOD!', sub: 'The King misses', color: '#8fe8ff', bg: '#0b2a5e' }, 1300);
       await this.callout('The King misses!', 'good', 1000);
     }
     this.heroAnim = { frames: ['idle0', 'idle1'], fps: 2 };
@@ -547,16 +769,19 @@ export class HoopsScene extends Phaser.Scene {
     const rim = A(HOOP.rimX, HOOP.rimY);
     const base = A(HOOP.rimX, HOOP.baseY);
     const s0 = 1;
-    const s1 = 0.55;
+    // misses must never look like they went in: short shots drop well in front of
+    // the rim (on the shooter's side), long ones hit the glass and fly off sideways
+    const toShooter = Math.sign(x - rim.x) || -1;
+    const s1 = o === 'short' ? 0.72 : 0.55;
     let end = { x: rim.x, y: rim.y - 8 };
     if (o === 'rimIn' || o === 'rimOut') end = { x: rim.x + side * HOOP.rimRX * 0.75, y: rim.y - 6 };
-    if (o === 'short') end = { x: rim.x + side * 10, y: rim.y + 70 };
-    if (o === 'long') end = { x: rim.x + side * 12, y: rim.y - 80 };
-    if (o === 'wide') end = { x: rim.x + side * 110, y: rim.y + 10 };
+    if (o === 'short') end = { x: rim.x + toShooter * 88, y: rim.y + 118 };
+    if (o === 'long') end = { x: rim.x + side * 22, y: rim.y - 72 };
+    if (o === 'wide') end = { x: rim.x + side * 120, y: rim.y + 10 };
     const p0 = new Phaser.Math.Vector2(x, y);
     const p2 = new Phaser.Math.Vector2(end.x, end.y);
     const p1 = new Phaser.Math.Vector2((x + end.x) / 2, Math.min(y, end.y) - 260);
-    this.ball.setVisible(true).setDepth(9).setAlpha(1);
+    this.ball.setVisible(true).setDepth(o === 'short' ? 11 : 9).setAlpha(1);
     this.ballShadow.setVisible(true).setAlpha(0.25);
     await new Promise<void>((res) => {
       this.flight = { t: 0, dur: 1050, p0, p1, p2, s0, s1, f0: floorY, f1: base.y, res };
@@ -586,13 +811,20 @@ export class HoopsScene extends Phaser.Scene {
     } else if (o === 'rimOut') {
       sfx.clank();
       this.cameras.main.shake(90, 0.004);
-      await this.tween({ targets: this.ball, x: rim.x + side * 70, y: rim.y - 40, duration: 260, ease: 'Quad.easeOut' });
-      await bounceToFloor(side * 50, base.y - this.ball.y + 30, 380);
+      await this.tween({ targets: this.ball, x: rim.x + side * 80, y: rim.y - 42, duration: 260, ease: 'Quad.easeOut' });
+      this.ball.setDepth(11);
+      await bounceToFloor(side * 55, base.y - this.ball.y + 30, 380);
     } else if (o === 'long') {
+      // off the glass and away to the side
       sfx.clank();
-      await this.tween({ targets: this.ball, y: this.ball.y - 10, duration: 80 });
-      await bounceToFloor(-side * 30, base.y - this.ball.y + 60, 420);
+      this.cameras.main.shake(70, 0.003);
+      await this.tween({ targets: this.ball, x: rim.x + side * 100, y: rim.y - 34, duration: 250, ease: 'Quad.easeOut' });
+      this.ball.setDepth(11);
+      await bounceToFloor(side * 50, base.y - this.ball.y + 30, 400);
+    } else if (o === 'short') {
+      await bounceToFloor(toShooter * 25, base.y + 40 - this.ball.y, 320);
     } else {
+      this.ball.setDepth(11);
       await bounceToFloor(side * 30, base.y - this.ball.y + 80, 380);
     }
     this.ball.setVisible(false);
@@ -619,7 +851,7 @@ export class HoopsScene extends Phaser.Scene {
       .image(x, y, 'camflash')
       .setBlendMode(Phaser.BlendModes.ADD)
       .setScale((lower ? 0.55 : 0.32) * (0.7 + Math.random() * 0.6))
-      .setDepth(1.5);
+      .setDepth(this.dark.level > 0.1 ? 11.5 : 1.5);
     this.tweens.add({ targets: f, alpha: 0, duration: 110 + Math.random() * 90, ease: 'Quad.easeIn', onComplete: () => f.destroy() });
   }
 
@@ -658,7 +890,15 @@ export class HoopsScene extends Phaser.Scene {
     this.camFocus = { x: 800, y: 450, zoom: 1 };
     this.king.setFlipX(true);
     this.cheer(1.5);
+    this.jumboShow({ kind: 'big', text: 'NEW CHAMP!', sub: `${characterById(this.hd.charId).name} beats the King ${this.total('you')} – ${this.total('king')}`, color: '#ffd23f', bg: '#3d1478' }, 1e9);
     await this.tween({ targets: this.king, x: ARENA_W + 220, duration: 1500, ease: 'Quad.easeIn' });
+    // the house lights dip and a spotlight finds the champion; confetti everywhere
+    const hpw = A(SPOTS.hero.x, SPOTS.hero.y);
+    this.setDark(0.45, 400);
+    this.aimSpot(0, hpw.x, hpw.y - 60, 1.2, 1.4, 0);
+    this.aimSpot(1, hpw.x + 10, hpw.y - 80, 1.0, 1.2, 500);
+    this.confetti(160);
+    this.excitedUntil = this.clock + 4000;
     this.heroAnim = { frames: ['jump', 'idle0'], fps: 5 };
     await this.callout(`YOU BEAT<br>KING PUFF BALL!<small>${this.total('you')} – ${this.total('king')}</small>`, 'title', 2200);
     fadeOutMusic(500);
@@ -671,6 +911,10 @@ export class HoopsScene extends Phaser.Scene {
     this.cut(kp.x - 10, kp.y - 140, 2.3);
     this.kingAnim = { frames: ['laugh0', 'laugh1'], fps: 7 };
     sfx.laugh();
+    this.jumboShow({ kind: 'big', text: 'KING WINS', sub: `${this.total('king')} – ${this.total('you')}`, color: '#ffd23f', bg: '#5a0b0b' }, 1e9);
+    // lights down, one spotlight on the gloating King
+    this.setDark(0.6, 500);
+    this.aimSpot(0, kp.x, kp.y - 80, 1.3, 1.4, 0);
     await this.callout('“HA HA HA HA!”', 'speech', 1600);
     sfx.laugh();
     this.camFocus = { x: 800, y: 450, zoom: 1 };
