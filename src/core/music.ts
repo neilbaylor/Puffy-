@@ -32,7 +32,8 @@ export function primeMusic() {
   primed = true;
   for (const t of Object.keys(urls) as Track[]) {
     const a = el(t);
-    if (a === wanted && !a.paused) continue;
+    // the song that should be playing is started for real by its own call, not here
+    if (a === wanted) continue;
     a.muted = true;
     a.play()
       .then(() => {
@@ -87,9 +88,37 @@ export function playMenuMusic() {
   for (const t of Object.values(tracks)) if (t && t !== a && !t.paused) t.pause();
   a.muted = isMuted();
   a.volume = 0.8;
-  if (!a.paused) return;
-  a.play().catch(() => {});
+  // already playing, or a start already on its way: never start it a second time
+  if (!a.paused || starting.has(a)) return;
+  starting.add(a);
+  a.play()
+    .catch(() => {})
+    .finally(() => starting.delete(a));
 }
+
+/** Songs with a play() still on its way (iOS can double up if asked again meanwhile). */
+const starting = new Set<HTMLAudioElement>();
+
+// the app went to the background: pause the music; coming back, only the song that
+// should be playing carries on (iOS home-screen apps otherwise sometimes double up)
+let resumeOnShow = false;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    resumeOnShow = !!wanted && !wanted.paused;
+    for (const a of Object.values(tracks)) a?.pause();
+  } else if (resumeOnShow && wanted) {
+    resumeOnShow = false;
+    for (const a of Object.values(tracks)) if (a && a !== wanted && !a.paused) a.pause();
+    wanted.muted = isMuted();
+    if (wanted.paused && !starting.has(wanted)) {
+      const w = wanted;
+      starting.add(w);
+      w.play()
+        .catch(() => {})
+        .finally(() => starting.delete(w));
+    }
+  }
+});
 
 /** Speed the current track up (or back down), e.g. 1.5× for sudden death. */
 export function setMusicRate(rate: number) {
