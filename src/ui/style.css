@@ -1756,4 +1756,5 @@ kbd {
 .results:not(.gameover) .results-hero canvas { max-width: 150px; }
 
 /* the keyboard controls sit a few px further below the Play button */
-.start-foot .controls { margin-top: 7px; }
+.start-foot .controls { margin-top: 13px; }
+.mouse-ico { vertical-align: -3px; }
