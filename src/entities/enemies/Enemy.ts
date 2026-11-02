@@ -6,6 +6,8 @@ import { GOAT_H, GOAT_MOUTH, GOAT_W } from '../../gfx/goat';
 import type { EnemyKind } from '../../level/builder';
 import type { GameScene } from '../../scenes/GameScene';
 import type { Player } from '../Player';
+import { Weapon, type WeaponKind } from './Weapons';
+import { TILE } from '../../config';
 
 export type DeathKind = 'stomp' | 'blast' | 'fall';
 
@@ -22,6 +24,8 @@ export abstract class Enemy extends Phaser.Physics.Arcade.Sprite {
   declare body: Phaser.Physics.Arcade.Body;
   abstract readonly kind: EnemyKind;
   hp = 1;
+  /** Some bad guys carry a weapon (gun, chainsaw, ball and chain). */
+  weapon: Weapon | null = null;
   /** Can be killed by jumping on it. */
   stompable = true;
   /** Landing on top just bounces you off (no damage either way). */
@@ -78,6 +82,7 @@ export abstract class Enemy extends Phaser.Physics.Arcade.Sprite {
       this.flashUntil = 0;
     }
     if (this.awake) this.tick(dt);
+    this.weapon?.update(dt, this.awake);
     if (this.y > this.gs.level.heightPx + 120) this.kill('fall');
   }
 
@@ -94,8 +99,15 @@ export abstract class Enemy extends Phaser.Physics.Arcade.Sprite {
     }
   }
 
+  /** Hand this bad guy a weapon. */
+  arm(kind: WeaponKind, size: 'small' | 'big') {
+    this.weapon = new Weapon(this.gs, this, kind, size);
+  }
+
   kill(how: DeathKind) {
     if (this.dead) return;
+    this.weapon?.drop();
+    this.weapon = null;
     this.dead = true;
     this.body.enable = false;
     this.clearTint();
@@ -182,6 +194,19 @@ export class Puffball extends Walker {
     hiRes(this, 22, 30, 13, 16);
   }
 
+  tick(dt = 0) {
+    // a gunner stops, turns to face you and takes aim
+    if (this.weapon?.aim) {
+      const tgt = this.gs.nearestPlayer(this.x, this.y);
+      if (tgt) this.dir = Math.sign(tgt.x - this.x) || this.dir;
+      this.body.setVelocityX(0);
+      this.setFlipX(this.dir > 0);
+      this.setFrame('w0');
+      return;
+    }
+    super.tick(dt);
+  }
+
   protected onStompDeath() {
     this.gs.fx.stars(this.x, this.y, 5);
     this.setFrame('flat');
@@ -200,7 +225,7 @@ export class BigPuff extends Walker {
   constructor(gs: GameScene, x: number, y: number) {
     super(gs, x, y, 'bigpuff', 'w0');
     hiRes(this, 36, 68, 18, 18);
-    this.hp = 3;
+    this.hp = 2;
     this.speed = 40;
     this.animRate = 4;
     this.careful = true;
@@ -228,6 +253,18 @@ export class BigPuff extends Walker {
       this.noticed = true;
       this.gs.fx.popText(this.x, b.top - 16, '!', '#ff5a3c', 22);
     }
+    // armed: a chainsaw charge drives him; a gunner plants his feet and fires
+    if (this.weapon?.busy) {
+      this.setFrame(Math.floor(this.t * 12) % 2 ? 'm1' : 'm0');
+      return;
+    }
+    if (this.weapon?.kind === 'gun' && this.weapon.aim && onGround) {
+      this.dir = Math.sign(dx) || this.dir;
+      this.setFlipX(this.dir > 0);
+      b.setVelocityX(0);
+      this.setFrame(this.mad ? 'm0' : 'w0');
+      return;
+    }
     if (!onGround) {
       this.setFrame(this.mad ? 'm1' : 'w1');
       return;
@@ -253,7 +290,7 @@ export class BigPuff extends Walker {
       return;
     }
     // chase, hopping up steps and over small gaps
-    const sp = this.mad ? 112 : 78;
+    const sp = (this.mad ? 112 : 78) * (this.weapon?.kind === 'saw' ? 1.25 : 1);
     const wall = this.dir < 0 ? b.blocked.left : b.blocked.right;
     const aheadX = this.dir > 0 ? b.right + 4 : b.left - 4;
     const gap = !this.gs.level.isSolidAt(aheadX, b.bottom + 6);
@@ -668,14 +705,29 @@ class SpitGlob {
   }
 }
 
+/** A fixed pseudo-random number per level column (so who's armed is the same every play). */
+const colHash = (x: number) => Math.imul(Math.floor(x / TILE) + 101, 2654435761) >>> 0;
+
 export function createEnemy(gs: GameScene, kind: EnemyKind, x: number, y: number): Enemy {
+  const h = colHash(x);
+  if (kind === 'puffball') {
+    // 1 in 3 small guys carry a blaster (still one hit)
+    const e = new Puffball(gs, x, y);
+    if (h % 3 === 0) e.arm('gun', 'small');
+    return e;
+  }
+  if (kind === 'bigpuff') {
+    // 1 in 3 medium guys are specials: a weapon, and three hits instead of two
+    const e = new BigPuff(gs, x, y);
+    if (h % 3 === 0) {
+      e.arm((['flail', 'gun', 'saw'] as const)[(h >>> 7) % 3], 'big');
+      e.hp = 3;
+    }
+    return e;
+  }
   switch (kind) {
     case 'goat':
       return new Goat(gs, x, y);
-    case 'puffball':
-      return new Puffball(gs, x, y);
-    case 'bigpuff':
-      return new BigPuff(gs, x, y);
     case 'giant':
       return new Giant(gs, x, y);
   }

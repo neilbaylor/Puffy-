@@ -108,6 +108,17 @@ export const sfx = {
     tone({ type: 'square', from: 520 * pitch, to: 640 * pitch, dur: 0.16, vol: 0.07, delay: 0.15 });
     noise(0.05, 0.08, 1800, 600, 0.14);
   },
+  /** A fuzzy blaster shot: a soft "pfoomp". */
+  pew: () => {
+    tone({ type: 'square', from: 520, to: 180, dur: 0.12, vol: 0.06 });
+    noise(0.1, 0.12, 1400, 400);
+  },
+  /** A chainsaw revving up. */
+  saw: () => {
+    tone({ type: 'sawtooth', from: 90, to: 160, dur: 0.35, vol: 0.06 });
+    tone({ type: 'sawtooth', from: 160, to: 140, dur: 0.5, vol: 0.05, delay: 0.32 });
+    noise(0.8, 0.06, 900, 300);
+  },
   /** A confetti cannon going off. */
   pop: () => {
     noise(0.18, 0.35, 900, 200);

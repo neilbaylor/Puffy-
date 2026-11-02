@@ -6,6 +6,7 @@ import { BIGPUFF_H, BIGPUFF_W, GIANT_H, GIANT_W, PUFFBALL_H, PUFFBALL_W, drawBig
 import { drawMuzzleFlash, drawRocket } from './bazooka';
 import { drawSoccerBall, drawSoccerGoal } from './soccer';
 import { GOAT_FRAMES, GOAT_H, GOAT_W, drawGoat, drawSpit } from './goat';
+import { BLASTER, SAW, drawBlaster, drawBullet, drawChainsaw, drawFlailBall } from './weapons';
 import { drawParachute } from './parachute';
 import { drawHockeyNet, drawPuck, drawRinkLines, drawStick } from './hockey';
 import { MOUNTAIN_LOOKS, drawMountainFar, drawMountainMid, drawMountainNear, type MountainLook } from './mountain';
@@ -129,6 +130,11 @@ function makeBaddies(scene: Phaser.Scene) {
   sheet(scene, 'giant', GIANT_W, GIANT_H, ['w0', 'w1', 'crouch', 'air', 'slam'] as const, (ctx, f) => drawGiant(ctx, 0, 0, f, st), 2.5);
   sheet(scene, 'goat', GOAT_W, GOAT_H, GOAT_FRAMES, (ctx, f) => drawGoat(ctx, 0, 0, f, st));
   addCanvas(scene, 'spit', hires(36, 14, ART_RES, (ctx) => drawSpit(ctx, 24, 7, st)));
+  // the armed bad guys' weapons
+  addCanvas(scene, 'w-blaster', hires(BLASTER.w, BLASTER.h, ART_RES, (ctx) => drawBlaster(ctx, st)));
+  sheet(scene, 'w-saw', SAW.w, SAW.h, ['s0', 's1'] as const, (ctx, f) => drawChainsaw(ctx, st, f === 's0' ? 0 : 1));
+  sheet(scene, 'w-ball', 30, 30, ['open', 'shut'] as const, (ctx, f) => drawFlailBall(ctx, st, f === 'open'));
+  addCanvas(scene, 'w-bullet', hires(18, 18, ART_RES, (ctx) => drawBullet(ctx, st)));
 }
 
 function makeItems(scene: Phaser.Scene, pal: WorldPalette) {
