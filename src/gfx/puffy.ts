@@ -10,6 +10,7 @@ import type { Ctx, Pose } from './draw';
 import { gait } from './draw';
 import { drawBazooka } from './bazooka';
 import { ellipsePts, paddlePts, type Fill, type Pt, type Style } from './handdrawn';
+import { face } from './face';
 
 export const PUFFY = {
   body: { base: '#f28a2e', shade: '#c9611a', light: '#ffc27a' } as Fill,
@@ -120,16 +121,41 @@ function drawPuffyPose(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style, 
   if (hurt) {
     drawHurtFace(ctx, cx, cy, st, seed);
   } else {
+  const f = face();
   // eye (seen from the side)
-  st.shape(ctx, ellipsePts(cx + 4, cy - 6, 5.3, 6.9, tilt, 32), PUFFY.eye, seed + 5, { lw: 0.85, plain: st.id === 'sticker' });
-  st.shape(ctx, ellipsePts(cx + 7, cy - 5.5, 1.5, 4.6, 0.05, 20), { base: st.ink, shade: st.ink, light: st.ink }, seed + 6, {
-    noLine: true,
-    plain: true,
-  });
-  ctx.fillStyle = '#ffffff';
-  ctx.beginPath();
-  ctx.ellipse(cx + 7.4, cy - 8, 0.7, 1, 0, 0, Math.PI * 2);
-  ctx.fill();
+  if (f.blink) {
+    // closed: the lid (body colour) over the eye, with a curved lash line
+    st.shape(ctx, ellipsePts(cx + 4, cy - 6, 5.3, 6.9, tilt, 32), PUFFY.body, seed + 5, { lw: 0.85, plain: true });
+    st.line(ctx, [[cx - 0.6, cy - 5.6], [cx + 4, cy - 3.6], [cx + 8.6, cy - 5.2]], seed + 6, 0.8);
+  } else {
+    st.shape(ctx, ellipsePts(cx + 4, cy - 6, 5.3, 6.9, tilt, 32), PUFFY.eye, seed + 5, { lw: 0.85, plain: st.id === 'sticker' });
+    // the pupil looks forward by default; it can glance back across the eye, up or down
+    const px = cx + 7 + (f.lookX < 0 ? f.lookX * 4.6 : f.lookX * 0.6);
+    const py = cy - 5.5 + f.lookY * 1.7;
+    st.shape(ctx, ellipsePts(px, py, 1.5, 4.6, 0.05, 20), { base: st.ink, shade: st.ink, light: st.ink }, seed + 6, {
+      noLine: true,
+      plain: true,
+    });
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.ellipse(px + 0.4, py - 2.5, 0.7, 1, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Puffy's mouth only shows when he makes a face: a little smile, an "o", or open
+  const mx = cx + 9.6;
+  const my = cy + 2;
+  if (f.mouth === 'smile') {
+    st.line(ctx, [[mx - 3, my - 0.9], [mx - 0.2, my + 1.4], [mx + 2.6, my - 0.6]], seed + 30, 0.8);
+  } else if (f.mouth === 'o' || f.mouth === 'open') {
+    const [w, h] = f.mouth === 'o' ? [1.4, 1.7] : [2.5, 2.1];
+    st.shape(ctx, ellipsePts(mx, my + 0.4, w, h, 0, 16), { base: '#5a2418', shade: '#3a160e', light: '#7a3424' }, seed + 31, { lw: 0.7, plain: true });
+    if (f.mouth === 'open') {
+      ctx.fillStyle = '#ef6f86';
+      ctx.beginPath();
+      ctx.ellipse(mx + 0.2, my + 1.3, 1.3, 0.75, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
   }
 
   leg(5, legR, liftR, PUFFY.body, seed + 7);

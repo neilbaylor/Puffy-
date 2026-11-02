@@ -4,6 +4,7 @@ import type { Session } from '../core/session';
 import { fadeOutMusic, playLevelClear, playLevelMusic, playLevelSong, primeMusic, setMusicMuted, stopMusic } from '../core/music';
 import { isMuted, setMuted, sfx, unlockAudio } from '../core/sfx';
 import { drawHeroCard, drawPortrait, renderPoseSet } from '../gfx/draw';
+import { NEUTRAL_FACE, type Face } from '../gfx/face';
 import { gamepadSources } from '../input/gamepad';
 import { isKeyDown } from '../input/keyboard';
 import { isTouchDevice, onInputModeChange, usingTouch } from '../input/touch';
@@ -88,6 +89,90 @@ function waveText(text: string) {
     .join('<b class="sep">•</b>');
 }
 
+const rand = (a: number, b: number) => a + Math.random() * (b - a);
+
+/**
+ * Little bits of life for a hero's face: now and then the eyes blink or glance
+ * around, and (separately, on their own clock) the mouth smiles, goes "o" or
+ * chatters. Each hero gets their own, so they never move in step.
+ */
+class FaceLife {
+  private f: Face = { ...NEUTRAL_FACE };
+  private timers = new Set<number>();
+  constructor(
+    private redraw: (f: Face) => void,
+    private alive: () => boolean,
+    opts: { mouth: boolean; calm?: boolean },
+  ) {
+    this.calm = !!opts.calm;
+    this.after(rand(400, 2400), () => this.eyes());
+    if (opts.mouth) this.after(rand(1500, 4500), () => this.mouth());
+  }
+  private calm: boolean;
+  stop() {
+    for (const t of this.timers) clearTimeout(t);
+    this.timers.clear();
+  }
+  private after(ms: number, fn: () => void) {
+    const id = window.setTimeout(() => {
+      this.timers.delete(id);
+      if (!this.alive()) return this.stop();
+      fn();
+    }, ms);
+    this.timers.add(id);
+  }
+  private set(p: Partial<Face>) {
+    this.f = { ...this.f, ...p };
+    this.redraw(this.f);
+  }
+  private eyes() {
+    const next = () => this.after(this.calm ? rand(2600, 6500) : rand(1300, 4200), () => this.eyes());
+    if (Math.random() < 0.5) {
+      // blink (sometimes twice)
+      this.set({ blink: true });
+      this.after(120, () => this.set({ blink: false }));
+      if (Math.random() < 0.25) {
+        this.after(260, () => this.set({ blink: true }));
+        this.after(370, () => this.set({ blink: false }));
+      }
+      return next();
+    }
+    // glance somewhere, hold it, look back (often with a blink)
+    const looks = [-1, -0.75, -0.4, 0.4, 0.9];
+    this.set({ lookX: looks[Math.floor(Math.random() * looks.length)], lookY: rand(-0.9, 0.6) });
+    const hold = this.calm ? rand(600, 1300) : rand(700, 1800);
+    this.after(hold, () => this.set({ lookX: 0, lookY: 0, blink: Math.random() < 0.3 }));
+    this.after(hold + 120, () => this.set({ blink: false }));
+    next();
+  }
+  private mouth() {
+    const next = (t: number) => this.after(t + rand(2200, 5800), () => this.mouth());
+    const r = Math.random();
+    if (r < 0.35) {
+      const hold = rand(900, 1900);
+      this.set({ mouth: 'smile' });
+      this.after(hold, () => this.set({ mouth: 'rest' }));
+      return next(hold);
+    }
+    if (r < 0.6) {
+      const hold = rand(450, 900);
+      this.set({ mouth: 'o' });
+      this.after(hold, () => this.set({ mouth: 'rest' }));
+      return next(hold);
+    }
+    // chatter: open / shut a few times
+    const n = 3 + Math.floor(Math.random() * 4);
+    let t = 0;
+    for (let i = 0; i < n; i++) {
+      const m = i % 2 === 0 ? 'open' : 'rest';
+      this.after(t, () => this.set({ mouth: m }));
+      t += rand(110, 180);
+    }
+    this.after(t, () => this.set({ mouth: 'rest' }));
+    next(t);
+  }
+}
+
 export class UI {
   private root: HTMLElement;
   private screen: HTMLElement | null = null;
@@ -99,6 +184,7 @@ export class UI {
   private gameScene: GameScene | null = null;
   private pickRaf = 0;
   private subtitleTimer = 0;
+  private hudFace: FaceLife | null = null;
   private selected = 0;
   private introEl: HTMLElement | null = null;
   /** Which level to start (1-based); you can pick once you've beaten a level. */
@@ -363,7 +449,16 @@ export class UI {
           <dt>Blast</dt><dd>${bar(c.bars.blast)}</dd>
         </dl>
       </button>`);
-      drawHeroCard(card.querySelector('canvas')!, c, 'idle0');
+      const cv = card.querySelector('canvas')!;
+      drawHeroCard(cv, c, 'idle0');
+      // now and then they look around, blink, smile or chatter (each on their own)
+      new FaceLife(
+        (f) => {
+          if (!card.classList.contains('cheer')) drawHeroCard(cv, c, 'idle0', f);
+        },
+        () => this.screen === el && el.isConnected,
+        { mouth: true },
+      );
       // select the moment a finger touches the card (a tap can trigger full screen and
       // shift the layout before the finger lifts); tapping the picked card again plays
       let pickedOnDown = false;
@@ -592,7 +687,12 @@ export class UI {
   private showHud() {
     this.hud.hidden = false;
     const hero = characterById(this.session.players[0]?.characterId ?? 'puffy');
-    drawPortrait(this.hud.querySelector('canvas')!, hero);
+    const cv = this.hud.querySelector('canvas')!;
+    drawPortrait(cv, hero);
+    // a very subtle bit of life: a slow breath (CSS) and the odd blink or glance
+    this.hudFace?.stop();
+    const session = this.session;
+    this.hudFace = new FaceLife((f) => drawPortrait(cv, hero, 'idle0', f), () => !this.hud.hidden && this.session === session, { mouth: false, calm: true });
     if (usingTouch()) this.touch.show();
     else this.touch.hide();
   }
@@ -739,11 +839,11 @@ export class UI {
           <h2>Level clear!</h2>
           ${firstTime ? '<p class="unlock-note">New: pick which level to start from on the start screen!</p>' : ''}
           <dl class="stat-list">
+            <dt>Lives left <i class="life-ico"></i></dt><dd>${r.lives}</dd>
             <dt>Aura carried <i class="aura-ico"></i></dt><dd>${r.aura}</dd>
             <dt>Root beer found <i class="rb-ico"></i></dt><dd>${r.rootbeerTotal}</dd>
             <dt>Puffballs popped</dt><dd>${r.popped}</dd>
             <dt>Giants beaten</dt><dd>${r.giants}</dd>
-            <dt>Lives left <i class="life-ico"></i></dt><dd>${r.lives}</dd>
             <dt>Time</dt><dd>${mins}:${secs}</dd>
           </dl>
           <div class="row">

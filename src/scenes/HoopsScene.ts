@@ -104,6 +104,8 @@ const A = (x: number, y: number) => ({ x: x + STAGE_OX, y: y + STAGE_OY });
  * flies away from the camera toward the hoop.
  */
 export class HoopsScene extends Phaser.Scene {
+  /** The last big shout on a swish (so it changes each time). */
+  private lastShout = '';
   private hd!: HoopsData;
   private hero!: Phaser.GameObjects.Sprite;
   private king!: Phaser.GameObjects.Sprite;
@@ -1179,8 +1181,15 @@ export class HoopsScene extends Phaser.Scene {
       this.heroAnim = { frames: ['jump', 'idle0'], fps: 5 };
       this.kingAnim = { frames: ['sad', 'idle0'], fps: 3 };
       this.cheer();
-      this.jumboShow({ kind: 'big', text: o === 'swish' ? 'KOBE!' : 'BUCKET!', sub: `${this.total('you')} – ${this.total('king')}`, color: '#8fff8a', bg: '#0b5e2a' });
-      await this.callout(o === 'swish' ? 'KOBE!' : 'IN!', 'good', 1000);
+      // a swish gets a big shout — mixed up, never the same one twice in a row
+      let shout = 'IN!';
+      if (o === 'swish') {
+        const shouts = ['KOBE!', 'GREAT SHOT!', 'BOOM!'].filter((t) => t !== this.lastShout);
+        shout = shouts[Math.floor(Math.random() * shouts.length)];
+        this.lastShout = shout;
+      }
+      this.jumboShow({ kind: 'big', text: o === 'swish' ? shout : 'BUCKET!', sub: `${this.total('you')} – ${this.total('king')}`, color: '#8fff8a', bg: '#0b5e2a' });
+      await this.callout(shout, 'good', 1000);
     } else {
       this.heroAnim = { frames: ['hurt'], fps: 1 };
       this.kingAnim = { frames: ['laugh0', 'laugh1'], fps: 6 };

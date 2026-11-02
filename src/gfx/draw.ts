@@ -9,6 +9,7 @@ import { drawScruffyStyled } from './scruffy';
 import { drawMusclesStyled } from './muscles';
 import { ellipsePts } from './handdrawn';
 import { drawNuggie } from './collectibles';
+import { withFace, type Face } from './face';
 
 /** Which hand-drawn look the game renders Puffy with (see the look-development page). */
 export const ART_STYLE = 'polished' as const;
@@ -92,7 +93,8 @@ export const CHAR_W = 56;
 export const CHAR_H = 56;
 
 /** Draws a hero facing right, feet touching y = oy + CHAR_H - 2. */
-export function drawCharacter(ctx: Ctx, ox: number, oy: number, ch: CharacterDef, pose: Pose) {
+export function drawCharacter(ctx: Ctx, ox: number, oy: number, ch: CharacterDef, pose: Pose, f?: Face) {
+  if (f) return withFace(f, () => drawCharacter(ctx, ox, oy, ch, pose));
   const st = STYLES[ART_STYLE];
   const base: Pose = pose === 'eat0' ? 'idle0' : pose === 'eat1' ? 'idle1' : pose;
   switch (ch.id) {
@@ -136,14 +138,14 @@ function drawEating(ctx: Ctx, ox: number, oy: number, id: string, chew: boolean,
 }
 
 /** Big lobby picture: feet on the bottom edge, heroes drawn at their real relative sizes. */
-export function drawHeroCard(target: HTMLCanvasElement, ch: CharacterDef, pose: Pose = 'idle0') {
+export function drawHeroCard(target: HTMLCanvasElement, ch: CharacterDef, pose: Pose = 'idle0', f?: Face) {
   const ctx = target.getContext('2d')!;
   ctx.clearRect(0, 0, target.width, target.height);
   const s = (target.height / (56 * 1.32)) * ch.scale;
   ctx.save();
   ctx.translate(target.width / 2, target.height * 0.985);
   ctx.scale(s, s);
-  drawCharacter(ctx, -27, -54, ch, pose);
+  drawCharacter(ctx, -27, -54, ch, pose, f);
   ctx.restore();
 }
 
@@ -152,22 +154,35 @@ export function drawHeroCard(target: HTMLCanvasElement, ch: CharacterDef, pose: 
  * A hero portrait, centred and sized by the actual drawing (not the frame), so
  * every hero sits in the middle of the badge whatever their size or shape.
  */
-export function drawPortrait(target: HTMLCanvasElement, ch: CharacterDef, pose: Pose = 'idle0') {
+/** Each hero + pose's drawn outline, measured once (so redrawing a new face is cheap). */
+const portraitBox = new Map<string, [number, number, number, number]>();
+
+export function drawPortrait(target: HTMLCanvasElement, ch: CharacterDef, pose: Pose = 'idle0', f?: Face) {
   const R = 4;
   const { c: tmp, ctx: t } = canvas(CHAR_W * R, CHAR_H * R);
   t.scale(R, R);
-  drawCharacter(t, 0, 0, ch, pose);
-  // find the drawing's bounding box
-  const data = t.getImageData(0, 0, tmp.width, tmp.height).data;
-  let x0 = tmp.width, y0 = tmp.height, x1 = 0, y1 = 0;
-  for (let y = 0; y < tmp.height; y += 2)
-    for (let x = 0; x < tmp.width; x += 2)
-      if (data[(y * tmp.width + x) * 4 + 3] > 24) {
-        if (x < x0) x0 = x;
-        if (x > x1) x1 = x;
-        if (y < y0) y0 = y;
-        if (y > y1) y1 = y;
-      }
+  drawCharacter(t, 0, 0, ch, pose, f);
+  // find the drawing's bounding box (with the neutral face, once per hero + pose)
+  const key = `${ch.id}:${pose}`;
+  let box = portraitBox.get(key);
+  if (!box) {
+    const { c: m, ctx: mc } = canvas(CHAR_W * R, CHAR_H * R);
+    mc.scale(R, R);
+    drawCharacter(mc, 0, 0, ch, pose);
+    const data = mc.getImageData(0, 0, m.width, m.height).data;
+    let x0 = m.width, y0 = m.height, x1 = 0, y1 = 0;
+    for (let y = 0; y < m.height; y += 2)
+      for (let x = 0; x < m.width; x += 2)
+        if (data[(y * m.width + x) * 4 + 3] > 24) {
+          if (x < x0) x0 = x;
+          if (x > x1) x1 = x;
+          if (y < y0) y0 = y;
+          if (y > y1) y1 = y;
+        }
+    box = [x0, y0, x1, y1];
+    portraitBox.set(key, box);
+  }
+  const [x0, y0, x1, y1] = box;
   const ctx = target.getContext('2d')!;
   ctx.clearRect(0, 0, target.width, target.height);
   if (x1 <= x0 || y1 <= y0) return;

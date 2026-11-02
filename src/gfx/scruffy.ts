@@ -7,6 +7,7 @@ import type { Ctx, Pose } from './draw';
 import { gait } from './draw';
 import { ellipsePts, paddlePts, type Fill, type Pt, type Style } from './handdrawn';
 import { drawBazooka } from './bazooka';
+import { face } from './face';
 
 export const SCRUFFY = {
   body: { base: '#f7953a', shade: '#cf6b1c', light: '#ffc98a' } as Fill,
@@ -105,6 +106,7 @@ function drawScruffyPose(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style
   // round body
   st.shape(ctx, ellipsePts(cx, cy, rx, ry, 0, 44), SCRUFFY.body, seed + 4, { light: [cx - 4, cy - 5] });
 
+  const f = face();
   // muzzle patch (the pale oval from the sketch)
   st.shape(ctx, ellipsePts(cx + 5.5, cy + 3, 5, hurt ? 5 : 4.2, -0.2, 28), SCRUFFY.muzzle, seed + 5, { lw: 0.75, plain: true });
   if (hurt) {
@@ -112,20 +114,39 @@ function drawScruffyPose(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style
     ctx.beginPath();
     ctx.ellipse(cx + 6, cy + 3.5, 1.8, 2.3, 0, 0, Math.PI * 2);
     ctx.fill();
+  } else if (f.mouth === 'open' || f.mouth === 'o') {
+    const [w, h] = f.mouth === 'o' ? [1.1, 1.3] : [2, 1.7];
+    st.shape(ctx, ellipsePts(cx + 6.5, cy + 4.6, w, h, 0, 16), { base: '#5a2418', shade: '#3a160e', light: '#7a3424' }, seed + 6, { lw: 0.6, plain: true });
+    if (f.mouth === 'open') {
+      ctx.fillStyle = '#ef6f86';
+      ctx.beginPath();
+      ctx.ellipse(cx + 6.7, cy + 5.5, 1.1, 0.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (f.mouth === 'smile') {
+    // a bigger, happier grin
+    st.line(ctx, [[cx + 3.2, cy + 3.4], [cx + 6.5, cy + 6.1], [cx + 9.6, cy + 3.1]], seed + 6, 0.65);
   } else {
     st.line(ctx, [[cx + 4, cy + 4], [cx + 6.5, cy + 5.1], [cx + 9, cy + 3.7]], seed + 6, 0.6);
   }
 
-  // two eyes looking up and forward
+  // two eyes looking up and forward (they can glance about, and blink)
   for (const [ex, ey, s] of [
     [cx + 0.5, cy - 3.2, 1],
     [cx + 7, cy - 4, 2],
   ] as const) {
     const er = hurt ? 3.4 : 2.9;
+    if (!hurt && f.blink) {
+      st.shape(ctx, ellipsePts(ex, ey, er, er * 1.2, 0, 20), SCRUFFY.body, seed + 10 + s, { lw: 0.7, plain: true });
+      st.line(ctx, [[ex - er + 0.5, ey + 0.2], [ex, ey + 1.2], [ex + er - 0.5, ey + 0.2]], seed + 20 + s, 0.6);
+      continue;
+    }
     st.shape(ctx, ellipsePts(ex, ey, er, er * 1.2, 0, 20), SCRUFFY.eye, seed + 10 + s, { lw: 0.7, plain: true });
     ctx.fillStyle = st.ink;
     ctx.beginPath();
-    ctx.ellipse(ex + 0.8, ey - (hurt ? 0 : 0.8), hurt ? 0.9 : 1.2, hurt ? 0.9 : 1.6, 0, 0, Math.PI * 2);
+    const lx = hurt ? 0 : f.lookX * 1.1 - 0.2 * (f.lookX < 0 ? 1 : 0);
+    const ly = hurt ? 0 : f.lookY * 1.1;
+    ctx.ellipse(ex + 0.8 + lx, ey - (hurt ? 0 : 0.8) + ly, hurt ? 0.9 : 1.2, hurt ? 0.9 : 1.6, 0, 0, Math.PI * 2);
     ctx.fill();
   }
 

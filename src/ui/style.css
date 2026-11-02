@@ -520,6 +520,13 @@ body {
 .hud-hero canvas {
   width: clamp(36px, 7vmin, 52px);
   height: clamp(36px, 7vmin, 52px);
+  /* a slow, very subtle breath */
+  transform-origin: 50% 85%;
+  animation: hud-breathe 3.4s ease-in-out infinite;
+}
+@keyframes hud-breathe {
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  50% { transform: translateY(-0.5px) scale(1.025, 1.035); }
 }
 .hud-stats {
   display: flex;
@@ -1684,7 +1691,7 @@ kbd {
   100% { transform: translateY(0) rotate(0) scale(1); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .card-name i, .card.cheer canvas, .card.cheer .card-name i { animation: none; }
+  .card-name i, .card.cheer canvas, .card.cheer .card-name i, .hud-hero canvas { animation: none; }
 }
 
 /* results on a phone in landscape: stats in two columns, all buttons on one row */
@@ -1736,5 +1743,6 @@ kbd {
 
 /* level clear: the left column stacks from the top — the hero, then Pick player */
 .results:not(.gameover) { align-items: flex-start; }
-.results:not(.gameover) .results-hero { gap: 6px; }
+.results:not(.gameover) .results-hero { gap: 0; }
+.results:not(.gameover) .results-hero .btn-small { margin-top: -6px; }
 .results:not(.gameover) .results-hero canvas { max-width: 150px; }

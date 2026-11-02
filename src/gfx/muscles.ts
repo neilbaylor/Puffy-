@@ -4,6 +4,7 @@
  * tuft of hair, lumpy muscly arms and long thick legs with curled feet.
  * He flexes one arm and carries the bazooka with the other.
  */
+import { face } from './face';
 import type { Ctx, Pose } from './draw';
 import { gait } from './draw';
 import { ellipsePts, petalPts, roundRectPts, type Fill, type Pt, type Style } from './handdrawn';
@@ -106,6 +107,7 @@ function drawMusclesPose(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style
   // body
   st.shape(ctx, ellipsePts(cx, cy, rx, ry, 0, 48), MUSCLES.body, seed + 4, { light: [cx - 4, cy - 6] });
 
+  const f = face();
   // little tuft of hair (the arc on top of his head)
   st.line(ctx, [[cx - 7, cy - ry + 1], [cx - 1, cy - ry - 3.5], [cx + 6, cy - ry - 1.5]], seed + 5, 0.9);
 
@@ -125,15 +127,20 @@ function drawMusclesPose(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style
     st.line(ctx, [[xx - 2.8, xy - 2.8], [xx + 2.8, xy + 2.8]], seed + 8, 0.95);
     st.line(ctx, [[xx + 2.8, xy - 2.8], [xx - 2.8, xy + 2.8]], seed + 18, 0.95);
   } else {
-    // big round eyes
+    // big round eyes (they can glance about, and blink)
     for (const [ex, ey, s] of [
       [cx + 0.5, cy - 4, 1],
       [cx + 8.5, cy - 4.5, 2],
     ] as const) {
+      if (f.blink) {
+        st.shape(ctx, ellipsePts(ex, ey, 3.8, 4.2, 0, 24), MUSCLES.body, seed + 6 + s, { lw: 0.75, plain: true });
+        st.line(ctx, [[ex - 3.2, ey + 0.3], [ex, ey + 1.6], [ex + 3.2, ey + 0.3]], seed + 20 + s, 0.7);
+        continue;
+      }
       st.shape(ctx, ellipsePts(ex, ey, 3.8, 4.2, 0, 24), MUSCLES.eye, seed + 6 + s, { lw: 0.75, plain: true });
       ctx.fillStyle = st.ink;
       ctx.beginPath();
-      ctx.ellipse(ex + 1, ey + 0.4, 1.2, 1.4, 0, 0, Math.PI * 2);
+      ctx.ellipse(ex + 1 + f.lookX * 1.5 - (f.lookX < 0 ? 0.6 : 0), ey + 0.4 + f.lookY * 1.6, 1.2, 1.4, 0, 0, Math.PI * 2);
       ctx.fill();
     }
   }
@@ -147,23 +154,43 @@ function drawMusclesPose(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style
     mouth = [];
     for (let i = 0; i <= 8; i++) mouth.push([mx - 5 + i * 1.25, my + 1 + (i % 2 ? -0.9 : 0.6)]);
     for (let i = 8; i >= 0; i--) mouth.push([mx - 5 + i * 1.25, my + 5.5 + Math.sin((i / 8) * Math.PI) * 1.2]);
+  } else if (f.mouth === 'smile') {
+    // a closed, wide smile
+    mouth = [];
+  } else if (f.mouth === 'o') {
+    // a round "ooh"
+    mouth = [];
+    for (let i = 0; i <= 20; i++) {
+      const a = (i / 20) * Math.PI * 2;
+      mouth.push([mx + Math.cos(a) * 2.8, my + 1.8 + Math.sin(a) * 3.2]);
+    }
   } else {
+    // the big grin (taller when he's laughing)
+    const h = f.mouth === 'open' ? 8.2 : 5.6;
     mouth = [[mx - 6, my - 1.2]];
     for (let i = 0; i <= 14; i++) {
       const a = (i / 14) * Math.PI;
-      mouth.push([mx - Math.cos(a) * 6, my - 1.2 + Math.sin(a) * 5.6]);
+      mouth.push([mx - Math.cos(a) * 6, my - 1.2 + Math.sin(a) * h]);
     }
     mouth.push([mx + 6, my - 1.2]);
   }
-  st.shape(ctx, mouth, MUSCLES.mouth, seed + 9, { lw: 0.85, plain: true });
-  if (hurt) {
+  if (!hurt && f.mouth === 'smile') {
+    st.line(ctx, [[mx - 6, my - 0.6], [mx - 3, my + 2.4], [mx + 3, my + 2.4], [mx + 6, my - 0.6]], seed + 9, 0.9);
+  } else if (!hurt && f.mouth === 'o') {
+    st.shape(ctx, mouth, { base: '#5a2418', shade: '#3a160e', light: '#7a3424' }, seed + 9, { lw: 0.85, plain: true });
+  } else {
+    st.shape(ctx, mouth, MUSCLES.mouth, seed + 9, { lw: 0.85, plain: true });
+  }
+  if (!hurt && (f.mouth === 'smile' || f.mouth === 'o')) {
+    // (no tongue showing)
+  } else if (hurt) {
     // tongue hanging out
     st.shape(ctx, roundRectPts(mx - 1.6, my + 4.6, 3.6, 6.5, 1.8), { base: '#ef6f86', shade: '#c94a62', light: '#ffa3b4' }, seed + 15, { lw: 0.7 });
   } else {
     // tongue peeking at the bottom of the grin
     ctx.save();
     ctx.beginPath();
-    ctx.ellipse(mx + 0.5, my + 4.4, 3.4, 1.6, 0, 0, Math.PI * 2);
+    ctx.ellipse(mx + 0.5, my + (f.mouth === 'open' ? 6.6 : 4.4), 3.4, 1.6, 0, 0, Math.PI * 2);
     ctx.fillStyle = '#ef6f86';
     ctx.fill();
     ctx.restore();
