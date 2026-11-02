@@ -690,7 +690,7 @@ export class GameScene extends Phaser.Scene {
     const d = p ? Math.hypot(p.x - x, (p.y - y) * 0.7) : 0;
     // full strength anywhere near you (most of the screen), fading gently further out
     let k = d < 400 ? 1 : Phaser.Math.Clamp(1 - (d - 400) / 1100, 0.3, 1);
-    if (!onScreen) k *= 0.55;
+    if (!onScreen) k *= 0.35;
     if (k < 0.1) return;
     this.cameras.main.shake(ms * (0.6 + 0.4 * k), intensity * k);
   }

@@ -1187,7 +1187,7 @@ html.rotating body {
   transform: translate(-50%, -50%) scale(0.6);
   opacity: 0;
   text-align: center;
-  font-size: clamp(30px, 8vmin, 70px);
+  font-size: clamp(36px, 9.5vmin, 72px);
   line-height: 0.95;
   -webkit-text-stroke: 0.15em #1c0f3a;
   paint-order: stroke fill;
@@ -1215,8 +1215,10 @@ html.rotating body {
 }
 .hoops-callout.turn {
   top: 30%;
-  font-size: clamp(22px, 5.5vmin, 46px);
+  /* big enough to read at a glance on a phone */
+  font-size: clamp(36px, 10vmin, 68px);
 }
+.hoops-callout.turn small { font-size: 0.42em; }
 .hoops-callout.turn.king {
   color: #ffd23f;
   text-shadow: 0 0.08em 0 #1c0f3a, 0 0 22px #ffd23f88;
@@ -1266,10 +1268,11 @@ html.rotating body {
   transform: rotate(-16deg);
   filter: drop-shadow(0 2px 0 #160828);
 }
-/* speech tail pointing down at the King */
+/* speech tail pointing down at the King (behind the words, over the bubble) */
 .hoops-callout.speech::after {
   content: '';
   position: absolute;
+  z-index: -1;
   right: 22%;
   bottom: -18px;
   width: 30px;

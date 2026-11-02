@@ -400,7 +400,7 @@ export const SUMMIT: ArenaStyle = {
   net: [0xe8463f, 0xfbfbf8],
   // centre-hung jumbotron, banners on the left, a lower upper deck with different aisles,
   // and a camera set lower and further to the side
-  layout: { jumboX: 428, bannerX: -140, upperY0: -18, aislesU: [120, 660, 1240], aislesL: [260, 930], seeds: [777, 9191], cam: { dx: 70, dy: 34, zoom: 1.07, rot: -0.012 } },
+  layout: { jumboX: 301, bannerX: -140, upperY0: -18, aislesU: [120, 660, 1240], aislesL: [260, 930], seeds: [777, 9191], cam: { dx: 70, dy: 34, zoom: 1.07, rot: -0.012 } },
 };
 
 /** The style the arena drawing functions use right now (set before drawing). */
@@ -1311,8 +1311,12 @@ export function drawArenaFront(ctx: Ctx) {
   ctx.restore();
 }
 
-/** The jumbotron's screen in stage coordinates (the scene draws live content there). */
-export const JUMBO = { x: 158, y: -24, w: 424, h: 108 };
+/**
+ * The jumbotron's screen in stage coordinates (the scene draws live content there).
+ * Content is laid out in w × h units and shown `s` times bigger; it hangs from the
+ * same bottom edge as before and grows upward (it's the only scoreboard now).
+ */
+export const JUMBO = { x: 158, y: 84 - 108 * 1.3, w: 424, h: 108, s: 1.3 };
 
 export type JumboContent =
   | { kind: 'title' }
@@ -1710,10 +1714,20 @@ export function drawRibbonScreen(ctx: Ctx, t: number, msg: { text: string; color
 }
 
 function drawJumbotron(ctx: Ctx) {
+  // drawn at the base size, scaled up about the screen's top-left corner
+  ctx.save();
+  ctx.translate(JUMBO.x, JUMBO.y);
+  ctx.scale(JUMBO.s, JUMBO.s);
+  ctx.translate(-JUMBO.x, -JUMBO.y);
+  drawJumbotronBase(ctx);
+  ctx.restore();
+}
+
+function drawJumbotronBase(ctx: Ctx) {
   const x0 = JUMBO.x - 8;
   const x1 = JUMBO.x + JUMBO.w + 8;
-  const y0 = -32;
-  const y1 = 92;
+  const y0 = JUMBO.y - 8;
+  const y1 = JUMBO.y + JUMBO.h + 8;
   ctx.strokeStyle = '#2b2835';
   ctx.lineWidth = 2;
   for (const cx of [x0 + 50, x1 - 50]) seg(ctx, [cx, T], [cx, y0]);

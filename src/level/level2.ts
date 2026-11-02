@@ -18,7 +18,7 @@ import { LevelBuilder, type LevelData } from './builder';
  *   171-190 GIANT #2 · checkpoint 2
  *   191-226 An alpine meadow climbing on up; HARD crevasse at the top
  *   227-246 GIANT #3 · checkpoint 3
- *   247-329 The last steep climb: double-jump ledge, narrow pillars, the summit
+ *   247-329 The last steep climb: double-jump ledge, pillar hops, the summit
  */
 export function buildLevel2(): LevelData {
   const L = new LevelBuilder('Puff Ball Planet · Part 2', 'World 1', 330, 62);
@@ -98,6 +98,7 @@ export function buildLevel2(): LevelData {
   L.zone(171, 190, 'z-snow');
   L.ground(172, 174, 29);
   L.ground(175, 190, 30);
+  L.aura(176, 33);
   L.spawn('giant', 181, 30);
   L.aura(185, 33);
   L.spawn('checkpoint', 188, 30);
@@ -108,6 +109,7 @@ export function buildLevel2(): LevelData {
   L.spawn('tree', 192.5, 31, { h: 62 });
   L.spawn('puffball', 195, 31);
   L.ground(197, 201, 32);
+  L.auraArc(197, 3, 35, 1);
   L.spawn('bigpuff', 200, 32);
   L.ground(202, 208, 34);
   L.spawn('tree', 205, 34, { h: 54 });
@@ -115,17 +117,20 @@ export function buildLevel2(): LevelData {
   L.spawn('para', 207, 34, { kind: 'bigpuff' });
   L.auraArc(202, 3, 37, 1);
   L.ground(209, 214, 35);
+  L.aura(210, 38);
   L.spawn('puffball', 212, 35);
   L.rootbeer(206, 40); // floating above the meadow
   // HARD: another wide crevasse
   L.auraArc(215, 4, 39, 1.5);
   L.ground(220, 226, 36);
+  L.aura(222, 39);
   L.spawn('tree', 224, 36, { h: 58 });
 
   // ── GIANT #3 · checkpoint 3 ─────────────────────────────────
   L.zone(227, 329, 'z-snow');
   L.ground(228, 230, 37);
   L.ground(231, 246, 38);
+  L.auraArc(232, 3, 41, 1);
   L.spawn('tree', 232.5, 38, { h: 54, pine: true });
   L.spawn('giant', 238, 38);
   L.aura(242, 41);
@@ -135,33 +140,39 @@ export function buildLevel2(): LevelData {
   L.ground(247, 250, 41);
   L.spawn('para', 249, 41, { kind: 'puffball' });
   L.ground(251, 256, 44);
+  L.auraArc(252, 3, 47, 1);
   L.cloud(249, 2, 43);
   L.spawn('goat', 254, 44);
   L.ground(257, 262, 45);
+  L.aura(259, 48);
   L.spawn('para', 258, 45, { kind: 'puffball' });
   L.spawn('para', 261, 45, { kind: 'bigpuff' });
   // HARD: a tall ledge (double jump)
-  L.ground(263, 267, 49);
-  L.spawn('goat', 266, 49);
+  L.ground(263, 266, 49);
+  L.spawn('goat', 265, 49);
   L.aura(262, 49);
-  // HARD: narrow pillars over a crevasse
-  L.ground(270, 270, 50);
-  L.ground(273, 273, 51);
-  L.ground(276, 276, 52);
-  L.aura(273, 54);
-  L.ground(279, 292, 52);
-  L.spawn('bigpuff', 283, 52);
-  L.spawn('goat', 288, 52);
-  L.spawn('tree', 285, 52, { h: 50, pine: true });
-  L.spawn('para', 290, 52, { kind: 'bigpuff' });
-  L.ground(293, 329, 53);
-  L.spawn('puffball', 297, 53);
-  L.spawn('checkpoint', 296, 53); // one last checkpoint after the pillar hops
-  L.spawn('bigpuff', 303, 53);
-  L.spawn('tree', 306, 53, { h: 58, pine: true });
+  // HARD: pillars over a crevasse (2 tiles wide each: room to land)
+  L.ground(269, 270, 50);
+  L.ground(273, 274, 51);
+  L.ground(277, 278, 52);
+  L.aura(273.5, 54);
+  L.aura(277.5, 55);
+  L.ground(281, 294, 52);
+  L.spawn('bigpuff', 285, 52);
+  L.auraArc(283, 3, 55, 1);
+  L.spawn('goat', 290, 52);
+  L.spawn('tree', 287, 52, { h: 50, pine: true });
+  L.spawn('para', 292, 52, { kind: 'bigpuff' });
+  L.ground(295, 329, 53);
+  L.spawn('puffball', 299, 53);
+  L.spawn('checkpoint', 298, 53); // one last checkpoint after the pillar hops
+  L.auraArc(301, 3, 56, 1);
+  L.spawn('bigpuff', 305, 53);
+  L.spawn('tree', 308, 53, { h: 58, pine: true });
+  L.auraArc(311, 4, 56, 1.5);
   L.spawn('goal', 322, 53);
   L.spawn('tree', 327, 53, { h: 66, pine: true });
-  L.rootbeer(293, 57); // the summit's secret: up high over the last wall
+  L.rootbeer(295, 57); // the summit's secret: up high over the last wall
 
   return L.build();
 }

@@ -43,13 +43,14 @@ import {
 } from '../gfx/hoops';
 import { stingerReveal, stingerTitle } from '../ui/stinger';
 import { addCanvas, hires } from '../gfx/textures';
+import { BOOM_FRAMES, BOOM_SIZE, drawBoomFrame } from '../gfx/boom';
 import { gamepadSources } from '../input/gamepad';
 import { isKeyDown } from '../input/keyboard';
 import { usingTouch } from '../input/touch';
 import type { GameData, GameOverState, ResultState } from './GameScene';
 import { loseLife } from '../core/lives';
 import { NetSim } from './hoopsNet';
-import { Confetti } from '../world/Confetti';
+import { SimpleConfetti } from '../world/SimpleConfetti';
 import { PLOP_FRAMES, PLOP_H, PLOP_KINDS, PLOP_SCALE, PLOP_W, drawPlop, type PlopKind } from '../gfx/plops';
 import { STYLES } from '../gfx/handdrawn';
 
@@ -96,6 +97,18 @@ const depthK = (y: number, baseY: number) => (y - 120) / (baseY - 120);
 const ARENA_RES = 1.25;
 const KING_RES = 2.5;
 /** Stage (1280 × 720) → arena texture coordinates. */
+/** The screen's safe-area insets (notch, rounded corners) in CSS px (re-read on resize). */
+const readSafe = () => {
+  const d = document.createElement('div');
+  d.style.cssText = 'position:fixed;visibility:hidden;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)';
+  document.body.appendChild(d);
+  const cs = getComputedStyle(d);
+  const r = { l: parseFloat(cs.paddingLeft) || 0, r: parseFloat(cs.paddingRight) || 0 };
+  d.remove();
+  return r;
+};
+let SAFE = readSafe();
+window.addEventListener('resize', () => setTimeout(() => (SAFE = readSafe()), 120));
 const A = (x: number, y: number) => ({ x: x + STAGE_OX, y: y + STAGE_OY });
 
 /**
@@ -127,7 +140,7 @@ export class HoopsScene extends Phaser.Scene {
   private kingHop = { h: 0 };
   private nextHop = 3000;
   private kingTalkUntil = 0;
-  private confettiFx!: Confetti;
+  private confettiFx!: SimpleConfetti;
   private heroCrowned = false;
   private heroShadow!: Phaser.GameObjects.Image;
   private kingShadow!: Phaser.GameObjects.Image;
@@ -189,7 +202,6 @@ export class HoopsScene extends Phaser.Scene {
     this.flight = null;
     this.meter = null;
     this.score = { you: [], king: [] };
-    this.lastBug = { you: -1, king: -1, yn: 0, kn: 0 };
     this.tapped = false;
     this.prevKey = true;
     this.dark = { level: 0 };
@@ -310,7 +322,7 @@ export class HoopsScene extends Phaser.Scene {
     this.crownBusy = false;
     this.heroHop = { h: 0 };
     this.nextHeroHop = 2500;
-    this.confettiFx = new Confetti(this, 12, () => ARENA_H, [STAGE_OY + 360, ARENA_H - 30]);
+    this.confettiFx = new SimpleConfetti(this, 12);
     // faint mirror images in the glossy floor
     this.heroRefl = this.add.sprite(0, 0, `char-${ch.id}`, 'idle0').setOrigin(0.5, 1).setFlipY(true).setAlpha(0.16).setDepth(4);
     this.kingRefl = this.add.sprite(0, 0, 'king', 'idle0').setOrigin(0.5, 1).setFlipY(true).setAlpha(0.16).setDepth(4);
@@ -337,7 +349,7 @@ export class HoopsScene extends Phaser.Scene {
     const JR = 2;
     this.jumboTex = (this.textures.exists('jumbo') ? this.textures.get('jumbo') : this.textures.createCanvas('jumbo', JUMBO.w * JR, JUMBO.h * JR)) as Phaser.Textures.CanvasTexture;
     const jp = A(JUMBO.x, JUMBO.y);
-    this.add.image(jp.x, jp.y, 'jumbo').setOrigin(0, 0).setScale(1 / JR).setDepth(11.6);
+    this.add.image(jp.x, jp.y, 'jumbo').setOrigin(0, 0).setScale(JUMBO.s / JR).setDepth(11.6);
     this.ribbonTex = (this.textures.exists('ribbon') ? this.textures.get('ribbon') : this.textures.createCanvas('ribbon', RIBBON.w * JR, RIBBON.h * JR)) as Phaser.Textures.CanvasTexture;
     const rp = A(RIBBON.x, RIBBON.y);
     this.add.image(rp.x, rp.y, 'ribbon').setOrigin(0, 0).setScale(1 / JR).setDepth(2.05);
@@ -347,7 +359,6 @@ export class HoopsScene extends Phaser.Scene {
     this.dom = document.createElement('div');
     this.dom.className = 'hoops';
     this.dom.innerHTML = `
-      <div class="hoops-score"></div>
       <div class="hoops-meters" hidden>
         <div class="hm" data-m="power"><b>Power</b><div class="hm-bar"><i class="hm-zone"></i><i class="hm-mark"></i></div></div>
         <div class="hm" data-m="aim"><b>Aim</b><div class="hm-bar"><i class="hm-zone"></i><i class="hm-mark"></i></div></div>
@@ -388,29 +399,30 @@ export class HoopsScene extends Phaser.Scene {
   private fitCamera(snap = false) {
     const cam = this.cameras.main;
     this.baseZoom = Math.max(this.scale.width / 1280, this.scale.height / 720);
-    // during the contest the wide shot is alive: a slow drift and breathing zoom like a
-    // broadcast camera, leaning toward the ball while it's in the air (not in cutscene shots)
     let fx = this.camFocus.x;
     let fy = this.camFocus.y;
     let fz = this.camFocus.zoom;
-    const wide = fz <= 1.05;
-    if (wide) {
-      // each arena's broadcast camera sits in its own spot
-      const lc = this.style.layout.cam;
-      fx += lc.dx;
-      fy += lc.dy;
-      fz *= lc.zoom;
-    }
-    cam.setRotation(this.style.layout.cam.rot * (wide ? 1 : 0.4));
-    if (!this.inIntro && wide) {
+    // how "wide" the shot is: 1 for the full-arena shot, 0 for close-ups, blended in
+    // between (so gliding from a close-up out to the arena never jumps or jerks)
+    const wk = Phaser.Math.Clamp((1.3 - fz) / 0.25, 0, 1);
+    const ease = wk * wk * (3 - 2 * wk);
+    // each arena's broadcast camera sits in its own spot
+    const lc = this.style.layout.cam;
+    fx += lc.dx * ease;
+    fy += lc.dy * ease;
+    fz *= 1 + (lc.zoom - 1) * ease;
+    cam.setRotation(lc.rot * (0.4 + 0.6 * ease));
+    // during the contest the wide shot is alive: a slow drift and breathing zoom like a
+    // broadcast camera, leaning toward the ball while it's in the air
+    if (!this.inIntro && ease > 0) {
       const t = this.clock / 1000;
-      fx += Math.sin(t * 0.23) * 30 + Math.sin(t * 0.57 + 1) * 8;
-      fy += Math.sin(t * 0.17 + 2) * 14;
-      fz *= 1.01 + 0.02 * Math.sin(t * 0.29);
+      fx += (Math.sin(t * 0.23) * 30 + Math.sin(t * 0.57 + 1) * 8) * ease;
+      fy += Math.sin(t * 0.17 + 2) * 14 * ease;
+      fz *= 1 + (0.01 + 0.02 * Math.sin(t * 0.29)) * ease;
       if (this.flight || this.loose) {
-        fx += (this.ball.x - fx) * 0.18;
-        fy += (this.ball.y - fy) * 0.08;
-        fz *= 1.03;
+        fx += (this.ball.x - fx) * 0.18 * ease;
+        fy += (this.ball.y - fy) * 0.08 * ease;
+        fz *= 1 + 0.03 * ease;
       }
     }
     let z = this.baseZoom * fz;
@@ -418,20 +430,27 @@ export class HoopsScene extends Phaser.Scene {
     // on long phone screens that means pulling back a little and framing a touch higher
     const jTop = A(0, JUMBO.y).y - 16;
     const feet = A(0, Math.max(SPOTS.hero.y, SPOTS.king.y)).y + 34;
-    if (wide) z = Math.min(z, this.scale.height / (feet - jTop), Math.max(this.scale.width / ARENA_W, this.scale.height / ARENA_H));
-    const target = snap ? z : cam.zoom + (z - cam.zoom) * 0.06;
+    const zWide = Math.min(z, this.scale.height / (feet - jTop), Math.max(this.scale.width / ARENA_W, this.scale.height / ARENA_H));
+    z += (zWide - z) * ease;
+    // in cutscenes the camera follows the (already eased) glide exactly; in the
+    // contest it drifts softly toward its target
+    const follow = snap || this.inIntro;
+    const target = follow ? z : cam.zoom + (z - cam.zoom) * 0.06;
     cam.setZoom(target);
     const vw = this.scale.width / target;
     const vh = this.scale.height / target;
     let x = Phaser.Math.Clamp(fx, vw / 2, ARENA_W - vw / 2);
     let y = Phaser.Math.Clamp(fy, vh / 2, ARENA_H - vh / 2);
-    if (wide) {
-      const jx0 = A(JUMBO.x, 0).x - 12;
-      const jx1 = A(JUMBO.x + JUMBO.w, 0).x + 12;
-      y = Phaser.Math.Clamp(Phaser.Math.Clamp(y, Math.min(feet - vh / 2, jTop + vh / 2), jTop + vh / 2), vh / 2, ARENA_H - vh / 2);
-      x = Phaser.Math.Clamp(Phaser.Math.Clamp(x, jx1 - vw / 2, jx0 + vw / 2), vw / 2, ARENA_W - vw / 2);
+    if (ease > 0) {
+      // (kept clear of the phone's notch / rounded corners too)
+      const jx0 = A(JUMBO.x, 0).x - 12 - SAFE.l / target;
+      const jx1 = A(JUMBO.x + JUMBO.w * JUMBO.s, 0).x + 12 + SAFE.r / target;
+      const yw = Phaser.Math.Clamp(Phaser.Math.Clamp(y, Math.min(feet - vh / 2, jTop + vh / 2), jTop + vh / 2), vh / 2, ARENA_H - vh / 2);
+      const xw = Phaser.Math.Clamp(Phaser.Math.Clamp(x, jx1 - vw / 2, jx0 + vw / 2), vw / 2, ARENA_W - vw / 2);
+      x += (xw - x) * ease;
+      y += (yw - y) * ease;
     }
-    if (snap) cam.centerOn(x, y);
+    if (follow) cam.centerOn(x, y);
     else {
       const cx = cam.midPoint.x + (x - cam.midPoint.x) * 0.06;
       const cy = cam.midPoint.y + (y - cam.midPoint.y) * 0.06;
@@ -465,28 +484,9 @@ export class HoopsScene extends Phaser.Scene {
     });
   }
 
-  private lastBug = { you: -1, king: -1, yn: 0, kn: 0 };
+  /** The jumbotron is the scoreboard: it shows the score between the big moments. */
   private renderScore() {
     if (this.jumbo.kind !== 'big') this.jumbo = this.scoreJumbo();
-    const n = Math.max(REGULATION, this.score.you.length, this.score.king.length);
-    const sum = (a: boolean[]) => a.filter(Boolean).length;
-    const you = sum(this.score.you);
-    const king = sum(this.score.king);
-    const lb = this.lastBug;
-    const dots = (arr: boolean[], prevN: number) =>
-      Array.from({ length: n }, (_, i) => `<i class="${i < arr.length ? (arr[i] ? 'in' : 'out') : ''}${i === arr.length - 1 && arr.length > prevN ? ' new' : ''}"></i>`).join('');
-    const done = Math.min(this.score.you.length, this.score.king.length);
-    const sudden = n > REGULATION;
-    const status = sudden ? `<span class="sd">SUDDEN DEATH</span>` : `SHOT <b>${Math.min(done + 1, REGULATION)}</b> OF ${REGULATION}`;
-    const row = (cls: string, name: string, arr: boolean[], score: number, prev: number, prevN: number, lead: boolean) =>
-      `<div class="hs-row ${cls}${lead ? ' lead' : ''}"><i class="tab"></i><b>${name}</b><span class="dots">${dots(arr, prevN)}</span><em class="${score !== prev && prev >= 0 ? 'bump' : ''}">${score}</em></div>`;
-    this.dom.querySelector('.hoops-score')!.innerHTML = `
-      <div class="hs-head"><i class="live"></i>${this.style.words.join(' ')}<span>${status}</span></div>
-      ${row('you', characterById(this.hd.charId).name, this.score.you, you, lb.you, lb.yn, you > king)}
-      ${row('king', 'King Puff Ball', this.score.king, king, lb.king, lb.kn, king > you)}
-      <i class="sheen"></i>`;
-    this.dom.querySelector('.hoops-score')!.classList.toggle('sudden', sudden);
-    this.lastBug = { you, king, yn: this.score.you.length, kn: this.score.king.length };
   }
 
   private prevKey = true;
@@ -880,6 +880,27 @@ export class HoopsScene extends Phaser.Scene {
     // slow motion for a beat, easing back to full speed
     this.confettiFx.timeScale = 0.25;
     this.tweens.add({ targets: this.confettiFx, timeScale: 1, delay: 380, duration: 900, ease: 'Sine.easeIn' });
+    // the big cartoon BOOM (hand-drawn frames, made the first time it's needed)
+    if (!this.textures.exists('kingboom')) {
+      const R = 1.5;
+      const c = document.createElement('canvas');
+      const fw = Math.round(BOOM_SIZE * R);
+      c.width = fw * BOOM_FRAMES.length;
+      c.height = fw;
+      const ctx = c.getContext('2d')!;
+      BOOM_FRAMES.forEach((_, i) => {
+        ctx.save();
+        ctx.translate(i * fw, 0);
+        ctx.scale(R, R);
+        drawBoomFrame(ctx, i);
+        ctx.restore();
+      });
+      addCanvas(this, 'kingboom', c, (t) => BOOM_FRAMES.forEach((f, i) => t.add(f, 0, i * fw, 0, fw, fw)));
+    }
+    const boom = this.add.image(cx, cy, 'kingboom', 'b0').setDepth(12.25).setScale(2.4 / 1.5);
+    BOOM_FRAMES.forEach((f, i) => this.time.delayedCall(i * 70, () => boom.setFrame(f)));
+    this.tweens.add({ targets: boom, scale: (2.9 / 1.5), duration: BOOM_FRAMES.length * 70, ease: 'Sine.easeOut' });
+    this.tweens.add({ targets: boom, alpha: 0, delay: BOOM_FRAMES.length * 70 - 120, duration: 260, onComplete: () => boom.destroy() });
     // fireball glow
     const glow = this.add.image(cx, cy, 'spot').setBlendMode(Phaser.BlendModes.ADD).setTint(0xffd27a).setDepth(12.2).setScale(0.2).setAlpha(1);
     this.tweens.add({ targets: glow, scale: 3.2, alpha: 0, duration: 900, ease: 'Cubic.easeOut', onComplete: () => glow.destroy() });
