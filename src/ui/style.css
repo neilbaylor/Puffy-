@@ -1758,3 +1758,6 @@ kbd {
 /* the keyboard controls sit a few px further below the Play button */
 .start-foot .controls { margin-top: 13px; }
 .mouse-ico { vertical-align: -3px; }
+
+/* the end-of-level hero is the live one from the pick-a-player cards (its own standing animation) */
+.results-hero canvas.live { animation: none; }

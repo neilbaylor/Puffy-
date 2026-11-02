@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { CHARACTERS, characterById } from '../data/characters';
+import { CHARACTERS, characterById, type CharacterDef } from '../data/characters';
 import type { Session } from '../core/session';
 import { fadeOutMusic, playLevelClear, playLevelMusic, playLevelSong, playMenuMusic, primeMusic, setMusicMuted, stopMusic } from '../core/music';
 import { isMuted, setMuted, sfx, unlockAudio } from '../core/sfx';
@@ -665,6 +665,26 @@ export class UI {
     this.cheerRaf = requestAnimationFrame(step);
   }
 
+  /**
+   * A hero drawn like on the pick-a-player cards, alive: the standing animation
+   * (two frames, at the game's pace) plus the odd blink, glance and breath.
+   * Runs until `alive()` says the screen has gone.
+   */
+  private liveHero(cv: HTMLCanvasElement, hero: CharacterDef, alive: () => boolean) {
+    let pose: 'idle0' | 'idle1' = 'idle0';
+    let face: Face | undefined;
+    cv.classList.add('live');
+    // (sized to fill the spot, the same size on both frames so it doesn't jump)
+    const draw = () => drawPortrait(cv, hero, pose, face, 'idle0');
+    draw();
+    new FaceLife((f) => ((face = f), draw()), alive, { mouth: true });
+    const iv = window.setInterval(() => {
+      if (!alive()) return clearInterval(iv);
+      pose = pose === 'idle0' ? 'idle1' : 'idle0';
+      draw();
+    }, 625);
+  }
+
   /** Hide the browser's address bar etc. (Android, iPad, desktop). iPhone needs "Add to Home Screen". */
   private goFullscreen(always = false) {
     if (!always && !isTouchDevice()) return;
@@ -838,7 +858,8 @@ export class UI {
         </div>
       </div>
     </div>`);
-    drawPortrait(el.querySelector('canvas')!, characterById(g.charId), 'hurt');
+    // the hero as on the pick-a-player screen: standing about, blinking, glancing, breathing
+    this.liveHero(el.querySelector('canvas')!, characterById(g.charId), () => this.screen === el);
     const again = () => {
       stopMusic();
       this.startGame(this.session);
@@ -891,7 +912,7 @@ export class UI {
         </div>
       </div>
     </div>`);
-    drawPortrait(el.querySelector('canvas')!, characterById(r.charId), 'jump');
+    this.liveHero(el.querySelector('canvas')!, characterById(r.charId), () => this.screen === el);
     // the default (and the big button) is on to the next level, when there is one
     const goNext = () => {
       if (!next) return this.startGame(this.session);
