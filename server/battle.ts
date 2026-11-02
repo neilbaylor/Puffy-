@@ -39,6 +39,9 @@ interface Client {
 }
 
 const ARENA = buildArena();
+/** (BATTLE_LAG_MS adds this much delay each way, to test how it plays on a slow connection) */
+const LAG = Math.max(0, Number(process.env.BATTLE_LAG_MS) || 0);
+const later = (fn: () => void) => (LAG ? setTimeout(fn, LAG) : fn());
 const heroOk = (h: string) => (CHARACTERS.some((c) => c.id === h) ? h : 'puffy');
 const cleanName = (n: unknown, slot: number) => {
   const s = String(n ?? '').replace(/[^\p{L}\p{N} _'!.-]/gu, '').trim().slice(0, 12);
@@ -252,11 +255,18 @@ class Room {
 
   private broadcast(msg: ServerMsg) {
     const data = JSON.stringify(msg);
-    for (const c of this.clients.values()) if (c.ws && c.ws.readyState === c.ws.OPEN) c.ws.send(data);
+    for (const c of this.clients.values()) {
+      const ws = c.ws;
+      if (ws && ws.readyState === ws.OPEN) later(() => ws.readyState === ws.OPEN && ws.send(data));
+    }
   }
 
   send(c: Client, msg: ServerMsg) {
-    if (c.ws && c.ws.readyState === c.ws.OPEN) c.ws.send(JSON.stringify(msg));
+    const ws = c.ws;
+    if (ws && ws.readyState === ws.OPEN) {
+      const data = JSON.stringify(msg);
+      later(() => ws.readyState === ws.OPEN && ws.send(data));
+    }
   }
 }
 
@@ -266,7 +276,7 @@ export function attachBattle(server: Server) {
   const wss = new WebSocketServer({ server, path: '/battle', maxPayload: 4096 });
   wss.on('connection', (ws) => {
     let me: Client | null = null;
-    ws.on('message', (raw) => {
+    ws.on('message', (raw) => later(() => {
       let msg: ClientMsg;
       try {
         msg = JSON.parse(String(raw));
@@ -279,7 +289,7 @@ export function attachBattle(server: Server) {
         return;
       }
       if (me && me.ws === ws) room.message(me, msg);
-    });
+    }));
     ws.on('close', () => {
       if (me && me.ws === ws) room.dropped(me);
     });
