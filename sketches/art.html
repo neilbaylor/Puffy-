@@ -229,7 +229,7 @@ section { display: grid; gap: 14px; }
   var current = NEUTRAL_FACE;
   var face = () => current;
   var EYES = ["n", "blink", "back", "up"];
-  var MOUTHS = ["rest", "smile", "o", "open"];
+  var MOUTHS = ["rest", "o", "open"];
   var FACE_FRAMES = EYES.flatMap((e) => MOUTHS.map((m) => `${e}-${m}`)).filter((k) => k !== "n-rest");
 
   // src/gfx/puffy.ts

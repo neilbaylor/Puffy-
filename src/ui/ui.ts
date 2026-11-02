@@ -151,17 +151,20 @@ class FaceLife {
     next();
   }
   private mouth() {
-    const next = (t: number) => this.after(t + rand(2200, 5800), () => this.mouth());
+    // mostly breathing (a small open and close), sometimes a big open mouth, or a chatter
+    const next = (t: number) => this.after(t + rand(1800, 3600), () => this.mouth());
     const r = Math.random();
-    if (r < 0.35) {
-      const hold = rand(900, 1900);
-      this.set({ mouth: 'smile' });
+    if (r < 0.7) {
+      const hold = rand(550, 900);
+      this.set({ mouth: 'o' });
       this.after(hold, () => this.set({ mouth: 'rest' }));
       return next(hold);
     }
-    if (r < 0.6) {
-      const hold = rand(450, 900);
+    if (r < 0.9) {
+      const hold = rand(700, 1100);
       this.set({ mouth: 'o' });
+      this.after(120, () => this.set({ mouth: 'open' }));
+      this.after(hold - 120, () => this.set({ mouth: 'o' }));
       this.after(hold, () => this.set({ mouth: 'rest' }));
       return next(hold);
     }
