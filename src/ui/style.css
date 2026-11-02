@@ -1221,7 +1221,20 @@ html.rotating body {
   /* big enough to read at a glance on a phone */
   font-size: clamp(36px, 10vmin, 68px);
 }
-.hoops-callout.turn small { font-size: 0.42em; }
+/* "1 of 5": white on a dark pill so it reads over the court or the crowd */
+.hoops-callout.turn small {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 0.18em 0.75em 0.2em;
+  border-radius: 999px;
+  font-size: 0.5em;
+  letter-spacing: 0.06em;
+  color: #fff;
+  background: #1c0f3ae6;
+  box-shadow: 0 0 0 2px #ffd23f;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+}
 .hoops-callout.turn.king {
   color: #ffd23f;
   text-shadow: 0 0.08em 0 #1c0f3a, 0 0 22px #ffd23f88;
