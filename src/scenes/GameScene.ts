@@ -66,6 +66,8 @@ const AURA_CHANCE = 0.6;
 const DEPTH_WAVE = 12;
 /** Display scale of the Giant's rolling flames (art is drawn at 3x). */
 const FLAME_S = 1.25 / 3;
+/** A flame spends its last this-many seconds dying down. */
+const FLAME_FADE = 0.7;
 /** Max wisps that scatter when you get hit while carrying aura. */
 const SCATTER_MAX = 10;
 
@@ -334,6 +336,7 @@ export class GameScene extends Phaser.Scene {
 
     themeClock.t += dt;
     this.applyTheme();
+    this.level.animate(this.time.now / 1000, this.view.left, this.view.left + this.view.width);
     this.bg.update(this.view, dt);
     this.emitHud();
   }
@@ -435,31 +438,39 @@ export class GameScene extends Phaser.Scene {
     const img = this.add.image(x, groundY + 3, 'flame', 'f0').setOrigin(0.5, 1).setScale(0.1 * FLAME_S, FLAME_S).setFlipX(dir < 0).setDepth(DEPTH_WAVE);
     this.tweens.add({ targets: img, scaleX: FLAME_S, duration: 140, ease: 'Back.easeOut' });
     this.fx.flameBurst(x, groundY);
-    this.waves.push({ img, glow, dir, speed, life: 1.5, y: groundY, t: Math.random() });
+    this.waves.push({ img, glow, dir, speed, life: 1.5 + FLAME_FADE * 0.6, y: groundY, t: Math.random() });
   }
 
   private updateWaves(dt: number) {
     this.waves = this.waves.filter((w) => {
       w.life -= dt;
-      w.img.x += w.dir * w.speed * dt;
       w.t += dt;
-      w.img.setFrame(`f${Math.floor(w.t * 14) % 4}`);
-      w.img.scaleY = FLAME_S * (1 + Math.sin(w.t * 23) * 0.06);
-      w.glow.setPosition(w.img.x, w.y - 16).setAlpha(0.6 + Math.sin(w.t * 31) * 0.15);
+      // the last stretch of a flame's life: it shrinks, slows, sputters and smokes
+      const vigor = Phaser.Math.Clamp(w.life / FLAME_FADE, 0, 1);
+      w.img.x += w.dir * w.speed * dt * (0.35 + 0.65 * vigor);
+      w.img.setFrame(`f${Math.floor(w.t * (8 + 6 * vigor)) % 4}`);
+      const sputter = vigor < 1 ? (Math.random() < 0.25 ? 0.75 : 1) : 1;
+      w.img.scaleY = FLAME_S * (0.25 + 0.75 * vigor) * (1 + Math.sin(w.t * 23) * 0.06) * sputter;
+      w.img.scaleX = FLAME_S * (0.55 + 0.45 * vigor);
+      w.img.setAlpha(0.45 + 0.55 * vigor);
+      w.glow.setPosition(w.img.x, w.y - 16).setAlpha((0.6 + Math.sin(w.t * 31) * 0.15) * vigor).setScale(1.6 * (0.5 + 0.5 * vigor), 1.1 * (0.5 + 0.5 * vigor));
       const front = w.img.x + w.dir * 20;
       const groundAhead = this.level.isSolidAt(front, w.y + 6) && !this.level.isSolidAt(front, w.y - 8);
-      this.fx.flameTrail(w.img.x, w.y, w.dir);
-      if (w.life <= 0 || !groundAhead) {
-        // the flame gutters out in a puff of smoke
-        this.fx.flameBurst(w.img.x, w.y);
-        this.tweens.add({ targets: [w.img, w.glow], alpha: 0, scaleY: 0.05, duration: 200, onComplete: () => (w.img.destroy(), w.glow.destroy()) });
+      this.fx.flameTrail(w.img.x, w.y, w.dir, vigor);
+      if (!groundAhead && w.life > FLAME_FADE) w.life = FLAME_FADE; // reached an edge: start dying there
+      if (w.life <= 0) {
+        // the last flicker sinks into a curl of smoke and a few embers
+        this.fx.flameDie(w.img.x, w.y);
+        this.tweens.add({ targets: w.img, scaleY: 0.02, scaleX: FLAME_S * 0.4, alpha: 0, duration: 800, ease: 'Sine.easeIn', onComplete: () => w.img.destroy() });
+        this.tweens.add({ targets: w.glow, alpha: 0, duration: 600, onComplete: () => w.glow.destroy() });
         return false;
       }
-      for (const p of this.players) {
-        if (!p.alive || p.invulnerable) continue;
-        const onWaveLevel = p.bottom > w.y - 18 && p.bottom < w.y + 6;
-        if (onWaveLevel && Math.abs(p.x - w.img.x) < 16 + p.body.width / 2) this.hitPlayer(p, w.img.x - w.dir * 30);
-      }
+      if (vigor > 0.4)
+        for (const p of this.players) {
+          if (!p.alive || p.invulnerable) continue;
+          const onWaveLevel = p.bottom > w.y - 18 && p.bottom < w.y + 6;
+          if (onWaveLevel && Math.abs(p.x - w.img.x) < 16 + p.body.width / 2) this.hitPlayer(p, w.img.x - w.dir * 30);
+        }
       return true;
     });
   }

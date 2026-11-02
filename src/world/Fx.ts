@@ -165,10 +165,17 @@ export class Fx {
   }
 
   /** Fire, embers and smoke left behind by a rolling flame (x, ground y, moving dir). */
-  flameTrail(x: number, y: number, dir: number) {
-    if (Math.random() < 0.7) this.burnE.emitParticleAt(x - dir * (6 + Math.random() * 14), y - 4 - Math.random() * 10);
-    if (Math.random() < 0.35) this.emberE.emitParticleAt(x - dir * Math.random() * 10, y - 20 - Math.random() * 16);
-    if (Math.random() < 0.45) this.ashE.emitParticleAt(x - dir * (16 + Math.random() * 12), y - 26 - Math.random() * 10);
+  flameTrail(x: number, y: number, dir: number, vigor = 1) {
+    // a dying flame gives fewer flickers and more smoke
+    if (Math.random() < 0.7 * vigor) this.burnE.emitParticleAt(x - dir * (6 + Math.random() * 14), y - 4 - Math.random() * 10 * vigor);
+    if (Math.random() < 0.35 * vigor + 0.05) this.emberE.emitParticleAt(x - dir * Math.random() * 10, y - 10 - Math.random() * 26 * vigor);
+    if (Math.random() < 0.45 + 0.35 * (1 - vigor)) this.ashE.emitParticleAt(x - dir * (10 + Math.random() * 14 * vigor), y - 10 - Math.random() * 22 * vigor);
+  }
+
+  /** A flame going out: a rising curl of smoke and a few last embers. */
+  flameDie(x: number, y: number) {
+    for (let i = 0; i < 12; i++) this.scene.time.delayedCall(i * 55, () => this.ashE.emitParticleAt(x + (Math.random() - 0.5) * 14, y - 6 - Math.random() * 10));
+    for (let i = 0; i < 5; i++) this.emberE.emitParticleAt(x + (Math.random() - 0.5) * 12, y - 8);
   }
 
   /** A whoomph of fire where a flame wave starts. */

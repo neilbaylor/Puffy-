@@ -1166,3 +1166,22 @@ body {
   background: #3d1478;
   clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
 }
+
+.hoops-skip {
+  position: absolute;
+  right: calc(16px + var(--safe-r));
+  bottom: calc(11vh + 10px);
+  padding: 8px 18px;
+  border: 2px solid #ffffff88;
+  border-radius: 999px;
+  background: #00000088;
+  color: #fff;
+  font: 900 clamp(13px, 2.4vmin, 18px) / 1 var(--body);
+  letter-spacing: 0.06em;
+  pointer-events: auto !important;
+  cursor: pointer;
+  animation: skip-in 0.4s ease-out;
+}
+@keyframes skip-in {
+  from { opacity: 0; transform: translateY(8px); }
+}

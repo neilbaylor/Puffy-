@@ -539,18 +539,23 @@ function cord(ctx: Ctx, a: Pt, b: Pt) {
   ctx.stroke();
 }
 
-/** Back half of the rim + the back of the net (behind the ball). */
-export function drawRimBack(ctx: Ctx) {
+/** Back half of the rim (+ the back of a still net, for static pictures). */
+export function drawRimBack(ctx: Ctx, withNet = true) {
   const { rimX: x, rimY: y } = HOOP;
   const { segs } = netLattice(x, y, 0);
   ctx.lineCap = 'round';
   for (const sg of segs) {
-    if (sg.front) continue;
+    if (sg.front || !withNet) continue;
     ctx.strokeStyle = `rgba(150,146,162,${0.75 - sg.t * 0.3})`;
     ctx.lineWidth = 1.1;
     cord(ctx, sg.a, sg.b);
   }
   rimTube(ctx, x, y, Math.PI, Math.PI * 2, false);
+}
+
+/** Just the front of the rim tube (the game draws a live, simulated net). */
+export function drawRimFrontTube(ctx: Ctx, ox: number, oy: number) {
+  rimTube(ctx, ox, oy, 0, Math.PI, true);
 }
 
 /** Front half of the rim + the front of the net, drawn into a canvas whose origin is the rim centre. `stretch` 0..1 swishes the net. */

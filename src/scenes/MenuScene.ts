@@ -39,6 +39,7 @@ export class MenuScene extends Phaser.Scene {
     const m = themeMix(themeClock.t);
     this.bg.setTheme(m);
     this.level.setTint(mixTint(m));
+    this.level.animate(this.time.now / 1000, this.x, this.x + vw);
     this.bg.update({ left: this.x, top, width: vw, height: vh }, dt);
   }
 }

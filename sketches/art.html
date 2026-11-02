@@ -1753,12 +1753,12 @@ section { display: grid; gap: 14px; }
     ctx.quadraticCurveTo((a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + 1.4, b[0], b[1]);
     ctx.stroke();
   }
-  function drawRimBack(ctx) {
+  function drawRimBack(ctx, withNet = true) {
     const { rimX: x, rimY: y } = HOOP;
     const { segs } = netLattice(x, y, 0);
     ctx.lineCap = "round";
     for (const sg of segs) {
-      if (sg.front) continue;
+      if (sg.front || !withNet) continue;
       ctx.strokeStyle = `rgba(150,146,162,${0.75 - sg.t * 0.3})`;
       ctx.lineWidth = 1.1;
       cord(ctx, sg.a, sg.b);

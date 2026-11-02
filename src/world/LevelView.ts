@@ -46,6 +46,19 @@ export class LevelView {
     this.scenery = scene.children.list.slice(first).filter((o): o is Phaser.GameObjects.Image => o instanceof Phaser.GameObjects.Image);
   }
 
+  /** Trees, flowers and grass that sway in the breeze. */
+  private sway: { img: Phaser.GameObjects.Image; amp: number; speed: number; ph: number }[] = [];
+
+  /** Sway the plants on screen; gusts come and go. `t` in seconds. */
+  animate(t: number, left: number, right: number) {
+    const gust = 0.55 + 0.45 * Math.sin(t * 0.33) * Math.sin(t * 0.21 + 1);
+    for (const s of this.sway) {
+      if (s.img.x < left - 80 || s.img.x > right + 80) continue;
+      // a wave of wind rolls across the level (phase follows x)
+      s.img.setAngle(s.amp * gust * Math.sin(t * s.speed - s.img.x * 0.004 + s.ph));
+    }
+  }
+
   /** Terrain, clouds, blocks and decor (for the colour grade as the look drifts). */
   private scenery: Phaser.GameObjects.Image[] = [];
   private tint = 0xffffff;
@@ -179,11 +192,12 @@ export class LevelView {
         const key = `tree-${d.name}-${i}`;
         if (!this.scene.textures.exists(key))
           addCanvas(this.scene, key, hires(96, h + 50, PROP_RES, (ctx) => drawPuffTree(ctx, 48, h + 46, h, DEFAULT_PALETTE, 100 + i * 13)));
-        this.scene.add
+        const img = this.scene.add
           .image(s.x * TILE + TILE / 2, (s.y + 1) * TILE + 4, key)
           .setOrigin(0.5, 1)
           .setScale(1 / PROP_RES)
           .setDepth(DEPTH.decor);
+        this.sway.push({ img, amp: 1.3, speed: 0.8 + (i % 3) * 0.12, ph: i * 1.7 });
       });
     const r = rng(1234);
     for (let x = 1; x < d.width - 1; x++) {
@@ -197,8 +211,13 @@ export class LevelView {
       const wx = x * TILE + TILE / 2 + (r() - 0.5) * 16;
       const wy = y * TILE + 3;
       const roll = r();
-      if (roll < 0.28) this.scene.add.image(wx, wy, 'flower', `f${Math.floor(r() * 4)}`).setOrigin(0.5, 1).setScale(1 / PROP_RES).setDepth(DEPTH.decor);
-      else if (roll < 0.55) this.scene.add.image(wx, wy + 1, 'tuft').setOrigin(0.5, 1).setScale(1 / PROP_RES).setDepth(DEPTH.decor);
+      if (roll < 0.28) {
+        const img = this.scene.add.image(wx, wy, 'flower', `f${Math.floor(r() * 4)}`).setOrigin(0.5, 1).setScale(1 / PROP_RES).setDepth(DEPTH.decor);
+        this.sway.push({ img, amp: 7, speed: 1.6 + r() * 0.6, ph: wx * 0.013 });
+      } else if (roll < 0.55) {
+        const img = this.scene.add.image(wx, wy + 1, 'tuft').setOrigin(0.5, 1).setScale(1 / PROP_RES).setDepth(DEPTH.decor);
+        this.sway.push({ img, amp: 6, speed: 2 + r() * 0.6, ph: wx * 0.013 });
+      }
     }
   }
 }

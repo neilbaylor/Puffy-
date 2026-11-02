@@ -25,7 +25,7 @@ import {
   drawCrowd,
   drawKing,
   drawRimBack,
-  drawRimFront,
+  drawRimFrontTube,
   drawSoftShadow,
   drawSpotBrush,
   drawSpotlight,
@@ -38,6 +38,7 @@ import { gamepadSources } from '../input/gamepad';
 import { isKeyDown } from '../input/keyboard';
 import type { GameData, GameOverState, ResultState } from './GameScene';
 import { loseLife } from '../core/lives';
+import { NetSim } from './hoopsNet';
 
 export interface HoopsData {
   session: Session;
@@ -70,7 +71,15 @@ export class HoopsScene extends Phaser.Scene {
   private king!: Phaser.GameObjects.Sprite;
   private ball!: Phaser.GameObjects.Image;
   private ballShadow!: Phaser.GameObjects.Image;
-  private net!: Phaser.GameObjects.Image;
+  // the hoop: a simulated net between the back and front of the rim
+  private netSim!: NetSim;
+  private netBack!: Phaser.GameObjects.Graphics;
+  private netFront!: Phaser.GameObjects.Graphics;
+  private rimFront!: Phaser.GameObjects.Image;
+  private board!: Phaser.GameObjects.Image;
+  private prevBallY = 0;
+  /** A loose ball bouncing on the floor after a shot. */
+  private loose: null | { vx: number; vy: number; floorY: number; t: number; res: () => void } = null;
   private heroScale = 1;
   private clock = 0;
   private waits: { at: number; res: () => void }[] = [];
@@ -162,19 +171,10 @@ export class HoopsScene extends Phaser.Scene {
       addCanvas(this, 'backboard', hires(320, 420, 3, (ctx) => {
         ctx.translate(160 - HOOP.rimX, 220 - HOOP.rimY);
         drawBackboard(ctx);
-        drawRimBack(ctx);
+        drawRimBack(ctx, false);
       }));
     }
-    if (!this.textures.exists('netf')) {
-      const { c, ctx } = canvas(2 * 140 * 3, 100 * 3);
-      ctx.scale(3, 3);
-      drawRimFront(ctx, 70, 16, 0);
-      drawRimFront(ctx, 210, 16, 1);
-      addCanvas(this, 'netf', c, (t) => {
-        t.add('n0', 0, 0, 0, 420, 300);
-        t.add('n1', 0, 420, 0, 420, 300);
-      });
-    }
+    if (!this.textures.exists('rimf')) addCanvas(this, 'rimf', hires(140, 40, 3, (ctx) => drawRimFrontTube(ctx, 70, 16)));
     if (!this.textures.exists('spot')) addCanvas(this, 'spot', hires(300, 700, 1, (ctx) => drawSpotlight(ctx, 300, 700)));
     if (!this.textures.exists('softshadow')) addCanvas(this, 'softshadow', hires(128, 40, 1, (ctx) => drawSoftShadow(ctx, 128, 40)));
     if (!this.textures.exists('spotbrush')) addCanvas(this, 'spotbrush', hires(256, 256, 1, (ctx) => drawSpotBrush(ctx, 256)));
@@ -194,7 +194,7 @@ export class HoopsScene extends Phaser.Scene {
     this.excitedUntil = 0;
 
     const bb = A(HOOP.rimX, HOOP.rimY);
-    this.add.image(bb.x, bb.y, 'backboard').setOrigin(0.5, 220 / 420).setScale(1 / 3).setDepth(5);
+    this.board = this.add.image(bb.x, bb.y, 'backboard').setOrigin(0.5, 220 / 420).setScale(1 / 3).setDepth(5);
 
     // spotlights
     for (const sp of [SPOTS.hero, SPOTS.king]) {
@@ -219,7 +219,11 @@ export class HoopsScene extends Phaser.Scene {
     this.ballShadow = this.add.image(0, 0, 'softshadow').setDisplaySize(48, 14).setDepth(6).setVisible(false);
     for (let i = 0; i < 4; i++) this.ghosts.push(this.add.image(0, 0, 'hball').setDepth(8.9).setVisible(false).setAlpha(0.3 - i * 0.07));
     this.ball = this.add.image(0, 0, 'hball').setScale(1 / 3).setDepth(9).setVisible(false);
-    this.net = this.add.image(bb.x, bb.y, 'netf', 'n0').setOrigin(0.5, 16 / 100).setScale(1 / 3).setDepth(10);
+    this.netSim = new NetSim(HOOP.rimRX, HOOP.rimRY);
+    this.netBack = this.add.graphics().setDepth(8.7);
+    this.netFront = this.add.graphics().setDepth(10);
+    this.rimFront = this.add.image(bb.x, bb.y, 'rimf').setOrigin(0.5, 16 / 40).setScale(1 / 3).setDepth(10.5);
+    this.loose = null;
 
     // darkness with spotlights cut out of it, plus the visible beams from the rafters
     this.darkRT = this.add.renderTexture(0, 0, ARENA_W, ARENA_H).setOrigin(0, 0).setDepth(11).setVisible(false);
@@ -247,9 +251,15 @@ export class HoopsScene extends Phaser.Scene {
       </div>
       <div class="hoops-lb"><i></i><i></i></div>
       <div class="hoops-l3"><b></b><span></span></div>
+      <button class="hoops-skip" hidden>Skip ›</button>
       <div class="hoops-callout"></div>`;
     document.getElementById('ui')!.appendChild(this.dom);
     window.addEventListener('pointerdown', this.tapListener);
+    const skipBtn = this.dom.querySelector<HTMLButtonElement>('.hoops-skip')!;
+    skipBtn.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      if (this.inIntro) this.skipping = true;
+    });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       window.removeEventListener('pointerdown', this.tapListener);
       this.dom.remove();
@@ -362,12 +372,21 @@ export class HoopsScene extends Phaser.Scene {
     }
 
     this.updateLighting();
+    this.updateLooseBall(dt / 1000);
+    this.updateNet(dt / 1000);
     if (this.clock >= this.jumboNext) {
       this.jumboNext = this.clock + 70;
       if (this.jumbo.kind === 'big' && this.clock > this.jumboUntil) this.jumbo = this.scoreJumbo();
       this.drawJumbo();
     }
-    if (this.inIntro && !this.skipping && this.tapPressed()) this.skipping = true;
+    if (this.inIntro) {
+      // touches during the intro don't skip it (fingers are often still on the controls when you
+      // reach the gate): only the Skip button, or Enter / Esc on a keyboard, once the title is done
+      this.tapped = false;
+      const canSkip = this.clock > 2600;
+      this.dom.querySelector<HTMLElement>('.hoops-skip')!.hidden = !canSkip || this.skipping;
+      if (canSkip && !this.skipping && (isKeyDown('Enter') || isKeyDown('Escape'))) this.skipping = true;
+    }
 
     // meters
     if (this.meter) {
@@ -602,6 +621,7 @@ export class HoopsScene extends Phaser.Scene {
     }
     // back to the game: everything in its final state (also after a skip)
     this.inIntro = false;
+    this.dom.querySelector<HTMLElement>('.hoops-skip')!.hidden = true;
     this.skipping = false;
     this.tapped = false;
     this.setDark(0, 0);
@@ -768,67 +788,122 @@ export class HoopsScene extends Phaser.Scene {
   private async shootBall(x: number, y: number, floorY: number, o: Outcome, side: number) {
     const rim = A(HOOP.rimX, HOOP.rimY);
     const base = A(HOOP.rimX, HOOP.baseY);
-    const s0 = 1;
+    // a bigger ball: radius ~31 in the hand, ~19 at the hoop (the rim is 88 across)
+    const s0 = 1.3;
     // misses must never look like they went in: short shots drop well in front of
     // the rim (on the shooter's side), long ones hit the glass and fly off sideways
     const toShooter = Math.sign(x - rim.x) || -1;
-    const s1 = o === 'short' ? 0.72 : 0.55;
-    let end = { x: rim.x, y: rim.y - 8 };
-    if (o === 'rimIn' || o === 'rimOut') end = { x: rim.x + side * HOOP.rimRX * 0.75, y: rim.y - 6 };
-    if (o === 'short') end = { x: rim.x + toShooter * 88, y: rim.y + 118 };
-    if (o === 'long') end = { x: rim.x + side * 22, y: rim.y - 72 };
-    if (o === 'wide') end = { x: rim.x + side * 120, y: rim.y + 10 };
+    const s1 = o === 'short' ? 0.95 : 0.8;
+    let end = { x: rim.x, y: rim.y - 14 };
+    if (o === 'rimIn' || o === 'rimOut') end = { x: rim.x + side * HOOP.rimRX * 0.8, y: rim.y - 12 };
+    if (o === 'short') end = { x: rim.x + toShooter * 92, y: rim.y + 118 };
+    if (o === 'long') end = { x: rim.x + side * 24, y: rim.y - 78 };
+    if (o === 'wide') end = { x: rim.x + side * 125, y: rim.y + 6 };
     const p0 = new Phaser.Math.Vector2(x, y);
     const p2 = new Phaser.Math.Vector2(end.x, end.y);
-    const p1 = new Phaser.Math.Vector2((x + end.x) / 2, Math.min(y, end.y) - 260);
+    const p1 = new Phaser.Math.Vector2((x + end.x) / 2, Math.min(y, end.y) - 270);
     this.ball.setVisible(true).setDepth(o === 'short' ? 11 : 9).setAlpha(1);
     this.ballShadow.setVisible(true).setAlpha(0.25);
+    this.prevBallY = y;
     await new Promise<void>((res) => {
       this.flight = { t: 0, dur: 1050, p0, p1, p2, s0, s1, f0: floorY, f1: base.y, res };
     });
 
-    const bounceToFloor = async (dx: number, dy: number, ms: number) => {
-      await this.tween({ targets: this.ball, x: this.ball.x + dx, y: this.ball.y + dy, rotation: this.spin + 3, duration: ms, ease: 'Quad.easeIn' });
-      this.ballShadow.setPosition(this.ball.x, this.ball.y + 4);
-      await this.tween({ targets: this.ball, y: this.ball.y - 30, duration: 180, yoyo: true, ease: 'Quad.easeOut' });
-      await this.tween({ targets: [this.ball, this.ballShadow], alpha: 0, duration: 250 });
-    };
-
     if (o === 'swish' || o === 'rimIn') {
       if (o === 'rimIn') {
-        sfx.clank();
+        // rattles on the rim, then drops
+        this.clank(1);
         this.cameras.main.shake(90, 0.003);
-        await this.tween({ targets: this.ball, x: rim.x, y: rim.y - 22, duration: 220, ease: 'Quad.easeOut' });
-        await this.tween({ targets: this.ball, y: rim.y - 6, duration: 160, ease: 'Quad.easeIn' });
+        await this.tween({ targets: this.ball, x: rim.x - side * 6, y: rim.y - 34, duration: 210, ease: 'Quad.easeOut' });
+        await this.tween({ targets: this.ball, x: rim.x + side * 14, y: rim.y - 14, duration: 170, ease: 'Quad.easeIn' });
+        this.clank(0.6);
+        await this.tween({ targets: this.ball, x: rim.x + side * 4, y: rim.y - 22, duration: 120, ease: 'Quad.easeOut' });
       }
-      // through the net
+      // through the net (the simulated net bulges and swishes around the ball)
       sfx.swish();
-      this.net.setFrame('n1');
-      await this.tween({ targets: this.ball, x: rim.x, y: rim.y + 46, duration: 260, ease: 'Sine.easeIn' });
-      this.net.setFrame('n0');
+      await this.tween({ targets: this.ball, x: rim.x, y: rim.y + 66, duration: 300, ease: 'Sine.easeIn' });
       this.ball.setDepth(11);
-      await bounceToFloor(side * 20, base.y - this.ball.y - 10, 300);
+      await this.looseBall(side * 35, 240, base.y + 12);
     } else if (o === 'rimOut') {
-      sfx.clank();
+      this.clank(1.2);
       this.cameras.main.shake(90, 0.004);
-      await this.tween({ targets: this.ball, x: rim.x + side * 80, y: rim.y - 42, duration: 260, ease: 'Quad.easeOut' });
+      await this.tween({ targets: this.ball, x: rim.x + side * 82, y: rim.y - 46, duration: 260, ease: 'Quad.easeOut' });
       this.ball.setDepth(11);
-      await bounceToFloor(side * 55, base.y - this.ball.y + 30, 380);
+      await this.looseBall(side * 150, -60, base.y + 34);
     } else if (o === 'long') {
       // off the glass and away to the side
-      sfx.clank();
+      this.clank(0.5);
       this.cameras.main.shake(70, 0.003);
-      await this.tween({ targets: this.ball, x: rim.x + side * 100, y: rim.y - 34, duration: 250, ease: 'Quad.easeOut' });
+      await this.tween({ targets: this.ball, x: rim.x + side * 100, y: rim.y - 36, duration: 250, ease: 'Quad.easeOut' });
       this.ball.setDepth(11);
-      await bounceToFloor(side * 50, base.y - this.ball.y + 30, 400);
+      await this.looseBall(side * 160, -40, base.y + 34);
     } else if (o === 'short') {
-      await bounceToFloor(toShooter * 25, base.y + 40 - this.ball.y, 320);
+      await this.looseBall(toShooter * 70, 200, base.y + 52);
     } else {
       this.ball.setDepth(11);
-      await bounceToFloor(side * 30, base.y - this.ball.y + 80, 380);
+      await this.looseBall(side * 110, 80, base.y + 80);
     }
-    this.ball.setVisible(false);
-    this.ballShadow.setVisible(false);
+    this.ball.setVisible(false).setAlpha(1);
+    this.ballShadow.setVisible(false).setAlpha(1);
+  }
+
+  /** Step and draw the net; the ball pushes through it when it's in the hoop. */
+  private updateNet(dt: number) {
+    const rim = A(HOOP.rimX, HOOP.rimY);
+    let ball: { x: number; y: number; r: number; vy: number } | null = null;
+    if (this.ball.visible && dt > 0) {
+      const r = 72 * this.ball.scaleX;
+      const bx = this.ball.x - rim.x;
+      const by = this.ball.y - rim.y;
+      const vy = (this.ball.y - this.prevBallY) / dt;
+      if (Math.abs(bx) < HOOP.rimRX + r && by > -r && by < 80) ball = { x: bx, y: by, r, vy };
+    }
+    this.prevBallY = this.ball.y;
+    this.netSim.step(dt, ball);
+    this.netSim.draw(this.netBack, this.netFront, rim.x, rim.y);
+  }
+
+  /** A clank on the rim: the hoop shivers and the net jumps. */
+  private clank(k = 1) {
+    sfx.clank();
+    this.netSim.impulse(k);
+    this.tweens.add({ targets: [this.rimFront, this.board], y: '+=2', duration: 50, yoyo: true, repeat: 1 });
+  }
+
+  /** Let the ball go: gravity, bounces that get lower each time, a roll, then it fades. */
+  private looseBall(vx: number, vy: number, floorY: number) {
+    return new Promise<void>((res) => (this.loose = { vx, vy, floorY, t: 0, res }));
+  }
+
+  private updateLooseBall(dt: number) {
+    const L = this.loose;
+    if (!L) return;
+    L.t += dt;
+    const r = 72 * this.ball.scaleY;
+    L.vy += 1500 * dt;
+    this.ball.x += L.vx * dt;
+    this.ball.y += L.vy * dt;
+    this.ball.rotation += (L.vx * dt) / Math.max(4, r);
+    if (this.ball.y > L.floorY - r) {
+      this.ball.y = L.floorY - r;
+      if (L.vy > 140) {
+        sfx.dribble(Math.min(1, L.vy / 700));
+        L.vy = -L.vy * 0.58;
+        L.vx *= 0.86;
+        // squash on impact
+        const sx = this.ball.scaleX;
+        this.tweens.add({ targets: this.ball, scaleY: sx * 0.84, scaleX: sx * 1.1, duration: 50, yoyo: true });
+      } else {
+        L.vy = 0;
+        L.vx *= Math.pow(0.25, dt); // rolling to a stop
+      }
+    }
+    const height = L.floorY - r - this.ball.y;
+    this.ballShadow.setPosition(this.ball.x, L.floorY + 2).setAlpha(0.75 * (1 - Math.min(1, height / 260)));
+    if (L.t > 1.7 || (L.vy === 0 && Math.abs(L.vx) < 12)) {
+      this.loose = null;
+      this.tweens.add({ targets: [this.ball, this.ballShadow], alpha: 0, duration: 260, onComplete: () => L.res() });
+    }
   }
 
   /** Keep a floor reflection in step with its sprite. */
