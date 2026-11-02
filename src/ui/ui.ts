@@ -345,7 +345,7 @@ export class UI {
       <button class="icon-btn fs-btn" data-act="fs" aria-label="Full screen" hidden>⛶</button>
       <p class="version">v${VERSION}</p>
       <div class="start-foot">
-        <button class="btn btn-big" data-act="play">Play</button>
+        <button class="btn btn-big btn-go" data-act="play">Play</button>
         ${usingTouch() ? '' : controlsHtml(true)}
       </div>
     </div>`);
@@ -706,7 +706,7 @@ export class UI {
           <h2>Out of lives!</h2>
           <p class="gameover-note">${g.name} fainted one too many times. Start the level again with 3 spare lives.</p>
           <div class="row">
-            <button class="btn" data-act="again">Try again</button>
+            <button class="btn btn-go" data-act="again">Try again</button>
             <button class="btn btn-alt" data-act="hero">Pick player</button>
           </div>
         </div>
@@ -760,7 +760,7 @@ export class UI {
           </dl>
           <div class="row">
             ${next ? `<button class="btn btn-next" data-act="next">Next: ${next.part} ▶</button>` : ''}
-            <button class="btn ${next ? 'btn-alt' : ''}" data-act="again">Play again</button>
+            <button class="btn ${next ? 'btn-alt' : 'btn-go'}" data-act="again">Play again</button>
           </div>
         </div>
       </div>

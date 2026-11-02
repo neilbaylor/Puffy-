@@ -96,9 +96,13 @@ body {
 .btn-alt {
   background: var(--paper);
 }
-/* "Next level" — the main action after a level: green, with a gentle pulse */
+/* the main "go" action is green everywhere: Play on the start screen, and
+   Next level after one (which also pulses gently) */
+.btn-go,
 .btn-next {
   background: linear-gradient(180deg, #8ff07a, #4fcf5a);
+}
+.btn-next {
   animation: next-pulse 1.4s ease-in-out infinite;
 }
 @keyframes next-pulse {
