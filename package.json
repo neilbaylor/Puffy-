@@ -12,9 +12,13 @@
     "start": "node server.mjs"
   },
   "dependencies": {
-    "phaser": "^3.90.0"
+    "phaser": "^3.90.0",
+    "ws": "^8.18.3"
   },
   "devDependencies": {
+    "@types/node": "^22.18.0",
+    "@types/ws": "^8.18.1",
+    "esbuild": "^0.28.2",
     "typescript": "5.9",
     "vite": "^7.3.7",
     "vite-plugin-singlefile": "^2.3.4"
