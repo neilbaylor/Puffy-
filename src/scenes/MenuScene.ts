@@ -3,6 +3,7 @@ import { MIN_VIEW_W, VIEW_H } from '../config';
 import { buildLevel1 } from '../level/level1';
 import { Background } from '../world/Background';
 import { LevelView } from '../world/LevelView';
+import { mixTint, themeClock, themeMix } from '../world/theme';
 
 /** Animated backdrop behind the start screen: a slow fly-over of Puff Ball Planet. */
 export class MenuScene extends Phaser.Scene {
@@ -33,6 +34,11 @@ export class MenuScene extends Phaser.Scene {
     this.x = (this.x + dt * 36) % Math.max(1, maxX);
     const top = this.level.heightPx - vh;
     cam.centerOn(this.x + vw / 2, top + vh / 2);
+    // the looks keep drifting behind the start screen too (same clock as the game)
+    themeClock.t += dt;
+    const m = themeMix(themeClock.t);
+    this.bg.setTheme(m);
+    this.level.setTint(mixTint(m));
     this.bg.update({ left: this.x, top, width: vw, height: vh }, dt);
   }
 }

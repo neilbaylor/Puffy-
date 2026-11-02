@@ -144,7 +144,6 @@ export class GameScene extends Phaser.Scene {
       run.bestAura = 0;
       run.rootbeer = new Set();
       resetLives();
-      themeClock.t = 0;
     }
     this.players = [];
     this.matches = [];
