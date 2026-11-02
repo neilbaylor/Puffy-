@@ -1216,8 +1216,8 @@ html.rotating body {
   color: #ff8a80;
 }
 .hoops-callout.turn {
-  /* under the jumbotron, over the court */
-  top: 52%;
+  /* down on the court, between the two shooters (clear of the hoop and scoreboard) */
+  top: 74%;
   /* big enough to read at a glance on a phone */
   font-size: clamp(36px, 10vmin, 68px);
 }

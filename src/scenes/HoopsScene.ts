@@ -438,7 +438,9 @@ export class HoopsScene extends Phaser.Scene {
     // in cutscenes the camera follows the (already eased) glide exactly; in the
     // contest it drifts softly toward its target
     const follow = snap || this.inIntro;
-    const target = follow ? z : cam.zoom + (z - cam.zoom) * 0.06;
+    // (time-based, so it settles at the same speed at any frame rate)
+    const k = 1 - Math.exp(-Math.min(0.1, this.game.loop.delta / 1000) * 3.7);
+    const target = follow ? z : cam.zoom + (z - cam.zoom) * k;
     cam.setZoom(target);
     const vw = this.scale.width / target;
     const vh = this.scale.height / target;
@@ -453,14 +455,15 @@ export class HoopsScene extends Phaser.Scene {
       const left = A(Math.min(...HERO_SPOTS.map((p) => p.x)), 0).x - 70;
       const right = A(Math.max(...KING_SPOTS.map((p) => p.x)), 0).x + 130;
       const xs = Phaser.Math.Clamp(x, right - vw / 2, Math.max(right - vw / 2, left + vw / 2));
-      const xw = Phaser.Math.Clamp(Phaser.Math.Clamp(xs, jx1 - vw / 2, jx0 + vw / 2), vw / 2, ARENA_W - vw / 2);
+      // (the arena's painted edge stops a little short of its very edge)
+      const xw = Phaser.Math.Clamp(Phaser.Math.Clamp(xs, jx1 - vw / 2, jx0 + vw / 2), vw / 2 + 40, Math.max(vw / 2 + 40, ARENA_W - 40 - vw / 2));
       x += (xw - x) * ease;
       y += (yw - y) * ease;
     }
     if (follow) cam.centerOn(x, y);
     else {
-      const cx = cam.midPoint.x + (x - cam.midPoint.x) * 0.06;
-      const cy = cam.midPoint.y + (y - cam.midPoint.y) * 0.06;
+      const cx = cam.midPoint.x + (x - cam.midPoint.x) * k;
+      const cy = cam.midPoint.y + (y - cam.midPoint.y) * k;
       cam.centerOn(cx, cy);
     }
   }
