@@ -1995,3 +1995,9 @@ kbd {
 .br-list li span { flex: 1; text-align: left; }
 .br-list li b { font: 400 18px var(--display); }
 .br-next { margin: 2px 0 0; font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+
+.battle-lobby.full .bl-slots,
+.battle-lobby.full .bl-me,
+.battle-lobby.full .bl-start,
+.battle-lobby.full .bl-sub { display: none; }
+.battle-lobby.full .bl-status { font-size: clamp(18px, 4.4vh, 26px); max-width: 22em; }

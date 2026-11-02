@@ -96,6 +96,8 @@ export class BattleUI {
     el.textContent = msg;
     el.hidden = !msg;
     this.lobby!.classList.toggle('waiting', s !== 'online');
+    // a full arena: nothing to pick or start, just the message (and Back)
+    this.lobby!.classList.toggle('full', s === 'full');
   }
 
   // ── lobby ──
