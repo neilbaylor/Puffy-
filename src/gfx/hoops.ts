@@ -400,7 +400,7 @@ export const SUMMIT: ArenaStyle = {
   net: [0xe8463f, 0xfbfbf8],
   // centre-hung jumbotron, banners on the left, a lower upper deck with different aisles,
   // and a camera set lower and further to the side
-  layout: { jumboX: 584, bannerX: -140, upperY0: -18, aislesU: [120, 660, 1240], aislesL: [260, 930], seeds: [777, 9191], cam: { dx: 70, dy: 34, zoom: 1.07, rot: -0.012 } },
+  layout: { jumboX: 584, bannerX: -140, upperY0: -18, aislesU: [120, 660, 1240], aislesL: [260, 930], seeds: [777, 9191], cam: { dx: 0, dy: 34, zoom: 1.07, rot: -0.012 } },
 };
 
 /** The style the arena drawing functions use right now (set before drawing). */
@@ -451,7 +451,8 @@ const DISPLAY_FONT = '"Lilita One", "Arial Black", sans-serif';
 
 /** Floor horizon (where the court meets the courtside boards) and vanishing point, stage coordinates. */
 const HORIZON = 330;
-const VPX = 860;
+/** (the hoop and court sit in the middle of the stage, so the TV camera can centre on them) */
+const VPX = 640;
 const VPY = 120;
 /** A pinhole camera over the court (feet): projection scale, height term and distance from the baseline. */
 const CAM_F = 595;
@@ -498,7 +499,7 @@ function arcUV(cu: number, cv: number, r: number, a0: number, a1: number, n = 48
 
 export const HOOP = {
   /** Rim centre in stage coordinates. */
-  rimX: 860,
+  rimX: 640,
   rimY: 250,
   rimRX: 44,
   rimRY: 11,
@@ -796,8 +797,8 @@ const B = 720 + STAGE_OY;
 
 /** Shooting spots on the floor (stage coordinates, feet). */
 export const SPOTS = {
-  hero: { x: 400, y: 640 },
-  king: { x: 1010, y: 650 },
+  hero: { x: 180, y: 640 },
+  king: { x: 790, y: 650 },
 };
 
 // LED advertising (all made-up Puff Ball Planet brands; per arena style)

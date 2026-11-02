@@ -1406,7 +1406,8 @@ html.rotating body {
   left: calc(max(5vw, 24px) + var(--safe-l));
   bottom: calc(14vh + 6px);
   display: grid;
-  transform: translateX(-120%);
+  /* (slid all the way off the left edge when hidden: no sliver left showing) */
+  transform: translateX(calc(-100% - max(5vw, 24px) - var(--safe-l) - 30px));
   transition: transform 0.45s cubic-bezier(0.6, 0, 0.3, 1);
 }
 .hoops-l3.show { transform: translateX(0); }

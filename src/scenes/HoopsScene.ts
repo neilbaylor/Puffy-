@@ -75,21 +75,21 @@ const REGULATION = 5;
 
 /** Where each player shoots from (stage coords, feet): they walk to a new one before every shot. */
 const HERO_SPOTS = [
-  { x: 400, y: 640 },
-  { x: 520, y: 588 },
-  { x: 300, y: 700 },
-  { x: 590, y: 676 },
-  { x: 455, y: 560 },
-  { x: 345, y: 612 },
+  { x: 180, y: 640 },
+  { x: 300, y: 588 },
+  { x: 80, y: 700 },
+  { x: 370, y: 676 },
+  { x: 235, y: 560 },
+  { x: 125, y: 612 },
 ];
 // (kept inside what a 4:3 iPad screen shows, so the King never walks off the edge)
 const KING_SPOTS = [
-  { x: 1010, y: 650 },
-  { x: 1000, y: 598 },
-  { x: 930, y: 702 },
-  { x: 968, y: 565 },
-  { x: 1018, y: 694 },
-  { x: 948, y: 626 },
+  { x: 790, y: 650 },
+  { x: 780, y: 598 },
+  { x: 710, y: 702 },
+  { x: 748, y: 565 },
+  { x: 798, y: 694 },
+  { x: 728, y: 626 },
 ];
 /** Perspective: how big someone standing at stage height y looks, relative to `baseY`. */
 const depthK = (y: number, baseY: number) => (y - 120) / (baseY - 120);
@@ -452,8 +452,8 @@ export class HoopsScene extends Phaser.Scene {
       const jx1 = A(JUMBO.x + JUMBO.w * JUMBO.s, 0).x + 12 + SAFE.r / target;
       const yw = Phaser.Math.Clamp(Phaser.Math.Clamp(y, Math.min(feet - vh / 2, jTop + vh / 2), jTop + vh / 2), vh / 2, ARENA_H - vh / 2);
       // …but never so far that a shooter on the edge of the court is cut off
-      const left = A(Math.min(...HERO_SPOTS.map((p) => p.x)), 0).x - 70;
-      const right = A(Math.max(...KING_SPOTS.map((p) => p.x)), 0).x + 130;
+      const left = Math.min(this.hero?.x ?? A(SPOTS.hero.x, 0).x, A(SPOTS.hero.x, 0).x) - 70;
+      const right = Math.max(this.king?.x ?? A(SPOTS.king.x, 0).x, A(SPOTS.king.x, 0).x) + 130;
       const xs = Phaser.Math.Clamp(x, right - vw / 2, Math.max(right - vw / 2, left + vw / 2));
       // (the arena's painted edge stops a little short of its very edge)
       const xw = Phaser.Math.Clamp(Phaser.Math.Clamp(xs, jx1 - vw / 2, jx0 + vw / 2), vw / 2 + 40, Math.max(vw / 2 + 40, ARENA_W - 40 - vw / 2));
@@ -1561,7 +1561,7 @@ export class HoopsScene extends Phaser.Scene {
     });
     anim(['run0', 'run1'], 9);
     // they charge in from the right and skid to a stop in a ragged line
-    const stopX = [800, 920, 1060, 1210, 1330, 1440];
+    const stopX = [580, 700, 840, 990, 1110, 1220];
     await Promise.all(plops.map((p, i) => this.tween({ targets: p, x: stopX[i], duration: 1000 + i * 120, ease: 'Quad.easeOut' })));
     // POOPA! POOPA! (with angry little hops)
     anim(['yell0', 'yell1'], 7);
