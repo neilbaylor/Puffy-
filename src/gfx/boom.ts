@@ -100,13 +100,13 @@ export function drawBoomFrame(ctx: Ctx, f: number) {
   const fade = 1 - Math.max(0, k - 0.45) / 0.55;
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2 + r() * 0.4;
-    const d = 40 + k * 70 + r() * 18;
-    const pr = (34 + r() * 14) * (1 + k * 0.5) * (1 - Math.max(0, k - 0.7) * 0.6);
+    const d = 72 + k * 56 + r() * 18;
+    const pr = (48 + r() * 14) * (1 + k * 0.35) * (1 - Math.max(0, k - 0.7) * 0.6);
     const hot = k < 0.35;
     puff(ctx, c + Math.cos(a) * d, c + Math.sin(a) * d * 0.85 - k * 26, pr, hot ? '#ffb46a' : '#efe7f2', hot ? '#f2884a' : '#d4c8dc', fade);
   }
   // the middle puff
-  puff(ctx, c, c - k * 30, (52 + k * 22) * (1 - Math.max(0, k - 0.7)), k < 0.25 ? '#ffc27a' : '#f6f0f7', k < 0.25 ? '#ff9a4c' : '#ddd2e4', fade);
+  puff(ctx, c, c - k * 30, (72 + k * 16) * (1 - Math.max(0, k - 0.7)), k < 0.25 ? '#ffc27a' : '#f6f0f7', k < 0.25 ? '#ff9a4c' : '#ddd2e4', fade);
   if (k < 0.5) {
     // flame tongues poking out between the puffs
     ctx.globalAlpha = 1 - k * 2;

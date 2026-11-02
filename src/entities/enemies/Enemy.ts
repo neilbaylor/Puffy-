@@ -441,7 +441,8 @@ export class Giant extends Enemy {
         this.setFrame(Math.floor(this.t * 5) % 2 ? 'w1' : 'w0');
         const dx = target ? Math.abs(target.x - this.x) : Infinity;
         const sameLevel = target ? Math.abs(target.bottom - b.bottom) < 48 : false;
-        if (target && onGround && this.chargeCooldown <= 0 && dx < 300 && dx > 70 && sameLevel) {
+        // (no charging at you across a gap or a wall: he'll leap over instead)
+        if (target && onGround && groundAhead && !wallAhead && this.chargeCooldown <= 0 && dx < 300 && dx > 70 && sameLevel) {
           // wind up, then charge!
           this.mode = 'chargeWindup';
           this.timer = 0.55; // a clear warning
@@ -496,7 +497,7 @@ export class Giant extends Enemy {
             const up = higher ? 680 : 620;
             const rise = Math.max(0, b.bottom - tgt.bottom);
             const t = up / 1600 + Math.sqrt(Math.max(0, (up * up) / (2 * 1600) - rise) * 2 / 1600);
-            const vx = Phaser.Math.Clamp(dx / Math.max(0.45, t), -240, 240);
+            const vx = Phaser.Math.Clamp(dx / Math.max(0.45, t), -300, 300);
             this.dir = Math.sign(dx) || this.dir;
             b.setVelocity(vx, -up);
           } else b.setVelocity(0, -600);

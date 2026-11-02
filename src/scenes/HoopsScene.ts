@@ -429,7 +429,8 @@ export class HoopsScene extends Phaser.Scene {
     // the wide shot always keeps the whole jumbotron (and everyone's feet) in view:
     // on long phone screens that means pulling back a little and framing a touch higher
     const jTop = A(0, JUMBO.y).y - 16;
-    const feet = A(0, Math.max(SPOTS.hero.y, SPOTS.king.y)).y + 34;
+    // (wherever they're standing now: they shoot from different spots)
+    const feet = Math.max(A(0, Math.max(SPOTS.hero.y, SPOTS.king.y)).y, this.hero?.y ?? 0, this.king?.y ?? 0) + 30;
     const zWide = Math.min(z, this.scale.height / (feet - jTop), Math.max(this.scale.width / ARENA_W, this.scale.height / ARENA_H));
     z += (zWide - z) * ease;
     // in cutscenes the camera follows the (already eased) glide exactly; in the
@@ -897,9 +898,9 @@ export class HoopsScene extends Phaser.Scene {
       });
       addCanvas(this, 'kingboom', c, (t) => BOOM_FRAMES.forEach((f, i) => t.add(f, 0, i * fw, 0, fw, fw)));
     }
-    const boom = this.add.image(cx, cy, 'kingboom', 'b0').setDepth(12.25).setScale(2.4 / 1.5);
+    const boom = this.add.image(cx, cy, 'kingboom', 'b0').setDepth(12.25).setScale(1.5 / 1.5);
     BOOM_FRAMES.forEach((f, i) => this.time.delayedCall(i * 70, () => boom.setFrame(f)));
-    this.tweens.add({ targets: boom, scale: (2.9 / 1.5), duration: BOOM_FRAMES.length * 70, ease: 'Sine.easeOut' });
+    this.tweens.add({ targets: boom, scale: 1.9 / 1.5, duration: BOOM_FRAMES.length * 70, ease: 'Sine.easeOut' });
     this.tweens.add({ targets: boom, alpha: 0, delay: BOOM_FRAMES.length * 70 - 120, duration: 260, onComplete: () => boom.destroy() });
     // fireball glow
     const glow = this.add.image(cx, cy, 'spot').setBlendMode(Phaser.BlendModes.ADD).setTint(0xffd27a).setDepth(12.2).setScale(0.2).setAlpha(1);
