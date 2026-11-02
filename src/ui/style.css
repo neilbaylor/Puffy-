@@ -1756,3 +1756,241 @@ kbd {
 
 /* the keyboard controls sit a few px further below the Play button */
 .start-foot .controls { margin-top: 7px; }
+
+/* ───────────── online battle ───────────── */
+
+/* the Battle button, top right of the start screen (full screen sits to its left) */
+.battle-btn {
+  position: absolute;
+  top: calc(10px + var(--safe-t));
+  right: calc(12px + var(--safe-r));
+  width: auto;
+  padding: 0 14px 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 900 clamp(15px, 2.8vmin, 19px) / 1 var(--display);
+  letter-spacing: 0.02em;
+  background: linear-gradient(180deg, #ffe27a, var(--gold));
+}
+.battle-btn span { font-size: 1.15em; }
+.start .fs-btn { right: calc(12px + var(--safe-r) + clamp(110px, 20vmin, 132px)); }
+
+.battle-lobby {
+  justify-content: center;
+  gap: clamp(8px, 2.2vh, 18px);
+  background: radial-gradient(ellipse at 50% 40%, #ffffff8c, transparent 70%);
+}
+.bl-back {
+  position: absolute;
+  top: calc(10px + var(--safe-t));
+  left: calc(12px + var(--safe-l));
+  font-size: 30px;
+  line-height: 0;
+  padding-bottom: 4px;
+}
+.bl-head { text-align: center; }
+.bl-title {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(36px, 10vh, 72px);
+  line-height: 0.95;
+  color: var(--gold);
+  -webkit-text-stroke: 0.07em var(--ink);
+  paint-order: stroke fill;
+  text-shadow: 0 0.07em 0 var(--ink);
+  transform: rotate(-3deg);
+}
+.bl-sub {
+  margin: 6px 0 0;
+  font: 800 clamp(12px, 2.4vmin, 16px) / 1.3 var(--body);
+  color: #fff;
+  -webkit-text-stroke: 4px var(--ink);
+  paint-order: stroke fill;
+}
+.bl-slots {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(8px, 1.6vw, 16px);
+  width: min(100%, 780px);
+}
+.bl-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 6px 8px;
+  border: 3px solid var(--ink);
+  border-radius: 18px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--sc) 30%, #fff) 0, var(--paper) 55%);
+  box-shadow: inset 0 7px 0 var(--sc), 0 5px 0 var(--ink);
+  font-family: var(--body);
+  color: var(--ink);
+  transition: opacity 0.2s;
+}
+.bl-slot canvas,
+.bl-wait { width: clamp(56px, 14vh, 100px); height: clamp(56px, 14vh, 100px); }
+.bl-wait {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 3px dashed color-mix(in srgb, var(--sc) 70%, var(--ink));
+  font: 400 clamp(26px, 6vh, 44px) / 1 var(--display);
+  color: color-mix(in srgb, var(--sc) 80%, var(--ink));
+}
+.bl-slot b {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 400 clamp(15px, 3.4vh, 21px) / 1.1 var(--display);
+}
+.bl-slot small {
+  font-weight: 800;
+  font-size: clamp(10px, 2vh, 12px);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.bl-slot.empty { opacity: 0.72; box-shadow: inset 0 7px 0 color-mix(in srgb, var(--sc) 45%, #fff), 0 5px 0 var(--ink); }
+.bl-slot.me { box-shadow: inset 0 7px 0 var(--sc), 0 5px 0 var(--ink), 0 0 0 4px var(--sc); transform: translateY(-3px); }
+.bl-me {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 10px 16px;
+}
+.bl-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: 900 13px var(--body);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fff;
+  -webkit-text-stroke: 4px var(--ink);
+  paint-order: stroke fill;
+}
+.bl-name input {
+  width: 9.5em;
+  padding: 7px 12px;
+  border: 3px solid var(--ink);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--ink);
+  font: 800 16px var(--body);
+  -webkit-text-stroke: 0;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.bl-heroes { display: inline-flex; gap: 6px; }
+.bl-hero {
+  padding: 7px 12px 6px;
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 15px / 1 var(--display);
+  box-shadow: 0 3px 0 var(--ink);
+  cursor: pointer;
+}
+.bl-hero.picked { background: var(--gold); }
+.bl-foot { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.bl-start:disabled { filter: grayscale(0.7); opacity: 0.7; cursor: default; }
+.bl-status {
+  margin: 0;
+  font: 800 14px var(--body);
+  color: #fff;
+  -webkit-text-stroke: 4px var(--ink);
+  paint-order: stroke fill;
+  text-align: center;
+}
+.battle-lobby.waiting .bl-slots { opacity: 0.6; }
+.bl-count {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #3a241866;
+  font: 400 clamp(110px, 40vh, 220px) / 1 var(--display);
+  color: var(--gold);
+  -webkit-text-stroke: 0.06em var(--ink);
+  paint-order: stroke fill;
+  text-shadow: 0 0.06em 0 var(--ink);
+  pointer-events: none;
+}
+.bl-count.pop { animation: bl-pop 0.9s cubic-bezier(0.2, 1.6, 0.4, 1); }
+@keyframes bl-pop {
+  0% { transform: scale(0.3) rotate(-12deg); opacity: 0; }
+  40% { transform: scale(1.1) rotate(3deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0); }
+}
+@media (max-height: 500px) {
+  .battle-lobby { gap: 7px; padding-top: calc(8px + var(--safe-t)); }
+  .bl-slot { padding: 7px 4px 6px; border-radius: 14px; }
+  .bl-name input { padding: 5px 10px; font-size: 15px; }
+  .bl-hero { padding: 6px 10px 5px; font-size: 14px; }
+}
+
+/* the scoreboard during a battle */
+.bhud {
+  position: absolute;
+  top: calc(6px + var(--safe-t));
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+  z-index: 5;
+}
+.bhud-time {
+  font: 400 clamp(22px, 5vh, 32px) / 1 var(--display);
+  color: #fff;
+  -webkit-text-stroke: 0.16em var(--ink);
+  paint-order: stroke fill;
+}
+.bhud-time.low { color: #ff6b5e; animation: next-pulse 0.5s ease-in-out infinite; }
+.bhud-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.bhud-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px 3px 4px;
+  border-radius: 999px;
+  background: #3a2418cc;
+  color: #fff;
+  font: 800 12px / 1.2 var(--body);
+}
+.bhud-chip i { width: 14px; height: 14px; border-radius: 50%; background: var(--sc); border: 2px solid #fff; }
+.bhud-chip b { font: 400 15px / 1 var(--display); color: var(--gold); }
+.bhud-chip.me { box-shadow: 0 0 0 2px var(--sc); }
+.bhud-chip.down { opacity: 0.5; }
+.bhud-leave {
+  position: absolute;
+  top: 0;
+  right: calc(12px + var(--safe-r));
+  pointer-events: auto;
+  font-size: 18px;
+}
+
+/* battle results */
+.battle-results { align-items: center; text-align: center; min-width: min(100%, 340px); }
+.battle-results h2 { color: #2f9a3f; margin: 0; }
+.br-winner {
+  width: clamp(80px, 22vh, 120px);
+  height: clamp(80px, 22vh, 120px);
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff6c8, color-mix(in srgb, var(--sc) 35%, #fff));
+  box-shadow: 0 0 0 4px var(--sc), 0 0 0 7px var(--ink);
+  animation: hop 1s ease-in-out infinite;
+}
+.br-list { list-style: none; margin: 4px 0 0; padding: 0; width: 100%; display: grid; gap: 4px; }
+.br-list li { display: flex; align-items: center; gap: 8px; font-weight: 800; }
+.br-list li i { width: 14px; height: 14px; border-radius: 50%; background: var(--sc); border: 2px solid var(--ink); }
+.br-list li span { flex: 1; text-align: left; }
+.br-list li b { font: 400 18px var(--display); }
+.br-next { margin: 2px 0 0; font-size: 12px; font-weight: 700; color: var(--ink-soft); }

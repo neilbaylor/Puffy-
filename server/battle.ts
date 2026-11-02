@@ -143,6 +143,8 @@ class Room {
 
   private startBattle() {
     this.sim = new BattleSim(ARENA);
+    // (BATTLE_SECS shortens matches for testing)
+    if (Number(process.env.BATTLE_SECS) > 0) this.sim.timeLeft = Number(process.env.BATTLE_SECS);
     this.winner = null;
     for (const c of this.clients.values()) {
       c.playing = !!c.ws;

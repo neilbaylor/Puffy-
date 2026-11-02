@@ -5,6 +5,7 @@ import { fadeOutMusic, playLevelClear, playLevelMusic, playLevelSong, playMenuMu
 import { isMuted, setMuted, sfx, unlockAudio } from '../core/sfx';
 import { drawHeroCard, drawPortrait, renderPoseSet } from '../gfx/draw';
 import { NEUTRAL_FACE, type Face } from '../gfx/face';
+import { BattleUI } from './battleUi';
 import { gamepadSources } from '../input/gamepad';
 import { isKeyDown } from '../input/keyboard';
 import { isTouchDevice, onInputModeChange, usingTouch } from '../input/touch';
@@ -190,6 +191,27 @@ export class UI {
   private subtitleTimer = 0;
   private hudFace: FaceLife | null = null;
   private hudIdle = 0;
+  /** The online battle screens (made the first time you tap Battle). */
+  private battleUi: BattleUI | null = null;
+  private get battle() {
+    return (this.battleUi ??= this.makeBattleUi());
+  }
+  private makeBattleUi() {
+    return new BattleUI({
+    root: this.root,
+    game: this.game,
+    setScreen: (el) => this.setScreen(el),
+    home: () => {
+      if (this.game.scene.isActive('Menu')) this.showStart();
+      else this.game.scene.start('Menu');
+    },
+    hero: () => CHARACTERS[this.selected]?.id ?? 'puffy',
+    touch: (on) => {
+      if (on && usingTouch()) this.touch.show();
+      else this.touch.hide();
+    },
+  });
+  }
   private selected = 0;
   private introEl: HTMLElement | null = null;
   /** Which level to start (1-based); you can pick once you've beaten a level. */
@@ -405,6 +427,7 @@ export class UI {
       }
       <button class="icon-btn fs-btn" data-act="fs" aria-label="Full screen" hidden>⛶</button>
       <button class="icon-btn mute-btn" data-act="mute" aria-label="Sound on or off"></button>
+      <button class="icon-btn battle-btn" data-act="battle" aria-label="Online battle with friends"><span>⚔︎</span> Battle</button>
       <p class="version">v${VERSION}</p>
       <div class="start-foot">
         <button class="btn btn-big btn-go" data-act="play">Play</button>
@@ -525,6 +548,10 @@ export class UI {
       setMusicMuted(isMuted());
       syncMute();
       if (!isMuted()) playMenuMusic();
+    });
+    el.querySelector('[data-act=battle]')!.addEventListener('click', () => {
+      sfx.select();
+      this.battle.open();
     });
     const fsBtn = el.querySelector<HTMLButtonElement>('[data-act=fs]')!;
     const syncFs = () => (fsBtn.hidden = !canFullscreen() || isFullscreen() || isStandalone());
