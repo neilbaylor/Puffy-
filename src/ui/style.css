@@ -1649,14 +1649,16 @@ kbd {
   from { transform: translateY(0.9em) rotate(14deg) scale(0.2); opacity: 0; }
 }
 
-/* hero names wave like the subtitle (each card a little out of step) */
+/* the picked hero's name waves like the subtitle (the others sit still) */
 .card-name .w { display: inline-block; white-space: nowrap; }
 .card-name .w + .w { margin-left: 0.28em; }
 .card-name i {
   display: inline-block;
   font-style: normal;
+}
+.card.picked .card-name i {
   animation: wn-wave 2.6s ease-in-out infinite;
-  animation-delay: calc(var(--d, 0s) + var(--i) * 0.06s);
+  animation-delay: calc(var(--i) * 0.06s);
 }
 
 /* picking a hero: a happy hop with a crouch and a squashy landing */
@@ -1681,27 +1683,8 @@ kbd {
   40% { transform: translateY(-0.35em) rotate(-8deg) scale(1.2); }
   100% { transform: translateY(0) rotate(0) scale(1); }
 }
-.card .spark {
-  position: absolute;
-  left: 50%;
-  top: 42%;
-  width: 11px;
-  height: 11px;
-  margin: -5.5px;
-  pointer-events: none;
-  background: var(--c);
-  border: 2px solid var(--ink);
-  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
-  opacity: 0;
-  animation: spark-pop 0.7s cubic-bezier(0.2, 0.8, 0.4, 1) both;
-}
-@keyframes spark-pop {
-  0% { opacity: 1; transform: translate(0, 0) rotate(0) scale(0.3); }
-  60% { opacity: 1; transform: translate(var(--dx), var(--dy)) rotate(var(--r)) scale(1.4); }
-  100% { opacity: 0; transform: translate(var(--dx), calc(var(--dy) + 10px)) rotate(var(--r)) scale(0.6); }
-}
 @media (prefers-reduced-motion: reduce) {
-  .card-name i, .card.cheer canvas, .card.cheer .card-name i, .card .spark { animation: none; }
+  .card-name i, .card.cheer canvas, .card.cheer .card-name i { animation: none; }
 }
 
 /* results on a phone in landscape: stats in two columns, all buttons on one row */

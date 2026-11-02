@@ -354,7 +354,7 @@ export class UI {
       const bar = (n: number) => `<i style="--n:${n}"></i>`;
       const card = h(`<button class="card" role="radio" data-i="${i}" style="--c:${c.colors.main};--cs:${c.colors.shade}">
         <canvas width="320" height="320"></canvas>
-        <div class="card-name" aria-label="${c.name}" style="--d:${i * -0.9}s">${waveWords(c.name)}</div>
+        <div class="card-name" aria-label="${c.name}">${waveWords(c.name)}</div>
         <div class="card-tag">${c.tagline}</div>
         <dl class="bars">
           <dt>Speed</dt><dd>${bar(c.bars.speed)}</dd>
@@ -489,7 +489,7 @@ export class UI {
   private cardPoses = new Map<string, Record<string, HTMLCanvasElement>>();
   private cheerRaf = 0;
 
-  /** The picked hero celebrates: crouch, hop, land with a squash, name bounces, sparkles. */
+  /** The picked hero celebrates: crouch, hop, land with a squash, and the name bounces. */
   private cheer(i: number) {
     const card = this.screen?.querySelectorAll<HTMLElement>('.card')[i];
     const cv = card?.querySelector('canvas');
@@ -526,8 +526,7 @@ export class UI {
         oc.drawImage(op.idle0, 0, 0);
       }
     });
-    card.querySelectorAll('.spark').forEach((s) => s.remove());
-    void card.offsetWidth;
+        void card.offsetWidth;
     card.classList.add('cheer');
     // the poses follow the hop's own clock (.cheer keyframes, 0.75 s), so they
     // always line up with it: crouch → up → coming down → landed
@@ -543,17 +542,6 @@ export class UI {
       }
     };
     this.cheerRaf = requestAnimationFrame(step);
-    // a little burst of sparkles around the hero
-    const colors = ['#ffd23f', '#ff7eb6', '#7ee3ff', '#ffffff', ch.colors.main];
-    for (let k = 0; k < 9; k++) {
-      const s = document.createElement('i');
-      s.className = 'spark';
-      const a = -Math.PI / 2 + (k / 8 - 0.5) * Math.PI * 1.25 + (Math.random() - 0.5) * 0.3;
-      const d = 46 + Math.random() * 30;
-      s.style.cssText = `--dx:${(Math.cos(a) * d).toFixed(1)}px;--dy:${(Math.sin(a) * d).toFixed(1)}px;--c:${colors[k % colors.length]};--r:${Math.round(Math.random() * 180)}deg;animation-delay:${(0.12 + Math.random() * 0.08).toFixed(2)}s`;
-      card.appendChild(s);
-      window.setTimeout(() => s.remove(), 1100);
-    }
   }
 
   /** Hide the browser's address bar etc. (Android, iPad, desktop). iPhone needs "Add to Home Screen". */
