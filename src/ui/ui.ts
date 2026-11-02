@@ -325,6 +325,10 @@ export class UI {
       this.hud.hidden = true;
       this.banner.hidden = true;
       this.touch.hide();
+      // the phone is upright as basketball begins: start it frozen (turning back carries on)
+      requestAnimationFrame(() => {
+        if (window.innerHeight > window.innerWidth && isTouchDevice() && game.scene.isActive('Hoops')) game.scene.pause('Hoops');
+      });
     });
     game.events.on('level-complete', (r: ResultState) => this.showResults(r));
     game.events.on('game-over', (g: GameOverState) => this.showGameOver(g));
