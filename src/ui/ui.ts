@@ -357,6 +357,13 @@ export class UI {
     });
     const checkOrientation = () => {
       const portrait = window.innerHeight > window.innerWidth;
+      const upright = portrait && isTouchDevice();
+      // turned the phone upright mid-level: pause the game for them
+      if (upright && this.rotate.hidden && this.gameScene && !this.screen) this.pause();
+      // basketball has no pause menu: it just freezes while the phone is upright
+      const sc = this.game.scene;
+      if (upright && sc.isActive('Hoops')) sc.pause('Hoops');
+      else if (!upright && sc.isPaused('Hoops')) sc.resume('Hoops');
       this.rotate.hidden = !(portrait && isTouchDevice());
       // the page behind matches the prompt, so no strip of sky shows under it (iOS home screen)
       document.documentElement.classList.toggle('rotating', !this.rotate.hidden);
@@ -417,7 +424,7 @@ export class UI {
     const el = h(`<div class="screen start${progress.beaten >= 1 ? '' : ' no-levels'}">
       <header class="start-head">
         <div class="logo"><span>P</span><span>U</span><span>F</span><span>F</span><span>Y</span></div>
-        <p class="world-name" aria-label="${levelInfo(this.level).world} · ${levelName(this.level)}">${waveText(`${levelInfo(this.level).world} · ${levelName(this.level)}`)}</p>
+        <p class="world-name" aria-label="${levelName(this.level)}">${waveText(levelName(this.level))}</p>
       </header>
       <h2>Pick your player</h2>
       <div class="cards" role="radiogroup" aria-label="Pick your player"></div>
@@ -485,7 +492,8 @@ export class UI {
     const syncLevels = () => {
       el.querySelectorAll<HTMLButtonElement>('.lvl').forEach((b) => b.classList.toggle('picked', Number(b.dataset.lvl) === this.level));
       const wn = el.querySelector<HTMLElement>('.world-name')!;
-      const text = `${levelInfo(this.level).world} · ${levelName(this.level)}`;
+      // the planet's name says which world it is ("Puff Ball Planet" is World 1)
+      const text = levelName(this.level);
       if (wn.getAttribute('aria-label') === text) return;
       wn.setAttribute('aria-label', text);
       // only the parts that changed (e.g. "Part 1" → "Part 2"; the world only when

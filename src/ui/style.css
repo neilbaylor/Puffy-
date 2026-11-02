@@ -830,7 +830,8 @@ html.rotating body {
   position: fixed;
   inset: -80px;
   padding: calc(80px + var(--safe-t) + 20px) calc(80px + 24px) calc(80px + var(--safe-b) + 20px);
-  z-index: 10;
+  /* above everything: level titles, the basketball stinger, menus, toasts */
+  z-index: 9999;
   display: flex;
   flex-direction: column;
   align-items: center;
