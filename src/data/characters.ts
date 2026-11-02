@@ -32,6 +32,13 @@ export interface CharacterDef {
   blastRadius: number;
   /** Hits dealt per rocket (1 for everyone, so "takes 2 shots" means the same for all heroes). */
   damage: number;
+  /**
+   * Heavy hitter: the first rocket on a tough enemy (3+ hits left) counts
+   * double — armed medium guys go down in 2, giants in one fewer.
+   */
+  heavyHitter?: boolean;
+  /** How far hits knock this hero back (1 = normal; Big Muscles is heavy). */
+  knockback?: number;
   /** Drawing scale (Scruffy is small, Big Muscles is big). */
   scale: number;
   /** Collision box size (px). Defaults 22 × 34. */
@@ -94,6 +101,8 @@ export const CHARACTERS: CharacterDef[] = [
     tagline: 'Big blasts',
     colors: { main: '#ec7b2b', shade: '#c0561a', light: '#ffb06a', accent: '#fffaf0' },
     scale: 1.32,
+    heavyHitter: true,
+    knockback: 0.55,
     hitW: 32,
     hitH: 58,
     muzzleY: 23,
@@ -104,8 +113,8 @@ export const CHARACTERS: CharacterDef[] = [
     jump: 585,
     staminaSecs: 2.4,
     refillSecs: 2.2,
-    fireRate: 0.6,
-    maxRockets: 1,
+    fireRate: 0.55,
+    maxRockets: 2,
     rocketSpeed: 560,
     blastRadius: 86,
     damage: 1,

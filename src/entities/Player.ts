@@ -333,7 +333,9 @@ export class Player {
     this.invulnUntil = this.scene.time.now + INVULN * 1000;
     this.stun = HIT_STUN;
     const away = Math.sign(this.x - fromX) || -this.facing;
-    this.body.setVelocity(away * 240, -360);
+    // heavy heroes (Big Muscles) barely budge
+    const k = this.char.knockback ?? 1;
+    this.body.setVelocity(away * 240 * k, -360 * (0.5 + 0.5 * k));
     this.scene.cameras.main.shake(120, 0.004);
   }
 
