@@ -352,16 +352,16 @@ body {
   .start h2 { display: none; }
   /* the title sits a little way down; the rows below it are packed snugly
      (the cards take up the slack), with only a small margin under Play */
-  .start { justify-content: flex-start; gap: 0; padding-top: calc(clamp(8px, 6.2vh, 30px) + var(--safe-t)); padding-bottom: calc(clamp(6px, 3vh, 14px) + var(--safe-b)); }
+  .start { justify-content: flex-start; gap: 0; padding-top: calc(clamp(6px, 4.4vh, 22px) + var(--safe-t)); padding-bottom: calc(clamp(6px, 3vh, 14px) + var(--safe-b)); }
   .start .cards { margin-top: clamp(8px, 3.6vh, 18px); }
-  .start .levels { margin-top: clamp(14px, 6vh, 28px); }
+  .start .levels { margin-top: clamp(20px, 8.6vh, 40px); }
   .start .start-foot { margin-top: clamp(6px, 2.4vh, 12px); }
   .logo { font-size: clamp(30px, 11vh, 52px); }
   .world-name { font-size: clamp(11px, 3.6vh, 16px); }
   /* shorter cards: the heroes are drawn smaller so everything fits under the title */
   .cards { flex: 0 1 auto; width: min(100%, 760px); }
   .card { padding: 4px 8px 8px; border-radius: 16px; box-shadow: 0 4px 0 var(--ink); }
-  .card canvas { height: max(70px, min(30vh, 40vmin, calc(100vh - 282px - var(--safe-t) - var(--safe-b)))); }
+  .card canvas { height: max(70px, min(30vh, 40vmin, calc(100vh - 286px - var(--safe-t) - var(--safe-b)))); }
   /* a little headroom for the logo's hopping letters */
   .start-head { margin-top: clamp(4px, 2.5vh, 12px); }
   .card-name { font-size: clamp(15px, 5vh, 22px); }
@@ -1750,3 +1750,9 @@ kbd {
   text-transform: uppercase;
   color: var(--ink-soft);
 }
+
+/* level clear: the left column stacks from the top — lives (level with the
+   World/Part line), the hero right under them, then Pick player */
+.results:not(.gameover) { align-items: flex-start; }
+.results:not(.gameover) .results-hero { gap: 6px; }
+.results:not(.gameover) .results-hero canvas { max-width: 150px; }

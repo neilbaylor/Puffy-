@@ -55,8 +55,8 @@ const kc = (k: string) => `<kbd>${k}</kbd>`;
 function controlsHtml(compact = false) {
   const rows: [string, string][] = [
     [`${kc('←')}${kc('→')} <small>or</small> ${kc('A')}${kc('D')}`, 'move'],
-    [`${kc('Space')} <small>or</small> ${kc('↑')}`, compact ? 'jump (again in the air: double jump)' : 'jump — press again in the air for a double jump'],
-    [`${kc('F')} <small>or</small> 🖱️ <small>click</small>`, 'fire the bazooka'],
+    [`${kc('↑')} <small>or</small> ${kc('W')}`, compact ? 'jump (again in the air: double jump)' : 'jump — press again in the air for a double jump'],
+    [`${kc('Space')} <small>or</small> 🖱️ <small>click</small>`, 'fire the bazooka'],
     [`hold ${kc('Shift')}`, 'run (uses stamina)'],
     [`${kc('Esc')}`, 'pause'],
   ];
@@ -753,7 +753,7 @@ export class UI {
           ${firstTime ? '<p class="unlock-note">New: pick which level to start from on the start screen!</p>' : ''}
           <dl class="stat-list">
             <dt>Aura carried <i class="aura-ico"></i></dt><dd>${r.aura}</dd>
-            <dt>Root beer found <i class="rb-ico"></i></dt><dd>${r.rootbeer} <small>(${r.rootbeerTotal} saved)</small></dd>
+            <dt>Root beer found <i class="rb-ico"></i></dt><dd>${r.rootbeerTotal}</dd>
             <dt>Puffballs popped</dt><dd>${r.popped}</dd>
             <dt>Giants beaten</dt><dd>${r.giants}</dd>
             <dt>Time</dt><dd>${mins}:${secs}</dd>
