@@ -1,139 +1,166 @@
 import { LevelBuilder, type LevelData } from './builder';
 
 /**
- * World 1 · "Puff Ball Planet" Part 2: up the mountain.
- * Heights are tiles from the bottom (the level is 38 tall, so the summit has sky above it). Steep parts climb
- * 3 tiles at a time (a jump, or a double jump); gentle parts step up 1 tile.
- * Each zone is its own piece of ground (split by crevasses) so it can have its
- * own look: green valleys, snowy rock, a frozen pond.
+ * World 1 · "Puff Ball Planet" Part 2: up the mountain — and it really is UP
+ * the whole way, from the green foothills to a summit 50 tiles higher, with
+ * no going back down. Heights are tiles from the bottom (the level is 62
+ * tall, so there's sky above the summit). Steep parts climb 2-3 tiles at a
+ * time; a few HARD jumps: wide crevasses that need a running jump, narrow
+ * rock pillars to hop across, and a ledge that needs a double jump.
+ * Each zone is its own piece of ground (split by crevasses) so it can have
+ * its own look: green valleys, snowy rock, a frozen pond.
  *
- *   0-36    Green valley foothills: gentle steps up, first Puffballs
- *   40-80   Steep snowy cliff face (3-tile steps), a goat, GIANT #1 · checkpoint 1
- *   84-128  Snowy slopes, gentle: Puffballs drop in by parachute, goats on patrol
- *   132-165 The frozen pond: Puffballs playing hockey shoot pucks at you
- *   169-185 GIANT #2 · checkpoint 2
- *   186-212 Down into a green alpine valley, then a steep climb back out
- *   216-232 GIANT #3 · checkpoint 3
- *   233-299 The last steep snowy climb, parachuters, goats, the summit gate
+ *   0-34    Green foothills, gentle steps up, first Puffballs
+ *   37-80   Steep snowy cliff face, a goat, GIANT #1 · checkpoint 1
+ *   81-85   HARD: a wide crevasse (running jump)
+ *   86-130  Snowy slopes: parachuters, goats, then pillar hops
+ *   131-170 The frozen pond: Puffballs and Big Puff Balls play hockey
+ *   171-190 GIANT #2 · checkpoint 2
+ *   191-226 An alpine meadow climbing on up; HARD crevasse at the top
+ *   227-246 GIANT #3 · checkpoint 3
+ *   247-329 The last steep climb: double-jump ledge, narrow pillars, the summit
  */
 export function buildLevel2(): LevelData {
-  const L = new LevelBuilder('Puff Ball Planet · Part 2', 'World 1', 300, 38);
+  const L = new LevelBuilder('Puff Ball Planet · Part 2', 'World 1', 330, 62);
 
-  // ── Green valley foothills (gentle) ─────────────────────────
-  L.zone(0, 38, 'z-valley');
-  L.ground(0, 18, 3);
+  // ── Green foothills (gentle steps up) ───────────────────────
+  L.zone(0, 36, 'z-valley');
+  L.ground(0, 16, 3);
   L.spawn('player', 4, 3);
   L.spawn('tree', 1.5, 3, { h: 62 });
   L.spawn('tree', 11, 3, { h: 54 });
-  L.auraArc(13, 3, 6, 1);
-  L.spawn('puffball', 16, 3);
-  L.ground(19, 24, 4);
-  L.spawn('puffball', 22, 4);
-  L.ground(25, 30, 5);
-  L.spawn('tree', 27, 5, { h: 58 });
-  L.spawn('para', 29, 5, { kind: 'puffball' });
-  L.ground(31, 36, 6);
-  L.aura(34, 9);
-  L.rootbeer(27, 10.5); // over the puff tree
+  L.auraArc(12, 3, 6, 1);
+  L.spawn('puffball', 15, 3);
+  L.ground(17, 22, 4);
+  L.spawn('bigpuff', 21, 4);
+  L.ground(23, 28, 5);
+  L.spawn('tree', 25, 5, { h: 58 });
+  L.spawn('para', 27, 5, { kind: 'puffball' });
+  L.ground(29, 34, 7);
+  L.spawn('puffball', 32, 7);
+  L.aura(33, 10);
+  L.rootbeer(25, 10.5); // over the puff tree
 
   // ── Steep snowy cliff face · GIANT #1 · checkpoint 1 ───────
-  L.zone(39, 82, 'z-snow');
-  L.ground(40, 46, 7);
-  L.spawn('tree', 41.5, 7, { h: 50, pine: true });
-  L.ground(47, 50, 10);
-  L.cloud(45, 2, 9); // a hand up the first wall
-  L.ground(51, 56, 13);
-  L.spawn('goat', 54, 13);
-  L.aura(49, 13);
-  L.ground(57, 62, 15);
-  L.spawn('para', 60, 15, { kind: 'bigpuff' });
-  L.ground(63, 80, 16);
-  L.spawn('tree', 64.5, 16, { h: 56, pine: true });
-  L.spawn('puffball', 67, 16);
-  L.spawn('giant', 72, 16);
-  L.aura(76, 19);
-  L.spawn('checkpoint', 78, 16);
+  L.zone(37, 80, 'z-snow');
+  L.ground(37, 42, 8);
+  L.spawn('tree', 38.5, 8, { h: 50, pine: true });
+  L.cloud(41, 2, 10); // a hand up the first wall
+  L.ground(43, 46, 11);
+  L.ground(47, 51, 13);
+  L.spawn('goat', 49, 13);
+  L.aura(46, 14);
+  L.ground(52, 56, 15);
+  L.spawn('bigpuff', 55, 15);
+  L.ground(57, 61, 16);
+  L.spawn('para', 59, 16, { kind: 'bigpuff' });
+  L.ground(62, 80, 17);
+  L.spawn('tree', 63.5, 17, { h: 56, pine: true });
+  L.spawn('puffball', 66, 17);
+  L.spawn('giant', 71, 17);
+  L.aura(75, 20);
+  L.spawn('checkpoint', 78, 17);
 
-  // ── Snowy slopes (gentle): parachuters and goats ────────────
-  L.zone(83, 130, 'z-snow');
-  L.ground(84, 92, 16);
-  L.cloud(81, 2, 17); // over the crevasse
-  L.spawn('para', 89, 16, { kind: 'puffball' });
-  L.ground(93, 100, 17);
-  L.spawn('goat', 97, 17);
-  L.spawn('tree', 94, 17, { h: 52, pine: true });
-  L.ground(101, 110, 18);
-  L.spawn('para', 104, 18, { kind: 'puffball' });
-  L.spawn('para', 108, 18, { kind: 'puffball' });
-  L.auraArc(102, 3, 21, 1);
-  L.ground(111, 128, 19);
-  L.spawn('tree', 113, 19, { h: 60, pine: true });
-  L.spawn('goat', 117, 19);
-  L.spawn('para', 121, 19, { kind: 'bigpuff' });
-  L.spawn('tree', 126.5, 19, { h: 48, pine: true });
-  L.rootbeer(119, 24); // high over the slope: second jump
+  // ── HARD: a wide crevasse — take a run at it ─────────────────
+  L.auraArc(81, 4, 21, 1.5);
 
-  // ── The frozen pond: hockey ─────────────────────────────────
-  L.zone(131, 166, 'z-ice');
-  L.cloud(129, 2, 20);
-  L.ground(132, 165, 19);
-  L.spawn('tree', 133, 19, { h: 50, pine: true });
-  L.spawn('hockey', 149, 19, { w: 22, team: 'pppb' });
-  L.aura(149, 23);
-  L.spawn('tree', 164, 19, { h: 56, pine: true });
+  // ── Snowy slopes, climbing on: parachuters and goats ────────
+  L.zone(86, 130, 'z-snow');
+  L.ground(86, 92, 18);
+  L.spawn('para', 89, 18, { kind: 'puffball' });
+  L.ground(93, 98, 19);
+  L.spawn('goat', 96, 19);
+  L.spawn('tree', 94, 19, { h: 52, pine: true });
+  L.ground(99, 104, 20);
+  L.spawn('para', 100, 20, { kind: 'puffball' });
+  L.spawn('para', 103, 20, { kind: 'bigpuff' });
+  L.ground(105, 110, 22);
+  L.spawn('goat', 108, 22);
+  L.ground(111, 117, 23);
+  L.spawn('tree', 112, 23, { h: 60, pine: true });
+  L.spawn('bigpuff', 115, 23);
+  L.rootbeer(113, 28); // high over the slope: second jump
+  // pillar hops over a crevasse (two narrow rock columns)
+  L.ground(119, 120, 25);
+  L.ground(123, 124, 27);
+  L.aura(123.5, 30);
+  L.ground(127, 130, 28);
+
+  // ── The frozen pond: hockey (with Big Puff Balls on the team) ─
+  L.zone(131, 170, 'z-ice');
+  L.ground(131, 170, 28);
+  L.spawn('tree', 132, 28, { h: 50, pine: true });
+  L.spawn('hockey', 150, 28, { w: 24, team: 'pbppb' });
+  L.aura(150, 32);
+  L.spawn('tree', 169, 28, { h: 56, pine: true });
 
   // ── GIANT #2 · checkpoint 2 ─────────────────────────────────
-  L.zone(167, 185, 'z-snow');
-  L.cloud(166, 2, 20);
-  L.ground(169, 185, 19);
-  L.spawn('giant', 175, 19);
-  L.aura(180, 22);
-  L.spawn('checkpoint', 183, 19);
+  L.zone(171, 190, 'z-snow');
+  L.ground(172, 174, 29);
+  L.ground(175, 190, 30);
+  L.spawn('giant', 181, 30);
+  L.aura(185, 33);
+  L.spawn('checkpoint', 188, 30);
 
-  // ── Down into a green alpine valley, then steeply back out ──
-  L.zone(186, 213, 'z-valley');
-  L.ground(188, 193, 16);
-  L.ground(194, 204, 12);
-  L.spawn('tree', 196, 12, { h: 62 });
-  L.spawn('puffball', 199, 12);
-  L.spawn('puffball', 202, 12);
-  L.spawn('tree', 203.5, 12, { h: 54 });
-  L.auraArc(197, 3, 15, 1);
-  L.ground(205, 208, 15);
-  L.ground(209, 212, 18);
-  L.spawn('para', 210, 18, { kind: 'puffball' });
-  L.rootbeer(200, 18.5); // floating above the valley
+  // ── An alpine meadow, still climbing ────────────────────────
+  L.zone(191, 226, 'z-valley');
+  L.ground(192, 196, 31);
+  L.spawn('tree', 192.5, 31, { h: 62 });
+  L.spawn('puffball', 195, 31);
+  L.ground(197, 201, 32);
+  L.spawn('bigpuff', 200, 32);
+  L.ground(202, 208, 34);
+  L.spawn('tree', 205, 34, { h: 54 });
+  L.spawn('puffball', 204, 34);
+  L.spawn('para', 207, 34, { kind: 'bigpuff' });
+  L.auraArc(202, 3, 37, 1);
+  L.ground(209, 214, 35);
+  L.spawn('puffball', 212, 35);
+  L.rootbeer(206, 40); // floating above the meadow
+  // HARD: another wide crevasse
+  L.auraArc(215, 4, 39, 1.5);
+  L.ground(220, 226, 36);
+  L.spawn('tree', 224, 36, { h: 58 });
 
   // ── GIANT #3 · checkpoint 3 ─────────────────────────────────
-  L.zone(214, 299, 'z-snow');
-  L.cloud(213, 2, 19);
-  L.ground(216, 232, 19);
-  L.spawn('tree', 217.5, 19, { h: 54, pine: true });
-  L.spawn('giant', 223, 19);
-  L.aura(228, 22);
-  L.spawn('checkpoint', 230, 19);
+  L.zone(227, 329, 'z-snow');
+  L.ground(228, 230, 37);
+  L.ground(231, 246, 38);
+  L.spawn('tree', 232.5, 38, { h: 54, pine: true });
+  L.spawn('giant', 238, 38);
+  L.aura(242, 41);
+  L.spawn('checkpoint', 244, 38);
 
   // ── The last steep climb to the summit ──────────────────────
-  L.ground(233, 236, 22);
-  L.ground(237, 240, 25);
-  L.cloud(235, 2, 24);
-  L.ground(241, 250, 25);
-  L.spawn('goat', 246, 25);
-  L.spawn('tree', 249, 25, { h: 46, pine: true });
-  L.cloud(252, 2, 25); // over the last crevasse
-  L.ground(255, 262, 26);
-  L.spawn('para', 257, 26, { kind: 'puffball' });
-  L.spawn('para', 260, 26, { kind: 'puffball' });
-  L.aura(258, 29);
-  L.ground(263, 266, 29);
-  L.ground(267, 299, 29);
-  L.spawn('bigpuff', 272, 29);
-  L.spawn('goat', 279, 29);
-  L.spawn('para', 283, 29, { kind: 'bigpuff' });
-  L.spawn('tree', 287, 29, { h: 58, pine: true });
-  L.spawn('goal', 292, 29);
-  L.spawn('tree', 297, 29, { h: 66, pine: true });
-  L.rootbeer(265, 33); // the summit's secret: up high over the last wall
+  L.ground(247, 250, 41);
+  L.spawn('para', 249, 41, { kind: 'puffball' });
+  L.ground(251, 256, 44);
+  L.cloud(249, 2, 43);
+  L.spawn('goat', 254, 44);
+  L.ground(257, 262, 45);
+  L.spawn('para', 258, 45, { kind: 'puffball' });
+  L.spawn('para', 261, 45, { kind: 'bigpuff' });
+  // HARD: a tall ledge (double jump)
+  L.ground(263, 267, 49);
+  L.spawn('goat', 266, 49);
+  L.aura(262, 49);
+  // HARD: narrow pillars over a crevasse
+  L.ground(270, 270, 50);
+  L.ground(273, 273, 51);
+  L.ground(276, 276, 52);
+  L.aura(273, 54);
+  L.ground(279, 292, 52);
+  L.spawn('bigpuff', 283, 52);
+  L.spawn('goat', 288, 52);
+  L.spawn('tree', 285, 52, { h: 50, pine: true });
+  L.spawn('para', 290, 52, { kind: 'bigpuff' });
+  L.ground(293, 329, 53);
+  L.spawn('puffball', 297, 53);
+  L.spawn('bigpuff', 301, 53);
+  L.spawn('tree', 306, 53, { h: 58, pine: true });
+  L.spawn('goal', 322, 53);
+  L.spawn('tree', 327, 53, { h: 66, pine: true });
+  L.rootbeer(293, 57); // the summit's secret: up high over the last wall
 
   return L.build();
 }

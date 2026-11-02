@@ -193,18 +193,84 @@ export class Puffball extends Walker {
 export class BigPuff extends Walker {
   readonly kind: EnemyKind = 'bigpuff';
   private mad = false;
+  private noticed = false;
+  private pounceCd = 1.2;
+  private crouch = 0;
+  private hopCd = 0;
   constructor(gs: GameScene, x: number, y: number) {
     super(gs, x, y, 'bigpuff', 'w0');
     hiRes(this, 36, 68, 18, 18);
-    this.hp = 2;
-    this.speed = 34;
+    this.hp = 3;
+    this.speed = 40;
     this.animRate = 4;
     this.careful = true;
   }
 
+  /**
+   * Medium guys are hunters: they patrol until they spot you, then chase —
+   * hopping up steps, leaping across small gaps — and when they're close
+   * they crouch and POUNCE at you. Three hits to pop (they get madder).
+   */
+  tick(dt = 1 / 60) {
+    const b = this.body;
+    const tgt = this.gs.nearestPlayer(this.x, this.y);
+    this.pounceCd -= dt;
+    this.hopCd -= dt;
+    const onGround = b.blocked.down;
+    const dx = tgt ? tgt.x - this.x : 0;
+    const dy = tgt ? tgt.bottom - b.bottom : 0;
+    const sees = !!tgt && tgt.alive && Math.abs(dx) < 340 && dy > -170 && dy < 150;
+    if (!sees) {
+      if (onGround) super.tick();
+      return;
+    }
+    if (!this.noticed) {
+      this.noticed = true;
+      this.gs.fx.popText(this.x, b.top - 16, '!', '#ff5a3c', 22);
+    }
+    if (!onGround) {
+      this.setFrame(this.mad ? 'm1' : 'w1');
+      return;
+    }
+    this.dir = Math.sign(dx) || this.dir;
+    this.setFlipX(this.dir > 0);
+    // crouching for a pounce
+    if (this.crouch > 0) {
+      this.crouch -= dt;
+      b.setVelocityX(0);
+      this.setFrame('m0');
+      this.setScale(this.scaleX, this.scaleX * 0.88);
+      if (this.crouch <= 0) {
+        this.setScale(this.scaleX, this.scaleX);
+        b.setVelocity(this.dir * (this.mad ? 270 : 230), -470);
+        this.pounceCd = (this.mad ? 1.2 : 1.7) + Math.random() * 0.8;
+        sfx.jump2?.();
+      }
+      return;
+    }
+    if (Math.abs(dx) < 170 && Math.abs(dy) < 60 && this.pounceCd <= 0) {
+      this.crouch = 0.28;
+      return;
+    }
+    // chase, hopping up steps and over small gaps
+    const sp = this.mad ? 112 : 78;
+    const wall = this.dir < 0 ? b.blocked.left : b.blocked.right;
+    const aheadX = this.dir > 0 ? b.right + 4 : b.left - 4;
+    const gap = !this.gs.level.isSolidAt(aheadX, b.bottom + 6);
+    if ((wall || (gap && dy <= 40)) && this.hopCd <= 0) {
+      b.setVelocity(this.dir * sp * 1.6, wall ? -560 : -430);
+      this.hopCd = 0.6;
+    } else if (gap && dy > 40) {
+      b.setVelocityX(0); // won't jump down into a pit after you
+    } else b.setVelocityX(this.dir * sp);
+    this.setFrame(Math.floor(this.t * (this.mad ? 9 : 7)) % 2 ? (this.mad ? 'm1' : 'w1') : this.mad ? 'm0' : 'w0');
+  }
+
   damage(n: number, how: DeathKind, by: Player | null) {
     super.damage(n, how, by);
-    if (this.dead || this.mad) return;
+    if (this.dead) return;
+    this.pounceCd = Math.min(this.pounceCd, 0.5);
+    if (this.mad) return;
     this.mad = true;
     this.speed = 70;
     this.animRate = 7;

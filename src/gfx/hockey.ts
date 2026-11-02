@@ -4,15 +4,62 @@ import { STYLES, ellipsePts, roundRectPts, type Fill, type Pt } from './handdraw
 /** Hockey on the frozen pond: sticks, pucks, nets and rink lines (polished hand-drawn). */
 const st = () => STYLES.polished;
 
-/** A hockey stick held at the top, blade at the bottom-left. 40 × 40, hand at (30, 6). */
+/**
+ * A real-looking hockey stick held at the top, blade at the bottom-left:
+ * a slim two-tone composite shaft with a graphic, white tape wound round the
+ * knob, a curved blade with a black tape job. 40 × 40, hand at (30, 6).
+ */
 export function drawStick(ctx: Ctx) {
   const S = st();
-  const shaft: Fill = { base: '#c8915a', shade: '#9a6a3a', light: '#ecc08c' };
-  const blade: Fill = { base: '#2c2a33', shade: '#16151b', light: '#55525e' };
-  S.shape(ctx, [[28, 4], [32, 6], [12, 32], [8, 30]], shaft, 901, { lw: 0.8 });
-  S.shape(ctx, roundRectPts(28, 3, 5, 7, 1.5), blade, 902, { lw: 0.6, plain: true }); // grip tape
-  S.shape(ctx, [[8, 29], [13, 33], [11, 37], [0, 37], [-1, 33]], blade, 903, { lw: 0.8 });
-  S.line(ctx, [[2, 35], [10, 35]], 904, 0.5, '#ffffff99');
+  const top: Pt = [31.5, 2.5];
+  const heel: Pt = [14, 33.5];
+  const ang = Math.atan2(heel[1] - top[1], heel[0] - top[0]);
+  const nx = -Math.sin(ang);
+  const ny = Math.cos(ang);
+  const w = 1.7;
+  const at = (t: number, off = 0): Pt => [top[0] + (heel[0] - top[0]) * t + nx * off, top[1] + (heel[1] - top[1]) * t + ny * off];
+  // shaft: matte black composite
+  S.shape(ctx, [at(0, -w), at(0, w), at(1, w), at(1, -w)], { base: '#26262e', shade: '#121218', light: '#4a4a58' }, 901, { lw: 0.7 });
+  // a red + white graphic band down the shaft, and a shine along one edge
+  ctx.fillStyle = '#e8463f';
+  const band = (t0: number, t1: number, col: string) => {
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    for (const [x, y] of [at(t0, -w + 0.3), at(t1, -w + 0.3), at(t1, w - 0.3), at(t0, w - 0.3)]) ctx.lineTo(x, y);
+    ctx.closePath();
+    ctx.fill();
+  };
+  band(0.42, 0.62, '#e8463f');
+  band(0.47, 0.51, '#ffffff');
+  band(0.66, 0.69, '#ffffff');
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+  ctx.lineWidth = 0.4;
+  ctx.beginPath();
+  ctx.moveTo(...at(0.12, -w * 0.45));
+  ctx.lineTo(...at(0.95, -w * 0.45));
+  ctx.stroke();
+  // white tape wound round the top, with a knob
+  S.shape(ctx, [at(-0.04, -w - 0.5), at(-0.04, w + 0.5), at(0.2, w + 0.3), at(0.2, -w - 0.3)], { base: '#f4f1ea', shade: '#d9d3c8', light: '#ffffff' }, 902, { lw: 0.6 });
+  for (let k = 0; k < 5; k++) {
+    const t = 0.02 + k * 0.04;
+    S.line(ctx, [at(t, -w - 0.4), at(t + 0.025, w + 0.4)], 903 + k, 0.35, '#b9b2a6');
+  }
+  // the blade: from the heel, curving gently up at the toe
+  const blade: Pt[] = [
+    [heel[0] + 2.4, heel[1] - 2.6],
+    [heel[0] + 2.6, heel[1] + 1.2],
+    [heel[0] - 2, heel[1] + 3.4],
+    [heel[0] - 9, heel[1] + 3.6],
+    [heel[0] - 12.5, heel[1] + 2.4],
+    [heel[0] - 13.2, heel[1] + 0.4],
+    [heel[0] - 11.5, heel[1] - 0.2],
+    [heel[0] - 6, heel[1] + 0.2],
+    [heel[0] - 1, heel[1] - 1.6],
+  ];
+  S.shape(ctx, blade, { base: '#2c2a33', shade: '#16151b', light: '#55525e' }, 904, { lw: 0.8 });
+  // black cloth tape job with a few lighter wraps
+  for (let k = 0; k < 5; k++) S.line(ctx, [[heel[0] - 2 - k * 2.1, heel[1] + 3.2], [heel[0] - 3.2 - k * 2.1, heel[1] + 0.2]], 910 + k, 0.35, '#5a5868');
+  S.line(ctx, [[heel[0] - 11.5, heel[1] + 2], [heel[0] - 1.5, heel[1] + 2.6]], 916, 0.4, '#ffffff66');
 }
 
 /** A puck: a short black cylinder seen from the side, radius r. */

@@ -100,6 +100,9 @@ export const bank = {
 
 type Group = Phaser.GameObjects.Group;
 
+/** Camera roll for the mountain climb (radians; the view leans so the ground rises to the right). */
+const UPHILL_TILT = -0.06;
+
 export class GameScene extends Phaser.Scene {
   session!: Session;
   level!: LevelView;
@@ -445,7 +448,7 @@ export class GameScene extends Phaser.Scene {
     if (!this.intro) return;
     if (this.introSkip) this.game.events.off('skip-intro', this.introSkip);
     this.intro = null;
-    this.cameras.main.setRotation(0);
+    this.cameras.main.setRotation(this.uphill);
     this.physics.world.resume();
     this.updateCamera(0, true);
     for (const p of this.players) p.spawnProtection();
@@ -499,7 +502,7 @@ export class GameScene extends Phaser.Scene {
     const land = smooth(0.62, 1, u);
     const top = this.introTop + (heroTop - this.introTop) * land - lift;
     cam.setZoom(zoom);
-    cam.setRotation(rot);
+    cam.setRotation(rot + this.uphill * smooth(0.35, 1, u));
     cam.centerOn(x, top + vh / 2);
     this.camX = x;
     this.camTop = top;
@@ -518,6 +521,7 @@ export class GameScene extends Phaser.Scene {
     // (so 4:3 iPads and 16:10 Android tablets see enough of the level ahead).
     const zoom = Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W) * this.cineZoom;
     cam.setZoom(zoom);
+    cam.setRotation(this.uphill);
     const vw = this.scale.width / zoom;
     const vh = this.scale.height / zoom;
     const { widthPx, heightPx } = this.level;
@@ -549,7 +553,14 @@ export class GameScene extends Phaser.Scene {
     const left = Math.round((this.camX - vw / 2) * zoom) / zoom;
     const top = Math.round(this.camTop * zoom) / zoom;
     cam.centerOn(left + vw / 2, top + vh / 2);
-    this.view = { left, top, width: vw, height: vh };
+    // a tilted view shows a little past each edge: draw the scenery a bit wider
+    const m = this.uphill ? Math.abs(this.uphill) * Math.max(vw, vh) * 0.6 : 0;
+    this.view = { left: left - m, top: top - m, width: vw + m * 2, height: vh + m * 2 };
+  }
+
+  /** Part 2 is a climb: the whole view leans uphill a touch, so it always feels like going up. */
+  private get uphill() {
+    return this.levelId === 2 ? UPHILL_TILT : 0;
   }
 
   // ─────────────────────────────────────────── interactions ──

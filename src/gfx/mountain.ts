@@ -142,7 +142,7 @@ const darker = (c: string, k: number) => {
 /** A snowy puff-pine: stacked rounded tiers with snow on each. */
 export function drawPine(ctx: Ctx, x: number, groundY: number, h: number, pal: WorldPalette, snow: string, seed: number, st: Style = ST) {
   st.shape(ctx, roundRectPts(x - 3, groundY - h * 0.25, 6, h * 0.25, 2), pal.trunk, seed, { lw: 0.8 });
-  const c = pal.canopies[seed % pal.canopies.length];
+  const c = pal.canopies[Math.abs(seed) % pal.canopies.length];
   for (let i = 0; i < 3; i++) {
     const w = h * (0.42 - i * 0.1);
     const y = groundY - h * 0.2 - i * h * 0.24;
@@ -159,45 +159,94 @@ export function drawPine(ctx: Ctx, x: number, groundY: number, h: number, pal: W
 }
 
 /** A tileable range of snow-capped peaks along the bottom of a W × H strip. */
+/**
+ * A jagged, irregular mountain range that tiles horizontally: main peaks of
+ * random height and width (some tall and sharp, some low and broad, often
+ * leaning), joined by notched saddles, then roughened with fractal midpoint
+ * displacement. Each peak gets a shadowed face and a ragged snow cap.
+ */
 function rangeTile(ctx: Ctx, W: number, H: number, baseY: number, peakH: [number, number], col: string, snow: string, seed: number, st: Style) {
   const r = rng(seed);
-  const peaks: { x: number; h: number; w: number }[] = [];
-  for (let x = 0; x < W; ) {
-    const w = 80 + r() * 100;
-    peaks.push({ x: x + w / 2, h: peakH[0] + r() * (peakH[1] - peakH[0]), w });
+  // anchors: valley, peak, valley, peak … ; first and last valley coincide (wraps)
+  const peaks: { x: number; y: number; w: number }[] = [];
+  for (let x = 0; x < W - 40; ) {
+    const w = 50 + Math.pow(r(), 1.4) * 190;
+    const tall = r();
+    peaks.push({ x: x + w * (0.3 + r() * 0.4), y: baseY - (peakH[0] + Math.pow(tall, 0.8) * (peakH[1] - peakH[0])), w });
     x += w;
   }
-  const scale = W / peaks.reduce((s, p) => s + p.w, 0); // make the peaks tile exactly
+  const scale = W / peaks.reduce((s2, p) => s2 + p.w, 0);
   let acc = 0;
   for (const p of peaks) {
+    const lean = (p.x - acc) / p.w;
     p.w *= scale;
-    p.x = acc + p.w / 2;
+    p.x = acc + p.w * lean;
     acc += p.w;
   }
-  const f = fill(col, darker(col, 0.86), darker(col, 1.08));
-  wrapX(W, (dx) => {
-    const pts: Pt[] = [[dx, H + 4]];
-    for (const p of peaks) {
-      pts.push([dx + p.x - p.w / 2, baseY - 6]);
-      pts.push([dx + p.x, baseY - p.h]);
+  const valleyY = () => baseY - 6 - r() * Math.min(40, (peakH[0] * 0.6));
+  const v0 = valleyY();
+  const anchors: Pt[] = [[0, v0]];
+  let edge = 0;
+  for (const p of peaks) {
+    anchors.push([p.x, p.y]);
+    edge += p.w;
+    if (edge < W - 1) anchors.push([edge + (r() - 0.5) * 10, valleyY()]);
+  }
+  anchors.push([W, v0]);
+  // fractal roughening
+  const ridge: Pt[] = [anchors[0]];
+  const rough = (a: Pt, b: Pt, depth: number) => {
+    if (depth === 0) {
+      ridge.push(b);
+      return;
     }
-    pts.push([dx + W, baseY - 6]);
-    pts.push([dx + W, H + 4]);
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const m: Pt = [(a[0] + b[0]) / 2 + (r() - 0.5) * len * 0.12, (a[1] + b[1]) / 2 + (r() - 0.5) * len * 0.32];
+    rough(a, m, depth - 1);
+    rough(m, b, depth - 1);
+  };
+  for (let k = 1; k < anchors.length; k++) rough(anchors[k - 1], anchors[k], 4);
+  const f = fill(col, darker(col, 0.86), darker(col, 1.08));
+  const shadow = darker(col, 0.8);
+  // all the randomness is decided up front, so every wrapped copy is identical (seamless)
+  const jit = peaks.map(() => ({ foot: (r() - 0.5) * 8, snow: Array.from({ length: 8 }, () => 0.7 + r() * 0.5) }));
+  wrapX(W, (dx) => {
+    const pts: Pt[] = [[dx, H + 4], ...ridge.map(([x, y]) => [x + dx, y] as Pt), [dx + W, H + 4]];
     st.shape(ctx, pts, f, seed + dx, { lw: 0.8 });
-    for (const p of peaks) {
-      const tx = dx + p.x;
-      const ty = baseY - p.h;
-      const s = Math.min(1, p.h / 120);
-      const cap: Pt[] = [
-        [tx, ty],
-        [tx + 24 * s, ty + 28 * s],
-        [tx + 12 * s, ty + 23 * s],
-        [tx + 4 * s, ty + 32 * s],
-        [tx - 6 * s, ty + 22 * s],
-        [tx - 15 * s, ty + 30 * s],
-        [tx - 24 * s, ty + 28 * s],
-      ];
-      st.shape(ctx, cap, fill(snow, '#dfe7f4', '#ffffff'), seed + tx, { lw: 0.6, plain: true });
+    // the shadowed face of each peak (light from the upper left)
+    ctx.fillStyle = shadow;
+    ctx.globalAlpha = 0.55;
+    for (const [pi, p] of peaks.entries()) {
+      const face = ridge.filter(([x]) => x >= p.x && x <= p.x + p.w * 0.55);
+      if (face.length < 2) continue;
+      ctx.beginPath();
+      ctx.moveTo(dx + p.x, p.y);
+      for (const [x, y] of face) ctx.lineTo(dx + x, y);
+      const last = face[face.length - 1];
+      ctx.lineTo(dx + last[0] - 4, Math.min(H + 4, last[1] + 40));
+      ctx.lineTo(dx + p.x + jit[pi].foot, Math.min(H + 4, baseY + 10));
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    // ragged snow caps on the taller peaks
+    for (const [pi, p] of peaks.entries()) {
+      const tall = baseY - p.y;
+      if (tall < peakH[0] * 0.75) continue;
+      const depth = Math.min(46, tall * 0.34);
+      const cap = ridge.filter(([x, y]) => Math.abs(x - p.x) < p.w * 0.6 && y < p.y + depth);
+      if (cap.length < 3) continue;
+      const pts2: Pt[] = cap.map(([x, y]) => [x + dx, y] as Pt);
+      // jagged lower edge, back the other way
+      const n = 7;
+      const xa = cap[0][0];
+      const xb = cap[cap.length - 1][0];
+      for (let k = n; k >= 0; k--) {
+        const x = xa + ((xb - xa) * k) / n;
+        const near = cap.reduce((best, q) => (Math.abs(q[0] - x) < Math.abs(best[0] - x) ? q : best), cap[0]);
+        pts2.push([x + dx, Math.max(near[1], p.y + depth * (k % 2 ? 0.55 : 1) * jit[pi].snow[k])]);
+      }
+      st.shape(ctx, pts2, fill(snow, '#dfe7f4', '#ffffff'), seed + p.x + dx, { lw: 0.6, plain: true });
     }
   });
 }
@@ -240,7 +289,8 @@ export function drawMountainNear(ctx: Ctx, W: number, H: number, look: MountainL
     for (let k = 0; k < 2; k++) {
       const px = x + (r() - 0.5) * w;
       const h = 26 + r() * 20;
-      wrapX(W, (dx) => drawPine(ctx, px + dx, top + 34 + r() * 6, h, look.pal, look.snow, 90 + Math.round(px), st));
+      const py = top + 34 + r() * 6;
+      wrapX(W, (dx) => drawPine(ctx, px + dx, py, h, look.pal, look.snow, 90 + Math.abs(Math.round(px)), st));
     }
   }
   const g = ctx.createLinearGradient(0, 96, 0, H);

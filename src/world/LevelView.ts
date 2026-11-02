@@ -11,6 +11,8 @@ import { ONE_WAY_TILES, SOLID_TILES } from '../level/tiles';
 const PAD = 34; // room around each terrain piece for grass blades / roots
 /** Terrain pieces are cut into chunks no wider than this (world px), to stay under mobile texture limits. */
 const CHUNK = 1600;
+/** Colour of the deep rock under each terrain chunk (sampled once, when the chunk is drawn). */
+const DEEP_FILL = new Map<string, number>();
 
 /** Highest point (smallest y) of a closed outline within the column range x0..x1. */
 function localTop(outline: Pt[], x0: number, x1: number) {
@@ -95,6 +97,17 @@ export class LevelView {
   }
 
   /** Top of the ground in column at world x (for framing the camera), or the level bottom. */
+
+  /** The lowest ground surface (largest y) between two x positions, ignoring pits. */
+  private deepestSurface(xa: number, xb: number) {
+    let deep = 0;
+    for (let x = Math.max(0, xa); x <= Math.min(this.widthPx - 1, xb); x += TILE) {
+      const y = this.surfaceY(x);
+      if (y < this.heightPx) deep = Math.max(deep, y);
+    }
+    return deep || this.heightPx;
+  }
+
   surfaceY(worldX: number): number {
     const x = Math.floor(worldX / TILE);
     for (let y = 0; y < this.data.height; y++) {
@@ -165,13 +178,45 @@ export class LevelView {
           // each chunk only as tall as the terrain inside it (a mountain is low at one
           // end and high at the other: no point keeping all that empty sky in memory)
           const top = Math.max(y0, localTop(outline, cx0 - PAD, cx0 + cw + PAD) - 24);
-          const ch = y1 - top + PAD * 2;
+          // …and it stops a little below the lowest ground anyone can see from nearby:
+          // the deep rock underneath is just a plain block of colour (saves lots of memory)
+          const deep = this.deepestSurface(cx0 - 700, cx0 + cw + 700);
+          const cut = Math.min(y1 + PAD, Math.max(top + 200, deep + 300));
+          const ch = cut - top + PAD;
           const key = `terrain-${d.name}-${kind}-${pieceId}-${ci}`;
+          let fillCol = DEEP_FILL.get(key);
           if (!this.scene.textures.exists(key)) {
             const c = hires(cw + PAD * 2, ch, PROP_RES, (ctx) => {
               ctx.translate(PAD - cx0, PAD - top);
               drawTerrainPiece(ctx, { kind, outline, pal, seed: Math.round(x0 + y0), floorY: this.heightPx });
             });
+            if (cut < y1 + PAD) {
+              // median of a few samples a little above the cut (so a pebble doesn't set the colour),
+              // then fade the bottom of the chunk into that colour so the plain block below is seamless
+              const cctx = c.getContext('2d')!;
+              const fadeH = Math.round(90 * PROP_RES);
+              const row = cctx.getImageData(0, c.height - fadeH, c.width, 1).data;
+              const cols: number[] = [];
+              for (let k = 1; k <= 9; k++) {
+                const i = Math.floor((c.width * k) / 10) * 4;
+                if (row[i + 3] > 200) cols.push((row[i] << 16) | (row[i + 1] << 8) | row[i + 2]);
+              }
+              const lum = (v: number) => ((v >> 16) & 255) * 0.3 + ((v >> 8) & 255) * 0.59 + (v & 255) * 0.11;
+              cols.sort((p1, p2) => lum(p1) - lum(p2));
+              fillCol = cols[Math.floor(cols.length / 2)] ?? 0x8a6a5a;
+              DEEP_FILL.set(key, fillCol);
+              const hex = `#${fillCol.toString(16).padStart(6, '0')}`;
+              const g2 = cctx.createLinearGradient(0, c.height - fadeH, 0, c.height);
+              g2.addColorStop(0, hex + '00');
+              g2.addColorStop(0.75, hex + 'ff');
+              g2.addColorStop(1, hex + 'ff');
+              cctx.save();
+              cctx.setTransform(1, 0, 0, 1, 0, 0);
+              cctx.globalCompositeOperation = 'source-atop';
+              cctx.fillStyle = g2;
+              cctx.fillRect(0, c.height - fadeH, c.width, fadeH);
+              cctx.restore();
+            }
             addCanvas(this.scene, key, c, undefined, { release: true });
           }
           this.scene.add
@@ -179,6 +224,17 @@ export class LevelView {
             .setOrigin(0, 0)
             .setScale(1 / PROP_RES)
             .setDepth(DEPTH.tiles);
+          if (cut < y1 + PAD && fillCol !== undefined) {
+            // the deep rock: from just above the cut down to the bottom of the level, with
+            // the piece's outline continuing down its sides
+            const g = this.scene.add.graphics().setDepth(DEPTH.tiles - 0.01);
+            const gx0 = Math.max(cx0, x0 + 3);
+            const gx1 = Math.min(cx0 + cw, x1 - 3);
+            g.fillStyle(fillCol, 1).fillRect(gx0, cut - 6, gx1 - gx0, this.heightPx + 200 - cut);
+            g.fillStyle(0x3a2a3a, 1);
+            if (gx0 === x0 + 3) g.fillRect(x0 + 1, cut - 6, 2.5, this.heightPx + 200 - cut);
+            if (gx1 === x1 - 3) g.fillRect(x1 - 3.5, cut - 6, 2.5, this.heightPx + 200 - cut);
+          }
         }
       }
   }
