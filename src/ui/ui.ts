@@ -6,7 +6,7 @@ import { isMuted, setMuted, sfx, unlockAudio } from '../core/sfx';
 import { drawHeroCard, drawPortrait } from '../gfx/draw';
 import { gamepadSources } from '../input/gamepad';
 import { isKeyDown } from '../input/keyboard';
-import { isTouchDevice } from '../input/touch';
+import { isTouchDevice, onInputModeChange, usingTouch } from '../input/touch';
 import type { GameData, GameOverState, GameScene, HudState, ResultState } from '../scenes/GameScene';
 import { TouchControls } from './touchControls';
 import { drawNuggie, drawRootBeer } from '../gfx/collectibles';
@@ -87,6 +87,7 @@ export class UI {
   private session: Session = { players: [] };
   private gameScene: GameScene | null = null;
   private pickRaf = 0;
+  private subtitleTimer = 0;
   private selected = 0;
   private introEl: HTMLElement | null = null;
   /** Which level to start (1-based); you can pick once you've beaten a level. */
@@ -190,7 +191,7 @@ export class UI {
       this.introEl.classList.add('on');
     });
     game.events.on('level-intro-end', () => {
-      if (!isTouchDevice()) {
+      if (!usingTouch()) {
         // a quick reminder of the keys, fading away after a few seconds
         const tip = h(`<div class="ctl-tip">${controlsHtml(true)}</div>`);
         this.root.appendChild(tip);
@@ -231,6 +232,12 @@ export class UI {
       document.documentElement.classList.toggle('rotating', !this.rotate.hidden);
     };
     window.addEventListener('resize', checkOrientation);
+    // switching between touch and keyboard mid-game shows / hides the on-screen controls
+    onInputModeChange((touch) => {
+      if (!this.gameScene || this.hud.hidden) return;
+      if (touch) this.touch.show();
+      else this.touch.hide();
+    });
     checkOrientation();
     // the first tap anywhere unlocks sound + music on mobile
     const unlock = () => {
@@ -279,7 +286,7 @@ export class UI {
     const el = h(`<div class="screen start">
       <header class="start-head">
         <div class="logo"><span>P</span><span>U</span><span>F</span><span>F</span><span>Y</span></div>
-        <p class="world-name" aria-label="World 1 · ${levelName(this.level)}">${waveText(`World 1 · ${levelName(this.level)}`)}</p>
+        <p class="world-name" aria-label="${levelInfo(this.level).world} · ${levelName(this.level)}">${waveText(`${levelInfo(this.level).world} · ${levelName(this.level)}`)}</p>
       </header>
       <h2>Pick your player</h2>
       <div class="cards" role="radiogroup" aria-label="Pick your player"></div>
@@ -294,7 +301,7 @@ export class UI {
       <p class="version">v${VERSION}</p>
       <div class="start-foot">
         <button class="btn btn-big" data-act="play">Play</button>
-        ${isTouchDevice() ? '' : controlsHtml(true)}
+        ${usingTouch() ? '' : controlsHtml(true)}
       </div>
     </div>`);
     const cards = el.querySelector('.cards')!;
@@ -334,9 +341,21 @@ export class UI {
     el.querySelector('[data-act=play]')!.addEventListener('click', () => this.play());
     const syncLevels = () => {
       el.querySelectorAll<HTMLButtonElement>('.lvl').forEach((b) => b.classList.toggle('picked', Number(b.dataset.lvl) === this.level));
-      const wn = el.querySelector('.world-name')!;
-      wn.innerHTML = waveText(`World 1 · ${levelName(this.level)}`);
-      wn.setAttribute('aria-label', `World 1 · ${levelName(this.level)}`);
+      const wn = el.querySelector<HTMLElement>('.world-name')!;
+      const text = `${levelInfo(this.level).world} · ${levelName(this.level)}`;
+      if (wn.getAttribute('aria-label') === text) return;
+      wn.setAttribute('aria-label', text);
+      // the old name's letters hop away and the new one pops in, letter by letter
+      // (works the same for a new world as for a new part)
+      clearTimeout(this.subtitleTimer);
+      wn.classList.remove('swap-in');
+      wn.classList.add('swap-out');
+      this.subtitleTimer = window.setTimeout(() => {
+        wn.innerHTML = waveText(text);
+        wn.classList.remove('swap-out');
+        void wn.offsetWidth;
+        wn.classList.add('swap-in');
+      }, 260);
     };
     el.querySelectorAll<HTMLButtonElement>('.lvl').forEach((b) =>
       b.addEventListener('click', () => {
@@ -448,7 +467,7 @@ export class UI {
     this.hud.hidden = false;
     const hero = characterById(this.session.players[0]?.characterId ?? 'puffy');
     drawPortrait(this.hud.querySelector('canvas')!, hero);
-    if (isTouchDevice()) this.touch.show();
+    if (usingTouch()) this.touch.show();
     else this.touch.hide();
   }
 
@@ -492,7 +511,7 @@ export class UI {
         <button class="btn btn-alt" data-act="restart">Restart level</button>
         <button class="btn btn-alt" data-act="hero">Pick another player</button>
         <button class="btn btn-alt" data-act="sound">${isMuted() ? 'Sound: off' : 'Sound: on'}</button>
-        ${isTouchDevice() ? '' : `<h3 class="ctl-title">Controls</h3>${controlsHtml()}`}
+        ${usingTouch() ? '' : `<h3 class="ctl-title">Controls</h3>${controlsHtml()}`}
       </div>
     </div>`);
     const act = (a: string, fn: () => void) => el.querySelector(`[data-act=${a}]`)!.addEventListener('click', fn);

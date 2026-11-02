@@ -102,6 +102,29 @@ export const bank = {
 
 type Group = Phaser.GameObjects.Group;
 
+/**
+ * Where the flyover is along its path (0…1) for flight time u (0…1). The
+ * speed eases up quickly, then slows down over a long, gentle tail (it keeps
+ * gliding and settles, rather than braking at the end).
+ */
+const INTRO_TABLE = (() => {
+  const N = 256;
+  const v: number[] = [];
+  for (let i = 0; i <= N; i++) {
+    const u = i / N;
+    const up = Math.min(1, u / 0.18);
+    v.push(up * up * (3 - 2 * up) * Math.pow(1 - u, 1.9));
+  }
+  const p = [0];
+  for (let i = 1; i <= N; i++) p.push(p[i - 1] + (v[i - 1] + v[i]) / 2);
+  return p.map((x) => x / p[N]);
+})();
+function introGlide(u: number) {
+  const f = Math.max(0, Math.min(1, u)) * (INTRO_TABLE.length - 1);
+  const i = Math.floor(f);
+  return i >= INTRO_TABLE.length - 1 ? 1 : INTRO_TABLE[i] + (INTRO_TABLE[i + 1] - INTRO_TABLE[i]) * (f - i);
+}
+
 /** Camera roll for the mountain climb (radians; the view leans so the ground rises to the right). */
 const UPHILL_TILT = -0.06;
 
@@ -458,7 +481,7 @@ export class GameScene extends Phaser.Scene {
     this.introU = 0;
     const info = levelInfo(this.levelId);
     this.game.events.emit('level-intro', { world: 'World 1', title: info.title, part: info.part });
-    const tw = this.tweens.add({ targets: this.intro, u: 1, duration: 5600, ease: 'Linear', onComplete: () => this.endIntro() });
+    const tw = this.tweens.add({ targets: this.intro, u: 1, duration: 6400, ease: 'Linear', onComplete: () => this.endIntro() });
     // skipping just fast-forwards the same flight (still lands smoothly)
     this.introSkip = () => tw.setTimeScale(5);
     this.game.events.once('skip-intro', this.introSkip);
@@ -474,7 +497,8 @@ export class GameScene extends Phaser.Scene {
     this.intro = null;
     this.cameras.main.setRotation(this.uphill);
     this.physics.world.resume();
-    this.updateCamera(0, true);
+    // no snap: the normal follow camera picks up exactly where the flight left off
+    this.updateCamera(0);
     for (const p of this.players) p.spawnProtection();
     this.game.events.emit('level-intro-end');
   }
@@ -500,7 +524,7 @@ export class GameScene extends Phaser.Scene {
     const vh = this.scale.height / zoom;
     const { widthPx, heightPx } = this.level;
     const endX = this.players[0]?.x ?? I.x1;
-    const rawX = I.x0 + (endX - I.x0) * smooth(0, 1, u);
+    const rawX = I.x0 + (endX - I.x0) * introGlide(u);
     const x = Phaser.Math.Clamp(rawX, vw / 2, Math.max(vw / 2, widthPx - vw / 2));
     const clampTop = (t: number) => Phaser.Math.Clamp(t, Math.min(0, heightPx - vh), heightPx - vh);
     // ride above the terrain (it climbs on the mountain), then blend onto the hero's framing

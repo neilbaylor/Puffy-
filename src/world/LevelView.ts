@@ -52,8 +52,10 @@ export class LevelView {
   ) {
     this.lazy = opts?.lazyNear !== undefined;
     this.lazyNear = opts?.lazyNear ?? 0;
-    // only one level's terrain lives in memory at a time (phones run out otherwise)
-    for (const k of scene.textures.getTextureKeys())
+    // only one level's terrain lives in memory at a time in the game (phones run out
+    // otherwise); the start screen's lazy views keep theirs (they only draw a little)
+    if (opts?.lazyNear === undefined)
+      for (const k of scene.textures.getTextureKeys())
       if (k.startsWith('terrain-') && !k.startsWith(`terrain-${data.name}-`)) scene.textures.remove(k);
     this.map = scene.make.tilemap({ data: data.tiles.map((r) => [...r]), tileWidth: TILE, tileHeight: TILE });
     const tileset = this.map.addTilesetImage('tiles', 'tiles', TILE, TILE, 1, 2)!;
@@ -82,13 +84,16 @@ export class LevelView {
   animate(t: number, left: number, right: number) {
     // lazy terrain: anything the view is about to reach right away, otherwise one chunk per frame
     if (this.pending.length) {
+      // the fly-over only ever moves forward slowly: draw what it's about to reach, nothing more
       const near = this.pending.filter((p) => p.x1 > left - 400 && p.x0 < right + 400);
-      const rest = this.pending.filter((p) => !near.includes(p));
       for (const p of near) p.make();
-      const mid = (left + right) / 2;
-      rest.sort((a, b) => Math.abs((a.x0 + a.x1) / 2 - mid) - Math.abs((b.x0 + b.x1) / 2 - mid));
-      rest.shift()?.make();
-      this.pending = rest;
+      this.pending = this.pending.filter((p) => !near.includes(p));
+      const ahead = this.pending.filter((p) => p.x0 < right + 2200 && p.x1 > left);
+      ahead.sort((a, b) => a.x0 - b.x0);
+      if (ahead[0]) {
+        ahead[0].make();
+        this.pending = this.pending.filter((p) => p !== ahead[0]);
+      }
     }
     const gust = 0.55 + 0.45 * Math.sin(t * 0.33) * Math.sin(t * 0.21 + 1);
     for (const s of this.sway) {

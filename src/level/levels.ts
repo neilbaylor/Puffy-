@@ -5,6 +5,8 @@ import { buildLevel2 } from './level2';
 export interface LevelInfo {
   /** 1-based level number. */
   id: number;
+  /** Which world it's in ("World 1"; World 2 — Plop Invasion — is coming). */
+  world: string;
   title: string;
   part: string;
   /** null = not built yet ("coming soon"). */
@@ -12,8 +14,8 @@ export interface LevelInfo {
 }
 
 export const LEVELS: LevelInfo[] = [
-  { id: 1, title: 'Puff Ball Planet', part: 'Part 1', build: buildLevel1 },
-  { id: 2, title: 'Puff Ball Planet', part: 'Part 2', build: buildLevel2 },
+  { id: 1, world: 'World 1', title: 'Puff Ball Planet', part: 'Part 1', build: buildLevel1 },
+  { id: 2, world: 'World 1', title: 'Puff Ball Planet', part: 'Part 2', build: buildLevel2 },
 ];
 
 export const levelInfo = (id: number) => LEVELS.find((l) => l.id === id) ?? LEVELS[0];

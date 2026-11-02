@@ -342,13 +342,16 @@ body {
   .bars { display: none; }
   .card-tag { display: none; }
   .start h2 { display: none; }
-  .start { gap: 6px; padding-top: calc(6px + var(--safe-t)); padding-bottom: calc(8px + var(--safe-b)); }
+  /* equal space above the title, between every row, and below the button */
+  .start { justify-content: space-evenly; gap: 4px; padding-top: calc(4px + var(--safe-t)); padding-bottom: calc(6px + var(--safe-b)); }
   .logo { font-size: clamp(30px, 11vh, 52px); }
   .world-name { font-size: clamp(11px, 3.6vh, 16px); }
   /* shorter cards: the heroes are drawn smaller so everything fits under the title */
   .cards { flex: 0 1 auto; width: min(100%, 760px); }
   .card { padding: 4px 8px 8px; border-radius: 16px; box-shadow: 0 4px 0 var(--ink); }
-  .card canvas { height: min(30vh, 40vmin); }
+  .card canvas { height: min(26vh, 36vmin); }
+  /* a little headroom for the logo's hopping letters */
+  .start-head { margin-top: clamp(4px, 2.5vh, 12px); }
   .card-name { font-size: clamp(15px, 5vh, 22px); }
   .start-foot { margin-bottom: 0; transform: none; }
   .btn-big { font-size: clamp(18px, 6vh, 26px); padding: 8px 34px 7px; }
@@ -1612,4 +1615,20 @@ kbd {
 }
 @keyframes tip-in {
   from { opacity: 0; transform: translateX(-50%) translateY(30px); }
+}
+
+/* the subtitle swapping to a new level / world name: old letters hop away, new ones pop in */
+.world-name.swap-out i {
+  animation: wn-out 0.24s ease-in forwards;
+  animation-delay: calc(var(--i) * 0.008s);
+}
+@keyframes wn-out {
+  to { transform: translateY(-0.7em) rotate(-12deg) scale(0.5); opacity: 0; }
+}
+.world-name.swap-in i {
+  animation: wn-in 0.55s cubic-bezier(0.2, 1.6, 0.4, 1) both, wn-wave 2.6s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 0.03s), calc(0.7s + var(--i) * 0.06s);
+}
+@keyframes wn-in {
+  from { transform: translateY(0.9em) rotate(14deg) scale(0.2); opacity: 0; }
 }

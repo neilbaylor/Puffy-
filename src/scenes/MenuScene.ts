@@ -34,12 +34,31 @@ export class MenuScene extends Phaser.Scene {
       });
     };
     this.game.events.on('menu-level', onLevel);
+    // while you look at the start screen, quietly draw the other level's opening scenery
+    // so switching to it is quick
+    this.time.delayedCall(1800, () => this.prewarm(this.levelId === 2 ? 1 : 2));
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.game.events.off('menu-level', onLevel));
     // the boot already put the start screen up; coming back from a game shows it again
     if (!data?.silent) this.game.events.emit('menu');
   }
 
   private levelId = 1;
+  private warmed = new Set<number>();
+
+  /** Draw a level's start-screen terrain textures now (then throw the objects away). */
+  private prewarm(id: number) {
+    const info = levelInfo(id);
+    if (!info.build || this.warmed.has(id) || this.levelId === id) return;
+    this.warmed.add(id);
+    const before = new Set(this.children.list);
+    const x0 = this.startX(id);
+    new LevelView(this, info.build(), { lazyNear: x0 + 500 });
+    for (const o of [...this.children.list]) if (!before.has(o)) o.destroy();
+  }
+
+  private startX(id: number) {
+    return id === 2 ? 86 * 32 : 0;
+  }
   private top: number | null = null;
 
   private build(id: number) {
@@ -47,7 +66,8 @@ export class MenuScene extends Phaser.Scene {
     // the fly-over starts somewhere that shows off the level (Part 2: up in the snow, not the
     // green foothills that look like Part 1); only the terrain near the camera is drawn now,
     // the rest a chunk per frame, so switching levels is quick
-    this.x0 = id === 2 ? 86 * 32 : 0;
+    this.x0 = this.startX(id);
+    this.warmed.add(id);
     this.level = new LevelView(this, (levelInfo(id).build ?? buildLevel1)(), { lazyNear: this.x0 + 500 });
     this.bg = new Background(this, this.level.heightPx - VIEW_H);
     this.amb = new Ambience(this, id, (x, y, max) => {

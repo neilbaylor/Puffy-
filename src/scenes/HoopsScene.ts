@@ -45,7 +45,7 @@ import { stingerReveal, stingerTitle } from '../ui/stinger';
 import { addCanvas, hires } from '../gfx/textures';
 import { gamepadSources } from '../input/gamepad';
 import { isKeyDown } from '../input/keyboard';
-import { isTouchDevice } from '../input/touch';
+import { usingTouch } from '../input/touch';
 import type { GameData, GameOverState, ResultState } from './GameScene';
 import { loseLife } from '../core/lives';
 import { NetSim } from './hoopsNet';
@@ -349,7 +349,7 @@ export class HoopsScene extends Phaser.Scene {
       <div class="hoops-meters" hidden>
         <div class="hm" data-m="power"><b>Power</b><div class="hm-bar"><i class="hm-zone"></i><i class="hm-mark"></i></div></div>
         <div class="hm" data-m="aim"><b>Aim</b><div class="hm-bar"><i class="hm-zone"></i><i class="hm-mark"></i></div></div>
-        <p class="hm-hint">${isTouchDevice() ? 'Tap' : 'Press Space or click'} to stop the marker in the green!</p>
+        <p class="hm-hint">${usingTouch() ? 'Tap' : 'Press Space or click'} to stop the marker in the green!</p>
       </div>
       <div class="hoops-lb"><i></i><i></i></div>
       <div class="hoops-l3"><b></b><span></span></div>
