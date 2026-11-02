@@ -270,7 +270,7 @@ export class UI {
       <div class="cards" role="radiogroup" aria-label="Pick your player"></div>
       ${
         progress.beaten >= 1
-          ? `<div class="levels" role="radiogroup" aria-label="Pick a level"><b>Level</b>${LEVELS.map(
+          ? `<div class="levels" role="radiogroup" aria-label="Pick a level">${LEVELS.map(
               (l) => `<button class="lvl" data-lvl="${l.id}" ${l.build ? '' : 'disabled'}>${l.part}${l.build ? '' : '<small>coming soon</small>'}</button>`,
             ).join('')}</div>`
           : ''

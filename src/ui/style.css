@@ -338,12 +338,21 @@ body {
   font-size: 22px;
 }
 /* short screens (phones in landscape): squeeze the start screen */
-@media (max-height: 460px) {
+@media (max-height: 500px) {
   .bars { display: none; }
   .card-tag { display: none; }
   .start h2 { display: none; }
-  .card canvas { height: 42vmin; }
-  .logo { font-size: clamp(32px, 11vmin, 56px); }
+  .start { gap: 6px; padding-top: calc(6px + var(--safe-t)); padding-bottom: calc(8px + var(--safe-b)); }
+  .logo { font-size: clamp(30px, 11vh, 52px); }
+  .world-name { font-size: clamp(11px, 3.6vh, 16px); }
+  /* shorter cards: the heroes are drawn smaller so everything fits under the title */
+  .cards { flex: 0 1 auto; width: min(100%, 760px); }
+  .card { padding: 4px 8px 8px; border-radius: 16px; box-shadow: 0 4px 0 var(--ink); }
+  .card canvas { height: min(30vh, 40vmin); }
+  .card-name { font-size: clamp(15px, 5vh, 22px); }
+  .start-foot { margin-bottom: 0; transform: none; }
+  .btn-big { font-size: clamp(18px, 6vh, 26px); padding: 8px 34px 7px; }
+  .lvl { padding: 5px 14px; min-width: 84px; }
 }
 
 /* modal panels */
