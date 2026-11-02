@@ -11,6 +11,7 @@ import type { GameData, GameOverState, GameScene, HudState, ResultState } from '
 import { TouchControls } from './touchControls';
 import { drawNuggie, drawRootBeer } from '../gfx/collectibles';
 import { VERSION } from '../version';
+import { LEVELS, levelInfo, levelName, progress } from '../level/levels';
 
 const h = (html: string) => {
   const t = document.createElement('template');
@@ -60,6 +61,8 @@ export class UI {
   private gameScene: GameScene | null = null;
   private pickRaf = 0;
   private selected = 0;
+  /** Which level to start (1-based); you can pick once you've beaten a level. */
+  private level = 1;
 
   constructor(private game: Phaser.Game) {
     this.root = document.getElementById('ui')!;
@@ -187,10 +190,17 @@ export class UI {
     const el = h(`<div class="screen start">
       <header class="start-head">
         <div class="logo"><span>P</span><span>U</span><span>F</span><span>F</span><span>Y</span></div>
-        <p class="world-name">World 1 · Puff Ball Planet</p>
+        <p class="world-name">World 1 · ${levelName(this.level)}</p>
       </header>
       <h2>Pick your player</h2>
       <div class="cards" role="radiogroup" aria-label="Pick your player"></div>
+      ${
+        progress.beaten >= 1
+          ? `<div class="levels" role="radiogroup" aria-label="Pick a level"><b>Level</b>${LEVELS.map(
+              (l) => `<button class="lvl" data-lvl="${l.id}" ${l.build ? '' : 'disabled'}>${l.part}${l.build ? '' : '<small>coming soon</small>'}</button>`,
+            ).join('')}</div>`
+          : ''
+      }
       <button class="icon-btn fs-btn" data-act="fs" aria-label="Full screen" hidden>⛶</button>
       <p class="version">v${VERSION}</p>
       <div class="start-foot">
@@ -233,6 +243,19 @@ export class UI {
       cards.appendChild(card);
     });
     el.querySelector('[data-act=play]')!.addEventListener('click', () => this.play());
+    const syncLevels = () => {
+      el.querySelectorAll<HTMLButtonElement>('.lvl').forEach((b) => b.classList.toggle('picked', Number(b.dataset.lvl) === this.level));
+      el.querySelector('.world-name')!.textContent = `World 1 · ${levelName(this.level)}`;
+    };
+    el.querySelectorAll<HTMLButtonElement>('.lvl').forEach((b) =>
+      b.addEventListener('click', () => {
+        if (!levelInfo(Number(b.dataset.lvl)).build) return;
+        this.level = Number(b.dataset.lvl);
+        sfx.select();
+        syncLevels();
+      }),
+    );
+    syncLevels();
     const fsBtn = el.querySelector<HTMLButtonElement>('[data-act=fs]')!;
     const syncFs = () => (fsBtn.hidden = !canFullscreen() || isFullscreen() || isStandalone());
     syncFs();
@@ -322,7 +345,7 @@ export class UI {
     this.game.scene.stop('Menu');
     this.game.scene.stop('Hoops');
     this.game.scene.stop('Game');
-    this.game.scene.start('Game', { session, checkpoint } satisfies GameData);
+    this.game.scene.start('Game', { session, checkpoint, level: this.level } satisfies GameData);
   }
 
   // ─────────────────────────────────────────── HUD ──
@@ -425,7 +448,7 @@ export class UI {
       <div class="panel results gameover">
         <div class="results-hero"><canvas width="160" height="160"></canvas></div>
         <div class="results-body">
-          <p class="eyebrow">World 1 · Puff Ball Planet</p>
+          <p class="eyebrow">World 1 · ${levelName(this.level)}</p>
           <h2>Out of lives!</h2>
           <p class="gameover-note">${g.name} fainted one too many times. Start the level again with 3 spare lives.</p>
           <div class="row">
@@ -455,6 +478,9 @@ export class UI {
 
   private showResults(r: ResultState) {
     this.touch.hide();
+    // beating a level unlocks picking where to start
+    const firstTime = progress.beaten < (r.level ?? 1);
+    progress.markBeaten(r.level ?? 1);
     playLevelClear();
     const mins = Math.floor(r.seconds / 60);
     const secs = String(r.seconds % 60).padStart(2, '0');
@@ -462,8 +488,9 @@ export class UI {
       <div class="panel results">
         <div class="results-hero"><canvas width="160" height="160"></canvas></div>
         <div class="results-body">
-          <p class="eyebrow">World 1 · Puff Ball Planet</p>
+          <p class="eyebrow">World 1 · ${levelName(r.level ?? this.level)}</p>
           <h2>Level clear!</h2>
+          ${firstTime ? '<p class="unlock-note">New: pick which level to start from on the start screen!</p>' : ''}
           <dl class="stat-list">
             <dt><i class="aura-ico"></i>Aura carried</dt><dd>${r.aura}</dd>
             <dt><i class="rb-ico"></i>Root beer found</dt><dd>${r.rootbeer} <small>(${r.rootbeerTotal} saved)</small></dd>

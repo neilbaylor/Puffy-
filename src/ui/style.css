@@ -1185,3 +1185,52 @@ body {
 @keyframes skip-in {
   from { opacity: 0; transform: translateY(8px); }
 }
+
+/* level picker (after you've beaten a level) */
+.levels {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 2px 0 0;
+}
+.levels b {
+  font: 900 clamp(12px, 2.2vmin, 15px) / 1 var(--body);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #3a2418;
+}
+.lvl {
+  display: grid;
+  min-width: 96px;
+  padding: 7px 16px;
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 clamp(15px, 2.8vmin, 20px) / 1 var(--display);
+  box-shadow: 0 3px 0 var(--ink);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.lvl.picked {
+  background: var(--gold);
+}
+.lvl small {
+  font: 800 10px/1.2 var(--body);
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+}
+.lvl:disabled {
+  opacity: 0.55;
+  cursor: default;
+  box-shadow: none;
+}
+.unlock-note {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: #fff3c4;
+  font: 800 13px/1.3 var(--body);
+  color: #6b4a00;
+}

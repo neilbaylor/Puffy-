@@ -126,13 +126,33 @@ export function drawHeroCard(target: HTMLCanvasElement, ch: CharacterDef, pose: 
 }
 
 /** A portrait for menus. */
+/**
+ * A hero portrait, centred and sized by the actual drawing (not the frame), so
+ * every hero sits in the middle of the badge whatever their size or shape.
+ */
 export function drawPortrait(target: HTMLCanvasElement, ch: CharacterDef, pose: Pose = 'idle0') {
+  const R = 4;
+  const { c: tmp, ctx: t } = canvas(CHAR_W * R, CHAR_H * R);
+  t.scale(R, R);
+  drawCharacter(t, 0, 0, ch, pose);
+  // find the drawing's bounding box
+  const data = t.getImageData(0, 0, tmp.width, tmp.height).data;
+  let x0 = tmp.width, y0 = tmp.height, x1 = 0, y1 = 0;
+  for (let y = 0; y < tmp.height; y += 2)
+    for (let x = 0; x < tmp.width; x += 2)
+      if (data[(y * tmp.width + x) * 4 + 3] > 24) {
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (y < y0) y0 = y;
+        if (y > y1) y1 = y;
+      }
   const ctx = target.getContext('2d')!;
   ctx.clearRect(0, 0, target.width, target.height);
-  const s = Math.min(target.width / CHAR_W, target.height / CHAR_H);
-  ctx.save();
-  ctx.translate((target.width - CHAR_W * s) / 2, (target.height - CHAR_H * s) / 2);
-  ctx.scale(s, s);
-  drawCharacter(ctx, 0, 0, ch, pose);
-  ctx.restore();
+  if (x1 <= x0 || y1 <= y0) return;
+  const bw = x1 - x0 + 2;
+  const bh = y1 - y0 + 2;
+  const pad = 0.08;
+  const s = Math.min((target.width * (1 - pad * 2)) / bw, (target.height * (1 - pad * 2)) / bh);
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(tmp, x0, y0, bw, bh, (target.width - bw * s) / 2, (target.height - bh * s) / 2, bw * s, bh * s);
 }

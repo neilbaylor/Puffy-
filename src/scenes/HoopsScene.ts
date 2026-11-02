@@ -45,6 +45,8 @@ export interface HoopsData {
   charId: string;
   /** Checkpoint to restart from if the King wins. */
   checkpoint: number;
+  /** Which level this palace ends (1-based). */
+  level?: number;
   /** Level stats so far (shown on the results screen if you win). */
   result: ResultState;
 }
@@ -54,6 +56,27 @@ type Outcome = 'swish' | 'rimIn' | 'rimOut' | 'short' | 'long' | 'wide';
 /** King Puff Ball makes about this share of his shots. */
 const KING_MAKE = 0.45;
 const REGULATION = 5;
+
+/** Where each player shoots from (stage coords, feet): they walk to a new one before every shot. */
+const HERO_SPOTS = [
+  { x: 400, y: 640 },
+  { x: 520, y: 588 },
+  { x: 300, y: 700 },
+  { x: 590, y: 676 },
+  { x: 455, y: 560 },
+  { x: 345, y: 612 },
+];
+// (kept inside what a 4:3 iPad screen shows, so the King never walks off the edge)
+const KING_SPOTS = [
+  { x: 1010, y: 650 },
+  { x: 1000, y: 598 },
+  { x: 930, y: 702 },
+  { x: 968, y: 565 },
+  { x: 1018, y: 694 },
+  { x: 948, y: 626 },
+];
+/** Perspective: how big someone standing at stage height y looks, relative to `baseY`. */
+const depthK = (y: number, baseY: number) => (y - 120) / (baseY - 120);
 
 const ARENA_RES = 1.25;
 const KING_RES = 2.5;
@@ -81,6 +104,12 @@ export class HoopsScene extends Phaser.Scene {
   /** A loose ball bouncing on the floor after a shot. */
   private loose: null | { vx: number; vy: number; floorY: number; t: number; res: () => void } = null;
   private heroScale = 1;
+  private kingScale = 1;
+  private heroShadow!: Phaser.GameObjects.Image;
+  private kingShadow!: Phaser.GameObjects.Image;
+  /** Index of the spot each player is standing on. */
+  private heroSpot = 0;
+  private kingSpot = 0;
   private clock = 0;
   private waits: { at: number; res: () => void }[] = [];
   private flight: null | { t: number; dur: number; p0: Phaser.Math.Vector2; p1: Phaser.Math.Vector2; p2: Phaser.Math.Vector2; s0: number; s1: number; f0: number; f1: number; res: () => void } = null;
@@ -206,11 +235,14 @@ export class HoopsScene extends Phaser.Scene {
     // characters, with floor shadows
     const hp = A(SPOTS.hero.x, SPOTS.hero.y);
     const kp = A(SPOTS.king.x, SPOTS.king.y);
-    this.add.image(hp.x, hp.y + 2, 'softshadow').setDisplaySize(150 * ch.scale, 30).setDepth(6);
-    this.add.image(kp.x, kp.y + 3, 'softshadow').setDisplaySize(210, 40).setDepth(6);
+    this.heroShadow = this.add.image(hp.x, hp.y + 2, 'softshadow').setDisplaySize(150 * ch.scale, 30).setDepth(6);
+    this.kingShadow = this.add.image(kp.x, kp.y + 3, 'softshadow').setDisplaySize(210, 40).setDepth(6);
     this.heroScale = (2.6 / ART_RES) * ch.scale;
+    this.kingScale = 1.45 / KING_RES;
+    this.heroSpot = 0;
+    this.kingSpot = 0;
     this.hero = this.add.sprite(hp.x, hp.y + 4, `char-${ch.id}`, 'idle0').setOrigin(0.5, 1).setScale(this.heroScale).setDepth(8);
-    this.king = this.add.sprite(kp.x, kp.y + 6, 'king', 'idle0').setOrigin(0.5, 1).setScale(1.45 / KING_RES).setDepth(8);
+    this.king = this.add.sprite(kp.x, kp.y + 6, 'king', 'idle0').setOrigin(0.5, 1).setScale(this.kingScale).setDepth(8);
     // faint mirror images in the glossy floor
     this.heroRefl = this.add.sprite(0, 0, `char-${ch.id}`, 'idle0').setOrigin(0.5, 1).setFlipY(true).setAlpha(0.16).setDepth(4);
     this.kingRefl = this.add.sprite(0, 0, 'king', 'idle0').setOrigin(0.5, 1).setFlipY(true).setAlpha(0.16).setDepth(4);
@@ -360,6 +392,10 @@ export class HoopsScene extends Phaser.Scene {
     this.hero.setFrame(h.frames[Math.floor((this.clock / 1000) * h.fps) % h.frames.length]);
     this.mirror(this.heroRefl, this.hero);
     this.mirror(this.kingRefl, this.king);
+    const hk = this.hero.scaleY / this.heroScale;
+    const kk = this.king.scaleY / this.kingScale;
+    this.heroShadow.setPosition(this.hero.x, this.hero.y - 2).setDisplaySize(150 * characterById(this.hd.charId).scale * hk, 30 * hk);
+    this.kingShadow.setPosition(this.king.x, this.king.y - 3).setDisplaySize(210 * kk, 40 * kk);
 
     // the crowd: on its feet after a basket, and camera flashes popping all the time
     const excited = this.clock < this.excitedUntil;
@@ -687,9 +723,11 @@ export class HoopsScene extends Phaser.Scene {
   }
 
   private async playerShot() {
-    const hp = A(SPOTS.hero.x, SPOTS.hero.y);
     this.renderScore();
     this.camFocus = { x: 800, y: 450, zoom: 1 };
+    if (this.score.you.length > 0) await this.walkToSpot('hero');
+    const hk = this.hero.scaleY / this.heroScale;
+    const hp = { x: this.hero.x, y: this.hero.y - 4 };
     const n = this.score.you.length;
     await this.callout(n >= REGULATION ? 'Your shot!<small>Sudden death</small>' : `Your shot!<small>${n + 1} of ${REGULATION}</small>`, 'turn', 900);
     const speed = 1.15 + Math.min(n, REGULATION - 1) * 0.12; // sudden death doesn't speed up further
@@ -716,13 +754,13 @@ export class HoopsScene extends Phaser.Scene {
     this.heroAnim = { frames: ['shoot'], fps: 1 };
     this.hero.setRotation(-0.28);
     const ch = characterById(this.hd.charId);
-    const mx = hp.x + 62 * ch.scale;
-    const my = hp.y - (ch.muzzleY ?? 18) * 2.6 - 6;
+    const mx = hp.x + 62 * ch.scale * hk;
+    const my = hp.y - ((ch.muzzleY ?? 18) * 2.6 + 6) * hk;
     sfx.shoot();
     const flash = this.add.image(mx + 8, my - 4, 'flash').setScale(0.9).setRotation(-0.5).setDepth(11);
     this.tweens.add({ targets: flash, scale: 1.4, alpha: 0, duration: 140, onComplete: () => flash.destroy() });
     this.tweens.add({ targets: this.hero, x: this.hero.x - 10, yoyo: true, duration: 90 });
-    await this.shootBall(mx, my, hp.y, o, Math.sign(a) || (Math.random() < 0.5 ? -1 : 1));
+    await this.shootBall(mx, my, hp.y, o, Math.sign(a) || (Math.random() < 0.5 ? -1 : 1), hk);
     this.hero.setRotation(0);
     const made = o === 'swish' || o === 'rimIn';
     this.score.you.push(made);
@@ -747,9 +785,11 @@ export class HoopsScene extends Phaser.Scene {
   // ── King's shot: out of his mouth, ~35% ──
 
   private async kingShot() {
-    const kp = A(SPOTS.king.x, SPOTS.king.y);
     this.renderScore();
     this.camFocus = { x: 800, y: 450, zoom: 1 };
+    if (this.score.king.length > 0) await this.walkToSpot('king');
+    const kk = this.king.scaleY / this.kingScale;
+    const kp = { x: this.king.x, y: this.king.y - 6 };
     await this.callout('King Puff Ball shoots…', 'turn king', 900);
     this.kingAnim = { frames: ['idle0', 'idle1'], fps: 5 };
     await this.wait(500);
@@ -762,8 +802,8 @@ export class HoopsScene extends Phaser.Scene {
     }
     this.kingAnim = { frames: ['shoot'], fps: 1 };
     sfx.spit();
-    const mouth = { x: kp.x - 18, y: kp.y - 110 };
-    await this.shootBall(mouth.x, mouth.y, kp.y, o, Math.random() < 0.5 ? -1 : 1);
+    const mouth = { x: kp.x - 18 * kk, y: kp.y - 110 * kk };
+    await this.shootBall(mouth.x, mouth.y, kp.y, o, Math.random() < 0.5 ? -1 : 1, kk);
     const made = o === 'swish' || o === 'rimIn';
     this.score.king.push(made);
     this.renderScore();
@@ -785,11 +825,11 @@ export class HoopsScene extends Phaser.Scene {
   }
 
   /** Fly the ball from (x, y) toward the hoop and play out the outcome. */
-  private async shootBall(x: number, y: number, floorY: number, o: Outcome, side: number) {
+  private async shootBall(x: number, y: number, floorY: number, o: Outcome, side: number, k = 1) {
     const rim = A(HOOP.rimX, HOOP.rimY);
     const base = A(HOOP.rimX, HOOP.baseY);
     // a bigger ball: radius ~31 in the hand, ~19 at the hoop (the rim is 88 across)
-    const s0 = 1.3;
+    const s0 = 1.3 * k;
     // misses must never look like they went in: short shots drop well in front of
     // the rim (on the shooter's side), long ones hit the glass and fly off sideways
     const toShooter = Math.sign(x - rim.x) || -1;
@@ -845,6 +885,39 @@ export class HoopsScene extends Phaser.Scene {
     }
     this.ball.setVisible(false).setAlpha(1);
     this.ballShadow.setVisible(false).setAlpha(1);
+  }
+
+  /** Walk a player to a new shooting spot (scaled for depth on the court), then face the hoop. */
+  private async walkToSpot(who: 'hero' | 'king') {
+    const isHero = who === 'hero';
+    const spots = isHero ? HERO_SPOTS : KING_SPOTS;
+    const cur = isHero ? this.heroSpot : this.kingSpot;
+    let next = cur;
+    while (next === cur) next = Math.floor(Math.random() * spots.length);
+    if (isHero) this.heroSpot = next;
+    else this.kingSpot = next;
+    const spr = isHero ? this.hero : this.king;
+    const base = isHero ? this.heroScale : this.kingScale;
+    const baseY = isHero ? HERO_SPOTS[0].y : KING_SPOTS[0].y;
+    const to = A(spots[next].x, spots[next].y);
+    const lift = isHero ? 4 : 6;
+    const dist = Math.hypot(to.x - spr.x, to.y + lift - spr.y);
+    // art: heroes face right, the King faces left
+    const goingRight = to.x > spr.x;
+    spr.setFlipX(isHero ? !goingRight : goingRight);
+    if (isHero) this.heroAnim = { frames: ['walk0', 'walk1', 'walk2', 'walk3'], fps: 10 };
+    else this.kingAnim = { frames: ['run0', 'run1'], fps: 6 };
+    await this.tween({
+      targets: spr,
+      x: to.x,
+      y: to.y + lift,
+      duration: Math.max(450, dist * 4.2),
+      ease: 'Sine.easeInOut',
+      onUpdate: () => spr.setScale(base * depthK(spr.y - lift - STAGE_OY, baseY)),
+    });
+    spr.setFlipX(false);
+    if (isHero) this.heroAnim = { frames: ['idle0', 'idle1'], fps: 2 };
+    else this.kingAnim = { frames: ['idle0', 'idle1'], fps: 2.5 };
   }
 
   /** Step and draw the net; the ball pushes through it when it's in the hoop. */
@@ -956,7 +1029,7 @@ export class HoopsScene extends Phaser.Scene {
   // ── endings ──
 
   private async youWin() {
-    const kp = A(SPOTS.king.x, SPOTS.king.y);
+    const kp = { x: this.king.x, y: this.king.y - 6 };
     this.cut(kp.x - 40, kp.y - 120, 1.9);
     this.kingAnim = { frames: ['sad'], fps: 1 };
     await this.callout('“NOOOO!”', 'speech', 1100);
@@ -968,7 +1041,7 @@ export class HoopsScene extends Phaser.Scene {
     this.jumboShow({ kind: 'big', text: 'NEW CHAMP!', sub: `${characterById(this.hd.charId).name} beats the King ${this.total('you')} – ${this.total('king')}`, color: '#ffd23f', bg: '#3d1478' }, 1e9);
     await this.tween({ targets: this.king, x: ARENA_W + 220, duration: 1500, ease: 'Quad.easeIn' });
     // the house lights dip and a spotlight finds the champion; confetti everywhere
-    const hpw = A(SPOTS.hero.x, SPOTS.hero.y);
+    const hpw = { x: this.hero.x, y: this.hero.y - 4 };
     this.setDark(0.45, 400);
     this.aimSpot(0, hpw.x, hpw.y - 60, 1.2, 1.4, 0);
     this.aimSpot(1, hpw.x + 10, hpw.y - 80, 1.0, 1.2, 500);
@@ -977,12 +1050,12 @@ export class HoopsScene extends Phaser.Scene {
     this.heroAnim = { frames: ['jump', 'idle0'], fps: 5 };
     await this.callout(`YOU BEAT<br>KING PUFF BALL!<small>${this.total('you')} – ${this.total('king')}</small>`, 'title', 2200);
     fadeOutMusic(500);
-    const result: ResultState = { ...this.hd.result, hoops: `${this.total('you')} – ${this.total('king')}` };
+    const result: ResultState = { ...this.hd.result, hoops: `${this.total('you')} – ${this.total('king')}`, level: this.hd.level ?? 1 };
     this.game.events.emit('level-complete', result);
   }
 
   private async kingWins() {
-    const kp = A(SPOTS.king.x, SPOTS.king.y);
+    const kp = { x: this.king.x, y: this.king.y - 6 };
     this.cut(kp.x - 10, kp.y - 140, 2.3);
     this.kingAnim = { frames: ['laugh0', 'laugh1'], fps: 7 };
     sfx.laugh();
@@ -1004,6 +1077,6 @@ export class HoopsScene extends Phaser.Scene {
     }
     this.cameras.main.fadeOut(400, 20, 10, 38);
     await this.wait(450);
-    this.scene.start('Game', { session: this.hd.session, checkpoint: this.hd.checkpoint, retry: true } satisfies GameData);
+    this.scene.start('Game', { session: this.hd.session, checkpoint: this.hd.checkpoint, retry: true, level: this.hd.level ?? 1 } satisfies GameData);
   }
 }

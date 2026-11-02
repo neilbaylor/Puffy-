@@ -26,7 +26,7 @@ import { LevelBuilder, type LevelData } from './builder';
  * Root beer: 7 rare bottles, mostly in tricky spots. They're banked for a future shop.
  */
 export function buildLevel1(): LevelData {
-  const L = new LevelBuilder('Puff Ball Planet', 'World 1', 330, 16);
+  const L = new LevelBuilder('Puff Ball Planet · Part 1', 'World 1', 330, 16);
 
   // ── Meadow start ───────────────────────────────────────────
   L.ground(0, 34, 3);

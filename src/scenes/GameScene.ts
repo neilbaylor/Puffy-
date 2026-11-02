@@ -11,6 +11,7 @@ import { Rocket } from '../entities/Rocket';
 import { SoccerMatch } from '../entities/Soccer';
 import { soloSource, sourceById } from '../input/devices';
 import type { EnemyKind } from '../level/builder';
+import { levelInfo } from '../level/levels';
 import { buildLevel1 } from '../level/level1';
 import { T } from '../level/tiles';
 import { Background, type View } from '../world/Background';
@@ -24,6 +25,8 @@ export interface GameData {
   session: Session;
   /** Index of the checkpoint to start from (-1 / undefined = level start). */
   checkpoint?: number;
+  /** Which level (1-based; default 1). */
+  level?: number;
   /** Restarting after a faint (keeps lives and run stats); otherwise it's a brand-new run. */
   retry?: boolean;
 }
@@ -57,6 +60,8 @@ export interface ResultState {
   faints: number;
   lives: number;
   seconds: number;
+  /** Which level was cleared (1-based). */
+  level?: number;
   /** Final free-throw score vs King Puff Ball, e.g. "4 – 2". */
   hoops?: string;
 }
@@ -120,6 +125,9 @@ export class GameScene extends Phaser.Scene {
   aura = 0;
   private startCheckpoint = -1;
   private retry = false;
+  /** Which level is being played (1-based). */
+  levelId = 1;
+  private data0: GameData = { session: { players: [] } };
   private lastCheckpoint = -1;
   private ended = false;
   private lastHud = '';
@@ -134,6 +142,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   init(data: GameData) {
+    this.data0 = data;
     this.session = data.session;
     this.startCheckpoint = data.checkpoint ?? -1;
     this.lastCheckpoint = this.startCheckpoint;
@@ -164,7 +173,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   create() {
-    const data = buildLevel1();
+    this.levelId = this.data0.level ?? 1;
+    const data = (levelInfo(this.levelId).build ?? buildLevel1)();
     this.physics.world.gravity.y = GRAVITY;
     this.physics.world.TILE_BIAS = 24;
     this.level = new LevelView(this, data);
@@ -650,7 +660,7 @@ export class GameScene extends Phaser.Scene {
       }
       this.cameras.main.fadeOut(300, 255, 248, 236);
       this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () =>
-        this.scene.restart({ session: this.session, checkpoint: this.lastCheckpoint, retry: true } satisfies GameData),
+        this.scene.restart({ session: this.session, checkpoint: this.lastCheckpoint, retry: true, level: this.levelId } satisfies GameData),
       );
     });
   }
@@ -692,7 +702,7 @@ export class GameScene extends Phaser.Scene {
         this.cameras.main.flash(200, 255, 240, 200);
         sfx.whoosh();
         void stingerCover().then(() =>
-          this.scene.start('Hoops', { session: this.session, charId: p.char.id, checkpoint: this.lastCheckpoint, result: res } satisfies HoopsData),
+          this.scene.start('Hoops', { session: this.session, charId: p.char.id, checkpoint: this.lastCheckpoint, level: this.levelId, result: res } satisfies HoopsData),
         );
       },
     });
