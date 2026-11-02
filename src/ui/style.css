@@ -342,14 +342,18 @@ body {
   .bars { display: none; }
   .card-tag { display: none; }
   .start h2 { display: none; }
-  /* equal space above the title, between every row, and below the button */
-  .start { justify-content: space-evenly; gap: 4px; padding-top: calc(4px + var(--safe-t)); padding-bottom: calc(6px + var(--safe-b)); }
+  /* the title sits a little way down; the rows below it are packed snugly
+     (the cards take up the slack), with only a small margin under Play */
+  .start { justify-content: flex-start; gap: 0; padding-top: calc(clamp(10px, 8.5vh, 40px) + var(--safe-t)); padding-bottom: calc(clamp(6px, 3vh, 14px) + var(--safe-b)); }
+  .start .cards { margin-top: clamp(8px, 3.6vh, 18px); }
+  .start .levels { margin-top: clamp(5px, 2.2vh, 10px); }
+  .start .start-foot { margin-top: clamp(6px, 2.4vh, 12px); }
   .logo { font-size: clamp(30px, 11vh, 52px); }
   .world-name { font-size: clamp(11px, 3.6vh, 16px); }
   /* shorter cards: the heroes are drawn smaller so everything fits under the title */
   .cards { flex: 0 1 auto; width: min(100%, 760px); }
   .card { padding: 4px 8px 8px; border-radius: 16px; box-shadow: 0 4px 0 var(--ink); }
-  .card canvas { height: min(26vh, 36vmin); }
+  .card canvas { height: max(70px, min(30vh, 40vmin, calc(100vh - 262px - var(--safe-t) - var(--safe-b)))); }
   /* a little headroom for the logo's hopping letters */
   .start-head { margin-top: clamp(4px, 2.5vh, 12px); }
   .card-name { font-size: clamp(15px, 5vh, 22px); }
@@ -907,9 +911,11 @@ html.rotating body {
 }
 @keyframes turn-hero {
   0%, 18% { transform: rotate(0) translateY(0); }
-  42% { transform: rotate(90deg) translateY(0); }
-  52% { transform: rotate(90deg) translateY(-16px); }
-  60%, 80% { transform: rotate(90deg) translateY(0); }
+  /* the hop: eases out going up, eases in coming down (no bounce through the floor) */
+  42% { transform: rotate(90deg) translateY(0); animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1); }
+  52% { transform: rotate(90deg) translateY(-13px); animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.3); }
+  60% { transform: rotate(90deg) translateY(0); animation-timing-function: linear; }
+  80% { transform: rotate(90deg) translateY(0); }
   96%, 100% { transform: rotate(0) translateY(0); }
 }
 

@@ -3,7 +3,7 @@ import { CHARACTERS, characterById } from '../data/characters';
 import type { Session } from '../core/session';
 import { fadeOutMusic, playLevelClear, playLevelMusic, playLevelSong, primeMusic, setMusicMuted, stopMusic } from '../core/music';
 import { isMuted, setMuted, sfx, unlockAudio } from '../core/sfx';
-import { drawHeroCard, drawPortrait } from '../gfx/draw';
+import { drawHeroCard, drawPortrait, renderPoseSet } from '../gfx/draw';
 import { gamepadSources } from '../input/gamepad';
 import { isKeyDown } from '../input/keyboard';
 import { isTouchDevice, onInputModeChange, usingTouch } from '../input/touch';
@@ -141,17 +141,51 @@ export class UI {
       <p>Turn your phone sideways to play!</p>
       <div class="rotate-hill"></div>
     </div>`);
-    // Puffy is alive in there: idle poses back and forth, and his jump pose for the hop
+    // Puffy is alive in there: idle poses back and forth, a crouch, a rising and a
+    // falling pose for the hop, and a squash on landing. Poses are drawn once at a
+    // shared scale, and timed off the CSS hop itself so they always line up.
     const rc = this.rotate.querySelector('canvas')!;
-    let lastPose = '';
+    const rctx = rc.getContext('2d')!;
+    const heroEl = this.rotate.querySelector<HTMLElement>('.rotate-hero')!;
+    let poses: Record<string, HTMLCanvasElement> | null = null;
+    let lastKey = '';
     const t0 = performance.now();
     const animatePuffy = () => {
       if (!this.rotate.hidden) {
-        const t = (performance.now() - t0) % 3000;
-        const pose = t > 1440 && t < 1800 ? 'jump' : Math.floor((performance.now() - t0) / 450) % 2 ? 'idle1' : 'idle0';
-        if (pose !== lastPose) {
-          drawPortrait(rc, CHARACTERS[0], pose as 'idle0');
-          lastPose = pose;
+        poses ??= renderPoseSet(CHARACTERS[0], ['idle0', 'idle1', 'jump', 'fall'], rc.width);
+        const anim = heroEl.getAnimations?.()[0];
+        const ct = anim && typeof anim.currentTime === 'number' ? anim.currentTime : performance.now() - t0;
+        const t = ct % 3000;
+        // the hop: takes off at 1260 ms, tops out at 1560, lands at 1800
+        let pose = Math.floor((performance.now() - t0) / 450) % 2 ? 'idle1' : 'idle0';
+        let sy = 1;
+        if (t >= 1140 && t < 1260) {
+          pose = 'idle0';
+          sy = 1 - 0.13 * Math.sin(((t - 1140) / 120) * (Math.PI / 2)); // crouch
+        } else if (t >= 1260 && t < 1530) {
+          pose = 'jump';
+          sy = 1 + 0.1 * Math.exp(-(t - 1260) / 90); // stretch on take-off
+        } else if (t >= 1530 && t < 1800) {
+          pose = 'fall';
+          sy = 1 + 0.05 * Math.sin(((t - 1530) / 270) * Math.PI);
+        } else if (t >= 1800 && t < 2250) {
+          pose = 'idle0';
+          const d = t - 1800;
+          sy = 1 - 0.17 * Math.exp(-d / 110) * Math.cos(d / 58); // land: squash, wobble, settle
+        }
+        sy = Math.round(sy * 200) / 200;
+        const key = `${pose}:${sy}`;
+        const img = poses[pose];
+        if (img && key !== lastKey) {
+          lastKey = key;
+          const w = rc.width;
+          const sx = 1 + (1 - sy) * 0.9;
+          rctx.clearRect(0, 0, w, w);
+          rctx.save();
+          rctx.translate(w / 2, w * 0.92); // squash about the feet
+          rctx.scale(sx, sy);
+          rctx.drawImage(img, -w / 2, -w * 0.92);
+          rctx.restore();
         }
       }
       requestAnimationFrame(animatePuffy);

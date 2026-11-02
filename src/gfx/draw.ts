@@ -178,3 +178,43 @@ export function drawPortrait(target: HTMLCanvasElement, ch: CharacterDef, pose: 
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(tmp, x0, y0, bw, bh, (target.width - bw * s) / 2, (target.height - bh * s) / 2, bw * s, bh * s);
 }
+
+/**
+ * Several poses of one hero, each drawn once onto its own canvas at ONE shared
+ * scale and with the feet on the same baseline, so flipping between them is a
+ * cheap drawImage and the hero never changes size from pose to pose.
+ */
+export function renderPoseSet(ch: CharacterDef, poses: Pose[], size: number): Record<string, HTMLCanvasElement> {
+  const R = 4;
+  const drawn = poses.map((pose) => {
+    const { c, ctx } = canvas(CHAR_W * R, CHAR_H * R);
+    ctx.scale(R, R);
+    drawCharacter(ctx, 0, 0, ch, pose);
+    return c;
+  });
+  // the union of every pose's outline
+  let x0 = Infinity, y0 = Infinity, x1 = 0, y1 = 0;
+  for (const c of drawn) {
+    const data = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data;
+    for (let y = 0; y < c.height; y += 2)
+      for (let x = 0; x < c.width; x += 2)
+        if (data[(y * c.width + x) * 4 + 3] > 24) {
+          if (x < x0) x0 = x;
+          if (x > x1) x1 = x;
+          if (y < y0) y0 = y;
+          if (y > y1) y1 = y;
+        }
+  }
+  const out: Record<string, HTMLCanvasElement> = {};
+  if (x1 <= x0) return out;
+  const bw = x1 - x0 + 2;
+  const bh = y1 - y0 + 2;
+  const s = Math.min((size * 0.84) / bw, (size * 0.84) / bh);
+  poses.forEach((pose, i) => {
+    const { c, ctx } = canvas(size, size);
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(drawn[i], x0, y0, bw, bh, (size - bw * s) / 2, size * 0.92 - bh * s, bw * s, bh * s);
+    out[pose] = c;
+  });
+  return out;
+}

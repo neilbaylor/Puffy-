@@ -523,7 +523,11 @@ export class GameScene extends Phaser.Scene {
     const vw = this.scale.width / zoom;
     const vh = this.scale.height / zoom;
     const { widthPx, heightPx } = this.level;
-    const endX = this.players[0]?.x ?? I.x1;
+    // aim for where the follow camera will actually sit — near the start of a
+    // level that's held off the edge, so aiming at the hero itself would slam
+    // into the edge mid-flight instead of gliding to a stop
+    const vwEnd = this.scale.width / base;
+    const endX = Phaser.Math.Clamp(this.players[0]?.x ?? I.x1, vwEnd / 2, Math.max(vwEnd / 2, widthPx - vwEnd / 2));
     const rawX = I.x0 + (endX - I.x0) * introGlide(u);
     const x = Phaser.Math.Clamp(rawX, vw / 2, Math.max(vw / 2, widthPx - vw / 2));
     const clampTop = (t: number) => Phaser.Math.Clamp(t, Math.min(0, heightPx - vh), heightPx - vh);
