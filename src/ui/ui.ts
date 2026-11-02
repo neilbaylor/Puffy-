@@ -335,8 +335,13 @@ export class UI {
     });
     const checkOrientation = () => {
       const portrait = window.innerHeight > window.innerWidth;
+      const upright = portrait && isTouchDevice();
       // turned the phone upright mid-level: pause the game for them
-      if (portrait && isTouchDevice() && this.rotate.hidden && this.gameScene && !this.screen) this.pause();
+      if (upright && this.rotate.hidden && this.gameScene && !this.screen) this.pause();
+      // basketball has no pause menu: it just freezes while the phone is upright
+      const sc = this.game.scene;
+      if (upright && sc.isActive('Hoops')) sc.pause('Hoops');
+      else if (!upright && sc.isPaused('Hoops')) sc.resume('Hoops');
       this.rotate.hidden = !(portrait && isTouchDevice());
       // the page behind matches the prompt, so no strip of sky shows under it (iOS home screen)
       document.documentElement.classList.toggle('rotating', !this.rotate.hidden);
