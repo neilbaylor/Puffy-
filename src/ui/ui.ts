@@ -213,9 +213,20 @@ export class UI {
         </dl>
       </button>`);
       drawHeroCard(card.querySelector('canvas')!, c, 'idle0');
-      card.addEventListener('click', () => {
+      // select the moment a finger touches the card (a tap can trigger full screen and
+      // shift the layout before the finger lifts); tapping the picked card again plays
+      let pickedOnDown = false;
+      card.addEventListener('pointerdown', () => {
         unlockAudio();
+        pickedOnDown = this.selected !== i;
+        if (pickedOnDown) this.select(i);
+      });
+      card.addEventListener('click', () => {
         this.goFullscreen();
+        if (pickedOnDown) {
+          pickedOnDown = false;
+          return;
+        }
         if (this.selected === i) this.play();
         else this.select(i);
       });
@@ -399,7 +410,8 @@ export class UI {
     this.gameScene = null;
     this.hud.hidden = true;
     this.touch.hide();
-    this.game.scene.start('Menu');
+    this.game.scene.start('Menu', { silent: true });
+    this.showStart();
   }
 
   private showGameOver(g: GameOverState) {

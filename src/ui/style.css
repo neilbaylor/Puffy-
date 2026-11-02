@@ -200,6 +200,8 @@ body {
 }
 .card {
   position: relative;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
   min-height: 0;
   display: flex;
   flex-direction: column;
