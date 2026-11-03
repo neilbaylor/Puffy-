@@ -100,6 +100,8 @@ interface HeroView {
   halo?: Phaser.GameObjects.Image;
   /** The block of ice they're stuck in (someone grabbed the ice). */
   ice: Phaser.GameObjects.Image;
+  /** Off screen: an arrow at the edge pointing to them, with their name (not for you). */
+  arrow?: Phaser.GameObjects.Container;
 }
 
 const PRIZE_TEXT: Record<PrizeKind, [string, string]> = {
@@ -170,6 +172,8 @@ export class BattleScene extends Phaser.Scene {
   private views = new Map<string, HeroView>();
   private rocketViews = new Map<number, Phaser.GameObjects.Image | Phaser.GameObjects.Sprite>();
   private prizeViews = new Map<number, PrizeView>();
+  /** Prizes someone just grabbed (they fly into the grabber; the snapshot may still show them a moment). */
+  private grabbed = new Set<number>();
   private snaps: Snapshot[] = [];
   private me: BPlayer | null = null;
   private pending: [number, number][] = [];
@@ -327,6 +331,124 @@ export class BattleScene extends Phaser.Scene {
     this.cameras.main.shake(170 * k * (0.6 + 0.4 * near), 0.0045 * k * near);
   }
 
+  /**
+   * A bonus being grabbed: it pops up a touch, then spins and shrinks into the
+   * hero who grabbed it (following them), with a trail of sparkles and a ring
+   * of its colour when it gets there.
+   */
+  private collectPrize(x: number, y: number, kind: PrizeKind, v: HeroView | undefined) {
+    let best = -1;
+    let bd = 90;
+    for (const [pid, pv] of this.prizeViews) {
+      const d = Math.hypot(pv.img.x - x, pv.img.y - y);
+      if (d < bd) {
+        bd = d;
+        best = pid;
+      }
+    }
+    if (best < 0) return;
+    const pv = this.prizeViews.get(best)!;
+    this.prizeViews.delete(best);
+    this.grabbed.add(best);
+    pv.chute.destroy();
+    pv.shadow.destroy();
+    const { img, glow } = pv;
+    img.setVisible(true).setOrigin(0.5, 0.5).setDepth(DEPTH.players + 0.5);
+    glow.setVisible(true).setDepth(DEPTH.players + 0.4);
+    const x0 = img.x;
+    const y0 = img.y - 15 * PRIZE_SCALE;
+    const k0 = img.scaleX;
+    const col = Phaser.Display.Color.HexStringToColor(PRIZE_COLOR[kind].mid).color;
+    const target = () => (v && v.sprite.active ? { x: v.sprite.x, y: v.sprite.y - 22 * v.size } : { x: x0, y: y0 - 40 });
+    this.tweens.addCounter({
+      from: 0,
+      to: 1,
+      duration: 520,
+      onUpdate: (tw) => {
+        const t = tw.getValue() ?? 0;
+        const { x: hx, y: hy } = target();
+        if (t < 0.28) {
+          // the pop: up a little, a little bigger
+          const u = Math.sin((t / 0.28) * (Math.PI / 2));
+          img.setPosition(x0, y0 - 14 * u).setScale(k0 * (1 + 0.3 * u)).setRotation(0);
+        } else {
+          // then in it goes, spinning and shrinking, faster and faster
+          const u = (t - 0.28) / 0.72;
+          const e = u * u;
+          const sx = x0 + (hx - x0) * e;
+          const sy = y0 - 14 + (hy - (y0 - 14)) * e - Math.sin(u * Math.PI) * 18;
+          img.setPosition(sx, sy).setScale(k0 * 1.3 * (1 - 0.88 * e)).setRotation(u * Math.PI * 3);
+          if (Math.random() < 0.6) this.fx.sparkle(sx, sy, 1);
+        }
+        glow.setPosition(img.x, img.y).setScale(1.5 * (img.scaleX / k0)).setAlpha(0.7);
+      },
+      onComplete: () => {
+        const { x: hx, y: hy } = target();
+        img.destroy();
+        glow.destroy();
+        // a ring of the bonus's colour round the hero
+        const ring = this.add.image(hx, hy, 'ring').setTint(col).setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.fx).setScale(0.12).setAlpha(1);
+        this.tweens.add({ targets: ring, scale: 0.75, alpha: 0, duration: 380, ease: 'Cubic.easeOut', onComplete: () => ring.destroy() });
+        this.fx.sparkle(hx, hy, 8);
+      },
+    });
+  }
+
+  /** The off-screen pointer for another player: a badge in their colour with a point, and their name. */
+  private makeArrow(name: string, col: string) {
+    const c = Phaser.Display.Color.HexStringToColor(col).color;
+    const g = this.add.graphics();
+    // (drawn pointing right; the whole pointer turns to face them)
+    g.fillStyle(0x3a2418, 1).fillCircle(0, 0, 11.5).fillTriangle(8, -9.5, 8, 9.5, 22, 0);
+    g.fillStyle(c, 1).fillCircle(0, 0, 9).fillTriangle(7, -7, 7, 7, 18.5, 0);
+    g.fillStyle(0xffffff, 0.55).fillCircle(-3, -3.5, 3);
+    const label = this.add
+      .text(0, 0, name, { fontFamily: 'Nunito, sans-serif', fontSize: '12px', fontStyle: '900', color: '#ffffff', stroke: col, strokeThickness: 4 })
+      .setOrigin(0.5, 0.5)
+      .setResolution(2);
+    return this.add.container(0, 0, [g, label]).setDepth(DEPTH.text + 5).setVisible(false);
+  }
+
+  /** Other players off the edge of the screen: a pointer just inside the edge, towards them. */
+  private placeArrows(players: Map<string, SnapPlayer>) {
+    const cam = this.cameras.main;
+    const following = !this.spectate && !this.preview;
+    const wv = cam.worldView;
+    // constant size on screen (CSS px) whatever the zoom
+    const px = this.scale.width / window.innerWidth / cam.zoom;
+    for (const [id, v] of this.views) {
+      if (!v.arrow) continue;
+      const p = players.get(id);
+      if (!following || !p || p.respawn > 0) {
+        v.arrow.setVisible(false);
+        continue;
+      }
+      // aim at the middle of their body
+      const tx = v.sprite.x;
+      const ty = v.sprite.y - 20;
+      const pad = 6 * px;
+      if (tx > wv.x + pad && tx < wv.right - pad && ty > wv.y + pad && ty < wv.bottom - pad) {
+        v.arrow.setVisible(false);
+        continue;
+      }
+      // just inside the edge (clear of the clock at the top and the scores at the bottom)
+      const mx = 30 * px;
+      const x = Phaser.Math.Clamp(tx, wv.x + mx, wv.right - mx);
+      const y = Phaser.Math.Clamp(ty, wv.y + 64 * px, wv.bottom - 70 * px);
+      const ang = Math.atan2(ty - y, tx - x);
+      const [g, label] = v.arrow.list as [Phaser.GameObjects.Graphics, Phaser.GameObjects.Text];
+      g.setRotation(ang);
+      // the name sits on the inside, away from the point
+      label.setText(this.names.get(id) ?? '');
+      label.setPosition(-Math.cos(ang) * (16 + label.width / 2), -Math.sin(ang) * 22);
+      v.arrow
+        .setVisible(true)
+        .setPosition(x, y)
+        .setScale(px * 1.25)
+        .setAlpha(0.85 + Math.sin(this.time.now / 180) * 0.15);
+    }
+  }
+
   /** Playing: a little closer in than the whole arena, gently following your hero (most of the arena still in view). */
   private followCamera(dt: number) {
     if (this.spectate || this.preview || !this.me) return;
@@ -394,6 +516,7 @@ export class BattleScene extends Phaser.Scene {
       v.hearts.destroy();
       v.halo?.destroy();
       v.ice.destroy();
+      v.arrow?.destroy();
       v = undefined;
     }
     if (!v) {
@@ -409,6 +532,7 @@ export class BattleScene extends Phaser.Scene {
       const halo = p.id === this.net.myId ? this.add.image(p.x, p.y, 'bhalo').setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.players - 0.05) : undefined;
       const ice = this.add.image(p.x, p.y, 'bice').setOrigin(0.5, 1).setScale(1 / ART_RES).setDepth(DEPTH.players + 0.2).setVisible(false);
       v = { cheer: -1, sprite, tag, hearts, anim: 0, tilt: 0, slot: p.slot, hero: p.hero, size: 1, sparkT: 0, face: new FaceClock(), halo, ice };
+      if (p.id !== this.net.myId) v.arrow = this.makeArrow(this.names.get(p.id) ?? '', col);
       this.views.set(p.id, v);
     }
     return v;
@@ -678,6 +802,7 @@ export class BattleScene extends Phaser.Scene {
         v.hearts.destroy();
         v.halo?.destroy();
         v.ice.destroy();
+        v.arrow?.destroy();
         this.views.delete(id);
       }
     this.renderEnemies(cur.enemies, dt);
@@ -721,6 +846,7 @@ export class BattleScene extends Phaser.Scene {
     // and bounce when they touch down, bob there glowing, blink for their last 2 s
     const live = new Set<number>();
     for (const [pid, kind, px, py, age] of cur.prizes) {
+      if (this.grabbed.has(pid)) continue;
       live.add(pid);
       let pv = this.prizeViews.get(pid);
       if (!pv) {
@@ -794,6 +920,7 @@ export class BattleScene extends Phaser.Scene {
     this.bg.setTheme(look);
     this.level.setTint(mixTint(look));
     this.followCamera(dt);
+    this.placeArrows(cur.players);
     const cam = this.cameras.main;
     const wv = cam.worldView;
     this.bg.update({ left: wv.x - 40, top: wv.y - 40, width: wv.width + 80, height: wv.height + 80 }, dt);
@@ -1089,6 +1216,7 @@ export class BattleScene extends Phaser.Scene {
         case 'prize': {
           const [text, col] = PRIZE_TEXT[e.kind];
           const v = this.views.get(e.id);
+          this.collectPrize(e.x, e.y, e.kind, v);
           if (v) {
             v.cheer = 0;
             // a little burst of stars round whoever grabbed it

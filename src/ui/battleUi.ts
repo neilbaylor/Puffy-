@@ -320,7 +320,7 @@ export class BattleUI {
         ${p ? '<canvas width="120" height="120"></canvas>' : '<div class="bl-wait">?</div>'}
         <b>${p ? esc(p.name) : 'Waiting…'}</b>
         <small>${p ? `${me ? 'You · ' : ''}${characterById(p.hero).name}` : SLOT_NAMES[slot]}</small>
-        ${p && played ? `<span class="bl-last${p.id === r?.winner ? ' won' : ''}" title="Last battle">${p.id === r?.winner ? '🏆 ' : ''}${p.kos} KO${p.kos === 1 ? '' : 's'}</span>` : ''}
+        ${p && played && p.kos > 0 ? `<span class="bl-last${p.id === r?.winner ? ' won' : ''}" title="Last battle">${p.id === r?.winner ? '🏆 ' : ''}${p.kos} KO${p.kos === 1 ? '' : 's'}</span>` : ''}
       </div>`);
       if (p) this.liveSlot(el.querySelector('canvas')!, p.hero, slot);
       box.appendChild(el);
