@@ -54,6 +54,21 @@ const cleanName = (n: unknown, slot: number) => {
 /** When the arena's full, this many more can watch (they get the next free spot). */
 const MAX_WATCHERS = 8;
 
+function demo(sim: BattleSim) {
+  const s = sim as unknown as { spawnEnemy: (ev: unknown[]) => void; enemies: { race: string; weapon: string | null; kind: string; hp: number; armed: boolean; x: number; chute: boolean; y: number; onGround: boolean }[]; enemyIn: number; grant: (p: unknown, k: string, ev: unknown[]) => void };
+  s.enemyIn = 1e9;
+  const looks: [string, string | null, string, number][] = [['plop', 'saw', 'medium', 600], ['plop', 'flail', 'medium', 820], ['plop', null, 'small', 700], ['puff', 'gun', 'small', 900]];
+  for (const [race, weapon, kind, x] of looks) {
+    s.spawnEnemy([]);
+    const e = s.enemies[s.enemies.length - 1];
+    if (!e) continue;
+    Object.assign(e, { race, weapon, armed: !!weapon, kind, hp: 9, x, y: 15 * 32, chute: false, onGround: true });
+  }
+  const ps = [...sim.players.values()];
+  if (ps[0]) s.grant(ps[0], 'fire', []);
+  setTimeout(() => ps[1] && s.grant(ps[1], 'ice', []), 2500);
+}
+
 class Room {
   clients = new Map<string, Client>();
   phase: Phase = 'lobby';
@@ -192,6 +207,8 @@ class Room {
     }
     this.phase = 'battle';
     this.broadcastRoom();
+    // (testing only: BATTLE_DEMO=1 sets up one of everything, to look at)
+    if (process.env.BATTLE_DEMO) demo(this.sim);
   }
 
   private endBattle() {

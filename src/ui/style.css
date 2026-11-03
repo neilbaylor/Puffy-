@@ -2033,6 +2033,7 @@ kbd {
 .br-list li i { width: 14px; height: 14px; border-radius: 50%; background: var(--sc); border: 2px solid var(--ink); }
 .br-list li span { flex: 1; text-align: left; }
 .br-list li b { font: 400 18px var(--display); }
+.br-why { margin: -2px 0 2px; font-size: 13px; font-weight: 800; color: var(--ink-soft); }
 .br-next { margin: 2px 0 0; font-size: 12px; font-weight: 700; color: var(--ink-soft); }
 
 /* the end-of-level hero is the live one from the pick-a-player cards (its own standing animation) */

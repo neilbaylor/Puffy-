@@ -510,10 +510,13 @@ export class BattleUI {
     const ranked = r.players.filter((p) => p.playing).sort((a, b) => b.kos - a.kos || a.deaths - b.deaths);
     const winner = r.players.find((p) => p.id === r.winner);
     const iWon = !!winner && winner.id === this.net?.myId;
+    // a tie on KOs went to whoever was knocked out least: say so
+    const tieBroken = !!winner && ranked.filter((p) => p.kos === winner.kos).length > 1;
     const el = h(`<div class="screen modal">
       <div class="panel battle-results">
         <p class="eyebrow">Battle over</p>
         <h2>${winner ? (iWon ? 'You win!' : `${esc(winner.name)} wins!`) : 'It’s a draw!'}</h2>
+        ${tieBroken ? '<p class="br-why">Same number of KOs: knocked out the fewest times</p>' : ''}
         ${winner ? `<canvas class="br-winner" width="160" height="160" style="--sc:${SLOT_COLORS[winner.slot]}"></canvas>` : ''}
         <ol class="br-list">${ranked
           .map((p) => `<li style="--sc:${SLOT_COLORS[p.slot]}"><i></i><span>${esc(p.name)}${p.id === this.net?.myId ? ' (you)' : ''}</span><b>${p.kos} KO${p.kos === 1 ? '' : 's'}</b></li>`)

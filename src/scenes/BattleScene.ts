@@ -62,9 +62,9 @@ const PRIZE_KINDS: PrizeKind[] = ['bomb', 'star', 'grow', 'rapid', 'heart', 'ice
 
 /** Plops drawn for each size of bad guy: which Plop, and how big. */
 const PLOP_ART: Record<EnemyKind, { kind: PlopKind; scale: number }> = {
-  small: { kind: 'small', scale: 0.5 },
-  medium: { kind: 'medium', scale: 0.86 },
-  big: { kind: 'large', scale: 1.75 },
+  small: { kind: 'small', scale: 0.4 },
+  medium: { kind: 'medium', scale: 0.72 },
+  big: { kind: 'large', scale: 1.6 },
 };
 const PLOP_RES = 2;
 
@@ -527,7 +527,7 @@ export class BattleScene extends Phaser.Scene {
         v.halo
           .setVisible(true)
           .setPosition(x, y - (c.hitH ?? 34) * v.size * 0.5)
-          .setScale(((c.hitH ?? 34) / 34) * v.size * 0.95 * pulse)
+          .setScale((((c.hitH ?? 34) / 34) * v.size * 0.95 * pulse) / ART_RES)
           .setAlpha(0.55 + Math.sin(this.time.now / 260) * 0.12);
       }
       const top = y - (c.hitH ?? 34) * v.size - 10;
