@@ -530,7 +530,7 @@ export class BattleScene extends Phaser.Scene {
           .setVisible(true)
           .setPosition(x, y - (c.hitH ?? 34) * v.size * 0.5)
           .setScale((((c.hitH ?? 34) / 34) * v.size * 0.72 * pulse) / ART_RES)
-          .setAlpha(0.32 + Math.sin(this.time.now / 260) * 0.07);
+          .setAlpha(0.37 + Math.sin(this.time.now / 260) * 0.07);
       }
       const top = y - (c.hitH ?? 34) * v.size - 10;
       // the name just over the head, the hearts above the name

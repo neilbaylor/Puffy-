@@ -46,6 +46,8 @@ const PRIZE_ODDS: [PrizeKind, number][] = [
 /** Timed powers: 0 none, 1 star (invincible), 2 grow (big & strong), 3 rapid fire, 4 fireballs. */
 export const POWER = { none: 0, star: 1, grow: 2, rapid: 3, fire: 4 } as const;
 const POWER_SECS: Record<number, number> = { 1: 10, 2: 8, 3: 7, 4: 8 };
+/** Seconds between shots in battles (Puffy and Big Muscles a touch quicker than in the levels). */
+const BATTLE_FIRE_RATE: Record<string, number> = { puffy: 0.38, muscles: 0.51 };
 /** Grabbing ice freezes everyone else this long. */
 export const FREEZE_SECS = 2;
 /** Landing on someone's head: a hit, and you bounce off. */
@@ -360,7 +362,7 @@ export function stepMove(p: BPlayer, btn: number, map: ArenaMap, ev?: BEvent[], 
     p.vx -= p.facing * 40;
     p.shotAgo = 0;
   } else if (ctl && (btn & BTN.fire) && p.fireCd <= 0 && canFire()) {
-    p.fireCd = c.fireRate * (p.power === POWER.rapid ? 0.4 : 1);
+    p.fireCd = (BATTLE_FIRE_RATE[p.hero] ?? c.fireRate) * (p.power === POWER.rapid ? 0.4 : 1);
     fire = 1;
     p.vx -= p.facing * 80; // recoil push
     p.shotAgo = 0;
@@ -769,11 +771,15 @@ export class BattleSim {
             break;
           }
         }
-        // somewhere it can land, not right on top of another prize
+        // somewhere it can land, not right on top of another prize, and only now and
+        // then up on the high cloud (never two up there at once)
         let x = 0;
-        for (let tries = 0; tries < 12; tries++) {
+        const high = (px: number) => landingY(this.map, px) < 7 * TILE_PX;
+        for (let tries = 0; tries < 16; tries++) {
           x = (2 + Math.floor(Math.random() * (this.map.w - 4)) + 0.5) * TILE_PX;
-          if (!this.prizes.some((q) => Math.abs(q.x - x) < 90)) break;
+          if (this.prizes.some((q) => Math.abs(q.x - x) < 90)) continue;
+          if (high(x) && (Math.random() < 0.75 || this.prizes.some((q) => high(q.x)))) continue;
+          break;
         }
         this.prizes.push({ id: this.nextPrize++, kind, x, y: -24, vy: 40, landed: false, age: 0 });
         ev.push({ k: 'drop', x, kind });

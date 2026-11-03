@@ -5,7 +5,7 @@
  */
 import type Phaser from 'phaser';
 import { sfx } from '../core/sfx';
-import { fadeOutMusic, playBattleMusic, playLevelMusic, preloadBattleMusic } from '../core/music';
+import { fadeOutMusic, playBattleMusic, playMenuMusic, preloadBattleMusic } from '../core/music';
 import { MATCH_SECS } from '../shared/battle/sim';
 import { CHARACTERS, characterById } from '../data/characters';
 import { drawPortrait } from '../gfx/draw';
@@ -52,7 +52,7 @@ const cleanRoom = (c: string) =>
   c
     .toLowerCase()
     .replace(/[^a-z0-9-]/g, '')
-    .slice(0, 20) || DEFAULT_ROOM;
+    .slice(0, 12) || DEFAULT_ROOM;
 
 function storedName() {
   try {
@@ -97,7 +97,7 @@ export class BattleUI {
     this.showLobby();
     if (!url) return this.status('offline', 'Online battles work on the game’s web address (not a saved copy).');
     this.status('connecting');
-    playLevelMusic(this.host.level());
+    playMenuMusic(); // (the start screen's song carries on in the lobby)
     preloadBattleMusic();
     this.net = new BattleNet(url, name, this.host.hero());
     this.net.onStatus = (s) => this.status(s);
@@ -171,7 +171,7 @@ export class BattleUI {
         <p class="eyebrow">Battle with friends</p>
         <h2>Room code</h2>
         <label class="bl-namebox bc-box">
-          <input maxlength="20" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Room code">
+          <input maxlength="12" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Room code">
         </label>
         <div class="row">
           <button class="btn btn-alt" data-act="back">Back</button>
@@ -181,6 +181,11 @@ export class BattleUI {
     </div>`);
     const input = el.querySelector<HTMLInputElement>('input')!;
     input.value = storedRoom();
+    // codes aren't case sensitive: shown in lower case as you type
+    input.addEventListener('input', () => {
+      const v = input.value.toLowerCase();
+      if (v !== input.value) input.value = v;
+    });
     const go = () => {
       const code = cleanRoom(input.value);
       try {
@@ -201,7 +206,7 @@ export class BattleUI {
       this.host.home();
     });
     this.host.setScreen(el);
-    playLevelMusic(this.host.level());
+    playMenuMusic();
   }
 
 
@@ -344,7 +349,7 @@ export class BattleUI {
     }
     // lobby / countdown / watching someone else's match
     if (this.inBattle || !this.lobby || !this.lobby.isConnected) {
-      if (this.inBattle) playLevelMusic(this.host.level());
+      if (this.inBattle) playMenuMusic();
       this.showLobby();
     }
     const lobby = this.lobby!;

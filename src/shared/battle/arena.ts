@@ -17,7 +17,7 @@ export function buildArena(): LevelData {
   b.cloud(23, 5, 6);
   b.cloud(2, 4, 10);
   b.cloud(26, 4, 10);
-  b.cloud(13, 6, 13);
+  b.cloud(13, 6, 12);
   // a floating island in the middle
   b.island(12, 19, 8, 1);
   // a few trees for decoration

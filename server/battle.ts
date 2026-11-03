@@ -376,7 +376,7 @@ export const cleanCode = (c: unknown) =>
   String(c ?? '')
     .toLowerCase()
     .replace(/[^a-z0-9-]/g, '')
-    .slice(0, 20) || 'birchcliff';
+    .slice(0, 12) || 'birchcliff';
 
 function roomFor(code: string) {
   let r = rooms.get(code);

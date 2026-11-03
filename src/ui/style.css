@@ -1999,7 +1999,7 @@ kbd {
 .bhud-chips {
   position: fixed;
   left: 50%;
-  bottom: calc(24px + var(--safe-b));
+  bottom: calc(12px + var(--safe-b));
   transform: translateX(-50%);
   display: flex;
   flex-wrap: wrap;
