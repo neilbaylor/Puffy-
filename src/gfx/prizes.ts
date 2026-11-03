@@ -220,58 +220,61 @@ export function drawPrize(ctx: Ctx, kind: PrizeKind) {
       break;
     }
     case 'grow': {
-      // a puff growing big: small outline, big puff, and a chunky up arrow
-      ctx.setLineDash([1.6, 1.4]);
-      ctx.strokeStyle = '#6a42b8';
-      ctx.lineWidth = 0.9;
-      ctx.beginPath();
-      ctx.arc(cx - 6.2, cy + 5.4, 3, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.setLineDash([]);
+      // a big strong flexing arm (upper arm along the bottom, fist up, a huge bicep)
+      const skin = '#ffc48a';
+      ctx.save();
+      ctx.translate(1.2, 0.6);
+      // a couple of "pow" lines off the bicep
       ctx.strokeStyle = INK;
-      ctx.lineWidth = 1.25;
-      // a fluffy orange puff (scalloped edge), with eyes
-      const pcx = cx + 4.6;
-      const pcy = cy + 3.6;
-      const PR = 6.9;
-      const n = 9;
-      const step = (Math.PI * 2) / n;
-      ctx.fillStyle = '#f28a2e';
+      ctx.lineWidth = 1.1;
       ctx.beginPath();
-      for (let i = 0; i < n; i++) {
-        const a = i * step - Math.PI / 2;
-        ctx.arc(pcx + Math.cos(a) * PR * 0.72, pcy + Math.sin(a) * PR * 0.72, PR * 0.4, a - step * 1.1, a + step * 1.1);
-      }
+      ctx.moveTo(cx - 8.2, cy - 6.8);
+      ctx.lineTo(cx - 9.6, cy - 8.2);
+      ctx.moveTo(cx - 4.6, cy - 9.6);
+      ctx.lineTo(cx - 5, cy - 11.4);
+      ctx.moveTo(cx - 10.4, cy - 3.4);
+      ctx.lineTo(cx - 12, cy - 4);
+      ctx.stroke();
+      ctx.lineWidth = 1.35;
+      ctx.fillStyle = skin;
+      ctx.beginPath();
+      ctx.moveTo(cx - 11, cy + 7.6); // shoulder, underneath
+      ctx.quadraticCurveTo(cx - 2, cy + 9.6, cx + 5, cy + 8.6); // under the upper arm to the elbow
+      ctx.quadraticCurveTo(cx + 9.8, cy + 7.6, cx + 9.4, cy + 2.6); // round the elbow
+      ctx.lineTo(cx + 8.6, cy - 4.4); // up the forearm to the wrist
+      ctx.bezierCurveTo(cx + 10.4, cy - 7.6, cx + 8.2, cy - 11.6, cx + 4.2, cy - 10.6); // round the fist
+      ctx.bezierCurveTo(cx + 1, cy - 10, cx + 0.6, cy - 6.2, cx + 2.2, cy - 4.6); // fist, inside
+      ctx.lineTo(cx + 2.6, cy - 0.2); // down the inside of the forearm to the crook
+      ctx.bezierCurveTo(cx + 1.6, cy - 9.4, cx - 8.4, cy - 10.2, cx - 8.8, cy - 1.6); // the (huge) bicep
+      ctx.quadraticCurveTo(cx - 10, cy - 0.4, cx - 11.4, cy - 0.2); // to the shoulder
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
-      ctx.fillStyle = '#ffb066';
+      // shading under the bicep and arm
+      ctx.fillStyle = '#e8955a';
       ctx.beginPath();
-      ctx.ellipse(pcx - 2.4, pcy - 3, 2.6, 1.6, -0.5, 0, Math.PI * 2);
+      ctx.moveTo(cx - 10.6, cy + 6.6);
+      ctx.quadraticCurveTo(cx - 2, cy + 8.4, cx + 5, cy + 7.4);
+      ctx.quadraticCurveTo(cx + 2, cy + 5.6, cx - 3, cy + 5.4);
+      ctx.quadraticCurveTo(cx - 8, cy + 5.4, cx - 10.6, cy + 6.6);
       ctx.fill();
-      for (const ex of [-1.8, 2]) {
-        ctx.fillStyle = '#fff';
-        ctx.beginPath();
-        ctx.arc(pcx + ex, pcy + 0.2, 1.7, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = INK;
-        ctx.beginPath();
-        ctx.arc(pcx + ex + 0.5, pcy + 0.4, 0.85, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      // arrow
-      ctx.fillStyle = '#ffffff';
+      // the crook of the elbow, and the knuckles
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(cx - 6.2, cy - 10);
-      ctx.lineTo(cx - 10.2, cy - 5);
-      ctx.lineTo(cx - 7.6, cy - 5);
-      ctx.lineTo(cx - 7.6, cy - 0.8);
-      ctx.lineTo(cx - 4.8, cy - 0.8);
-      ctx.lineTo(cx - 4.8, cy - 5);
-      ctx.lineTo(cx - 2.2, cy - 5);
-      ctx.closePath();
-      ctx.fill();
+      ctx.moveTo(cx + 2.6, cy - 0.2);
+      ctx.quadraticCurveTo(cx + 1.4, cy + 2.2, cx - 0.6, cy + 2.8);
+      ctx.moveTo(cx + 3.2, cy - 8.4);
+      ctx.quadraticCurveTo(cx + 4.8, cy - 7.6, cx + 6.6, cy - 8.2);
+      ctx.moveTo(cx + 3.6, cy - 6.2);
+      ctx.quadraticCurveTo(cx + 5.2, cy - 5.4, cx + 7.4, cy - 6);
       ctx.stroke();
+      // a shine on the bicep
+      ctx.fillStyle = '#ffffffcc';
+      ctx.beginPath();
+      ctx.ellipse(cx - 4.2, cy - 4.6, 2.9, 1.4, -0.3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
       break;
     }
     case 'rapid': {
