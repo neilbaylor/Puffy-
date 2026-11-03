@@ -1189,7 +1189,7 @@ html.rotating body {
   transform: translate(-50%, -50%) scale(0.6);
   opacity: 0;
   text-align: center;
-  font-size: clamp(30px, 8vmin, 70px);
+  font-size: clamp(36px, 9.5vmin, 72px);
   line-height: 0.95;
   -webkit-text-stroke: 0.15em #1c0f3a;
   paint-order: stroke fill;
@@ -1216,8 +1216,28 @@ html.rotating body {
   color: #ff8a80;
 }
 .hoops-callout.turn {
-  top: 30%;
-  font-size: clamp(22px, 5.5vmin, 46px);
+  /* centred on the screen, over the court below the hoop */
+  top: 58%;
+  left: 50%;
+  /* big enough to read at a glance on a phone */
+  font-size: clamp(36px, 10vmin, 68px);
+}
+/* "1 of 5": white on a dark pill so it reads over the court or the crowd */
+.hoops-callout.turn small {
+  display: block;
+  width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 10px;
+  padding: 0.18em 0.75em 0.2em;
+  border-radius: 999px;
+  font-size: 0.5em;
+  letter-spacing: 0.06em;
+  color: #fff;
+  background: #1c0f3ae6;
+  box-shadow: 0 0 0 2px #ffd23f;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
 }
 .hoops-callout.turn.king {
   color: #ffd23f;
@@ -1268,10 +1288,11 @@ html.rotating body {
   transform: rotate(-16deg);
   filter: drop-shadow(0 2px 0 #160828);
 }
-/* speech tail pointing down at the King */
+/* speech tail pointing down at the King (behind the words, over the bubble) */
 .hoops-callout.speech::after {
   content: '';
   position: absolute;
+  z-index: -1;
   right: 22%;
   bottom: -18px;
   width: 30px;
@@ -1399,10 +1420,11 @@ html.rotating body {
 .hoops-lb.on i { height: 11vh; }
 .hoops-l3 {
   position: absolute;
-  left: calc(4vw + var(--safe-l));
+  left: calc(max(5vw, 24px) + var(--safe-l));
   bottom: calc(14vh + 6px);
   display: grid;
-  transform: translateX(-120%);
+  /* (slid all the way off the left edge when hidden: no sliver left showing) */
+  transform: translateX(calc(-100% - max(5vw, 24px) - var(--safe-l) - 30px));
   transition: transform 0.45s cubic-bezier(0.6, 0, 0.3, 1);
 }
 .hoops-l3.show { transform: translateX(0); }

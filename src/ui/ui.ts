@@ -311,7 +311,7 @@ export class UI {
       this.touch.hide();
       this.introEl = h(`<div class="lvl-intro">
         <i class="li-bar"></i><i class="li-bar"></i>
-        <div class="li-title"><small>${i.world}</small><strong>${i.title}</strong><em>${i.part}</em></div>
+        <div class="li-title"><strong>${i.title}</strong><em>${i.part}</em></div>
         <button class="li-skip">Skip ›</button>
       </div>`);
       this.introEl.querySelector('.li-skip')!.addEventListener('pointerdown', (e) => {

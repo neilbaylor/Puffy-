@@ -432,11 +432,17 @@ export class Giant extends Enemy {
         if (target && Math.abs(target.x - this.x) > 20) this.dir = Math.sign(target.x - this.x);
         const aheadX = this.dir > 0 ? b.right + 4 : b.left - 4;
         const groundAhead = this.gs.level.isSolidAt(aheadX, b.bottom + 6);
-        b.setVelocityX(groundAhead && !(this.dir < 0 ? b.blocked.left : b.blocked.right) ? this.dir * 66 : 0);
+        const wallAhead = this.dir < 0 ? b.blocked.left : b.blocked.right;
+        b.setVelocityX(groundAhead && !wallAhead ? this.dir * 66 : 0);
+        // you're up on a step / another block, or across a gap: don't just stand at the
+        // wall or edge — get ready to leap over to you soon
+        if (target && onGround && (wallAhead || !groundAhead || target.bottom < b.bottom - 24) && Math.abs(target.x - this.x) < 420)
+          this.timer = Math.min(this.timer, 0.35);
         this.setFrame(Math.floor(this.t * 5) % 2 ? 'w1' : 'w0');
         const dx = target ? Math.abs(target.x - this.x) : Infinity;
         const sameLevel = target ? Math.abs(target.bottom - b.bottom) < 48 : false;
-        if (target && onGround && this.chargeCooldown <= 0 && dx < 300 && dx > 70 && sameLevel) {
+        // (no charging at you across a gap or a wall: he'll leap over instead)
+        if (target && onGround && groundAhead && !wallAhead && this.chargeCooldown <= 0 && dx < 300 && dx > 70 && sameLevel) {
           // wind up, then charge!
           this.mode = 'chargeWindup';
           this.timer = 0.55; // a clear warning
@@ -478,10 +484,23 @@ export class Giant extends Enemy {
         if (this.timer <= 0) {
           this.mode = 'air';
           this.underFor = 0;
-          // a hop: straight up when you're close (fair to dash under), a lunge toward you from afar
+          // a hop: straight up when you're close on the same ground (fair to dash under);
+          // a leap over to you when you're far, or up on another block / across a gap
           const tgt = this.gs.nearestPlayer(this.x, this.y);
-          const far = tgt ? Math.abs(tgt.x - this.x) > 260 : false;
-          b.setVelocity(far ? this.dir * 150 : 0, far ? -620 : -600);
+          const dx = tgt ? tgt.x - this.x : 0;
+          const higher = tgt ? tgt.bottom < b.bottom - 24 : false;
+          const aheadX = dx > 0 ? b.right + 4 : b.left - 4;
+          const blockedOff = tgt ? (dx < 0 ? b.blocked.left : b.blocked.right) || !this.gs.level.isSolidAt(aheadX, b.bottom + 6) : false;
+          const far = Math.abs(dx) > 260;
+          if (tgt && (far || higher || blockedOff)) {
+            // aim to come down right on their block (time in the air ≈ up + down to that height)
+            const up = higher ? 680 : 620;
+            const rise = Math.max(0, b.bottom - tgt.bottom);
+            const t = up / 1600 + Math.sqrt(Math.max(0, (up * up) / (2 * 1600) - rise) * 2 / 1600);
+            const vx = Phaser.Math.Clamp(dx / Math.max(0.45, t), -300, 300);
+            this.dir = Math.sign(dx) || this.dir;
+            b.setVelocity(vx, -up);
+          } else b.setVelocity(0, -600);
           this.timer = 0.15;
         }
         break;
