@@ -160,6 +160,9 @@ export const playHoops = () => play('hoops', true);
 /** The start screen's song ("Game Ready"): loops; keeps going if it's already on. */
 export const playMenuMusic = () => play('menu', false);
 
+/** The start screen's song decoded ahead of time (during the loading screen), so the first tap is instant. */
+export const preloadMenuMusic = () => decode('menu');
+
 /** Get a level's song ready (decoded) ahead of time, so it starts straight away. */
 export const preloadLevelMusic = (level = 1) => void decode(levelTrack(level));
 

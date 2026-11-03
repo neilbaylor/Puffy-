@@ -36,7 +36,7 @@ export class MenuScene extends Phaser.Scene {
     this.game.events.on('menu-level', onLevel);
     // while you look at the start screen, quietly draw the other level's opening scenery
     // so switching to it is quick
-    this.time.delayedCall(1800, () => this.prewarm(this.levelId === 2 ? 1 : 2));
+    this.time.delayedCall(1800, () => this.prewarmOther());
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.game.events.off('menu-level', onLevel));
     // the boot already put the start screen up; coming back from a game shows it again
     if (!data?.silent) this.game.events.emit('menu');
@@ -44,6 +44,11 @@ export class MenuScene extends Phaser.Scene {
 
   private levelId = 1;
   private warmed = new Set<number>();
+
+  /** The level that isn't showing: its start-screen terrain drawn now (the loading screen does this, out of sight). */
+  prewarmOther() {
+    this.prewarm(this.levelId === 2 ? 1 : 2);
+  }
 
   /** Draw a level's start-screen terrain textures now (then throw the objects away). */
   private prewarm(id: number) {

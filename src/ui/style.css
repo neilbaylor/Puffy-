@@ -62,13 +62,34 @@ body {
 #boot {
   position: fixed;
   inset: 0;
+  z-index: 1000;
   display: grid;
   place-items: center;
   font: 400 28px var(--display);
   color: #fff;
-  -webkit-text-stroke: 6px var(--ink);
-  paint-order: stroke fill;
   background: linear-gradient(#6ec3ff, #fff3dc);
+  transition: opacity 0.3s ease;
+}
+#boot p { margin: 0 0 14px; -webkit-text-stroke: 6px var(--ink); paint-order: stroke fill; text-align: center; }
+#boot.out { opacity: 0; pointer-events: none; }
+/* the loading bar: the game's art being drawn, then everything warmed up */
+.boot-bar {
+  width: min(280px, 62vw);
+  height: 16px;
+  margin: 0 auto;
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  box-shadow: 0 3px 0 var(--ink);
+  overflow: hidden;
+}
+.boot-bar i {
+  display: block;
+  height: 100%;
+  width: calc(var(--p, 0) * 100%);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffe27a, var(--gold));
+  transition: width 0.2s ease;
 }
 
 /* ───────────── buttons ───────────── */

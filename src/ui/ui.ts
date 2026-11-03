@@ -295,6 +295,8 @@ export class UI {
     this.selected = Math.max(0, CHARACTERS.findIndex((c) => c.id === store.get('puffy.hero')));
 
     game.events.on('menu', () => this.showStart());
+    // (during the loading screen: each hero's card poses drawn now, so the first pick is instant)
+    game.events.on('warm-start', () => this.warmCards());
     game.events.on('game-start', (s: GameScene, info: { fresh: boolean; atStart: boolean; level: string; world: string }) => {
       this.gameScene = s;
       this.setScreen(null);
@@ -641,14 +643,10 @@ export class UI {
   private cardPoses = new Map<string, Record<string, HTMLCanvasElement>>();
   private cheerRaf = 0;
 
-  /** The picked hero celebrates: crouch, hop, land with a squash, and the name bounces. */
-  private cheer(i: number) {
-    const card = this.screen?.querySelectorAll<HTMLElement>('.card')[i];
-    const cv = card?.querySelector('canvas');
-    if (!card || !cv) return;
+  private posesFor(i: number, cv: HTMLCanvasElement) {
     const ch = CHARACTERS[i];
     let poses = this.cardPoses.get(ch.id);
-    if (!poses) {
+    if (!poses || poses.idle0.width !== cv.width || poses.idle0.height !== cv.height) {
       poses = {};
       for (const pose of ['idle0', 'jump', 'fall'] as const) {
         const c = document.createElement('canvas');
@@ -659,6 +657,24 @@ export class UI {
       }
       this.cardPoses.set(ch.id, poses);
     }
+    return poses;
+  }
+
+  /** Every card's hop poses, drawn ahead of time. */
+  private warmCards() {
+    this.screen?.querySelectorAll<HTMLElement>('.card').forEach((card, i) => {
+      const cv = card.querySelector('canvas');
+      if (cv) this.posesFor(i, cv);
+    });
+  }
+
+  /** The picked hero celebrates: crouch, hop, land with a squash, and the name bounces. */
+  private cheer(i: number) {
+    const card = this.screen?.querySelectorAll<HTMLElement>('.card')[i];
+    const cv = card?.querySelector('canvas');
+    if (!card || !cv) return;
+    const ch = CHARACTERS[i];
+    const poses = this.posesFor(i, cv);
     const ctx = cv.getContext('2d')!;
     let shown = '';
     const show = (pose: string) => {
