@@ -830,15 +830,16 @@ body {
 .tbtn-bomb[hidden] { display: none; }
 .tbtn-bomb b {
   position: absolute;
-  right: -4px;
-  bottom: -4px;
-  min-width: 1.6em;
-  padding: 0.1em 0.3em;
+  right: -6px;
+  bottom: -6px;
+  min-width: 1.5em;
+  padding: 0.12em 0.32em 0.08em;
   border-radius: 999px;
-  border: 2px solid #3a2418;
+  border: 2.5px solid #3a2418;
   background: #fff;
   color: #3a2418;
-  font: 400 1.05em / 1.1 var(--display);
+  -webkit-text-stroke: 0;
+  font: 400 1.35em / 1.1 var(--display);
   text-align: center;
 }
 
@@ -2200,11 +2201,39 @@ kbd {
 .bl-room b { font-weight: 900; color: #c8661a; }
 .battle-lobby.loading .bl-room,
 .battle-lobby.full .bl-room { display: none; }
+/* which room you're in: top right of the lobby (just a label) */
+.bl-roomtag {
+  position: absolute;
+  top: calc(12px + var(--safe-t));
+  right: calc(14px + var(--safe-r));
+  padding: 4px 12px 5px;
+  border-radius: 999px;
+  background: #1c0f3ad9;
+  color: #fff;
+  font: 800 clamp(11px, 2.4vmin, 14px) / 1.2 var(--body);
+}
+.bl-roomtag b { color: var(--gold); font-weight: 900; }
+.battle-lobby.loading .bl-roomtag,
+.battle-lobby.full .bl-roomtag { display: none; }
+/* last battle's score, on each player's square */
+.bl-slot { position: relative; }
+.bl-last {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 2px 8px 3px;
+  border-radius: 999px;
+  border: 2px solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+  font: 400 clamp(11px, 2.4vh, 14px) / 1.1 var(--display);
+}
+.bl-last.won { background: var(--gold); }
 /* the room code window */
 .bc-panel { align-items: center; text-align: center; gap: 10px; min-width: min(100%, 360px); }
 .bc-panel h2 { margin: 0; }
 .bc-help { margin: 0; font-weight: 700; color: var(--ink-soft); }
-.bc-box { --my: #f28a2e; width: 100%; height: clamp(48px, 11vh, 58px); box-sizing: border-box; }
+.bc-box { --my: #f28a2e; width: 100%; height: clamp(56px, 13vh, 68px); box-sizing: border-box; margin: clamp(6px, 2vh, 14px) 0; }
 .bc-box input { flex: 1; min-width: 0; text-align: center; font-size: clamp(20px, 4.6vh, 26px); }
 
 /* your name and hero on one row, all the same height: the name box is as wide as one and

@@ -170,7 +170,6 @@ export class BattleUI {
       <div class="panel bc-panel">
         <p class="eyebrow">Battle with friends</p>
         <h2>Room code</h2>
-        <p class="bc-help">Everyone who types the same code plays together.</p>
         <label class="bl-namebox bc-box">
           <input maxlength="20" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Room code">
         </label>
@@ -213,6 +212,7 @@ export class BattleUI {
     this.stopBattle();
     const el = h(`<div class="screen battle-lobby">
       <button class="icon-btn bl-back" aria-label="Back">‹</button>
+      <div class="bl-roomtag" aria-label="Room code">Room <b>${esc(this.code)}</b></div>
       <header class="bl-head">
         <h1 class="bl-title">Battle!</h1>
         <p class="bl-sub">Up to ${MAX_BATTLERS} friends</p>
@@ -283,6 +283,8 @@ export class BattleUI {
     const box = this.lobby?.querySelector('.bl-slots');
     if (!box) return;
     box.innerHTML = '';
+    // after a battle, each square shows how its player did (and the winner's cup)
+    const played = !!r && r.phase !== 'battle' && r.players.some((q) => q.kos > 0 || q.deaths > 0);
     for (let slot = 0; slot < MAX_BATTLERS; slot++) {
       const p = r?.players.find((q) => q.slot === slot);
       const me = p && p.id === this.net?.myId;
@@ -290,6 +292,7 @@ export class BattleUI {
         ${p ? '<canvas width="120" height="120"></canvas>' : '<div class="bl-wait">?</div>'}
         <b>${p ? esc(p.name) : 'Waiting…'}</b>
         <small>${p ? `${me ? 'You · ' : ''}${characterById(p.hero).name}` : SLOT_NAMES[slot]}</small>
+        ${p && played ? `<span class="bl-last${p.id === r?.winner ? ' won' : ''}" title="Last battle">${p.id === r?.winner ? '🏆 ' : ''}${p.kos} KO${p.kos === 1 ? '' : 's'}</span>` : ''}
       </div>`);
       if (p) this.liveSlot(el.querySelector('canvas')!, p.hero, slot);
       box.appendChild(el);

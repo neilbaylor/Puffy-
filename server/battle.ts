@@ -65,6 +65,14 @@ function demo(sim: BattleSim) {
     Object.assign(e, { race, weapon, armed: !!weapon, kind, hp: 9, x, y: 15 * 32, chute: false, onGround: true });
   }
   const ps = [...sim.players.values()];
+  if (process.env.BATTLE_DEMO === 'buttons') {
+    // the first player is carrying bombs and has fireballs (to see the buttons)
+    if (ps[0]) {
+      s.grant(ps[0], 'fire', []);
+      ps[0].bombs = 3;
+    }
+    return;
+  }
   if (process.env.BATTLE_DEMO === 'prizes') {
     // every bonus sitting in a row, a big boulder dropped onto the ramp, a big anvil
     const z = sim as unknown as { prizes: unknown[]; hazards: unknown[]; dropIn: number; hazardIn: number };
