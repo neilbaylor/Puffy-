@@ -1104,7 +1104,7 @@ export class BattleSim {
         continue;
       }
       // (a touch slower than everything else falls: time to get out of the way)
-      z.vy = Math.min(480, z.vy + 600 * DT);
+      z.vy = Math.min(340, z.vy + 420 * DT);
       const prevY = z.y;
       z.y += z.vy * DT;
       // anyone underneath gets bonked (anvils and big ones hurt more)
