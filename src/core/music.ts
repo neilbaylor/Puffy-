@@ -87,6 +87,8 @@ let playing: Playing | null = null;
 let want: { t: Track; loop: boolean; at?: (dur: number) => number } | null = null;
 let token = 0;
 let rate = 1;
+/** The playback speed the current song should have (the battle song runs a hair fast to fit the clock). */
+let baseRate = 1;
 
 function stopNow() {
   if (!playing) return;
@@ -127,9 +129,10 @@ function startWanted() {
   });
 }
 
-function play(t: Track, restart: boolean, loop = true, at?: (dur: number) => number) {
+function play(t: Track, restart: boolean, loop = true, at?: (dur: number) => number, speed = 1) {
   if (!restart && playing?.t === t && want?.t === t) return;
-  rate = 1;
+  rate = speed;
+  baseRate = speed;
   if (restart || playing?.t !== t) stopNow();
   want = { t, loop, at };
   startWanted();
@@ -161,11 +164,15 @@ export const playMenuMusic = () => play('menu', false);
 export const preloadLevelMusic = (level = 1) => void decode(levelTrack(level));
 
 /**
- * The battle song: it ends exactly as the clock hits 0. `secondsLeft` is asked
- * at the moment it starts (the song is cued to that point).
+ * The battle song, from the very start to the very end, finishing exactly as the
+ * clock hits 0: it's played a touch faster to fit the battle (151.3 s of song in
+ * 150 s: under 1% faster, which nobody can hear). `secondsLeft` is asked at the
+ * moment it starts (joining a moment late cues it to the right spot).
  */
-export function playBattleMusic(secondsLeft: () => number) {
-  play('battle', true, false, (dur) => dur - secondsLeft());
+export function playBattleMusic(secondsLeft: () => number, battleSecs: number) {
+  const SONG = 151.33;
+  const speed = SONG / battleSecs;
+  play('battle', true, false, () => (battleSecs - secondsLeft()) * speed, speed);
 }
 export const preloadBattleMusic = () => void decode('battle');
 
@@ -180,8 +187,8 @@ document.addEventListener('visibilitychange', () => {
 
 /** Speed the current track up (or back down), e.g. 1.5× for sudden death. */
 export function setMusicRate(r: number) {
-  rate = r;
-  if (playing) playing.src.playbackRate.value = r;
+  rate = r * baseRate;
+  if (playing) playing.src.playbackRate.value = rate;
 }
 
 /** Fade the current track out over `ms`. */

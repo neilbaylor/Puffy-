@@ -39,6 +39,21 @@ const h = (html: string) => {
 const usingTouchNow = () => matchMedia('(pointer: coarse)').matches;
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
+/** The room code you used last (everyone starts in "birchcliff" until they change it). */
+const DEFAULT_ROOM = 'birchcliff';
+function storedRoom() {
+  try {
+    return localStorage.getItem('puffy.room') || DEFAULT_ROOM;
+  } catch {
+    return DEFAULT_ROOM;
+  }
+}
+const cleanRoom = (c: string) =>
+  c
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '')
+    .slice(0, 20) || DEFAULT_ROOM;
+
 function storedName() {
   try {
     return localStorage.getItem('puffy.name') ?? '';
@@ -69,9 +84,14 @@ export class BattleUI {
 
   constructor(private host: BattleHost) {}
 
-  /** Join the room and show the lobby. */
-  open() {
-    const url = battleUrl();
+  private code = DEFAULT_ROOM;
+
+  /** Battle: first the room code (in a little window), then into that room's lobby. */
+  open(code?: string) {
+    if (!code) return this.askCode();
+    this.code = code;
+    const base = battleUrl();
+    const url = base ? `${base}${base.includes('?') ? '&' : '?'}room=${encodeURIComponent(code)}` : null;
     const name = storedName();
     this.lastPhase = '';
     this.showLobby();
@@ -137,7 +157,65 @@ export class BattleUI {
     if (!this.lobby?.isConnected || !this.lobby.classList.contains('full')) return;
     this.net?.close();
     this.host.game.events.off('battle-hud', this.onHud);
-    this.open();
+    this.open(this.code);
+  }
+
+  /**
+   * The room code window. Everyone who types the same code plays together: if
+   * there's a room with that code you go in, otherwise it's made for you. The
+   * code you use is remembered for next time.
+   */
+  private askCode() {
+    const el = h(`<div class="screen modal battle-code">
+      <div class="panel bc-panel">
+        <p class="eyebrow">Battle with friends</p>
+        <h2>Room code</h2>
+        <p class="bc-help">Everyone who types the same code plays together.</p>
+        <label class="bl-namebox bc-box">
+          <input maxlength="20" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Room code">
+        </label>
+        <div class="row">
+          <button class="btn btn-alt" data-act="back">Back</button>
+          <button class="btn btn-go" data-act="go">Let’s go!</button>
+        </div>
+      </div>
+    </div>`);
+    const input = el.querySelector<HTMLInputElement>('input')!;
+    input.value = storedRoom();
+    const go = () => {
+      const code = cleanRoom(input.value);
+      try {
+        localStorage.setItem('puffy.room', code);
+      } catch {
+        /* private mode */
+      }
+      sfx.select();
+      this.open(code);
+    };
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation(); // typing isn't playing
+      if (e.key === 'Enter') go();
+    });
+    el.querySelector('[data-act=go]')!.addEventListener('click', go);
+    el.querySelector('[data-act=back]')!.addEventListener('click', () => {
+      sfx.back();
+      this.host.home();
+    });
+    this.host.setScreen(el);
+    playLevelMusic(this.host.level());
+  }
+
+  /** Tap the room code in the lobby: leave this room and pick another. */
+  private changeRoom() {
+    clearTimeout(this.retryT);
+    this.stopClock();
+    this.watch(false);
+    this.net?.close();
+    this.net = null;
+    this.host.game.events.off('battle-hud', this.onHud);
+    window.removeEventListener('pagehide', this.onPageHide);
+    this.lobby = null;
+    this.askCode();
   }
 
   // ── lobby ──
@@ -149,6 +227,7 @@ export class BattleUI {
       <header class="bl-head">
         <h1 class="bl-title">Battle!</h1>
         <p class="bl-sub">Up to ${MAX_BATTLERS} friends</p>
+        <button class="bl-room" type="button" aria-label="Change room">Room <b>${esc(this.code)}</b> ✎</button>
       </header>
       <div class="bl-preview" hidden><b class="bl-live">● LIVE</b></div>
       <div class="bl-slots"></div>
@@ -156,7 +235,7 @@ export class BattleUI {
         <label class="bl-namecard">
           <span class="bl-namelabel">Your name</span>
           <span class="bl-namebox">
-            <input maxlength="12" autocomplete="off" spellcheck="false" placeholder="Type your name">
+            <input maxlength="10" autocomplete="off" spellcheck="false" placeholder="Type your name">
           </span>
         </label>
         <div class="bl-heroes" role="radiogroup" aria-label="Your hero">${CHARACTERS.map((c) => `<button class="bl-hero" data-hero="${c.id}">${c.name}</button>`).join('')}</div>
@@ -181,10 +260,14 @@ export class BattleUI {
     </div>`);
     this.lobby = el;
     el.querySelector('.bl-back')!.addEventListener('click', () => this.leave());
+    el.querySelector('.bl-room')!.addEventListener('click', () => {
+      sfx.select();
+      this.changeRoom();
+    });
     const input = el.querySelector<HTMLInputElement>('.bl-namebox input')!;
     input.value = storedName();
     input.addEventListener('change', () => {
-      const v = input.value.trim().slice(0, 12);
+      const v = input.value.trim().slice(0, 10);
       try {
         localStorage.setItem('puffy.name', v);
       } catch {
@@ -453,7 +536,7 @@ export class BattleUI {
     }
     // the battle song, cued so it ends exactly when the clock hits 0
     this.lastTimeLeft = MATCH_SECS;
-    playBattleMusic(() => this.lastTimeLeft);
+    playBattleMusic(() => this.lastTimeLeft, MATCH_SECS);
     this.host.touch(true);
     this.hud?.remove();
     this.hud = h(`<div class="bhud">

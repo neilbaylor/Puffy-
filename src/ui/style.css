@@ -1865,7 +1865,7 @@ kbd {
 .bl-slots {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: clamp(8px, 1.6vw, 16px);
+  gap: var(--slotgap);
   width: min(100%, 780px);
 }
 .bl-slot {
@@ -2019,7 +2019,7 @@ kbd {
 
 /* battle results */
 .battle-results { align-items: center; text-align: center; min-width: min(100%, 340px); }
-.battle-results h2 { color: #2f9a3f; margin: 0; }
+.battle-results h2 { color: #2f9a3f; margin: 0 0 clamp(6px, 2vh, 14px); }
 .br-winner {
   width: clamp(80px, 22vh, 120px);
   height: clamp(80px, 22vh, 120px);
@@ -2160,7 +2160,7 @@ kbd {
 .battle-lobby { justify-content: flex-start; padding-top: calc(7px + var(--safe-t)); will-change: transform; }
 .battle-lobby > .bl-preview,
 .battle-lobby > .bl-slots { margin-top: auto; }
-.battle-lobby > .bl-foot { margin-bottom: auto; min-height: var(--rowh); justify-content: center; }
+.battle-lobby > .bl-foot { margin-top: clamp(8px, 3.5vh, 26px); margin-bottom: auto; min-height: var(--rowh); justify-content: center; }
 /* the subtitle on a dark pill: readable over sky, clouds or hills */
 .bl-sub {
   display: inline-block;
@@ -2173,14 +2173,37 @@ kbd {
   font: 800 clamp(13px, 2.6vmin, 17px) / 1.25 var(--body);
 }
 .bl-sub b { color: var(--gold); }
+/* the room you're in (tap it to change room) */
+.bl-room {
+  display: block;
+  margin: 6px auto 0;
+  padding: 2px 12px 3px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font: 800 clamp(11px, 2.2vmin, 14px) / 1.3 var(--body);
+  cursor: pointer;
+}
+.bl-room b { font-weight: 900; color: #c8661a; }
+.battle-lobby.loading .bl-room,
+.battle-lobby.full .bl-room { display: none; }
+/* the room code window */
+.bc-panel { align-items: center; text-align: center; gap: 10px; min-width: min(100%, 360px); }
+.bc-panel h2 { margin: 0; }
+.bc-help { margin: 0; font-weight: 700; color: var(--ink-soft); }
+.bc-box { --my: #f28a2e; width: 100%; height: clamp(48px, 11vh, 58px); box-sizing: border-box; }
+.bc-box input { flex: 1; min-width: 0; text-align: center; font-size: clamp(20px, 4.6vh, 26px); }
 
-/* your name and hero on one row, all the same height; the name box stretches so its
-   left edge lines up with the first player square */
-.battle-lobby { --rowh: clamp(46px, 11vh, 60px); }
-.bl-me { align-items: flex-end; flex-wrap: nowrap; width: min(100%, 780px); }
-.battle-lobby:not(.watching) .bl-namecard { flex: 1; min-width: 0; }
+/* your name and hero on one row, all the same height: the name box is as wide as the
+   first two player squares, the hero buttons spread across the other two */
+.battle-lobby { --rowh: clamp(46px, 11vh, 60px); --slotgap: clamp(8px, 1.6vw, 16px); }
+.bl-me { align-items: flex-end; flex-wrap: nowrap; width: min(100%, 780px); gap: var(--slotgap); }
+.battle-lobby:not(.watching) .bl-namecard { flex: 0 0 calc(50% - var(--slotgap) / 2); min-width: 0; }
 .battle-lobby:not(.watching) .bl-namebox { width: 100%; }
 .battle-lobby:not(.watching) .bl-namebox input { flex: 1; min-width: 0; width: auto; }
+.battle-lobby:not(.watching) .bl-heroes { flex: 1; justify-content: space-between; min-width: 0; }
+.battle-lobby:not(.watching) .bl-hero { flex: 1; padding: 0 6px; }
 .bl-heroes { flex: none; }
 .bl-namebox { height: var(--rowh); box-sizing: border-box; }
 .bl-heroes { gap: 8px; }

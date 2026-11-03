@@ -63,8 +63,8 @@ export interface SnapRocket {
  */
 export type SnapEnemy = [number, EnemyKind, number, number, 1 | -1, number, number, number, number];
 export const WEAPON_CODE = { gun: 1, saw: 2, flail: 3 } as const;
-/** Something falling from the sky: [id, kind, x, y, seconds of warning left (> 0: just a shadow)]. */
-export type SnapHazard = [number, 'rock' | 'anvil', number, number, number];
+/** Something falling from the sky: [id, kind, x, y, seconds of warning left (> 0: just a shadow), flags: 1 big · 2 rolling]. */
+export type SnapHazard = [number, 'rock' | 'anvil', number, number, number, number];
 
 /** A prize in the arena: [id, kind, x, y (bottom), seconds it has been there]. */
 export type SnapPrize = [number, PrizeKind, number, number, number];

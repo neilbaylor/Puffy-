@@ -48,7 +48,7 @@ const LAG = Math.max(0, Number(process.env.BATTLE_LAG_MS) || 0);
 const later = (fn: () => void) => (LAG ? setTimeout(fn, LAG) : fn());
 const heroOk = (h: string) => (CHARACTERS.some((c) => c.id === h) ? h : 'puffy');
 const cleanName = (n: unknown, slot: number) => {
-  const s = String(n ?? '').replace(/[^\p{L}\p{N} _'!.-]/gu, '').trim().slice(0, 12);
+  const s = String(n ?? '').replace(/[^\p{L}\p{N} _'!.-]/gu, '').trim().slice(0, 10);
   return s || (slot >= 0 ? `Player ${slot + 1}` : 'Fan');
 };
 /** When the arena's full, this many more can watch (they get the next free spot). */
@@ -65,6 +65,18 @@ function demo(sim: BattleSim) {
     Object.assign(e, { race, weapon, armed: !!weapon, kind, hp: 9, x, y: 15 * 32, chute: false, onGround: true });
   }
   const ps = [...sim.players.values()];
+  if (process.env.BATTLE_DEMO === 'prizes') {
+    // every bonus sitting in a row, a big boulder dropped onto the ramp, a big anvil
+    const z = sim as unknown as { prizes: unknown[]; hazards: unknown[]; dropIn: number; hazardIn: number };
+    z.dropIn = 1e9;
+    z.hazardIn = 1e9;
+    (['bomb', 'star', 'grow', 'rapid', 'heart', 'ice', 'fire'] as const).forEach((kind, i) =>
+      z.prizes.push({ id: 900 + i, kind, x: (13.2 + i * 1.1) * 32, y: 9 * 32, vy: 0, landed: true, age: 0 }),
+    );
+    z.hazards.push({ id: 990, kind: 'rock', big: true, x: 300, y: -60, vx: 0, vy: 0, warn: 4.5, rolling: 0 });
+    z.hazards.push({ id: 991, kind: 'anvil', big: true, x: 24 * 32, y: -60, vx: 0, vy: 0, warn: 9, rolling: 0 });
+    return;
+  }
   if (ps[0]) s.grant(ps[0], 'fire', []);
   setTimeout(() => ps[1] && s.grant(ps[1], 'ice', []), 2500);
 }
@@ -297,7 +309,7 @@ class Room {
           e.weapon ? WEAPON_CODE[e.weapon] : 0,
           e.weapon === 'flail' ? Math.round(sim.flailBall(e).a * 100) / 100 : 0,
         ]);
-        const hazards = sim.hazards.map((z): SnapHazard => [z.id, z.kind, r1(z.x), r1(z.y), r1(z.warn)]);
+        const hazards = sim.hazards.map((z): SnapHazard => [z.id, z.kind, r1(z.x), r1(z.y), r1(z.warn), (z.big ? 1 : 0) | (z.rolling > 0 ? 2 : 0)]);
         this.broadcast({ t: 'snap', k: sim.tick, tl: r1(sim.timeLeft), p: players, r: rockets, z: prizes, n: enemies, h: hazards, e: events });
         const anyone = [...this.clients.values()].some((c) => c.playing && c.ws);
         if (sim.over || !anyone) this.endBattle();
@@ -345,11 +357,40 @@ class Room {
   }
 }
 
-/** Start the battle server on this HTTP server (WebSockets at /battle). */
+/**
+ * Rooms by code (e.g. "birchcliff"): anyone who comes with the same code is in
+ * the same room. They live in memory only (no database): a room is made when the
+ * first person arrives and dropped a minute after the last one has gone.
+ */
+const rooms = new Map<string, { room: Room; emptySince: number }>();
+const MAX_ROOMS = 200;
+export const cleanCode = (c: unknown) =>
+  String(c ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '')
+    .slice(0, 20) || 'birchcliff';
+
+function roomFor(code: string) {
+  let r = rooms.get(code);
+  if (!r) {
+    if (rooms.size >= MAX_ROOMS) return null;
+    r = { room: new Room(), emptySince: 0 };
+    rooms.set(code, r);
+  }
+  return r.room;
+}
+
+/** Start the battle server on this HTTP server (WebSockets at /battle?room=code). */
 export function attachBattle(server: Server) {
-  const room = new Room();
   const wss = new WebSocketServer({ server, path: '/battle', maxPayload: 4096 });
-  wss.on('connection', (ws) => {
+  wss.on('connection', (ws, req) => {
+    const code = cleanCode(new URL(req.url ?? '/', 'http://x').searchParams.get('room'));
+    const room = roomFor(code);
+    if (!room) {
+      ws.send(JSON.stringify({ t: 'full' } satisfies ServerMsg));
+      ws.close();
+      return;
+    }
     let me: Client | null = null;
     ws.on('message', (raw) => later(() => {
       let msg: ClientMsg;
@@ -379,7 +420,14 @@ export function attachBattle(server: Server) {
     last = now;
     while (acc >= DT) {
       acc -= DT;
-      room.tick();
+      for (const r of rooms.values()) r.room.tick();
+    }
+    // empty rooms go after a minute
+    const t = Date.now();
+    for (const [code, r] of rooms) {
+      if (r.room.clients.size > 0) r.emptySince = 0;
+      else if (!r.emptySince) r.emptySince = t;
+      else if (t - r.emptySince > 60000) rooms.delete(code);
     }
   }, 1000 / TICK_HZ / 2);
   console.log('Battle server ready at /battle');

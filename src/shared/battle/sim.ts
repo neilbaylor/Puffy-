@@ -149,11 +149,16 @@ export interface BEnemy {
 export interface BHazard {
   id: number;
   kind: 'rock' | 'anvil';
+  /** 1 in 3 is a big one (bigger, and hits harder). */
+  big: boolean;
   x: number;
   y: number;
+  vx: number;
   vy: number;
   /** > 0: still just a shadow on the ground, seconds until it drops. */
   warn: number;
+  /** A big boulder that landed on the ramp rolls down it (and on along the floor a bit): seconds rolling. */
+  rolling: number;
 }
 
 export interface BPrize {
@@ -184,7 +189,7 @@ export type BEvent =
   | { k: 'throw'; x: number; y: number; kind: 'poo' | 'saw' }
   | { k: 'stomp'; id: string; on: string | number; x: number; y: number }
   | { k: 'freeze'; by: string }
-  | { k: 'crash'; kind: 'rock' | 'anvil'; x: number; y: number };
+  | { k: 'crash'; kind: 'rock' | 'anvil'; x: number; y: number; big?: boolean; roll?: boolean };
 
 const charOf = (hero: string): CharacterDef => CHARACTERS.find((c) => c.id === hero) ?? CHARACTERS[0];
 /** How big this hero is right now ("grow" makes you bigger). */
@@ -439,6 +444,9 @@ function moveAndCollide(p: BPlayer, c: CharacterDef, map: ArenaMap) {
     p.vy = 0;
   }
 }
+
+/** How big a falling rock / anvil is (half its width, world px). */
+export const hazardR = (z: { kind: 'rock' | 'anvil'; big: boolean }) => (z.kind === 'anvil' ? 28 : 23) * (z.big ? 1.55 : 1);
 
 /** Where something dropped at x first lands: the ramp, or the first ground or cloud below the sky. */
 export function landingY(map: ArenaMap, x: number) {
@@ -1038,7 +1046,7 @@ export class BattleSim {
       const n = Math.random() < 0.3 ? 2 + Math.floor(Math.random() * 2) : 1;
       for (let i = 0; i < n; i++) {
         const x = (2 + Math.random() * (this.map.w - 4)) * TILE_PX;
-        this.hazards.push({ id: this.nextThing++, kind: Math.random() < 0.35 ? 'anvil' : 'rock', x, y: -40, vy: 0, warn: 1.1 + i * 0.35 });
+        this.hazards.push({ id: this.nextThing++, kind: Math.random() < 0.35 ? 'anvil' : 'rock', big: Math.random() < 1 / 3, x, y: -40, vx: 0, vy: 0, warn: 1.1 + i * 0.35, rolling: 0 });
       }
     }
     const T = TILE_PX;
@@ -1047,33 +1055,82 @@ export class BattleSim {
         z.warn -= DT;
         continue;
       }
+      const r = hazardR(z);
+      const dmg = z.kind === 'anvil' || z.big ? 2 : 1;
+      if (z.rolling > 0) {
+        // a big boulder rolling down the ramp, then along the floor until it stops and crumbles
+        z.rolling += DT;
+        const ry = this.map.rampY(z.x);
+        if (ry !== null) {
+          z.vx = Math.max(-360, Math.min(360, z.vx + this.rampDownhill(z.x) * 380 * DT));
+          z.x += z.vx * DT;
+          z.y = this.map.rampY(z.x) ?? z.y;
+        } else {
+          z.vx *= Math.pow(0.35, DT); // slows on the flat
+          const nx = z.x + z.vx * DT;
+          if (this.map.solidAt(nx + Math.sign(z.vx) * r * 0.8, z.y - 6)) z.vx = 0; // (stops against a wall or step)
+          else z.x = nx;
+          z.y = landingY(this.map, z.x);
+        }
+        // anyone in its way gets bowled over
+        for (const p of this.players.values()) {
+          if (p.respawn > 0) continue;
+          const c = charOf(p.hero);
+          const k = sizeOf(p);
+          if (Math.abs(p.x - z.x) < boxW(c, k) / 2 + r && p.y > z.y - r * 2 && p.y - boxH(c, k) < z.y) this.hurt(p, 'sky', z.x - Math.sign(z.vx) * 20, 1, 1.1, ev);
+        }
+        for (const e of this.enemies) {
+          const [w, h] = ENEMY_BOX[e.kind];
+          if (Math.abs(e.x - z.x) < w / 2 + r && e.y > z.y - r * 2 && e.y - h < z.y) this.hurtEnemy(e, 1, ev);
+        }
+        if (Math.abs(z.vx) < 25 || z.rolling > 6) {
+          ev.push({ k: 'crash', kind: z.kind, x: z.x, y: z.y, big: true });
+          z.warn = -99;
+        }
+        continue;
+      }
       z.vy = Math.min(1100, z.vy + GRAVITY * DT);
       const prevY = z.y;
       z.y += z.vy * DT;
-      const r = z.kind === 'anvil' ? 25 : 20;
-      // anyone underneath gets bonked (anvils hurt more)
+      // anyone underneath gets bonked (anvils and big ones hurt more)
       for (const p of this.players.values()) {
         if (p.respawn > 0) continue;
         const c = charOf(p.hero);
         const k = sizeOf(p);
-        if (Math.abs(p.x - z.x) < boxW(c, k) / 2 + r && z.y > p.y - boxH(c, k) && z.y - r * 2 < p.y) this.hurt(p, 'sky', z.x, z.kind === 'anvil' ? 2 : 1, 0.8, ev);
+        if (Math.abs(p.x - z.x) < boxW(c, k) / 2 + r && z.y > p.y - boxH(c, k) && z.y - r * 2 < p.y) this.hurt(p, 'sky', z.x, dmg, 0.8, ev);
       }
       for (const e of this.enemies) {
         const [w, h] = ENEMY_BOX[e.kind];
-        if (Math.abs(e.x - z.x) < w / 2 + r && z.y > e.y - h && z.y - r * 2 < e.y) this.hurtEnemy(e, z.kind === 'anvil' ? 3 : 1, ev);
+        if (Math.abs(e.x - z.x) < w / 2 + r && z.y > e.y - h && z.y - r * 2 < e.y) this.hurtEnemy(e, z.kind === 'anvil' ? 3 : dmg, ev);
       }
       const ty = Math.floor(z.y / T);
       const tx = Math.floor(z.x / T);
       const ry = this.map.rampLand(z.x, prevY, z.y, z.vy, false);
       if (ry !== null) {
-        ev.push({ k: 'crash', kind: z.kind, x: z.x, y: ry });
-        z.warn = -99;
+        if (z.kind === 'rock' && z.big) {
+          // a big boulder on the ramp: it rolls down
+          z.y = ry;
+          z.vy = 0;
+          z.vx = this.rampDownhill(z.x) * 60;
+          z.rolling = DT;
+          ev.push({ k: 'crash', kind: z.kind, x: z.x, y: ry, big: true, roll: true });
+        } else {
+          ev.push({ k: 'crash', kind: z.kind, x: z.x, y: ry, big: z.big });
+          z.warn = -99;
+        }
       } else if (z.y > 0 && (this.map.solid(tx, ty) || (this.map.oneWay(tx, ty) && prevY <= ty * T + 0.5))) {
-        ev.push({ k: 'crash', kind: z.kind, x: z.x, y: ty * T });
+        ev.push({ k: 'crash', kind: z.kind, x: z.x, y: ty * T, big: z.big });
         z.warn = -99; // done
       }
     }
     this.hazards = this.hazards.filter((z) => z.warn > -50);
+  }
+
+  /** Which way is downhill on the ramp at x (-1 left, 1 right). */
+  private rampDownhill(x: number) {
+    const r = this.map.ramps.find((q) => x >= q.x0 && x <= q.x1 + q.flat);
+    if (!r) return 0;
+    return r.y0 > r.y1 ? -1 : 1;
   }
 
   /** Where something dropped at x first lands (top of the first ground or cloud below the sky). */

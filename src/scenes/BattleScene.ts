@@ -5,11 +5,11 @@ import { characterById } from '../data/characters';
 import { ART_RES, WALK_FRAMES } from '../gfx/draw';
 import { recolorForSlot } from '../gfx/recolor';
 import { addCanvas, hires } from '../gfx/textures';
-import { drawBombBall, drawChute, drawFireball, drawPrize } from '../gfx/prizes';
+import { PRIZE_COLOR, drawBombBall, drawChute, drawFireball, drawPrize } from '../gfx/prizes';
 import { PLOP_FRAMES, PLOP_H, PLOP_W, drawPlop, type PlopKind } from '../gfx/plops';
 import { canvas } from '../gfx/draw';
 import { STYLES } from '../gfx/handdrawn';
-import { SAW } from '../gfx/weapons';
+import { BLASTER, SAW } from '../gfx/weapons';
 import { drawAnvil, drawIceBlock, drawPellet, drawPoo, drawRamp, drawRock } from '../gfx/hazards';
 import { W_RES } from '../gfx/weapons';
 import { soloSource } from '../input/devices';
@@ -28,7 +28,9 @@ const INTERP_TICKS = 3;
 
 /** Prizes and things falling from the sky are drawn this much bigger than their art. */
 const PRIZE_SCALE = 1.6;
-const HAZARD_SCALE = 1.4;
+/** Rocks and anvils: most medium, 1 in 3 big (drawn to match their size in the rules). */
+const HAZARD_SCALE = 1.75;
+const HAZARD_BIG = 1.55;
 
 interface HeroView {
   sprite: Phaser.GameObjects.Sprite;
@@ -439,7 +441,7 @@ export class BattleScene extends Phaser.Scene {
     });
     const hazards = b.hazards.map((hb): SnapHazard => {
       const ha = a.hazards.find((h) => h[0] === hb[0]);
-      return ha && hb[4] <= 0 ? [hb[0], hb[1], hb[2], ha[3] + (hb[3] - ha[3]) * k, hb[4]] : hb;
+      return ha && hb[4] <= 0 ? [hb[0], hb[1], ha[2] + (hb[2] - ha[2]) * k, ha[3] + (hb[3] - ha[3]) * k, hb[4], hb[5]] : hb;
     });
     return { players, rockets, prizes, enemies, hazards, timeLeft: last.timeLeft };
   }
@@ -527,12 +529,13 @@ export class BattleScene extends Phaser.Scene {
         v.halo
           .setVisible(true)
           .setPosition(x, y - (c.hitH ?? 34) * v.size * 0.5)
-          .setScale((((c.hitH ?? 34) / 34) * v.size * 0.95 * pulse) / ART_RES)
-          .setAlpha(0.55 + Math.sin(this.time.now / 260) * 0.12);
+          .setScale((((c.hitH ?? 34) / 34) * v.size * 0.72 * pulse) / ART_RES)
+          .setAlpha(0.32 + Math.sin(this.time.now / 260) * 0.07);
       }
       const top = y - (c.hitH ?? 34) * v.size - 10;
-      v.tag.setText(this.names.get(id) ?? '').setPosition(x, top - 9);
-      this.drawHearts(v.hearts, x, top, p.hp, p.bombs);
+      // the name just over the head, the hearts above the name
+      v.tag.setText(this.names.get(id) ?? '').setPosition(x, top + 4);
+      this.drawHearts(v.hearts, x, top - 18, p.hp, p.bombs);
     }
     for (const [id, v] of this.views)
       if (!seen.has(id)) {
@@ -586,7 +589,14 @@ export class BattleScene extends Phaser.Scene {
       live.add(pid);
       let pv = this.prizeViews.get(pid);
       if (!pv) {
-        const glow = this.add.image(px, py, 'glow').setTint(0xfff3b0).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.6).setDepth(DEPTH.pickups - 0.1).setScale(0.85);
+        // the same soft pulsing glow the nuggies have in the levels, in the bonus's colour
+        const glow = this.add
+          .image(px, py, 'glow')
+          .setTint(Phaser.Display.Color.HexStringToColor(PRIZE_COLOR[kind].mid).color)
+          .setBlendMode(Phaser.BlendModes.ADD)
+          .setAlpha(0.6)
+          .setDepth(DEPTH.pickups - 1)
+          .setScale(1.5);
         const chute = this.add.image(px, py, `prize-chute-${kind}`).setScale(PRIZE_SCALE / ART_RES).setOrigin(0.5, 1).setDepth(DEPTH.pickups);
         const img = this.add.image(px, py, `prize-${kind}`).setScale(PRIZE_SCALE / ART_RES).setOrigin(0.5, 1).setDepth(DEPTH.pickups + 0.1);
         pv = { img, chute, glow, lastY: py, falling: 1 };
@@ -600,7 +610,7 @@ export class BattleScene extends Phaser.Scene {
       const sway = falling ? Math.sin(t * 2) * 0.12 : 0;
       pv.img.setPosition(px, py + bob).setRotation(sway);
       pv.chute.setPosition(px, py + bob - 26 * PRIZE_SCALE).setRotation(sway).setAlpha(pv.falling).setVisible(pv.falling > 0.05);
-      pv.glow.setPosition(px, py + bob - 15 * PRIZE_SCALE).setAlpha(0.45 + Math.sin(t * 5) * 0.15);
+      pv.glow.setPosition(px, py + bob - 15 * PRIZE_SCALE).setScale(1.45 + Math.sin(t * 4) * 0.15).setAlpha(0.6);
       const blink = age > 12 && Math.floor(this.time.now / 110) % 2 === 0;
       pv.img.setVisible(!blink);
       pv.glow.setVisible(!blink);
@@ -681,19 +691,63 @@ export class BattleScene extends Phaser.Scene {
       v.lastX = x;
       v.anim += dt * (moving ? 7 : 2);
       let frame: string;
-      if (v.plop) frame = moving ? (Math.floor(v.anim) % 2 ? 'run0' : 'run1') : 'idle';
-      else frame = kind === 'big' && !onGround && !chute ? 'air' : Math.floor(v.anim) % 2 ? 'w1' : 'w0';
+      // each size of Plop has its own walk: the small ones hop, the middle ones waddle,
+      // the big ones stomp (squashing down on every step); standing still, they shout
+      const ox = 0;
+      let oy = 0;
+      let rot = 0;
+      let sx = 1;
+      let sy = 1;
+      if (v.plop) {
+        frame = moving ? (Math.floor(v.anim) % 2 ? 'run0' : 'run1') : onGround && !chute ? (Math.floor(v.anim * 2) % 2 ? 'yell0' : 'yell1') : 'idle';
+        const ph = v.anim * Math.PI;
+        if (moving && onGround) {
+          if (kind === 'small') {
+            oy = -Math.abs(Math.sin(ph * 1.5)) * 7;
+            sy = 1 + Math.sin(ph * 3) * 0.06;
+            sx = 2 - sy;
+          } else if (kind === 'medium') {
+            rot = Math.sin(ph) * 0.13;
+            oy = -Math.abs(Math.sin(ph)) * 2;
+          } else {
+            const step = Math.abs(Math.cos(ph));
+            sy = 0.93 + step * 0.07;
+            sx = 1.06 - step * 0.06;
+            rot = Math.sin(ph) * 0.04;
+            if (step < 0.12 && Math.random() < 0.5) this.fx.dust(x + (Math.random() - 0.5) * w, y, 2);
+          }
+        } else if (onGround) {
+          sy = 1 + Math.sin(this.time.now / 300 + id) * 0.025; // breathing
+        }
+        const base = PLOP_ART[kind].scale / PLOP_RES;
+        v.spr.setScale(base * sx, base * sy).setRotation(rot);
+      } else frame = kind === 'big' && !onGround && !chute ? 'air' : Math.floor(v.anim) % 2 ? 'w1' : 'w0';
       // (Plops are drawn facing right; the Puff Balls' art faces left)
-      v.spr.setFrame(frame).setPosition(x, y + 2).setFlipX(v.plop ? dir < 0 : dir > 0);
+      v.spr.setFrame(frame).setPosition(x + ox, y + 2 + oy).setFlipX(v.plop ? dir < 0 : dir > 0);
       if (flags & 8) v.spr.setTintFill(0xffffff);
       else v.spr.clearTint();
       v.chute.setVisible(chute).setPosition(x, y - h + 4).setRotation(Math.sin(this.time.now / 400 + id) * 0.12);
-      const handX = x + dir * w * 0.55;
-      const handY = y - h * 0.42;
-      if (v.gun) v.gun.setPosition(handX, handY).setFlipX(dir > 0);
+      // the front hand: a Plop's is the tip of its arm; a Puff Ball's as in the levels
+      let handX: number;
+      let handY: number;
+      if (v.plop) {
+        const k = PLOP_ART[kind].scale;
+        handX = x + ox + dir * 46 * k * sx;
+        handY = y + 2 + oy - 46 * k * sy;
+      } else {
+        handX = x + dir * (kind === 'small' ? 17 : 31);
+        handY = y - (kind === 'small' ? 17 : 39);
+      }
+      // weapons held by their grip (the art faces left; flipped when facing right)
+      if (v.gun) {
+        const gx = BLASTER.gx / BLASTER.w;
+        v.gun.setOrigin(dir < 0 ? gx : 1 - gx, BLASTER.gy / BLASTER.h).setPosition(handX, handY).setFlipX(dir > 0);
+      }
       if (v.saw) {
+        const gx = SAW.gx / SAW.w;
         v.saw
-          .setPosition(x + dir * (w * 0.5 + SAW.w * 0.18), handY)
+          .setOrigin(dir < 0 ? gx : 1 - gx, SAW.gy / SAW.h)
+          .setPosition(handX, handY)
           .setFlipX(dir > 0)
           .setFrame(Math.floor(this.time.now / (moving ? 35 : 80)) % 2 ? 's0' : 's1');
       }
@@ -705,10 +759,10 @@ export class BattleScene extends Phaser.Scene {
         const by = cy + Math.sin(ang) * R * 0.8;
         v.chain.clear();
         v.chain.lineStyle(2.4, 0x3a2418, 1);
-        const hx = x + dir * w * 0.3;
+        // the chain runs from the hand to the ball
         for (let i = 1; i <= 6; i++) {
           const t = i / 7;
-          v.chain.strokeCircle(hx + (bx - hx) * t, cy + (by - cy) * t, 1.6);
+          v.chain.strokeCircle(handX + (bx - handX) * t, handY + (by - handY) * t, 1.6);
         }
         v.ball.setPosition(bx, by).setFrame(Math.floor(this.time.now / 160) % 2 ? 'open' : 'shut').setFlipX(bx > x);
       }
@@ -728,14 +782,16 @@ export class BattleScene extends Phaser.Scene {
   /** Rocks and anvils: a growing shadow where it'll land, then down it comes. */
   private renderHazards(list: SnapHazard[]) {
     const seen = new Set<number>();
-    for (const [id, kind, x, y, warn] of list) {
+    for (const [id, kind, x, y, warn, flags] of list) {
       seen.add(id);
+      const big = (flags & 1) !== 0;
+      const rolling = (flags & 2) !== 0;
       let v = this.hazardViews.get(id);
       if (!v) {
         // where it lands: the ramp, or the first ground or cloud below the sky
         const landY = landingY(this.map, x);
-        const shadow = this.add.ellipse(x, landY, 40, 10, 0x2b1a12, 0.35).setDepth(DEPTH.pickups - 0.2);
-        const img = this.add.image(x, y, kind === 'anvil' ? 'banvil' : 'brock').setOrigin(0.5, 1).setScale(HAZARD_SCALE / ART_RES).setDepth(DEPTH.projectiles + 0.5);
+        const shadow = this.add.ellipse(x, landY, 40 * (big ? HAZARD_BIG : 1), 10, 0x2b1a12, 0.35).setDepth(DEPTH.pickups - 0.2);
+        const img = this.add.image(x, y, kind === 'anvil' ? 'banvil' : 'brock').setOrigin(0.5, kind === 'rock' ? 0.5 : 1).setScale((HAZARD_SCALE * (big ? HAZARD_BIG : 1)) / ART_RES).setDepth(DEPTH.projectiles + 0.5);
         v = { img, shadow, landY };
         this.hazardViews.set(id, v);
         sfx.whoosh();
@@ -743,7 +799,11 @@ export class BattleScene extends Phaser.Scene {
       // the shadow darkens and tightens as it gets closer
       const near = warn > 0 ? 1 - Math.min(1, warn / 1.1) : 1 - Math.min(1, (v.landY - y) / 500);
       v.shadow.setAlpha(0.15 + 0.35 * near).setScale(1.4 - 0.5 * near, 1);
-      v.img.setVisible(warn <= 0).setPosition(x, y).setRotation(kind === 'rock' ? y * 0.02 : 0);
+      // (rocks are drawn round their middle so they can spin; rolling down the ramp they turn with the slope)
+      const half = kind === 'rock' ? (21 * HAZARD_SCALE * (big ? HAZARD_BIG : 1)) / 1 : 0;
+      v.img.setVisible(warn <= 0).setPosition(x, y - half * 0.92).setRotation(kind === 'rock' ? (rolling ? x * 0.045 : y * 0.02) : 0);
+      v.shadow.setVisible(!rolling);
+      if (rolling && Math.random() < 0.35) this.fx.dust(x, y, 1);
       if (warn > 0 && Math.floor(this.time.now / 140) % 2) v.shadow.setAlpha(0.6);
     }
     for (const [id, v] of this.hazardViews)
@@ -867,12 +927,15 @@ export class BattleScene extends Phaser.Scene {
           sfx.pew();
           this.fx.muzzle(e.x, e.y, e.dir, e.x - e.dir * 10);
           break;
-        case 'crash':
-          this.fx.dust(e.x, e.y, e.kind === 'anvil' ? 16 : 10);
-          this.fx.debris(e.x, e.y - 8);
-          (e.kind === 'anvil' ? sfx.thud : sfx.stomp)();
-          this.cameras.main.shake(e.kind === 'anvil' ? 200 : 110, e.kind === 'anvil' ? 0.008 : 0.004);
+        case 'crash': {
+          const k = e.big ? 1.7 : 1;
+          this.fx.dust(e.x, e.y, Math.round((e.kind === 'anvil' ? 16 : 10) * k));
+          if (!e.roll) this.fx.debris(e.x, e.y - 8);
+          if (e.big && !e.roll) this.fx.debris(e.x + 14, e.y - 12);
+          (e.kind === 'anvil' || e.big ? sfx.thud : sfx.stomp)();
+          this.cameras.main.shake((e.kind === 'anvil' ? 200 : 110) * k, (e.kind === 'anvil' ? 0.008 : 0.004) * k);
           break;
+        }
         case 'throw':
           sfx.whoosh();
           if (e.kind === 'saw') sfx.saw();

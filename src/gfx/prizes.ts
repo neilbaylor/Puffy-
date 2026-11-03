@@ -5,6 +5,8 @@
  */
 import type { PrizeKind } from '../shared/battle/sim';
 import type { Ctx } from './draw';
+import { drawRocket } from './bazooka';
+import { STYLES } from './handdrawn';
 
 const INK = '#3a2418';
 
@@ -275,35 +277,25 @@ export function drawPrize(ctx: Ctx, kind: PrizeKind) {
       break;
     }
     case 'rapid': {
-      // a lightning bolt with speed lines
-      ctx.strokeStyle = '#ffffffcc';
-      ctx.lineWidth = 1.2;
-      for (const [y, l] of [[-4, 5], [1, 7], [6, 4.5]] as const) {
+      // three of the heroes' own rockets streaking along, one after another
+      const rocket = (x: number, y: number, k: number) => {
+        ctx.strokeStyle = '#ffffffd8';
+        ctx.lineWidth = 1.2;
         ctx.beginPath();
-        ctx.moveTo(cx - 11, cy + y);
-        ctx.lineTo(cx - 11 + l, cy + y);
+        ctx.moveTo(x - 11.5 * k, y - 1.6 * k);
+        ctx.lineTo(x - 7 * k, y - 1.6 * k);
+        ctx.moveTo(x - 12.5 * k, y + 1.6 * k);
+        ctx.lineTo(x - 8 * k, y + 1.6 * k);
         ctx.stroke();
-      }
-      ctx.strokeStyle = INK;
-      ctx.lineWidth = 1.25;
-      ctx.fillStyle = '#ffd23f';
-      ctx.beginPath();
-      ctx.moveTo(cx + 3.4, cy - 10.5);
-      ctx.lineTo(cx - 5, cy + 1.6);
-      ctx.lineTo(cx + 0.4, cy + 1.6);
-      ctx.lineTo(cx - 2.4, cy + 10.6);
-      ctx.lineTo(cx + 7.4, cy - 2.4);
-      ctx.lineTo(cx + 2, cy - 2.4);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = '#fff6c8';
-      ctx.beginPath();
-      ctx.moveTo(cx + 2.6, cy - 8.4);
-      ctx.lineTo(cx - 2.6, cy + 0.2);
-      ctx.lineTo(cx - 1.2, cy + 0.2);
-      ctx.closePath();
-      ctx.fill();
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(k, k);
+        drawRocket(ctx, STYLES.polished, 0, 0);
+        ctx.restore();
+      };
+      rocket(cx + 3.4, cy - 5.6, 0.56);
+      rocket(cx + 5.8, cy + 0.6, 0.56);
+      rocket(cx + 1, cy + 6.6, 0.56);
       break;
     }
     case 'heart': {
@@ -383,40 +375,86 @@ export function drawPrize(ctx: Ctx, kind: PrizeKind) {
   ctx.fill();
 }
 
-/** A small parachute for a prize floating down (30 × 22), striped in the bonus's colour. */
+/**
+ * A little parachute for a prize floating down (30 × 22): a rounded canopy of
+ * five panels in the bonus's colour and cream, shaded towards the edges, a
+ * scalloped hem, a vent on top, and lines down to a ring over the bubble.
+ */
 export function drawChute(ctx: Ctx, kind?: PrizeKind) {
-  const col = kind ? PRIZE_COLOR[kind] : { mid: '#ff7eb6', light: '#fff6e8', dark: '#c95a8a' };
+  const col = kind ? PRIZE_COLOR[kind] : { light: '#ffe0ee', mid: '#ff86b8', dark: '#d24c86' };
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
-  ctx.strokeStyle = INK;
-  ctx.lineWidth = 0.8;
-  ctx.beginPath();
-  ctx.moveTo(4, 9);
-  ctx.lineTo(13, 21);
-  ctx.moveTo(26, 9);
-  ctx.lineTo(17, 21);
-  ctx.moveTo(15, 9);
-  ctx.lineTo(15, 21);
-  ctx.stroke();
-  ctx.lineWidth = 1.4;
-  const cols = [col.mid, '#fff8ee', col.mid, '#fff8ee'];
-  for (let i = 0; i < 4; i++) {
-    ctx.fillStyle = cols[i];
+  const cx = 15;
+  const top = 1.2;
+  const hem = 11.2;
+  const L = 1.6;
+  const R = 28.4;
+  const N = 5;
+  const hx = (i: number) => L + ((R - L) * i) / N;
+  // lines down to the ring
+  ctx.strokeStyle = '#5a4030';
+  ctx.lineWidth = 0.6;
+  for (let i = 0; i <= N; i++) {
     ctx.beginPath();
-    ctx.moveTo(15, 9);
-    ctx.arc(15, 9, 12, Math.PI + (i * Math.PI) / 4, Math.PI + ((i + 1) * Math.PI) / 4);
-    ctx.closePath();
+    ctx.moveTo(hx(i), hem + 0.6);
+    ctx.lineTo(cx, 20.4);
+    ctx.stroke();
+  }
+  // the canopy outline: a dome over a scalloped hem
+  const dome = new Path2D();
+  dome.moveTo(L, hem);
+  dome.bezierCurveTo(L, top + 2, cx - 9, top, cx, top);
+  dome.bezierCurveTo(cx + 9, top, R, top + 2, R, hem);
+  for (let i = N; i > 0; i--) dome.quadraticCurveTo((hx(i) + hx(i - 1)) / 2, hem + 2.6, hx(i - 1), hem);
+  dome.closePath();
+  ctx.save();
+  ctx.clip(dome);
+  // panels: curved seams fanning out from the top
+  for (let i = 0; i < N; i++) {
+    const a = hx(i);
+    const b = hx(i + 1);
+    const g = ctx.createLinearGradient(a, 0, b, 0);
+    const base = i % 2 === 0 ? col.mid : '#fff8ee';
+    const edge = i % 2 === 0 ? col.dark : '#ead9c8';
+    g.addColorStop(0, edge);
+    g.addColorStop(0.45, base);
+    g.addColorStop(1, edge);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(cx, top - 1);
+    ctx.quadraticCurveTo(a + (cx - a) * 0.35, top + 2, a, hem + 3);
+    ctx.lineTo(b, hem + 3);
+    ctx.quadraticCurveTo(b + (cx - b) * 0.35, top + 2, cx, top - 1);
     ctx.fill();
   }
-  // scalloped hem + outline
+  // a soft shine across the top
+  ctx.fillStyle = '#ffffff55';
   ctx.beginPath();
-  ctx.arc(15, 9, 12, Math.PI, 0);
-  for (let i = 4; i > 0; i--) ctx.quadraticCurveTo(3 + i * 6 - 3, 11.4, 3 + (i - 1) * 6, 9);
-  ctx.closePath();
-  ctx.stroke();
-  ctx.strokeStyle = '#ffffffaa';
-  ctx.lineWidth = 1;
+  ctx.ellipse(cx - 4, top + 3.2, 8, 2.2, -0.12, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  // seams + outline
+  ctx.strokeStyle = '#3a241880';
+  ctx.lineWidth = 0.6;
+  for (let i = 1; i < N; i++) {
+    const a = hx(i);
+    ctx.beginPath();
+    ctx.moveTo(cx, top);
+    ctx.quadraticCurveTo(a + (cx - a) * 0.35, top + 2, a, hem);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 1.3;
+  ctx.stroke(dome);
+  // vent on top, and the ring the lines meet at
+  ctx.fillStyle = col.dark;
   ctx.beginPath();
-  ctx.arc(15, 9, 9.6, Math.PI * 1.15, Math.PI * 1.45);
+  ctx.ellipse(cx, top + 0.8, 1.8, 0.9, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.lineWidth = 0.9;
+  ctx.fillStyle = '#ffd23f';
+  ctx.beginPath();
+  ctx.arc(cx, 20.6, 1.3, 0, Math.PI * 2);
+  ctx.fill();
   ctx.stroke();
 }
