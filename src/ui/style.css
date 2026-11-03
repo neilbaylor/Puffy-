@@ -1902,7 +1902,6 @@ kbd {
 }
 .bl-hero.picked { background: var(--gold); }
 .bl-foot { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.bl-start:disabled { filter: grayscale(0.7); opacity: 0.7; cursor: default; }
 .bl-status {
   margin: 0;
   font: 800 14px var(--body);
@@ -1912,30 +1911,10 @@ kbd {
   text-align: center;
 }
 .battle-lobby.waiting .bl-slots { opacity: 0.6; }
-.bl-count {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  background: #3a241866;
-  font: 400 clamp(110px, 40vh, 220px) / 1 var(--display);
-  color: var(--gold);
-  -webkit-text-stroke: 0.06em var(--ink);
-  paint-order: stroke fill;
-  text-shadow: 0 0.06em 0 var(--ink);
-  pointer-events: none;
-}
-.bl-count.pop { animation: bl-pop 0.9s cubic-bezier(0.2, 1.6, 0.4, 1); }
-@keyframes bl-pop {
-  0% { transform: scale(0.3) rotate(-12deg); opacity: 0; }
-  40% { transform: scale(1.1) rotate(3deg); opacity: 1; }
-  100% { transform: scale(1) rotate(0); }
-}
 @media (max-height: 500px) {
   .battle-lobby { gap: 7px; padding-top: calc(8px + var(--safe-t)); }
   .bl-slot { padding: 7px 4px 6px; border-radius: 14px; }
   .bl-name input { padding: 5px 10px; font-size: 15px; }
-  .bl-hero { padding: 6px 10px 5px; font-size: 14px; }
 }
 
 /* the scoreboard during a battle */
@@ -1999,11 +1978,6 @@ kbd {
 .br-list li b { font: 400 18px var(--display); }
 .br-next { margin: 2px 0 0; font-size: 12px; font-weight: 700; color: var(--ink-soft); }
 
-.battle-lobby.full .bl-slots,
-.battle-lobby.full .bl-me,
-.battle-lobby.full .bl-start,
-.battle-lobby.full .bl-sub { display: none; }
-.battle-lobby.full .bl-status { font-size: clamp(18px, 4.4vh, 26px); max-width: 22em; }
 /* the end-of-level hero is the live one from the pick-a-player cards (its own standing animation) */
 .results-hero canvas.live { animation: none; }
 
@@ -2095,15 +2069,6 @@ kbd {
 }
 .bl-dice:active { transform: translateY(2px); box-shadow: none; }
 
-/* the countdown before a battle */
-.bl-timer {
-  margin: 0;
-  font: 400 clamp(17px, 4vh, 22px) / 1 var(--display);
-  color: #fff;
-  -webkit-text-stroke: 5px var(--ink);
-  paint-order: stroke fill;
-}
-.bl-timer b { font-weight: 400; color: var(--gold); font-size: 1.25em; }
 
 /* watching a battle you're not in: a live window instead of the slots */
 .bl-preview {
@@ -2132,3 +2097,142 @@ kbd {
 .battle-lobby.watching .bl-slots { display: none; }
 /* (the lobby's soft white wash would fog the window: keep it off while watching) */
 .battle-lobby.watching { background: none; }
+
+/* ── lobby layout: the title up top, everything else centred in the space below ── */
+.battle-lobby { justify-content: flex-start; padding-top: calc(4px + var(--safe-t)); will-change: transform; }
+.battle-lobby > .bl-preview,
+.battle-lobby > .bl-slots { margin-top: auto; }
+.battle-lobby > .bl-foot { margin-bottom: auto; min-height: var(--rowh); justify-content: center; }
+/* the subtitle on a dark pill: readable over sky, clouds or hills */
+.bl-sub {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 4px 14px 5px;
+  border-radius: 999px;
+  background: #1c0f3ad9;
+  color: #fff;
+  -webkit-text-stroke: 0;
+  font: 800 clamp(13px, 2.6vmin, 17px) / 1.25 var(--body);
+}
+.bl-sub b { color: var(--gold); }
+
+/* your name and hero on one row, all the same height */
+.battle-lobby { --rowh: clamp(46px, 11vh, 60px); }
+.bl-me { align-items: flex-end; flex-wrap: nowrap; }
+.bl-namebox { height: var(--rowh); box-sizing: border-box; }
+.bl-heroes { gap: 8px; }
+.bl-hero {
+  height: var(--rowh);
+  padding: 0 clamp(14px, 2.4vw, 22px);
+  border-radius: 16px;
+  font-size: clamp(17px, 4vh, 23px);
+  box-shadow: 0 4px 0 var(--ink);
+}
+.bl-hero:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+/* watching: the live window, then your name across the whole row, then the heroes underneath */
+.battle-lobby.watching .bl-me {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  width: min(92vw, calc(34vh * 2.2), 640px);
+}
+.battle-lobby.watching .bl-namebox { width: 100%; }
+.battle-lobby.watching .bl-namebox input { flex: 1; min-width: 0; }
+.battle-lobby.watching .bl-heroes { display: grid; grid-template-columns: repeat(3, 1fr); }
+.battle-lobby.watching .bl-preview { width: min(92vw, calc(34vh * 2.2), 640px); }
+.battle-lobby.watching { --rowh: clamp(42px, 9.5vh, 56px); }
+
+/* only one here: waiting for someone else */
+.bl-waitmsg {
+  margin: 0;
+  padding: 6px 20px 8px;
+  border-radius: 999px;
+  background: #1c0f3ad9;
+  color: #fff;
+  font: 400 clamp(18px, 4.6vh, 26px) / 1.1 var(--display);
+}
+.bl-waitmsg i { font-style: normal; animation: bl-dot 1.2s infinite; }
+.bl-waitmsg i:nth-child(2) { animation-delay: 0.2s; }
+.bl-waitmsg i:nth-child(3) { animation-delay: 0.4s; }
+@keyframes bl-dot { 0%, 60%, 100% { opacity: 0.25; } 30% { opacity: 1; } }
+
+/* the countdown clock: a big face with a ring that runs down */
+.bl-clock { display: flex; align-items: center; gap: 14px; }
+.bl-clock-label {
+  font: 400 clamp(20px, 5vh, 30px) / 1 var(--display);
+  color: #fff;
+  -webkit-text-stroke: 0.22em var(--ink);
+  paint-order: stroke fill;
+}
+.bl-clock-face {
+  --p: 1;
+  display: grid;
+  place-items: center;
+  width: clamp(76px, 19vh, 124px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 4px solid var(--ink);
+  box-shadow: 0 5px 0 var(--ink);
+  background:
+    radial-gradient(circle, var(--paper) 0 62%, transparent 63%),
+    conic-gradient(var(--gold) calc(var(--p) * 360deg), #1c0f3a33 0);
+}
+.bl-clock-face b {
+  font: 400 clamp(38px, 10vh, 66px) / 1 var(--display);
+  color: var(--ink);
+}
+.bl-clock-face.tick b { animation: bl-tick 0.5s cubic-bezier(0.2, 1.6, 0.4, 1); }
+@keyframes bl-tick { 0% { transform: scale(1.45); } 100% { transform: scale(1); } }
+.bl-clock.hot .bl-clock-face {
+  background:
+    radial-gradient(circle, #fff1e8 0 62%, transparent 63%),
+    conic-gradient(#ff5a4a calc(var(--p) * 360deg), #1c0f3a33 0);
+}
+.bl-clock.hot .bl-clock-face b { color: #e8463f; }
+/* the last seconds: the clock pushes in, lobby rumbling around it */
+.bl-clock.hot { transform: scale(1.12); transition: transform 0.3s cubic-bezier(0.2, 1.6, 0.4, 1); }
+
+/* the start: the lobby (and the start screen picture behind it) slides up and away */
+.bl-curtain {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  background-size: 100% 100%;
+  box-shadow: 0 10px 0 var(--ink), 0 30px 40px #0006;
+  transition: transform 0.85s cubic-bezier(0.6, -0.15, 0.7, 0.4);
+  pointer-events: none;
+}
+.bl-curtain.away { transform: translateY(-115%); }
+
+/* the arena's full: its own little screen */
+.battle-lobby.full > :not(.bl-head):not(.bl-back):not(.bl-fullcard) { display: none; }
+.bl-fullcard {
+  margin: auto 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: clamp(14px, 3vh, 24px) clamp(20px, 4vw, 36px);
+  border: 4px solid var(--ink);
+  border-radius: 22px;
+  background: var(--paper);
+  box-shadow: 0 6px 0 var(--ink);
+  text-align: center;
+  color: var(--ink);
+}
+.bl-fullcard[hidden] { display: none; }
+.battle-lobby.full .bl-sub { display: none; }
+.bl-fullcard h2 { margin: 0; font: 400 clamp(24px, 6vh, 36px) / 1 var(--display); }
+.bl-fullcard p { margin: 0; font: 700 clamp(13px, 2.8vh, 16px) / 1.35 var(--body); color: var(--ink-soft); }
+.bl-fulldots { display: flex; gap: 8px; }
+.bl-fulldots i {
+  width: clamp(26px, 6vh, 36px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 3px solid var(--ink);
+  background: radial-gradient(circle at 35% 30%, #fff8, transparent 45%), var(--sc);
+  animation: hop 1.2s ease-in-out infinite;
+}
+.bl-fulldots i:nth-child(2) { animation-delay: 0.15s; }
+.bl-fulldots i:nth-child(3) { animation-delay: 0.3s; }
+.bl-fulldots i:nth-child(4) { animation-delay: 0.45s; }

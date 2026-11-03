@@ -17,8 +17,6 @@ import { MAX_BATTLERS, packPlayer, type ClientMsg, type Phase, type RoomPlayer, 
 /** (BATTLE_COUNTDOWN lengthens it, for taking screenshots) */
 /** Once two or more friends are in, the next battle counts down from this on its own. */
 const AUTO_COUNTDOWN_SECS = Number(process.env.BATTLE_COUNTDOWN) > 0 ? Number(process.env.BATTLE_COUNTDOWN) : 15;
-/** "Start now" (or practising alone) skips to a short countdown. */
-const COUNTDOWN_SECS = 3;
 const RESULTS_SECS = 8;
 /** A dropped player keeps their place this long (phones drop the connection when backgrounded). */
 const REJOIN_SECS = 30;
@@ -136,16 +134,7 @@ class Room {
         this.broadcastRoom();
         return;
       case 'start':
-        // start now: from the lobby (practising alone), or cut the auto countdown short
-        if (this.phase === 'lobby') {
-          this.phase = 'countdown';
-          this.timer = COUNTDOWN_SECS;
-          this.lastCountdownSecond = -1;
-          this.broadcastRoom();
-        } else if (this.phase === 'countdown' && this.timer > COUNTDOWN_SECS) {
-          this.timer = COUNTDOWN_SECS;
-          this.broadcastRoom();
-        }
+        // (no "start now": a battle starts by itself when the countdown runs out)
         return;
       case 'ping':
         this.send(c, { t: 'pong', c: msg.c });
@@ -214,8 +203,8 @@ class Room {
         }
         break;
       case 'countdown': {
-        // someone left and it's just one again: back to waiting (unless they chose to practise)
-        if (ready < 2 && this.timer > COUNTDOWN_SECS) {
+        // someone left and it's just one again: back to waiting
+        if (ready < 2) {
           this.phase = 'lobby';
           this.broadcastRoom();
           break;
