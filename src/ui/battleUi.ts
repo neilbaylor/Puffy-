@@ -219,6 +219,7 @@ export class BattleUI {
     const connected = r.players.filter((p) => p.connected).length;
     const watching = r.phase === 'battle' && !playing;
     lobby.classList.toggle('watching', watching);
+    lobby.querySelector<HTMLElement>('.bl-preview')!.hidden = !watching;
     this.watch(watching);
     const start = lobby.querySelector<HTMLButtonElement>('.bl-start')!;
     const timer = lobby.querySelector<HTMLElement>('.bl-timer')!;

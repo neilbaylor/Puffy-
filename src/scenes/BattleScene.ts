@@ -105,7 +105,7 @@ export class BattleScene extends Phaser.Scene {
     this.hazardViews.clear();
     const arena = buildArena();
     this.map = new ArenaMap(arena);
-    this.level = new LevelView(this, arena);
+    this.level = new LevelView(this, arena, { keep: this.spectate });
     this.bg = new Background(this, this.level.heightPx - VIEW_H);
     this.fx = new Fx(this);
     this.views.clear();

@@ -2129,7 +2129,6 @@ kbd {
   animation: next-pulse 1.4s ease-in-out infinite;
 }
 .battle-lobby.watching .bl-preview { display: block; }
-.battle-lobby.watching .bl-preview[hidden] { display: block; }
 .battle-lobby.watching .bl-slots { display: none; }
 /* (the lobby's soft white wash would fog the window: keep it off while watching) */
 .battle-lobby.watching { background: none; }

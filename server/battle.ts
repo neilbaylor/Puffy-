@@ -104,6 +104,8 @@ class Room {
   }
 
   dropped(c: Client) {
+    // only watching (not in this battle): nothing to come back to, free the spot now
+    if (this.phase === 'battle' && !c.playing) return this.remove(c);
     c.ws = null;
     c.droppedAt = Date.now();
     c.queue = [];

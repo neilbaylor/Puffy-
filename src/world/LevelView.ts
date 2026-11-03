@@ -48,13 +48,14 @@ export class LevelView {
     private scene: Phaser.Scene,
     readonly data: LevelData,
     /** Lazy: only draw the terrain near `nearX` now, the rest bit by bit (the start screen). */
-    opts?: { lazyNear?: number },
+    /** keep: leave other levels' terrain alone (a battle watched while the start screen still shows). */
+    opts?: { lazyNear?: number; keep?: boolean },
   ) {
     this.lazy = opts?.lazyNear !== undefined;
     this.lazyNear = opts?.lazyNear ?? 0;
     // only one level's terrain lives in memory at a time in the game (phones run out
     // otherwise); the start screen's lazy views keep theirs (they only draw a little)
-    if (opts?.lazyNear === undefined)
+    if (opts?.lazyNear === undefined && !opts?.keep)
       for (const k of scene.textures.getTextureKeys())
       if (k.startsWith('terrain-') && !k.startsWith(`terrain-${data.name}-`)) scene.textures.remove(k);
     this.map = scene.make.tilemap({ data: data.tiles.map((r) => [...r]), tileWidth: TILE, tileHeight: TILE });
