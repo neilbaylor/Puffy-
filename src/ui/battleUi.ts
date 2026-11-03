@@ -574,7 +574,7 @@ export class BattleUI {
     time.classList.toggle('low', t <= 10);
     // bombs you're carrying: a counter (with the key to press on a keyboard), and the touch button
     const bombs = this.hud.querySelector<HTMLElement>('.bhud-bombs')!;
-    bombs.hidden = s.bombs <= 0;
+    bombs.hidden = s.bombs <= 0 || usingTouchNow();
     const bt = `💣 ×${s.bombs}${usingTouchNow() ? '' : ' · B or Enter to throw'}`;
     if (s.bombs > 0 && bombs.textContent !== bt) bombs.textContent = bt;
     this.host.bombs(s.bombs);

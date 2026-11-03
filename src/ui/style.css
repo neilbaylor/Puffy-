@@ -2233,7 +2233,7 @@ kbd {
 .bc-panel { align-items: center; text-align: center; gap: 10px; min-width: min(100%, 360px); }
 .bc-panel h2 { margin: 0; }
 .bc-help { margin: 0; font-weight: 700; color: var(--ink-soft); }
-.bc-box { --my: #f28a2e; width: 100%; height: clamp(56px, 13vh, 68px); box-sizing: border-box; margin: clamp(6px, 2vh, 14px) 0; }
+.bc-box { --my: #f28a2e; width: 100%; height: clamp(56px, 13vh, 68px); box-sizing: border-box; margin: 0 0 clamp(6px, 2vh, 14px); }
 .bc-box input { flex: 1; min-width: 0; text-align: center; font-size: clamp(20px, 4.6vh, 26px); }
 
 /* your name and hero on one row, all the same height: the name box is as wide as one and
