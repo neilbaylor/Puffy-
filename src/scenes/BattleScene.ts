@@ -43,7 +43,7 @@ type PrizeView = {
 const PLOP_PAD = 16;
 
 /** Playing, the camera is this much closer in than the whole-arena view. */
-const FOLLOW_ZOOM = 1.15;
+const FOLLOW_ZOOM = 1.2;
 /** Prizes and things falling from the sky are drawn this much bigger than their art. */
 const PRIZE_SCALE = 1.6;
 /** Rocks and anvils: most medium, 1 in 3 big (drawn to match their size in the rules). */
@@ -626,7 +626,7 @@ export class BattleScene extends Phaser.Scene {
   /** Where everyone else is right now: a smooth blend between two snapshots, a moment ago. */
   private othersAt(): {
     players: Map<string, SnapPlayer>;
-    rockets: Map<number, { x: number; y: number; dir: 1 | -1; kind: RocketKind }>;
+    rockets: Map<number, { x: number; y: number; dir: 1 | -1; kind: RocketKind; owner: string }>;
     prizes: [number, PrizeKind, number, number, number][];
     enemies: SnapEnemy[];
     hazards: SnapHazard[];
@@ -653,10 +653,10 @@ export class BattleScene extends Phaser.Scene {
       if (!pa || pa.respawn > 0 !== pb.respawn > 0 || Math.abs(pa.x - pb.x) > 120) players.set(pb.id, pb);
       else players.set(pb.id, { ...(k < 0.5 ? pa : pb), x: pa.x + (pb.x - pa.x) * k, y: pa.y + (pb.y - pa.y) * k, vx: pa.vx + (pb.vx - pa.vx) * k, vy: pa.vy + (pb.vy - pa.vy) * k });
     }
-    const rockets = new Map<number, { x: number; y: number; dir: 1 | -1; kind: RocketKind }>();
+    const rockets = new Map<number, { x: number; y: number; dir: 1 | -1; kind: RocketKind; owner: string }>();
     for (const rb of b.rockets) {
       const ra = a.rockets.find((r) => r.id === rb.id);
-      rockets.set(rb.id, ra ? { x: ra.x + (rb.x - ra.x) * k, y: ra.y + (rb.y - ra.y) * k, dir: rb.dir, kind: rb.kind } : rb);
+      rockets.set(rb.id, ra ? { x: ra.x + (rb.x - ra.x) * k, y: ra.y + (rb.y - ra.y) * k, dir: rb.dir, kind: rb.kind, owner: rb.owner } : rb);
     }
     const prizes = b.prizes.map(([id, kind, x, y, age]) => {
       const pa = a.prizes.find((z) => z[0] === id);
@@ -787,8 +787,8 @@ export class BattleScene extends Phaser.Scene {
         v.halo
           .setVisible(true)
           .setPosition(x, y - (c.hitH ?? 34) * v.size * 0.5)
-          .setScale(((c.hitH ?? 34) / 34) * v.size * 0.6 * pulse)
-          .setAlpha(0.6 + Math.sin(this.time.now / 260) * 0.12);
+          .setScale(((c.hitH ?? 34) / 34) * (1 + (v.size - 1) * 0.3) * 0.6 * pulse)
+          .setAlpha(0.36 + Math.sin(this.time.now / 260) * 0.08);
       }
       const top = y - (c.hitH ?? 34) * v.size - 10;
       // the name just over the head, the hearts above the name
@@ -814,7 +814,9 @@ export class BattleScene extends Phaser.Scene {
         if (r.kind === 'saw') img = this.add.sprite(r.x, r.y, 'w-saw', 's0').setScale(0.8 / W_RES).setDepth(DEPTH.projectiles);
         else {
           const tex = { bomb: 'bbomb', pellet: 'bpellet', fire: 'bfire', poo: 'bpoo', rocket: 'rocket' }[r.kind];
-          img = this.add.image(r.x, r.y, tex).setScale((r.kind === 'fire' ? 1.3 : r.kind === 'poo' ? 1.15 : 1) / ART_RES).setDepth(DEPTH.projectiles).setFlipX(r.dir < 0);
+          // (a grown hero's rockets, bombs and fireballs are as much bigger as they are)
+          const grown = this.views.get(r.owner)?.size ?? 1;
+          img = this.add.image(r.x, r.y, tex).setScale(((r.kind === 'fire' ? 1.3 : r.kind === 'poo' ? 1.15 : 1) * grown) / ART_RES).setDepth(DEPTH.projectiles).setFlipX(r.dir < 0);
         }
         this.rocketViews.set(id, img);
       }
