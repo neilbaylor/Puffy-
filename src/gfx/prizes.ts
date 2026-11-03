@@ -220,59 +220,51 @@ export function drawPrize(ctx: Ctx, kind: PrizeKind) {
       break;
     }
     case 'grow': {
-      // a big strong flexing arm (upper arm along the bottom, fist up, a huge bicep)
-      const skin = '#ffc48a';
+      // a flexed arm, drawn like a real one: shoulder on the left, the upper arm along
+      // the bottom with the bicep bulging up, a forearm that tapers to the wrist, a fist
       ctx.save();
-      ctx.translate(1.2, 0.6);
-      // a couple of "pow" lines off the bicep
+      ctx.translate(cx + 0.4, cy + 1.2);
+      ctx.scale(0.8, 0.8);
+      const arm = new Path2D();
+      arm.moveTo(-10, 7); // shoulder, underneath
+      arm.quadraticCurveTo(-3, 8.6, 3.5, 7.7); // the underside of the upper arm
+      arm.quadraticCurveTo(7.8, 7.4, 8.3, 4.4); // the elbow
+      arm.bezierCurveTo(8.9, 1.4, 8.3, -1.6, 7.2, -4); // the forearm, thick by the elbow
+      arm.lineTo(6.9, -5); // the wrist
+      arm.bezierCurveTo(8.8, -5.6, 8.7, -10.4, 5.5, -10.6); // round the fist
+      arm.bezierCurveTo(3.6, -10.7, 2.6, -9.6, 2.8, -8.2);
+      arm.bezierCurveTo(2.2, -7.4, 2.4, -6, 3.6, -5.2); // the thumb side
+      arm.lineTo(3.9, -4.4);
+      arm.bezierCurveTo(3.2, -2, 2.8, 0, 2.2, 1.4); // down the inside of the forearm
+      arm.bezierCurveTo(0.6, -2.8, -5.2, -3.6, -7.2, -0.6); // the bicep
+      arm.quadraticCurveTo(-8.6, 0.8, -10, 1.2); // the shoulder
+      arm.closePath();
+      ctx.fillStyle = '#f4b88c';
+      ctx.fill(arm);
+      // a little shading along the underside
+      ctx.save();
+      ctx.clip(arm);
+      ctx.fillStyle = '#d98d62';
+      ctx.beginPath();
+      ctx.ellipse(-1.5, 8.6, 11, 2.6, -0.04, 0, Math.PI * 2);
+      ctx.ellipse(8.6, 1.5, 1.6, 5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
       ctx.strokeStyle = INK;
+      ctx.lineWidth = 1.5;
+      ctx.stroke(arm);
+      // the crook of the elbow, the thumb over the fingers
       ctx.lineWidth = 1.1;
       ctx.beginPath();
-      ctx.moveTo(cx - 8.2, cy - 6.8);
-      ctx.lineTo(cx - 9.6, cy - 8.2);
-      ctx.moveTo(cx - 4.6, cy - 9.6);
-      ctx.lineTo(cx - 5, cy - 11.4);
-      ctx.moveTo(cx - 10.4, cy - 3.4);
-      ctx.lineTo(cx - 12, cy - 4);
-      ctx.stroke();
-      ctx.lineWidth = 1.35;
-      ctx.fillStyle = skin;
-      ctx.beginPath();
-      ctx.moveTo(cx - 11, cy + 7.6); // shoulder, underneath
-      ctx.quadraticCurveTo(cx - 2, cy + 9.6, cx + 5, cy + 8.6); // under the upper arm to the elbow
-      ctx.quadraticCurveTo(cx + 9.8, cy + 7.6, cx + 9.4, cy + 2.6); // round the elbow
-      ctx.lineTo(cx + 8.6, cy - 4.4); // up the forearm to the wrist
-      ctx.bezierCurveTo(cx + 10.4, cy - 7.6, cx + 8.2, cy - 11.6, cx + 4.2, cy - 10.6); // round the fist
-      ctx.bezierCurveTo(cx + 1, cy - 10, cx + 0.6, cy - 6.2, cx + 2.2, cy - 4.6); // fist, inside
-      ctx.lineTo(cx + 2.6, cy - 0.2); // down the inside of the forearm to the crook
-      ctx.bezierCurveTo(cx + 1.6, cy - 9.4, cx - 8.4, cy - 10.2, cx - 8.8, cy - 1.6); // the (huge) bicep
-      ctx.quadraticCurveTo(cx - 10, cy - 0.4, cx - 11.4, cy - 0.2); // to the shoulder
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-      // shading under the bicep and arm
-      ctx.fillStyle = '#e8955a';
-      ctx.beginPath();
-      ctx.moveTo(cx - 10.6, cy + 6.6);
-      ctx.quadraticCurveTo(cx - 2, cy + 8.4, cx + 5, cy + 7.4);
-      ctx.quadraticCurveTo(cx + 2, cy + 5.6, cx - 3, cy + 5.4);
-      ctx.quadraticCurveTo(cx - 8, cy + 5.4, cx - 10.6, cy + 6.6);
-      ctx.fill();
-      // the crook of the elbow, and the knuckles
-      ctx.strokeStyle = INK;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(cx + 2.6, cy - 0.2);
-      ctx.quadraticCurveTo(cx + 1.4, cy + 2.2, cx - 0.6, cy + 2.8);
-      ctx.moveTo(cx + 3.2, cy - 8.4);
-      ctx.quadraticCurveTo(cx + 4.8, cy - 7.6, cx + 6.6, cy - 8.2);
-      ctx.moveTo(cx + 3.6, cy - 6.2);
-      ctx.quadraticCurveTo(cx + 5.2, cy - 5.4, cx + 7.4, cy - 6);
+      ctx.moveTo(2.2, 1.4);
+      ctx.quadraticCurveTo(1.2, 3, -0.4, 3.4);
+      ctx.moveTo(3.2, -7.6);
+      ctx.quadraticCurveTo(4.6, -6.6, 6.6, -7.4);
       ctx.stroke();
       // a shine on the bicep
-      ctx.fillStyle = '#ffffffcc';
+      ctx.fillStyle = '#ffffffb8';
       ctx.beginPath();
-      ctx.ellipse(cx - 4.2, cy - 4.6, 2.9, 1.4, -0.3, 0, Math.PI * 2);
+      ctx.ellipse(-3.2, -0.6, 2.3, 1, -0.2, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
       break;
