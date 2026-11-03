@@ -49,6 +49,9 @@ function slotPortrait(target: HTMLCanvasElement, hero: string, slot: number) {
   ctx.drawImage(out, 0, 0);
 }
 
+/** For the 🎲 button next to your name. */
+const FUN_NAMES = ['Captain Fluff', 'Sir Puffsalot', 'Nugget', 'Boom Boom', 'Rocket Rex', 'Sparky', 'Mr. Muffin', 'Dizzy', 'Turbo', 'Pickle', 'Noodle', 'Biscuit', 'Zoomer', 'Kaboom', 'Fuzzball', 'Puffinator'];
+
 export class BattleUI {
   private net: BattleNet | null = null;
   private lobby: HTMLElement | null = null;
@@ -74,6 +77,7 @@ export class BattleUI {
 
   /** Leave the room and go back to the start screen. */
   leave() {
+    this.watch(false);
     this.net?.close();
     this.net = null;
     this.host.game.events.off('battle-hud', this.onHud);
@@ -110,12 +114,21 @@ export class BattleUI {
         <h1 class="bl-title">Battle!</h1>
         <p class="bl-sub">Up to ${MAX_BATTLERS} friends — everyone opens Puffy and taps <b>Battle</b></p>
       </header>
+      <div class="bl-preview" hidden><b class="bl-live">● LIVE</b></div>
       <div class="bl-slots"></div>
       <div class="bl-me">
-        <label class="bl-name"><span>Your name</span><input maxlength="12" autocomplete="off" spellcheck="false" placeholder="Your name"></label>
+        <label class="bl-namecard">
+          <span class="bl-namelabel">Your name</span>
+          <span class="bl-namebox">
+            <i class="bl-pen" aria-hidden="true">✎</i>
+            <input maxlength="12" autocomplete="off" spellcheck="false" placeholder="Type your name">
+            <button type="button" class="bl-dice" aria-label="Pick a random name">🎲</button>
+          </span>
+        </label>
         <div class="bl-heroes" role="radiogroup" aria-label="Your hero">${CHARACTERS.map((c) => `<button class="bl-hero" data-hero="${c.id}">${c.name}</button>`).join('')}</div>
       </div>
       <div class="bl-foot">
+        <p class="bl-timer" hidden></p>
         <button class="btn btn-big btn-go bl-start">Start battle</button>
         <p class="bl-status" hidden></p>
       </div>
@@ -123,8 +136,16 @@ export class BattleUI {
     </div>`);
     this.lobby = el;
     el.querySelector('.bl-back')!.addEventListener('click', () => this.leave());
-    const input = el.querySelector<HTMLInputElement>('.bl-name input')!;
+    const input = el.querySelector<HTMLInputElement>('.bl-namebox input')!;
     input.value = storedName();
+    el.querySelector('.bl-dice')!.addEventListener('click', (e) => {
+      e.preventDefault();
+      sfx.select();
+      let n = input.value;
+      while (n === input.value) n = FUN_NAMES[Math.floor(Math.random() * FUN_NAMES.length)];
+      input.value = n;
+      input.dispatchEvent(new Event('change'));
+    });
     input.addEventListener('change', () => {
       const v = input.value.trim().slice(0, 12);
       try {
@@ -191,16 +212,31 @@ export class BattleUI {
     }
     // lobby / countdown / watching someone else's match
     if (this.inBattle || !this.lobby || !this.lobby.isConnected) this.showLobby();
+    const lobby = this.lobby!;
+    // (your name card wears your colour)
+    if (me) lobby.style.setProperty('--my', SLOT_COLORS[me.slot]);
     this.renderSlots(r);
-    const start = this.lobby!.querySelector<HTMLButtonElement>('.bl-start')!;
-    const others = r.players.filter((p) => p.connected).length;
-    start.disabled = r.phase !== 'lobby';
-    start.textContent = r.phase === 'battle' ? 'Battle in progress…' : r.phase === 'results' ? 'Back in a moment…' : others <= 1 ? 'Practice alone' : 'Start battle';
-    const sub = this.lobby!.querySelector<HTMLElement>('.bl-sub')!;
-    if (r.phase === 'battle' && !playing) sub.innerHTML = 'A battle is on — you’ll join the <b>next</b> one';
-    const count = this.lobby!.querySelector<HTMLElement>('.bl-count')!;
-    count.hidden = r.phase !== 'countdown';
-    if (r.phase === 'countdown') {
+    const connected = r.players.filter((p) => p.connected).length;
+    const watching = r.phase === 'battle' && !playing;
+    lobby.classList.toggle('watching', watching);
+    this.watch(watching);
+    const start = lobby.querySelector<HTMLButtonElement>('.bl-start')!;
+    const timer = lobby.querySelector<HTMLElement>('.bl-timer')!;
+    const sub = lobby.querySelector<HTMLElement>('.bl-sub')!;
+    sub.innerHTML = watching
+      ? 'A battle is on — you’ll join the <b>next</b> one'
+      : connected <= 1
+        ? 'Waiting for friends… it starts by itself once <b>2</b> are here'
+        : `Up to ${MAX_BATTLERS} friends — everyone opens Puffy and taps <b>Battle</b>`;
+    const counting = r.phase === 'countdown';
+    start.disabled = !(r.phase === 'lobby' || (counting && r.timer > 3));
+    start.textContent = watching ? 'Watching…' : r.phase === 'results' ? 'Back in a moment…' : counting ? 'Start now' : connected <= 1 ? 'Practice alone' : 'Start battle';
+    timer.hidden = !counting || r.timer <= 3;
+    if (counting) timer.innerHTML = `Battle starts in <b>${r.timer}</b>`;
+    // the last three seconds: big numbers over everything
+    const count = lobby.querySelector<HTMLElement>('.bl-count')!;
+    count.hidden = !counting || r.timer > 3;
+    if (counting && r.timer <= 3) {
       count.textContent = String(Math.max(1, r.timer));
       count.classList.remove('pop');
       void count.offsetWidth;
@@ -209,10 +245,42 @@ export class BattleUI {
     }
   }
 
+  // ── watching a battle you're not in (a live window in the lobby) ──
+
+  private spectating = false;
+  private onResize = () => this.placePreview();
+
+  private watch(on: boolean) {
+    const g = this.host.game;
+    if (on && !this.spectating && this.net) {
+      this.spectating = true;
+      g.scene.start('Battle', { net: this.net, spectate: true });
+      window.addEventListener('resize', this.onResize);
+      // (once the scene has started)
+      requestAnimationFrame(() => requestAnimationFrame(() => this.placePreview()));
+    } else if (!on && this.spectating) {
+      this.spectating = false;
+      window.removeEventListener('resize', this.onResize);
+      if (!this.inBattle) g.scene.stop('Battle');
+    }
+  }
+
+  private placePreview() {
+    const box = this.lobby?.querySelector<HTMLElement>('.bl-preview');
+    const sc = this.host.game.scene.getScene('Battle') as unknown as { setPreview?: (r: { x: number; y: number; w: number; h: number } | null) => void };
+    if (!box || !this.spectating || !sc?.setPreview) return;
+    const b = box.getBoundingClientRect();
+    sc.setPreview({ x: b.left + 4, y: b.top + 4, w: b.width - 8, h: b.height - 8 });
+  }
+
   // ── the match ──
 
   private startBattle() {
     if (!this.net) return;
+    if (this.spectating) {
+      this.spectating = false;
+      window.removeEventListener('resize', this.onResize);
+    }
     this.inBattle = true;
     const g = this.host.game;
     g.scene.stop('Menu');

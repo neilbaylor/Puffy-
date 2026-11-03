@@ -6,11 +6,13 @@ import { ART_RES, WALK_FRAMES } from '../gfx/draw';
 import { recolorForSlot } from '../gfx/recolor';
 import { addCanvas, hires } from '../gfx/textures';
 import { drawBombBall, drawChute, drawPrize } from '../gfx/prizes';
+import { drawAnvil, drawPellet, drawRock } from '../gfx/hazards';
+import { W_RES } from '../gfx/weapons';
 import { soloSource } from '../input/devices';
 import type { BattleNet, Snapshot } from '../net/battleNet';
 import { buildArena } from '../shared/battle/arena';
-import { SLOT_COLORS, type SnapPlayer } from '../shared/battle/protocol';
-import { ArenaMap, BTN, DT, HEARTS, POWER, sizeOf, stepMove, type BEvent, type BPlayer, type PrizeKind } from '../shared/battle/sim';
+import { SLOT_COLORS, type SnapEnemy, type SnapHazard, type SnapPlayer } from '../shared/battle/protocol';
+import { ArenaMap, BTN, DT, ENEMY_BOX, HEARTS, POWER, sizeOf, stepMove, type BEvent, type BPlayer, type EnemyKind, type PrizeKind } from '../shared/battle/sim';
 import { Background } from '../world/Background';
 import { Fx } from '../world/Fx';
 import { LevelView } from '../world/LevelView';
@@ -41,6 +43,21 @@ const PRIZE_TEXT: Record<PrizeKind, [string, string]> = {
 };
 const PRIZE_KINDS: PrizeKind[] = ['bomb', 'star', 'grow', 'rapid', 'heart'];
 
+/** How each kind of bad guy is drawn: texture, scale, feet origin, gun size. */
+const ENEMY_ART: Record<EnemyKind, { tex: string; scale: number; ox: number; oy: number; gun: number }> = {
+  small: { tex: 'puffball', scale: 1 / ART_RES, ox: 0.5, oy: 46 / 48, gun: 0.55 },
+  medium: { tex: 'bigpuff', scale: 1 / ART_RES, ox: 0.5, oy: 86 / 88, gun: 0.8 },
+  big: { tex: 'giant', scale: 1 / 2.5, ox: 88 / 172, oy: 200 / 204, gun: 1 },
+};
+
+interface EnemyView {
+  spr: Phaser.GameObjects.Sprite;
+  gun: Phaser.GameObjects.Image | null;
+  chute: Phaser.GameObjects.Image;
+  anim: number;
+  lastX: number;
+}
+
 export interface BattleHud {
   timeLeft: number;
   players: { id: string; kos: number; hp: number; slot: number; down: boolean }[];
@@ -70,13 +87,22 @@ export class BattleScene extends Phaser.Scene {
   private fix = { x: 0, y: 0 };
   private names = new Map<string, string>();
   private hudT = 0;
+  private enemyViews = new Map<number, EnemyView>();
+  private hazardViews = new Map<number, { img: Phaser.GameObjects.Image; shadow: Phaser.GameObjects.Ellipse; landY: number }>();
+  /** Just watching (joined mid-battle): no hero of your own, shown in a little window. */
+  private spectate = false;
+  private preview: { x: number; y: number; w: number; h: number } | null = null;
 
   constructor() {
     super('Battle');
   }
 
-  create(data: { net: BattleNet }) {
+  create(data: { net: BattleNet; spectate?: boolean }) {
     this.net = data.net;
+    this.spectate = !!data.spectate;
+    this.preview = null;
+    this.enemyViews.clear();
+    this.hazardViews.clear();
     const arena = buildArena();
     this.map = new ArenaMap(arena);
     this.level = new LevelView(this, arena);
@@ -105,14 +131,30 @@ export class BattleScene extends Phaser.Scene {
     for (const k of PRIZE_KINDS) if (!this.textures.exists(`prize-${k}`)) addCanvas(this, `prize-${k}`, hires(30, 30, R, (ctx) => drawPrize(ctx, k)));
     if (!this.textures.exists('prize-chute')) addCanvas(this, 'prize-chute', hires(30, 22, R, (ctx) => drawChute(ctx)));
     if (!this.textures.exists('bbomb')) addCanvas(this, 'bbomb', hires(24, 24, R, (ctx) => drawBombBall(ctx, 11, 13, 7)));
+    if (!this.textures.exists('brock')) addCanvas(this, 'brock', hires(42, 42, R, (ctx) => drawRock(ctx)));
+    if (!this.textures.exists('banvil')) addCanvas(this, 'banvil', hires(42, 40, R, (ctx) => drawAnvil(ctx)));
+    if (!this.textures.exists('bpellet')) addCanvas(this, 'bpellet', hires(16, 16, R, (ctx) => drawPellet(ctx)));
+  }
+
+  /** Watch the battle in a little window (a box on the lobby screen, in CSS px), or full screen (null). */
+  setPreview(rect: { x: number; y: number; w: number; h: number } | null) {
+    this.preview = rect;
+    this.fitCamera();
   }
 
   /** The whole arena is always in view. */
   private fitCamera() {
     const cam = this.cameras.main;
+    // the canvas is drawn at device pixels; the lobby box is in CSS pixels
+    const k = this.scale.width / window.innerWidth;
+    const r = this.preview;
+    if (r) cam.setViewport(Math.round(r.x * k), Math.round(r.y * k), Math.round(r.w * k), Math.round(r.h * k));
+    else cam.setViewport(0, 0, this.scale.width, this.scale.height);
+    const W = r ? r.w * k : this.scale.width;
+    const H = r ? r.h * k : this.scale.height;
     // (the empty sky above the highest cloud is trimmed off, so the heroes are bigger)
     const SKY = 56;
-    const zoom = Math.min(this.scale.width / this.map.widthPx, this.scale.height / (this.map.heightPx - SKY));
+    const zoom = Math.min(W / this.map.widthPx, H / (this.map.heightPx - SKY));
     cam.setZoom(zoom);
     cam.centerOn(this.map.widthPx / 2, (this.map.heightPx + SKY) / 2);
   }
@@ -171,14 +213,14 @@ export class BattleScene extends Phaser.Scene {
         this.snaps.push(s);
       }
       if (this.snaps.length > 40) this.snaps.splice(0, this.snaps.length - 40);
-      this.reconcile(fresh[fresh.length - 1]);
+      if (!this.spectate) this.reconcile(fresh[fresh.length - 1]);
     }
 
     // ── your hero: one step per tick with your buttons, sent to the server too ──
     this.acc += dt;
     while (this.acc >= DT) {
       this.acc -= DT;
-      this.localTick();
+      if (!this.spectate) this.localTick();
     }
 
     this.render(dt);
@@ -245,8 +287,10 @@ export class BattleScene extends Phaser.Scene {
   /** Where everyone else is right now: a smooth blend between two snapshots, a moment ago. */
   private othersAt(): {
     players: Map<string, SnapPlayer>;
-    rockets: Map<number, { x: number; y: number; dir: 1 | -1; kind: 'rocket' | 'bomb' }>;
+    rockets: Map<number, { x: number; y: number; dir: 1 | -1; kind: 'rocket' | 'bomb' | 'pellet' }>;
     prizes: [number, PrizeKind, number, number, number][];
+    enemies: SnapEnemy[];
+    hazards: SnapHazard[];
     timeLeft: number;
   } | null {
     const n = this.snaps.length;
@@ -270,7 +314,7 @@ export class BattleScene extends Phaser.Scene {
       if (!pa || pa.respawn > 0 !== pb.respawn > 0 || Math.abs(pa.x - pb.x) > 120) players.set(pb.id, pb);
       else players.set(pb.id, { ...(k < 0.5 ? pa : pb), x: pa.x + (pb.x - pa.x) * k, y: pa.y + (pb.y - pa.y) * k, vx: pa.vx + (pb.vx - pa.vx) * k, vy: pa.vy + (pb.vy - pa.vy) * k });
     }
-    const rockets = new Map<number, { x: number; y: number; dir: 1 | -1; kind: 'rocket' | 'bomb' }>();
+    const rockets = new Map<number, { x: number; y: number; dir: 1 | -1; kind: 'rocket' | 'bomb' | 'pellet' }>();
     for (const rb of b.rockets) {
       const ra = a.rockets.find((r) => r.id === rb.id);
       rockets.set(rb.id, ra ? { x: ra.x + (rb.x - ra.x) * k, y: ra.y + (rb.y - ra.y) * k, dir: rb.dir, kind: rb.kind } : rb);
@@ -279,7 +323,15 @@ export class BattleScene extends Phaser.Scene {
       const pa = a.prizes.find((z) => z[0] === id);
       return [id, kind, x, pa ? pa[3] + (y - pa[3]) * k : y, age] as [number, PrizeKind, number, number, number];
     });
-    return { players, rockets, prizes, timeLeft: last.timeLeft };
+    const enemies = b.enemies.map((eb): SnapEnemy => {
+      const ea = a.enemies.find((e) => e[0] === eb[0]);
+      return ea ? [eb[0], eb[1], ea[2] + (eb[2] - ea[2]) * k, ea[3] + (eb[3] - ea[3]) * k, eb[4], eb[5]] : eb;
+    });
+    const hazards = b.hazards.map((hb): SnapHazard => {
+      const ha = a.hazards.find((h) => h[0] === hb[0]);
+      return ha && hb[4] <= 0 ? [hb[0], hb[1], hb[2], ha[3] + (hb[3] - ha[3]) * k, hb[4]] : hb;
+    });
+    return { players, rockets, prizes, enemies, hazards, timeLeft: last.timeLeft };
   }
 
   private render(dt: number) {
@@ -354,14 +406,19 @@ export class BattleScene extends Phaser.Scene {
         v.hearts.destroy();
         this.views.delete(id);
       }
+    this.renderEnemies(cur.enemies, dt);
+    this.renderHazards(cur.hazards);
     // rockets
     for (const [id, r] of cur.rockets) {
       let img = this.rocketViews.get(id);
       if (!img) {
-        img = this.add.image(r.x, r.y, r.kind === 'bomb' ? 'bbomb' : 'rocket').setScale(1 / ART_RES).setDepth(DEPTH.projectiles).setFlipX(r.dir < 0);
+        img = this.add.image(r.x, r.y, r.kind === 'bomb' ? 'bbomb' : r.kind === 'pellet' ? 'bpellet' : 'rocket').setScale(1 / ART_RES).setDepth(DEPTH.projectiles).setFlipX(r.dir < 0);
         this.rocketViews.set(id, img);
       }
-      if (r.kind === 'bomb') {
+      if (r.kind === 'pellet') {
+        img.setPosition(r.x, r.y);
+        if (Math.random() < 0.4) this.fx.trail(r.x - r.dir * 6, r.y);
+      } else if (r.kind === 'bomb') {
         img.setPosition(r.x, r.y).setRotation(img.rotation + r.dir * dt * 7);
         if (Math.random() < 0.5) this.fx.sparkle(r.x + 6, r.y - 8, 1);
       } else {
@@ -424,6 +481,77 @@ export class BattleScene extends Phaser.Scene {
       };
       this.game.events.emit('battle-hud', hud);
     }
+  }
+
+  /** The bad guys: walking (or floating down under a parachute), some carrying a blaster. */
+  private renderEnemies(list: SnapEnemy[], dt: number) {
+    const seen = new Set<number>();
+    for (const [id, kind, x, y, dir, flags] of list) {
+      seen.add(id);
+      const art = ENEMY_ART[kind];
+      let v = this.enemyViews.get(id);
+      if (!v) {
+        const spr = this.add.sprite(x, y, art.tex, 'w0').setOrigin(art.ox, art.oy).setScale(art.scale).setDepth(DEPTH.enemies);
+        const gun = flags & 2 ? this.add.image(x, y, 'w-blaster').setScale(art.gun / W_RES).setDepth(DEPTH.enemies + 0.1) : null;
+        const chute = this.add.image(x, y, 'chute').setOrigin(0.5, 1).setScale(1 / ART_RES).setDepth(DEPTH.enemies - 0.1);
+        v = { spr, gun, chute, anim: Math.random() * 4, lastX: x };
+        this.enemyViews.set(id, v);
+      }
+      const onGround = (flags & 1) !== 0;
+      const chute = (flags & 4) !== 0;
+      const moving = Math.abs(x - v.lastX) > 0.2;
+      v.lastX = x;
+      v.anim += dt * (moving ? 7 : 2);
+      const [, h] = ENEMY_BOX[kind];
+      const frame = kind === 'big' && !onGround && !chute ? 'air' : Math.floor(v.anim) % 2 ? 'w1' : 'w0';
+      v.spr.setFrame(frame).setPosition(x, y + 2).setFlipX(dir > 0);
+      if (flags & 8) v.spr.setTintFill(0xffffff);
+      else v.spr.clearTint();
+      v.chute.setVisible(chute).setPosition(x, y - h + 4).setRotation(Math.sin(this.time.now / 400 + id) * 0.12);
+      if (v.gun) v.gun.setPosition(x + dir * ENEMY_BOX[kind][0] * 0.55, y - h * 0.42).setFlipX(dir > 0);
+    }
+    for (const [id, v] of this.enemyViews)
+      if (!seen.has(id)) {
+        v.spr.destroy();
+        v.gun?.destroy();
+        v.chute.destroy();
+        this.enemyViews.delete(id);
+      }
+  }
+
+  /** Rocks and anvils: a growing shadow where it'll land, then down it comes. */
+  private renderHazards(list: SnapHazard[]) {
+    const seen = new Set<number>();
+    for (const [id, kind, x, y, warn] of list) {
+      seen.add(id);
+      let v = this.hazardViews.get(id);
+      if (!v) {
+        // where it lands: the first ground or cloud below the sky
+        const tx = Math.floor(x / 32);
+        let landY = this.map.heightPx;
+        for (let ty = 0; ty < this.map.h; ty++)
+          if (this.map.solid(tx, ty) || this.map.oneWay(tx, ty)) {
+            landY = ty * 32;
+            break;
+          }
+        const shadow = this.add.ellipse(x, landY, 40, 10, 0x2b1a12, 0.35).setDepth(DEPTH.pickups - 0.2);
+        const img = this.add.image(x, y, kind === 'anvil' ? 'banvil' : 'brock').setOrigin(0.5, 1).setScale(1 / ART_RES).setDepth(DEPTH.projectiles + 0.5);
+        v = { img, shadow, landY };
+        this.hazardViews.set(id, v);
+        sfx.whoosh();
+      }
+      // the shadow darkens and tightens as it gets closer
+      const near = warn > 0 ? 1 - Math.min(1, warn / 1.1) : 1 - Math.min(1, (v.landY - y) / 500);
+      v.shadow.setAlpha(0.15 + 0.35 * near).setScale(1.4 - 0.5 * near, 1);
+      v.img.setVisible(warn <= 0).setPosition(x, y).setRotation(kind === 'rock' ? y * 0.02 : 0);
+      if (warn > 0 && Math.floor(this.time.now / 140) % 2) v.shadow.setAlpha(0.6);
+    }
+    for (const [id, v] of this.hazardViews)
+      if (!seen.has(id)) {
+        v.img.destroy();
+        v.shadow.destroy();
+        this.hazardViews.delete(id);
+      }
   }
 
   private drawHearts(g: Phaser.GameObjects.Graphics, x: number, y: number, hp: number, bombs = 0) {
@@ -519,6 +647,29 @@ export class BattleScene extends Phaser.Scene {
         case 'bounce':
           sfx.bump();
           this.fx.dust(e.x, e.y + 7, 3);
+          break;
+        case 'espawn':
+          sfx.whoosh();
+          if (!e.chute) this.fx.dust(e.x, (this.map.h - 3) * 32, 8);
+          break;
+        case 'ehit':
+          sfx.bump();
+          break;
+        case 'edie':
+          this.fx.explosion(e.x, e.y, e.kind === 'big' ? 110 : 60);
+          this.fx.stars(e.x, e.y - 10, e.kind === 'big' ? 18 : 8);
+          sfx.pop();
+          if (e.kind === 'big') this.cameras.main.shake(260, 0.01);
+          break;
+        case 'eshot':
+          sfx.pew();
+          this.fx.muzzle(e.x, e.y, e.dir, e.x - e.dir * 10);
+          break;
+        case 'crash':
+          this.fx.dust(e.x, e.y, e.kind === 'anvil' ? 16 : 10);
+          this.fx.debris(e.x, e.y - 8);
+          (e.kind === 'anvil' ? sfx.thud : sfx.stomp)();
+          this.cameras.main.shake(e.kind === 'anvil' ? 200 : 110, e.kind === 'anvil' ? 0.008 : 0.004);
           break;
         case 'spawn': {
           const v = this.views.get(e.id);

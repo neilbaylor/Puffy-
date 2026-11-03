@@ -12,10 +12,13 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import { CHARACTERS } from '../src/data/characters';
 import { buildArena } from '../src/shared/battle/arena';
 import { BattleSim, DT, TICK_HZ } from '../src/shared/battle/sim';
-import { MAX_BATTLERS, packPlayer, type ClientMsg, type Phase, type RoomPlayer, type RoomState, type ServerMsg, type SnapPrize } from '../src/shared/battle/protocol';
+import { MAX_BATTLERS, packPlayer, type ClientMsg, type Phase, type RoomPlayer, type RoomState, type ServerMsg, type SnapEnemy, type SnapHazard, type SnapPrize } from '../src/shared/battle/protocol';
 
 /** (BATTLE_COUNTDOWN lengthens it, for taking screenshots) */
-const COUNTDOWN_SECS = Number(process.env.BATTLE_COUNTDOWN) > 0 ? Number(process.env.BATTLE_COUNTDOWN) : 3;
+/** Once two or more friends are in, the next battle counts down from this on its own. */
+const AUTO_COUNTDOWN_SECS = Number(process.env.BATTLE_COUNTDOWN) > 0 ? Number(process.env.BATTLE_COUNTDOWN) : 15;
+/** "Start now" (or practising alone) skips to a short countdown. */
+const COUNTDOWN_SECS = 3;
 const RESULTS_SECS = 8;
 /** A dropped player keeps their place this long (phones drop the connection when backgrounded). */
 const REJOIN_SECS = 30;
@@ -131,11 +134,16 @@ class Room {
         this.broadcastRoom();
         return;
       case 'start':
-        if (this.phase !== 'lobby') return;
-        this.phase = 'countdown';
-        this.timer = COUNTDOWN_SECS;
-        this.lastCountdownSecond = -1;
-        this.broadcastRoom();
+        // start now: from the lobby (practising alone), or cut the auto countdown short
+        if (this.phase === 'lobby') {
+          this.phase = 'countdown';
+          this.timer = COUNTDOWN_SECS;
+          this.lastCountdownSecond = -1;
+          this.broadcastRoom();
+        } else if (this.phase === 'countdown' && this.timer > COUNTDOWN_SECS) {
+          this.timer = COUNTDOWN_SECS;
+          this.broadcastRoom();
+        }
         return;
       case 'ping':
         this.send(c, { t: 'pong', c: msg.c });
@@ -192,8 +200,24 @@ class Room {
   tick() {
     const now = Date.now();
     for (const c of [...this.clients.values()]) if (!c.ws && c.droppedAt && now - c.droppedAt > REJOIN_SECS * 1000) this.remove(c);
+    const ready = [...this.clients.values()].filter((c) => c.ws).length;
     switch (this.phase) {
+      case 'lobby':
+        // two or more friends here: the countdown starts by itself
+        if (ready >= 2) {
+          this.phase = 'countdown';
+          this.timer = AUTO_COUNTDOWN_SECS;
+          this.lastCountdownSecond = -1;
+          this.broadcastRoom();
+        }
+        break;
       case 'countdown': {
+        // someone left and it's just one again: back to waiting (unless they chose to practise)
+        if (ready < 2 && this.timer > COUNTDOWN_SECS) {
+          this.phase = 'lobby';
+          this.broadcastRoom();
+          break;
+        }
         this.timer -= DT;
         const sec = Math.ceil(this.timer);
         if (sec !== this.lastCountdownSecond) {
@@ -224,7 +248,9 @@ class Room {
         const r1 = (v: number) => Math.round(v * 10) / 10;
         const rockets = sim.rockets.map((r) => ({ id: r.id, owner: r.owner, kind: r.kind, x: r1(r.x), y: r1(r.y), dir: r.dir }));
         const prizes = sim.prizes.map((z): SnapPrize => [z.id, z.kind, r1(z.x), r1(z.y), r1(z.age)]);
-        this.broadcast({ t: 'snap', k: sim.tick, tl: r1(sim.timeLeft), p: players, r: rockets, z: prizes, e: events });
+        const enemies = sim.enemies.map((e): SnapEnemy => [e.id, e.kind, r1(e.x), r1(e.y), e.dir, (e.onGround ? 1 : 0) | (e.armed ? 2 : 0) | (e.chute ? 4 : 0) | (e.hurtT > 0 ? 8 : 0)]);
+        const hazards = sim.hazards.map((z): SnapHazard => [z.id, z.kind, r1(z.x), r1(z.y), r1(z.warn)]);
+        this.broadcast({ t: 'snap', k: sim.tick, tl: r1(sim.timeLeft), p: players, r: rockets, z: prizes, n: enemies, h: hazards, e: events });
         const anyone = [...this.clients.values()].some((c) => c.playing && c.ws);
         if (sim.over || !anyone) this.endBattle();
         break;

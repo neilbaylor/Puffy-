@@ -49,6 +49,9 @@ const BOMBS_PER_PRIZE = 3;
 const MAX_PRIZES = 3;
 const PRIZE_LIFE = 15;
 
+/** Bad guys' collision boxes [w, h] (feet at y), matching their art in the levels. */
+export const ENEMY_BOX: Record<EnemyKind, [number, number]> = { small: [22, 30], medium: [36, 68], big: [104, 176] };
+
 /** Buttons, as bits (what the game sends the server each tick). */
 export const BTN = { left: 1, right: 2, jump: 4, fire: 8, run: 16 } as const;
 
@@ -91,7 +94,8 @@ export interface BPlayer {
 export interface BRocket {
   id: number;
   owner: string;
-  kind: 'rocket' | 'bomb';
+  /** (pellets are the armed bad guys' shots) */
+  kind: 'rocket' | 'bomb' | 'pellet';
   x: number;
   y: number;
   vx: number;
@@ -102,6 +106,38 @@ export interface BRocket {
   radius: number;
   /** Hearts it takes off. */
   damage: number;
+}
+
+/** Bad guys who drop in to cause trouble for everyone. */
+export type EnemyKind = 'small' | 'medium' | 'big';
+export interface BEnemy {
+  id: number;
+  kind: EnemyKind;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  dir: 1 | -1;
+  hp: number;
+  onGround: boolean;
+  armed: boolean;
+  /** Floating down under a parachute. */
+  chute: boolean;
+  fireCd: number;
+  jumpCd: number;
+  /** Seconds left of the white "ouch" flash. */
+  hurtT: number;
+}
+
+/** Things that fall out of the sky: a shadow first (warn), then down it comes. */
+export interface BHazard {
+  id: number;
+  kind: 'rock' | 'anvil';
+  x: number;
+  y: number;
+  vy: number;
+  /** > 0: still just a shadow on the ground, seconds until it drops. */
+  warn: number;
 }
 
 export interface BPrize {
@@ -124,7 +160,12 @@ export type BEvent =
   | { k: 'spawn'; id: string }
   | { k: 'drop'; x: number; kind: PrizeKind }
   | { k: 'prize'; id: string; kind: PrizeKind; x: number; y: number }
-  | { k: 'bounce'; x: number; y: number };
+  | { k: 'bounce'; x: number; y: number }
+  | { k: 'espawn'; kind: EnemyKind; x: number; chute: boolean }
+  | { k: 'ehit'; id: number }
+  | { k: 'edie'; kind: EnemyKind; x: number; y: number }
+  | { k: 'eshot'; x: number; y: number; dir: 1 | -1 }
+  | { k: 'crash'; kind: 'rock' | 'anvil'; x: number; y: number };
 
 const charOf = (hero: string): CharacterDef => CHARACTERS.find((c) => c.id === hero) ?? CHARACTERS[0];
 /** How big this hero is right now ("grow" makes you bigger). */
@@ -342,11 +383,16 @@ export class BattleSim {
   players = new Map<string, BPlayer>();
   rockets: BRocket[] = [];
   prizes: BPrize[] = [];
+  enemies: BEnemy[] = [];
+  hazards: BHazard[] = [];
   tick = 0;
   timeLeft = MATCH_SECS;
   private nextRocket = 1;
   private nextPrize = 1;
   private dropIn = 3;
+  private nextThing = 1;
+  private enemyIn = 7;
+  private hazardIn = 5;
 
   constructor(data: LevelData) {
     this.map = new ArenaMap(data);
@@ -438,6 +484,8 @@ export class BattleSim {
     }
     this.stepPrizes(ev);
     this.starContacts(ev);
+    this.stepEnemies(ev);
+    this.stepHazards(ev);
     // rockets: speed up, fly straight, blow up on walls, heroes or old age;
     // bombs: arc and bounce, and go off when the fuse runs out (or they hit someone)
     for (const r of this.rockets) {
@@ -460,10 +508,18 @@ export class BattleSim {
         }
         boom = r.age > 1.6 || r.y > this.map.heightPx + 60;
       } else {
-        r.vx += (r.dir * r.speed - r.vx) * Math.min(1, DT * 7);
+        if (r.kind === 'rocket') r.vx += (r.dir * r.speed - r.vx) * Math.min(1, DT * 7);
         r.x += r.vx * DT;
-        boom = r.age > ROCKET_LIFE || r.x < -40 || r.x > this.map.widthPx + 40 || this.map.solidAt(r.x + r.dir * 6, r.y);
+        boom = r.age > ROCKET_LIFE * (r.kind === 'pellet' ? 1.6 : 1) || r.x < -40 || r.x > this.map.widthPx + 40 || this.map.solidAt(r.x + r.dir * 6, r.y);
       }
+      if (!boom && r.kind !== 'pellet')
+        for (const e of this.enemies) {
+          const [w, h] = ENEMY_BOX[e.kind];
+          if (Math.abs(r.x - e.x) < w / 2 + 6 && r.y > e.y - h - 3 && r.y < e.y + 3) {
+            boom = true;
+            break;
+          }
+        }
       if (!boom && (r.kind === 'rocket' || r.age > 0.2))
         for (const p of this.players.values()) {
           if (p.id === r.owner || p.respawn > 0) continue;
@@ -486,6 +542,13 @@ export class BattleSim {
   private explode(r: BRocket, ev: BEvent[]) {
     const bx = r.x + (r.kind === 'rocket' ? r.dir * 6 : 0);
     ev.push({ k: 'boom', x: bx, y: r.y, r: r.radius });
+    // heroes' blasts pop the bad guys too
+    if (r.kind !== 'pellet')
+      for (const e of this.enemies) {
+        const [w, h] = ENEMY_BOX[e.kind];
+        const d = Math.hypot(e.x - bx, e.y - h / 2 - r.y);
+        if (d < r.radius + Math.max(w, h) / 2) this.hurtEnemy(e, r.damage, ev);
+      }
     for (const p of this.players.values()) {
       if (p.id === r.owner || p.respawn > 0) continue;
       const c = charOf(p.hero);
@@ -613,6 +676,194 @@ export class BattleSim {
         p.powerT = POWER_SECS[POWER.rapid];
         break;
     }
+  }
+
+  // ── bad guys ──
+
+  /** Room for one more? At most one big one, or two small / medium ones. */
+  private enemyBudget(): EnemyKind | null {
+    if (this.enemies.some((e) => e.kind === 'big') || this.enemies.length >= 2) return null;
+    const r = Math.random();
+    if (this.enemies.length === 0 && r < 0.18) return 'big';
+    return r < 0.6 ? 'small' : 'medium';
+  }
+
+  private spawnEnemy(ev: BEvent[]) {
+    const kind = this.enemyBudget();
+    if (!kind) return;
+    const chute = kind !== 'big' && Math.random() < 0.5;
+    const T = TILE_PX;
+    let x: number;
+    let y: number;
+    if (chute) {
+      // floats down somewhere over the arena
+      x = (3 + Math.random() * (this.map.w - 6)) * T;
+      y = -20;
+    } else {
+      // walks in from one side, on the raised ends of the floor
+      const left = Math.random() < 0.5;
+      x = left ? 1.5 * T : this.map.widthPx - 1.5 * T;
+      y = (this.map.h - 3) * T;
+    }
+    const armed = kind !== 'big' && Math.random() < 1 / 3;
+    const hp = kind === 'big' ? 5 : kind === 'medium' ? (armed ? 3 : 2) : 1;
+    const dir: 1 | -1 = x < this.map.widthPx / 2 ? 1 : -1;
+    this.enemies.push({ id: this.nextThing++, kind, x, y, vx: 0, vy: 0, dir, hp, onGround: !chute, armed, chute, fireCd: 1.5 + Math.random(), jumpCd: 1, hurtT: 0 });
+    ev.push({ k: 'espawn', kind, x, chute });
+  }
+
+  private hurtEnemy(e: BEnemy, n: number, ev: BEvent[]) {
+    if (e.hp <= 0) return;
+    e.hp -= n;
+    e.hurtT = 0.12;
+    if (e.hp <= 0) ev.push({ k: 'edie', kind: e.kind, x: e.x, y: e.y - ENEMY_BOX[e.kind][1] / 2 });
+    else ev.push({ k: 'ehit', id: e.id });
+  }
+
+  private nearest(x: number, y: number) {
+    let best: BPlayer | null = null;
+    let bd = Infinity;
+    for (const p of this.players.values()) {
+      if (p.respawn > 0) continue;
+      const d = Math.hypot(p.x - x, (p.y - y) * 1.4);
+      if (d < bd) {
+        bd = d;
+        best = p;
+      }
+    }
+    return best;
+  }
+
+  private stepEnemies(ev: BEvent[]) {
+    this.enemyIn -= DT;
+    if (this.enemyIn <= 0) {
+      this.enemyIn = 7 + Math.random() * 6;
+      this.spawnEnemy(ev);
+    }
+    const T = TILE_PX;
+    for (const e of this.enemies) {
+      const [w, h] = ENEMY_BOX[e.kind];
+      e.hurtT = Math.max(0, e.hurtT - DT);
+      e.jumpCd -= DT;
+      e.fireCd -= DT;
+      const tgt = this.nearest(e.x, e.y);
+      if (e.chute) {
+        // drifting down, swaying a little
+        e.vy = 75;
+        e.vx = Math.sin((this.tick + e.id * 17) * 0.06) * 30;
+      } else {
+        const dx = tgt ? tgt.x - e.x : 0;
+        if (tgt && Math.abs(dx) > 8) e.dir = dx > 0 ? 1 : -1;
+        const speed = e.kind === 'big' ? 55 : e.kind === 'medium' ? 82 : 70;
+        // an armed one plants its feet to shoot when it has a clear line
+        const aiming = e.armed && tgt && Math.abs(tgt.y - e.y) < 70 && Math.abs(dx) < 360;
+        if (e.onGround) e.vx = aiming && e.fireCd < 0.5 ? 0 : e.dir * speed;
+        if (aiming && e.fireCd <= 0) {
+          e.fireCd = 2.4 + Math.random() * 0.8;
+          const mx = e.x + e.dir * w * 0.7;
+          const my = e.y - h * 0.5;
+          this.rockets.push({ id: this.nextRocket++, owner: `e${e.id}`, kind: 'pellet', x: mx, y: my, vx: e.dir * 300, vy: 0, dir: e.dir, age: 0, speed: 300, radius: 14, damage: 1 });
+          ev.push({ k: 'eshot', x: mx, y: my, dir: e.dir });
+        }
+        // hop up steps, over gaps and up to you
+        const ahead = e.x + e.dir * (w / 2 + 4);
+        const wall = this.map.solidAt(ahead, e.y - 4);
+        const higher = tgt ? tgt.y < e.y - 40 && Math.abs(dx) < 220 : false;
+        if (e.onGround && e.jumpCd <= 0 && (wall || higher || (e.kind === 'big' && Math.random() < 0.01))) {
+          e.vy = e.kind === 'big' ? -640 : -600;
+          e.onGround = false;
+          e.jumpCd = e.kind === 'big' ? 2.2 : 0.9;
+        }
+      }
+      // move and land (on solid ground and clouds)
+      if (!e.chute) e.vy = Math.min(MAX_FALL, e.vy + GRAVITY * DT);
+      const nx = e.x + e.vx * DT;
+      if (!this.map.solidAt(nx + Math.sign(e.vx) * (w / 2), e.y - 4) && !this.map.solidAt(nx + Math.sign(e.vx) * (w / 2), e.y - h + 4)) e.x = nx;
+      else e.vx = 0;
+      e.x = Math.max(w / 2 + 2, Math.min(this.map.widthPx - w / 2 - 2, e.x));
+      const prevY = e.y;
+      e.y += e.vy * DT;
+      const wasAir = !e.onGround;
+      e.onGround = false;
+      if (e.vy >= 0) {
+        const ty = Math.floor(e.y / T);
+        for (const tx of [Math.floor((e.x - w / 2 + 2) / T), Math.floor((e.x + w / 2 - 2) / T)])
+          if (this.map.solid(tx, ty) || (this.map.oneWay(tx, ty) && prevY <= ty * T + 0.5)) {
+            e.y = ty * T;
+            e.vy = 0;
+            e.onGround = true;
+            if (e.chute) e.chute = false;
+            // a big one lands with a thump that hurts anyone standing close by
+            if (wasAir && e.kind === 'big') {
+              ev.push({ k: 'boom', x: e.x, y: e.y - 6, r: 60 });
+              for (const p of this.players.values())
+                if (p.onGround && Math.abs(p.x - e.x) < 90 && Math.abs(p.y - e.y) < 20) this.hurt(p, 'enemy', e.x, 1, 1, ev);
+            }
+            break;
+          }
+      }
+      if (e.y > this.map.heightPx + 100) e.hp = 0;
+      // bumping into a bad guy hurts
+      for (const p of this.players.values()) {
+        if (p.respawn > 0) continue;
+        const c = charOf(p.hero);
+        const k = sizeOf(p);
+        const pw = boxW(c, k);
+        const ph = boxH(c, k);
+        if (Math.abs(p.x - e.x) < (pw + w) / 2 - 4 && p.y - ph < e.y - 4 && e.y - h < p.y - 4) {
+          if (p.power === POWER.star) this.hurtEnemy(e, 5, ev);
+          else this.hurt(p, 'enemy', e.x, 1, 1, ev);
+        }
+      }
+    }
+    this.enemies = this.enemies.filter((e) => e.hp > 0);
+  }
+
+  // ── rocks and anvils from the sky ──
+
+  private stepHazards(ev: BEvent[]) {
+    this.hazardIn -= DT;
+    if (this.hazardIn <= 0) {
+      this.hazardIn = 3.5 + Math.random() * 3.5;
+      const x = (2 + Math.random() * (this.map.w - 4)) * TILE_PX;
+      this.hazards.push({ id: this.nextThing++, kind: Math.random() < 0.35 ? 'anvil' : 'rock', x, y: -40, vy: 0, warn: 1.1 });
+    }
+    const T = TILE_PX;
+    for (const z of this.hazards) {
+      if (z.warn > 0) {
+        z.warn -= DT;
+        continue;
+      }
+      z.vy = Math.min(1100, z.vy + GRAVITY * DT);
+      const prevY = z.y;
+      z.y += z.vy * DT;
+      const r = z.kind === 'anvil' ? 18 : 14;
+      // anyone underneath gets bonked (anvils hurt more)
+      for (const p of this.players.values()) {
+        if (p.respawn > 0) continue;
+        const c = charOf(p.hero);
+        const k = sizeOf(p);
+        if (Math.abs(p.x - z.x) < boxW(c, k) / 2 + r && z.y > p.y - boxH(c, k) && z.y - r * 2 < p.y) this.hurt(p, 'sky', z.x, z.kind === 'anvil' ? 2 : 1, 0.8, ev);
+      }
+      for (const e of this.enemies) {
+        const [w, h] = ENEMY_BOX[e.kind];
+        if (Math.abs(e.x - z.x) < w / 2 + r && z.y > e.y - h && z.y - r * 2 < e.y) this.hurtEnemy(e, z.kind === 'anvil' ? 3 : 1, ev);
+      }
+      const ty = Math.floor(z.y / T);
+      const tx = Math.floor(z.x / T);
+      if (z.y > 0 && (this.map.solid(tx, ty) || (this.map.oneWay(tx, ty) && prevY <= ty * T + 0.5))) {
+        ev.push({ k: 'crash', kind: z.kind, x: z.x, y: ty * T });
+        z.warn = -99; // done
+      }
+    }
+    this.hazards = this.hazards.filter((z) => z.warn > -50);
+  }
+
+  /** Where something dropped at x first lands (top of the first ground or cloud below the sky). */
+  landingY(x: number) {
+    const tx = Math.floor(x / TILE_PX);
+    for (let ty = 0; ty < this.map.h; ty++) if (this.map.solid(tx, ty) || this.map.oneWay(tx, ty)) return ty * TILE_PX;
+    return this.map.heightPx;
   }
 
   rocketsOf(id: string) {

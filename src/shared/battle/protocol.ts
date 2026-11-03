@@ -1,7 +1,7 @@
 /**
  * Messages between the game and the battle server (JSON over a WebSocket at /battle).
  */
-import type { BEvent, BPlayer, PrizeKind } from './sim';
+import type { BEvent, BPlayer, EnemyKind, PrizeKind } from './sim';
 
 export const MAX_BATTLERS = 4;
 
@@ -48,11 +48,16 @@ export type SnapPlayer = Omit<BPlayer, 'lastHitBy'> & { ack: number };
 export interface SnapRocket {
   id: number;
   owner: string;
-  kind: 'rocket' | 'bomb';
+  kind: 'rocket' | 'bomb' | 'pellet';
   x: number;
   y: number;
   dir: 1 | -1;
 }
+
+/** A bad guy: [id, kind, x, y (feet), dir, flags: 1 on ground · 2 armed · 4 parachute · 8 just hurt]. */
+export type SnapEnemy = [number, EnemyKind, number, number, 1 | -1, number];
+/** Something falling from the sky: [id, kind, x, y, seconds of warning left (> 0: just a shadow)]. */
+export type SnapHazard = [number, 'rock' | 'anvil', number, number, number];
 
 /** A prize in the arena: [id, kind, x, y (bottom), seconds it has been there]. */
 export type SnapPrize = [number, PrizeKind, number, number, number];
@@ -62,7 +67,7 @@ export type ServerMsg =
   | { t: 'welcome'; id: string }
   | { t: 'full' }
   | { t: 'room'; room: RoomState }
-  | { t: 'snap'; k: number; tl: number; p: PackedPlayer[]; r: SnapRocket[]; z: SnapPrize[]; e: BEvent[] }
+  | { t: 'snap'; k: number; tl: number; p: PackedPlayer[]; r: SnapRocket[]; z: SnapPrize[]; n: SnapEnemy[]; h: SnapHazard[]; e: BEvent[] }
   | { t: 'pong'; c: number };
 
 // ── compact player encoding (a snapshot goes out 30 times a second) ──
