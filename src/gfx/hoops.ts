@@ -360,7 +360,7 @@ export const PALACE: ArenaStyle = {
   padBottom: '#0f0d1a',
   logo: '#e8b931',
   net: [0xfbfbf8],
-  layout: { jumboX: 584, bannerX: 150, upperY0: -46, aislesU: [-40, 340, 1120, 1390], aislesL: [90, 470, 1270], seeds: [4242, 5151], cam: { dx: 0, dy: 0, zoom: 1, rot: 0 } },
+  layout: { jumboX: 375, bannerX: 1000, upperY0: -46, aislesU: [-40, 340, 1120, 1390], aislesL: [90, 470, 1270], seeds: [4242, 5151], cam: { dx: 0, dy: 0, zoom: 1, rot: 0 } },
 };
 
 /** Part 2: the Summit Dome up the mountain (ice blue, navy and red; striped net). */
@@ -400,7 +400,7 @@ export const SUMMIT: ArenaStyle = {
   net: [0xe8463f, 0xfbfbf8],
   // centre-hung jumbotron, banners on the left, a lower upper deck with different aisles,
   // and a camera set lower and further to the side
-  layout: { jumboX: 584, bannerX: -140, upperY0: -18, aislesU: [120, 660, 1240], aislesL: [260, 930], seeds: [777, 9191], cam: { dx: 0, dy: 34, zoom: 1.07, rot: -0.012 } },
+  layout: { jumboX: 375, bannerX: -140, upperY0: -18, aislesU: [120, 660, 1240], aislesL: [260, 930], seeds: [777, 9191], cam: { dx: 0, dy: 34, zoom: 1.07, rot: -0.012 } },
 };
 
 /** The style the arena drawing functions use right now (set before drawing). */
@@ -1317,7 +1317,7 @@ export function drawArenaFront(ctx: Ctx) {
  * Content is laid out in w × h units and shown `s` times bigger; it hangs from the
  * same bottom edge as before and grows upward (it's the only scoreboard now).
  */
-export const JUMBO = { x: 158, y: 84 - 108 * 1.3, w: 424, h: 108, s: 1.3 };
+export const JUMBO = { x: 158, y: 84 - 108 * 1.25, w: 424, h: 108, s: 1.25 };
 
 export type JumboContent =
   | { kind: 'title' }

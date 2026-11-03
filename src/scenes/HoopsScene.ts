@@ -430,11 +430,10 @@ export class HoopsScene extends Phaser.Scene {
     let z = this.baseZoom * fz;
     // the wide shot always keeps the whole jumbotron (and everyone's feet) in view:
     // on long phone screens that means pulling back a little and framing a touch higher
-    const jTop = A(0, JUMBO.y).y - 16;
+    const jTop = A(0, JUMBO.y).y - 6;
     // (wherever they're standing now: they shoot from different spots)
-    const feet = Math.max(A(0, Math.max(SPOTS.hero.y, SPOTS.king.y)).y, this.hero?.y ?? 0, this.king?.y ?? 0) + 30;
-    // (never wider than the arena's painted area)
-    const zWide = Math.max(Math.min(z, this.scale.height / (feet - jTop)), this.scale.width / (ARENA_W - 180), this.scale.height / ARENA_H);
+    const feet = Math.max(A(0, Math.max(SPOTS.hero.y, SPOTS.king.y)).y, this.hero?.y ?? 0, this.king?.y ?? 0) + 12;
+    const zWide = Math.min(z, this.scale.height / (feet - jTop), Math.max(this.scale.width / ARENA_W, this.scale.height / ARENA_H));
     z += (zWide - z) * ease;
     // in cutscenes the camera follows the (already eased) glide exactly; in the
     // contest it drifts softly toward its target
@@ -457,7 +456,7 @@ export class HoopsScene extends Phaser.Scene {
       const right = Math.max(this.king?.x ?? A(SPOTS.king.x, 0).x, A(SPOTS.king.x, 0).x) + 130;
       const xs = Phaser.Math.Clamp(x, right - vw / 2, Math.max(right - vw / 2, left + vw / 2));
       // (the arena's painted edge stops a little short of its very edge)
-      const xw = Phaser.Math.Clamp(Phaser.Math.Clamp(xs, jx1 - vw / 2, jx0 + vw / 2), vw / 2 + 90, Math.max(vw / 2 + 90, ARENA_W - 90 - vw / 2));
+      const xw = Phaser.Math.Clamp(Phaser.Math.Clamp(xs, jx1 - vw / 2, jx0 + vw / 2), vw / 2, Math.max(vw / 2, ARENA_W - vw / 2));
       x += (xw - x) * ease;
       y += (yw - y) * ease;
     }
