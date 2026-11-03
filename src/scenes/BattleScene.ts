@@ -399,13 +399,16 @@ export class BattleScene extends Phaser.Scene {
     const c = Phaser.Display.Color.HexStringToColor(col).color;
     const g = this.add.graphics();
     // (drawn pointing right; the whole pointer turns to face them)
-    g.fillStyle(0x3a2418, 1).fillCircle(0, 0, 11.5).fillTriangle(8, -9.5, 8, 9.5, 22, 0);
-    g.fillStyle(c, 1).fillCircle(0, 0, 9).fillTriangle(7, -7, 7, 7, 18.5, 0);
-    g.fillStyle(0xffffff, 0.55).fillCircle(-3, -3.5, 3);
+    // a white edge round a dark outline round their colour, so it stands out on any background
+    g.fillStyle(0xffffff, 1).fillCircle(0, 0, 14).fillTriangle(9, -12.5, 9, 12.5, 26.5, 0);
+    g.fillStyle(0x3a2418, 1).fillCircle(0, 0, 12).fillTriangle(8.5, -10, 8.5, 10, 23, 0);
+    g.fillStyle(c, 1).fillCircle(0, 0, 9.5).fillTriangle(7.5, -7.5, 7.5, 7.5, 19, 0);
+    g.fillStyle(0xffffff, 0.55).fillCircle(-3, -3.5, 3.2);
     const label = this.add
-      .text(0, 0, name, { fontFamily: 'Nunito, sans-serif', fontSize: '12px', fontStyle: '900', color: '#ffffff', stroke: col, strokeThickness: 4 })
+      .text(0, 0, name, { fontFamily: 'Nunito, sans-serif', fontSize: '15px', fontStyle: '900', color: col, stroke: '#ffffff', strokeThickness: 5 })
       .setOrigin(0.5, 0.5)
-      .setResolution(2);
+      .setShadow(0, 1.5, '#3a2418', 0, true, false)
+      .setResolution(3);
     return this.add.container(0, 0, [g, label]).setDepth(DEPTH.text + 5).setVisible(false);
   }
 
@@ -440,11 +443,11 @@ export class BattleScene extends Phaser.Scene {
       g.setRotation(ang);
       // the name sits on the inside, away from the point
       label.setText(this.names.get(id) ?? '');
-      label.setPosition(-Math.cos(ang) * (16 + label.width / 2), -Math.sin(ang) * 22);
+      label.setPosition(-Math.cos(ang) * (20 + label.width / 2), -Math.sin(ang) * 26);
       v.arrow
         .setVisible(true)
         .setPosition(x, y)
-        .setScale(px * 1.25)
+        .setScale(px * 1.4)
         .setAlpha(0.85 + Math.sin(this.time.now / 180) * 0.15);
     }
   }
