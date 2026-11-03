@@ -13,7 +13,7 @@ import type { GameData, GameOverState, GameScene, HudState, ResultState } from '
 import { TouchControls } from './touchControls';
 import { drawNuggie, drawRootBeer } from '../gfx/collectibles';
 import { VERSION } from '../version';
-import { LEVELS, levelInfo, levelName, progress } from '../level/levels';
+import { LEVELS, latestLevel, levelInfo, levelName, progress } from '../level/levels';
 
 const h = (html: string) => {
   const t = document.createElement('template');
@@ -222,7 +222,8 @@ export class UI {
   private selected = 0;
   private introEl: HTMLElement | null = null;
   /** Which level to start (1-based); you can pick once you've beaten a level. */
-  private level = 1;
+  /** (starts on the furthest level you've unlocked) */
+  private level = latestLevel();
 
   constructor(private game: Phaser.Game) {
     this.root = document.getElementById('ui')!;
@@ -389,22 +390,14 @@ export class UI {
       else this.touch.hide();
     });
     checkOrientation();
-    // the first tap anywhere unlocks sound + music on mobile
+    // the first tap anywhere unlocks sound + music (if the browser didn't already let it
+    // start by itself). Some browsers only count the finger lifting as a "real" tap.
     const unlock = () => {
       unlockAudio();
       primeMusic();
     };
-    window.addEventListener('pointerdown', unlock, { once: true });
-    window.addEventListener('keydown', unlock, { once: true });
-    // phones/tablets: full screen from the very first tap. Browsers only count a
-    // touch as a "user gesture" when the finger lifts, so listen for that too.
-    const fsOnTap = () => {
-      this.goFullscreen();
-      window.removeEventListener('pointerup', fsOnTap);
-      window.removeEventListener('touchend', fsOnTap);
-    };
-    window.addEventListener('pointerup', fsOnTap);
-    window.addEventListener('touchend', fsOnTap);
+    for (const ev of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) window.addEventListener(ev, unlock, { once: true });
+    // (no automatic full screen: the full-screen button, or installing the game as an app)
   }
 
   private setScreen(el: HTMLElement | null) {
@@ -484,7 +477,6 @@ export class UI {
         if (pickedOnDown) this.select(i);
       });
       card.addEventListener('click', () => {
-        this.goFullscreen();
         if (pickedOnDown) {
           pickedOnDown = false;
           return;
@@ -584,7 +576,7 @@ export class UI {
     syncFs();
     document.addEventListener('fullscreenchange', syncFs);
     fsBtn.addEventListener('click', () => {
-      this.goFullscreen(true);
+      this.goFullscreen();
       setTimeout(syncFs, 300);
     });
     this.setScreen(el);
@@ -735,8 +727,7 @@ export class UI {
   }
 
   /** Hide the browser's address bar etc. (Android, iPad, desktop). iPhone needs "Add to Home Screen". */
-  private goFullscreen(always = false) {
-    if (!always && !isTouchDevice()) return;
+  private goFullscreen() {
     if (isFullscreen() || isStandalone()) return;
     const de = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => void };
     try {
@@ -759,7 +750,6 @@ export class UI {
     }
     unlockAudio();
     primeMusic();
-    this.goFullscreen();
     const hero = CHARACTERS[this.selected];
     store.set('puffy.hero', hero.id);
     this.startGame({ players: [{ slot: 0, characterId: hero.id, inputId: 'solo' }] });
