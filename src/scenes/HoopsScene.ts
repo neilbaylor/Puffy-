@@ -882,7 +882,7 @@ export class HoopsScene extends Phaser.Scene {
     const cam = this.cameras.main;
     sfx.explode();
     sfx.drum();
-    cam.flash(420, 255, 250, 235);
+    cam.flash(300, 255, 250, 235);
     cam.shake(700, 0.022);
     k.setVisible(false);
     this.kingRefl.setVisible(false);
@@ -1491,9 +1491,12 @@ export class HoopsScene extends Phaser.Scene {
       sfx.drum();
       await this.tween({ targets: this.king, scaleX: this.king.scaleX * 1.35, scaleY: this.king.scaleY * 1.25, duration: 700, ease: 'Quad.easeIn', onUpdate: () => this.king.setX(kp.x + (Math.random() - 0.5) * 8) });
       this.burstKing();
-      this.camFocus = { x: 800, y: 450, zoom: 1 };
+      // stay on the King and ease back a little so the whole BOOM fits, then go wide
+      this.camFocus = { x: kp.x - 20, y: kp.y - 100, zoom: 1.3 };
       this.cheer(1.6);
-      await this.wait(900);
+      await this.wait(950);
+      this.camFocus = { x: 800, y: 450, zoom: 1 };
+      await this.wait(350);
     } else {
       // the King runs off… stops at the edge of the court, turns, and gets the last word
       this.kingAnim = { frames: ['run0', 'run1'], fps: 10 };
