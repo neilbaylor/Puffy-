@@ -174,5 +174,11 @@ export function buildLevel2(): LevelData {
   L.spawn('tree', 327, 53, { h: 66, pine: true });
   L.rootbeer(295, 57); // the summit's secret: up high over the last wall
 
+  // a few more root beers along the way
+  L.rootbeer(54, 19); // over the snowy steps
+  L.rootbeer(158, 32); // above the hockey pond
+  L.rootbeer(187, 34); // by checkpoint 2
+  L.rootbeer(271.5, 55); // over the crevasse between the pillars
+
   return L.build();
 }

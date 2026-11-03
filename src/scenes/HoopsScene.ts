@@ -485,6 +485,10 @@ export class HoopsScene extends Phaser.Scene {
   private callout(text: string, cls = '', ms = 1100) {
     const el = this.dom.querySelector<HTMLElement>('.hoops-callout')!;
     el.className = `hoops-callout show ${cls}`;
+    // "Your shot!" hangs just under the net (it follows the camera); the others use the CSS spot
+    this.pinTurn = cls === 'turn';
+    if (this.pinTurn) this.placeTurnCallout();
+    else el.style.removeProperty('top');
     if (cls.includes('speech')) this.kingTalkUntil = this.clock + Math.min(ms, 1500);
     el.innerHTML = text;
     void el.offsetWidth;
@@ -492,6 +496,21 @@ export class HoopsScene extends Phaser.Scene {
     return this.wait(ms).then(() => {
       if (token === this.calloutToken) el.className = 'hoops-callout';
     });
+  }
+
+  private pinTurn = false;
+
+  /** Put the turn callout's top edge just under the bottom of the net, centred on the hoop. */
+  private placeTurnCallout() {
+    const el = this.dom.querySelector<HTMLElement>('.hoops-callout')!;
+    const cam = this.cameras.main;
+    const net = A(HOOP.rimX, HOOP.rimY + 62);
+    const canvas = this.game.canvas;
+    const cr = canvas.getBoundingClientRect();
+    const dr = this.dom.getBoundingClientRect();
+    const k = cr.height / canvas.height;
+    const y = cr.top + ((net.y - cam.worldView.y) * cam.zoom + cam.y) * k - dr.top;
+    el.style.top = `${Math.round(y)}px`;
   }
 
   /** The jumbotron is the scoreboard: it shows the score between the big moments. */
@@ -521,6 +540,7 @@ export class HoopsScene extends Phaser.Scene {
     due.forEach((w) => w.res());
 
     this.fitCamera();
+    if (this.pinTurn) this.placeTurnCallout();
 
     // idle animation loops
     const k = this.kingAnim;
