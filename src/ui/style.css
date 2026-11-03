@@ -2010,23 +2010,23 @@ kbd {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
   width: max-content;
-  max-width: 56vw;
+  max-width: 60vw;
 }
 .bhud-chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 3px 9px 3px 4px;
+  gap: 7px;
+  padding: 4px 13px 4px 5px;
   border-radius: 999px;
   background: #3a2418cc;
   color: #fff;
-  font: 800 12px / 1.2 var(--body);
+  font: 800 clamp(15px, 3.6vmin, 19px) / 1.2 var(--body);
 }
-.bhud-chip i { width: 14px; height: 14px; border-radius: 50%; background: var(--sc); border: 2px solid #fff; }
-.bhud-chip b { font: 400 15px / 1 var(--display); color: var(--gold); }
-.bhud-chip.me { box-shadow: 0 0 0 2px var(--sc); }
+.bhud-chip i { width: clamp(17px, 4vmin, 21px); height: clamp(17px, 4vmin, 21px); border-radius: 50%; background: var(--sc); border: 2px solid #fff; }
+.bhud-chip b { font: 400 clamp(19px, 4.6vmin, 24px) / 1 var(--display); color: var(--gold); }
+.bhud-chip.me { box-shadow: 0 0 0 3px var(--sc); }
 .bhud-chip.down { opacity: 0.5; }
 .bhud-leave {
   position: absolute;
