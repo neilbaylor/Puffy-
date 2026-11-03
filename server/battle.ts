@@ -47,8 +47,10 @@ const later = (fn: () => void) => (LAG ? setTimeout(fn, LAG) : fn());
 const heroOk = (h: string) => (CHARACTERS.some((c) => c.id === h) ? h : 'puffy');
 const cleanName = (n: unknown, slot: number) => {
   const s = String(n ?? '').replace(/[^\p{L}\p{N} _'!.-]/gu, '').trim().slice(0, 12);
-  return s || `Player ${slot + 1}`;
+  return s || (slot >= 0 ? `Player ${slot + 1}` : 'Fan');
 };
+/** When the arena's full, this many more can watch (they get the next free spot). */
+const MAX_WATCHERS = 8;
 
 class Room {
   clients = new Map<string, Client>();
@@ -72,14 +74,13 @@ class Room {
         this.broadcastRoom();
         return c;
       }
-    if (this.clients.size >= MAX_BATTLERS) {
+    if (this.clients.size >= MAX_BATTLERS + MAX_WATCHERS) {
       ws.send(JSON.stringify({ t: 'full' } satisfies ServerMsg));
       ws.close();
       return null;
     }
-    const used = new Set([...this.clients.values()].map((c) => c.slot));
-    let slot = 0;
-    while (used.has(slot)) slot++;
+    // the arena's full: watch (slot -1) until a spot opens
+    const slot = this.freeSlot();
     const c: Client = {
       id: `p${this.nextId++}`,
       token: String(msg.token ?? '').slice(0, 64),
@@ -99,6 +100,26 @@ class Room {
     this.send(c, { t: 'welcome', id: c.id });
     this.broadcastRoom();
     return c;
+  }
+
+  /** The lowest free player spot, or -1 if all four are taken. */
+  private freeSlot() {
+    const used = new Set([...this.clients.values()].map((c) => c.slot));
+    for (let s = 0; s < MAX_BATTLERS; s++) if (!used.has(s)) return s;
+    return -1;
+  }
+
+  /** Between battles: watchers (oldest first) take any spots that have opened up. */
+  private promoteWatchers() {
+    let changed = false;
+    for (const c of this.clients.values()) {
+      if (c.slot >= 0 || !c.ws) continue;
+      const s = this.freeSlot();
+      if (s < 0) break;
+      c.slot = s;
+      changed = true;
+    }
+    if (changed) this.broadcastRoom();
   }
 
   dropped(c: Client) {
@@ -150,7 +171,7 @@ class Room {
     if (Number(process.env.BATTLE_SECS) > 0) this.sim.timeLeft = Number(process.env.BATTLE_SECS);
     this.winner = null;
     for (const c of this.clients.values()) {
-      c.playing = !!c.ws;
+      c.playing = !!c.ws && c.slot >= 0;
       c.queue = [];
       c.lastSeq = 0;
       c.lastBtn = 0;
@@ -191,7 +212,8 @@ class Room {
   tick() {
     const now = Date.now();
     for (const c of [...this.clients.values()]) if (!c.ws && c.droppedAt && now - c.droppedAt > REJOIN_SECS * 1000) this.remove(c);
-    const ready = [...this.clients.values()].filter((c) => c.ws).length;
+    if (this.phase === 'lobby' || this.phase === 'countdown') this.promoteWatchers();
+    const ready = [...this.clients.values()].filter((c) => c.ws && c.slot >= 0).length;
     switch (this.phase) {
       case 'lobby':
         // two or more friends here: the countdown starts by itself

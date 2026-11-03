@@ -50,9 +50,6 @@ function slotPortrait(target: HTMLCanvasElement, hero: string, slot: number) {
   ctx.drawImage(out, 0, 0);
 }
 
-/** For the 🎲 button next to your name. */
-const FUN_NAMES = ['Captain Fluff', 'Sir Puffsalot', 'Nugget', 'Boom Boom', 'Rocket Rex', 'Sparky', 'Mr. Muffin', 'Dizzy', 'Turbo', 'Pickle', 'Noodle', 'Biscuit', 'Zoomer', 'Kaboom', 'Fuzzball', 'Puffinator'];
-
 export class BattleUI {
   private net: BattleNet | null = null;
   private lobby: HTMLElement | null = null;
@@ -70,6 +67,7 @@ export class BattleUI {
     this.lastPhase = '';
     this.showLobby();
     if (!url) return this.status('offline', 'Online battles work on the game’s web address (not a saved copy).');
+    this.status('connecting');
     this.net = new BattleNet(url, name, this.host.hero());
     this.net.onStatus = (s) => this.status(s);
     this.net.onRoom = (r) => this.room(r);
@@ -95,14 +93,20 @@ export class BattleUI {
     const msg =
       text ??
       {
-        connecting: 'Connecting to the battle server…',
+        connecting: '',
         online: '',
         full: 'The arena is full (4 players). Try again in a bit!',
-        offline: 'Lost the connection — reconnecting…',
+        offline: '',
       }[s];
     el.textContent = s === 'full' ? '' : msg;
     el.hidden = !msg || s === 'full';
     this.lobby!.classList.toggle('waiting', s !== 'online');
+    // connecting (or lost it): a little loading card instead of the lobby
+    const loading = (s === 'connecting' || s === 'offline') && !text;
+    this.lobby!.classList.toggle('loading', loading);
+    const lc = this.lobby!.querySelector<HTMLElement>('.bl-loading')!;
+    lc.hidden = !loading;
+    lc.querySelector('p')!.textContent = s === 'offline' ? 'Lost the connection — reconnecting…' : 'Connecting to the arena…';
     // a full arena: its own screen; knock again every few seconds until a spot opens
     this.lobby!.classList.toggle('full', s === 'full');
     this.lobby!.querySelector<HTMLElement>('.bl-fullcard')!.hidden = s !== 'full';
@@ -126,7 +130,7 @@ export class BattleUI {
       <button class="icon-btn bl-back" aria-label="Back">‹</button>
       <header class="bl-head">
         <h1 class="bl-title">Battle!</h1>
-        <p class="bl-sub">Up to ${MAX_BATTLERS} friends — everyone opens Puffy and taps <b>Battle</b></p>
+        <p class="bl-sub">Up to ${MAX_BATTLERS} friends</p>
       </header>
       <div class="bl-preview" hidden><b class="bl-live">● LIVE</b></div>
       <div class="bl-slots"></div>
@@ -134,9 +138,7 @@ export class BattleUI {
         <label class="bl-namecard">
           <span class="bl-namelabel">Your name</span>
           <span class="bl-namebox">
-            <i class="bl-pen" aria-hidden="true">✎</i>
             <input maxlength="12" autocomplete="off" spellcheck="false" placeholder="Type your name">
-            <button type="button" class="bl-dice" aria-label="Pick a random name">🎲</button>
           </span>
         </label>
         <div class="bl-heroes" role="radiogroup" aria-label="Your hero">${CHARACTERS.map((c) => `<button class="bl-hero" data-hero="${c.id}">${c.name}</button>`).join('')}</div>
@@ -149,6 +151,10 @@ export class BattleUI {
         <p class="bl-waitmsg" hidden>Waiting for players<i>.</i><i>.</i><i>.</i></p>
         <p class="bl-status" hidden></p>
       </div>
+      <div class="bl-loading" hidden>
+        <div class="bl-fulldots">${SLOT_COLORS.map((c) => `<i style="--sc:${c}"></i>`).join('')}</div>
+        <p>Connecting to the arena…</p>
+      </div>
       <div class="bl-fullcard" hidden>
         <div class="bl-fulldots">${SLOT_COLORS.map((c) => `<i style="--sc:${c}"></i>`).join('')}</div>
         <h2>The arena is full</h2>
@@ -159,14 +165,6 @@ export class BattleUI {
     el.querySelector('.bl-back')!.addEventListener('click', () => this.leave());
     const input = el.querySelector<HTMLInputElement>('.bl-namebox input')!;
     input.value = storedName();
-    el.querySelector('.bl-dice')!.addEventListener('click', (e) => {
-      e.preventDefault();
-      sfx.select();
-      let n = input.value;
-      while (n === input.value) n = FUN_NAMES[Math.floor(Math.random() * FUN_NAMES.length)];
-      input.value = n;
-      input.dispatchEvent(new Event('change'));
-    });
     input.addEventListener('change', () => {
       const v = input.value.trim().slice(0, 12);
       try {
@@ -202,10 +200,10 @@ export class BattleUI {
     for (let slot = 0; slot < MAX_BATTLERS; slot++) {
       const p = r?.players.find((q) => q.slot === slot);
       const me = p && p.id === this.net?.myId;
-      const el = h(`<div class="bl-slot${p ? '' : ' empty'}${me ? ' me' : ''}" style="--sc:${SLOT_COLORS[slot]}">
+      const el = h(`<div class="bl-slot${p ? '' : ' empty'}${me ? ' me' : ''}${p && !p.connected ? ' away' : ''}" style="--sc:${SLOT_COLORS[slot]}">
         ${p ? '<canvas width="120" height="120"></canvas>' : '<div class="bl-wait">?</div>'}
         <b>${p ? esc(p.name) : 'Waiting…'}</b>
-        <small>${p ? `${me ? 'You · ' : ''}${characterById(p.hero).name}${p.connected ? '' : ' · reconnecting'}` : SLOT_NAMES[slot]}</small>
+        <small>${p ? `${me ? 'You · ' : ''}${characterById(p.hero).name}` : SLOT_NAMES[slot]}</small>
       </div>`);
       if (p) slotPortrait(el.querySelector('canvas')!, p.hero, slot);
       box.appendChild(el);
@@ -231,21 +229,26 @@ export class BattleUI {
     if (this.inBattle || !this.lobby || !this.lobby.isConnected) this.showLobby();
     const lobby = this.lobby!;
     // (your name card wears your colour)
-    if (me) lobby.style.setProperty('--my', SLOT_COLORS[me.slot]);
+    const spectator = !!me && me.slot < 0;
+    if (me && me.slot >= 0) lobby.style.setProperty('--my', SLOT_COLORS[me.slot]);
     this.renderSlots(r);
-    const connected = r.players.filter((p) => p.connected).length;
     const watching = r.phase === 'battle' && !playing;
     lobby.classList.toggle('watching', watching);
     lobby.querySelector<HTMLElement>('.bl-preview')!.hidden = !watching;
     this.watch(watching);
     const sub = lobby.querySelector<HTMLElement>('.bl-sub')!;
     sub.innerHTML = watching
-      ? 'A battle is on — you’ll join the <b>next</b> one'
+      ? spectator
+        ? 'The arena’s full — you’re watching'
+        : 'A battle is on — you’ll join the <b>next</b> one'
       : r.phase === 'results'
         ? 'That battle’s over — the next one starts soon'
-        : `Up to ${MAX_BATTLERS} friends — everyone opens Puffy and taps <b>Battle</b>`;
+        : spectator
+          ? 'The arena’s full — you’ll get the <b>next</b> free spot'
+          : `Up to ${MAX_BATTLERS} friends`;
     const counting = r.phase === 'countdown';
-    lobby.querySelector<HTMLElement>('.bl-waitmsg')!.hidden = !(r.phase === 'lobby' && connected <= 1);
+    const players = r.players.filter((p) => p.connected && p.slot >= 0).length;
+    lobby.querySelector<HTMLElement>('.bl-waitmsg')!.hidden = !(r.phase === 'lobby' && players <= 1);
     lobby.querySelector<HTMLElement>('.bl-clock')!.hidden = !counting;
     if (counting) this.runClock(r.timer, phaseChanged);
     else this.stopClock();

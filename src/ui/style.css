@@ -2123,7 +2123,7 @@ kbd {
 .battle-lobby.watching { background: none; }
 
 /* ── lobby layout: the title up top, everything else centred in the space below ── */
-.battle-lobby { justify-content: flex-start; padding-top: calc(4px + var(--safe-t)); will-change: transform; }
+.battle-lobby { justify-content: flex-start; padding-top: calc(7px + var(--safe-t)); will-change: transform; }
 .battle-lobby > .bl-preview,
 .battle-lobby > .bl-slots { margin-top: auto; }
 .battle-lobby > .bl-foot { margin-bottom: auto; min-height: var(--rowh); justify-content: center; }
@@ -2244,7 +2244,29 @@ kbd {
   text-align: center;
   color: var(--ink);
 }
-.bl-fullcard[hidden] { display: none; }
+.bl-fullcard[hidden],
+.bl-loading[hidden] { display: none; }
+/* connecting: a little loading card, nothing else yet */
+.battle-lobby.loading > :not(.bl-head):not(.bl-back):not(.bl-loading) { display: none; }
+.battle-lobby.loading .bl-sub { display: none; }
+.bl-loading {
+  margin: auto 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.bl-loading p {
+  margin: 0;
+  padding: 6px 18px 8px;
+  border-radius: 999px;
+  background: #1c0f3ad9;
+  color: #fff;
+  font: 400 clamp(17px, 4.2vh, 24px) / 1.1 var(--display);
+}
+/* someone whose connection dropped (a phone that went to sleep): their card fades until they're back */
+.bl-slot.away { opacity: 0.5; }
+.bl-slot.away canvas { filter: grayscale(0.8); }
 .battle-lobby.full .bl-sub { display: none; }
 .bl-fullcard h2 { margin: 0; font: 400 clamp(24px, 6vh, 36px) / 1 var(--display); }
 .bl-fullcard p { margin: 0; font: 700 clamp(13px, 2.8vh, 16px) / 1.35 var(--body); color: var(--ink-soft); }
