@@ -154,6 +154,8 @@ class Room {
       const s = this.freeSlot();
       if (s < 0) break;
       c.slot = s;
+      // no name of their own: "Player N" for the square they've got
+      if (c.name === cleanName('', -1)) c.name = cleanName('', s);
       changed = true;
     }
     if (changed) this.broadcastRoom();
@@ -212,6 +214,8 @@ class Room {
   // ── the match ──
 
   private startBattle() {
+    // anyone still without a name plays as "Player N" (their square's number)
+    for (const c of this.clients.values()) if (c.slot >= 0 && !String(c.name).trim()) c.name = cleanName('', c.slot);
     this.sim = new BattleSim(ARENA);
     // (BATTLE_SECS shortens matches for testing)
     if (Number(process.env.BATTLE_SECS) > 0) this.sim.timeLeft = Number(process.env.BATTLE_SECS);
