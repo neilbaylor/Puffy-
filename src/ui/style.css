@@ -2230,6 +2230,7 @@ kbd {
 }
 .bl-last.won { background: var(--gold); }
 /* the room code window */
+.bc-panel .btn:disabled { filter: grayscale(1); opacity: 0.55; cursor: default; transform: none; }
 .bc-panel { align-items: center; text-align: center; gap: 10px; min-width: min(100%, 360px); }
 .bc-panel h2 { margin: 0; }
 .bc-help { margin: 0; font-weight: 700; color: var(--ink-soft); }

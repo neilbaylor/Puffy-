@@ -181,12 +181,16 @@ export class BattleUI {
     </div>`);
     const input = el.querySelector<HTMLInputElement>('input')!;
     input.value = storedRoom();
-    // codes aren't case sensitive: shown in lower case as you type
-    input.addEventListener('input', () => {
+    // codes aren't case sensitive: shown in lower case as you type; no code, no going
+    const goBtn = el.querySelector<HTMLButtonElement>('[data-act=go]')!;
+    const sync = () => {
       const v = input.value.toLowerCase();
       if (v !== input.value) input.value = v;
-    });
+      goBtn.disabled = !/[a-z0-9]/.test(v);
+    };
+    input.addEventListener('input', sync);
     const go = () => {
+      if (goBtn.disabled) return;
       const code = cleanRoom(input.value);
       try {
         localStorage.setItem('puffy.room', code);
@@ -200,7 +204,8 @@ export class BattleUI {
       e.stopPropagation(); // typing isn't playing
       if (e.key === 'Enter') go();
     });
-    el.querySelector('[data-act=go]')!.addEventListener('click', go);
+    goBtn.addEventListener('click', go);
+    sync();
     el.querySelector('[data-act=back]')!.addEventListener('click', () => {
       sfx.back();
       this.host.home();
