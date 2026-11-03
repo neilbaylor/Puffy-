@@ -2084,7 +2084,7 @@ kbd {
 
 /* ── battle lobby: your name card ── */
 .bl-namecard {
-  --my: #f28a2e;
+  /* (--my: your square's colour, set on the lobby; orange until you have one) */
   display: inline-flex;
   flex-direction: column;
   gap: 3px;
@@ -2249,7 +2249,7 @@ kbd {
 
 /* your name and hero on one row, all the same height: the name box is as wide as one and
    a half player squares, the hero buttons spread across the rest */
-.battle-lobby { --rowh: clamp(46px, 11vh, 60px); --slotgap: clamp(8px, 1.6vw, 16px); }
+.battle-lobby { --my: #f28a2e; --rowh: clamp(46px, 11vh, 60px); --slotgap: clamp(8px, 1.6vw, 16px); }
 .bl-me { align-items: flex-end; flex-wrap: nowrap; width: min(100%, 780px); gap: var(--slotgap); }
 .battle-lobby:not(.watching) .bl-namecard { flex: 0 0 calc(37.5% - var(--slotgap) / 8); min-width: 0; }
 .battle-lobby:not(.watching) .bl-namebox { width: 100%; }
