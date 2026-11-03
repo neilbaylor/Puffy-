@@ -39,8 +39,11 @@ type PrizeView = {
   land: number;
 };
 
+/** Room either side of a Plop's frame for its arms. */
+const PLOP_PAD = 16;
+
 /** Playing, the camera is this much closer in than the whole-arena view. */
-const FOLLOW_ZOOM = 1.25;
+const FOLLOW_ZOOM = 1.15;
 /** Prizes and things falling from the sky are drawn this much bigger than their art. */
 const PRIZE_SCALE = 1.6;
 /** Rocks and anvils: most medium, 1 in 3 big (drawn to match their size in the rules). */
@@ -250,16 +253,18 @@ export class BattleScene extends Phaser.Scene {
     for (const kind of ['small', 'medium', 'large'] as PlopKind[]) {
       const key = `bplop-${kind}`;
       if (this.textures.exists(key)) continue;
-      const pw = Math.round(PLOP_W * PLOP_RES) + 4;
+      // (a margin each side: the leaf arms reach past the art's own frame)
+      const fw = Math.round((PLOP_W + PLOP_PAD * 2) * PLOP_RES);
+      const pw = fw + 4;
       const { c, ctx } = canvas(pw * PLOP_FRAMES.length, Math.round(PLOP_H * PLOP_RES));
       PLOP_FRAMES.forEach((f, i) => {
         ctx.save();
         ctx.translate(i * pw, 0);
         ctx.scale(PLOP_RES, PLOP_RES);
-        drawPlop(ctx, 0, 0, f, STYLES.polished, kind);
+        drawPlop(ctx, PLOP_PAD, 0, f, STYLES.polished, kind);
         ctx.restore();
       });
-      addCanvas(this, key, c, (t) => PLOP_FRAMES.forEach((f, i) => t.add(f, 0, i * pw, 0, Math.round(PLOP_W * PLOP_RES), Math.round(PLOP_H * PLOP_RES))));
+      addCanvas(this, key, c, (t) => PLOP_FRAMES.forEach((f, i) => t.add(f, 0, i * pw, 0, fw, Math.round(PLOP_H * PLOP_RES))));
     }
     if (!this.textures.exists('bpellet')) addCanvas(this, 'bpellet', hires(16, 16, R, (ctx) => drawPellet(ctx)));
   }
@@ -308,6 +313,20 @@ export class BattleScene extends Phaser.Scene {
     this.camC = null;
   }
 
+  /**
+   * Something heavy hits the ground at (x, y): a shockwave ring and dust along
+   * the ground, and the camera shakes (hardest when it's near you).
+   */
+  private groundShake(x: number, y: number, k: number) {
+    this.fx.shockwave(x, y, 55 * k);
+    this.fx.dust(x - 24 * k, y, Math.round(6 * k));
+    this.fx.dust(x + 24 * k, y, Math.round(6 * k));
+    const me = this.me;
+    const d = me && !this.spectate ? Math.hypot(me.x - x, (me.y - y) * 0.7) : 300;
+    const near = d < 350 ? 1 : Math.max(0.35, 1 - (d - 350) / 900);
+    this.cameras.main.shake(240 * k * (0.6 + 0.4 * near), 0.012 * k * near);
+  }
+
   /** Playing: a little closer in than the whole arena, gently following your hero (most of the arena still in view). */
   private followCamera(dt: number) {
     if (this.spectate || this.preview || !this.me) return;
@@ -319,11 +338,14 @@ export class BattleScene extends Phaser.Scene {
     const vh = cam.height / zoom;
     const clamp = (v: number, lo: number, hi: number) => (lo > hi ? (lo + hi) / 2 : Math.max(lo, Math.min(hi, v)));
     const p = this.me;
-    const tx = clamp(p.x + this.fix.x + p.vx * 0.12, vw / 2, this.map.widthPx - vw / 2);
-    const ty = clamp(p.y + this.fix.y - 40, SKY + vh / 2, this.map.heightPx - vh / 2);
+    // (only part of the way towards you: the middle of the arena pulls the view back)
+    const mx = this.map.widthPx / 2;
+    const my = (this.map.heightPx + SKY) / 2;
+    const tx = clamp(mx + (p.x + this.fix.x - mx) * 0.6, vw / 2, this.map.widthPx - vw / 2);
+    const ty = clamp(my + (p.y + this.fix.y - 40 - my) * 0.5, SKY + vh / 2, this.map.heightPx - vh / 2);
     if (!this.camC) this.camC = { x: tx, y: ty };
     else if (p.respawn <= 0) {
-      const k = 1 - Math.exp(-dt * 3.2);
+      const k = 1 - Math.exp(-dt * 1.4);
       this.camC.x += (tx - this.camC.x) * k;
       this.camC.y += (ty - this.camC.y) * k;
     }
@@ -579,7 +601,7 @@ export class BattleScene extends Phaser.Scene {
       let cheer: ReturnType<typeof cheerPose> = null;
       if (v.cheer >= 0) {
         v.cheer += dt;
-        cheer = cheerPose(v.cheer, p.hero === 'scruffy');
+        cheer = cheerPose(v.cheer * 0.8, p.hero === 'scruffy');
         if (!cheer) v.cheer = -1;
       }
       let sx = 1;
@@ -588,10 +610,11 @@ export class BattleScene extends Phaser.Scene {
       let hy = 0;
       let rot = v.tilt;
       if (cheer) {
-        sx = cheer.sx;
-        sy = cheer.sy;
+        // (the squash and stretch a bit stronger than on the cards: it's smaller on screen)
+        sx = 1 + (cheer.sx - 1) * 1.6;
+        sy = 1 + (cheer.sy - 1) * 1.6;
         const hh = (c.hitH ?? 34) * v.size;
-        hy = -cheer.up * hh * 0.75;
+        hy = -cheer.up * hh * 1.25;
         if (p.onGround && cheer.frame !== 'idle0') {
           frame = cheer.frame;
           if (v.sprite.texture.key !== bodyKey) v.sprite.setTexture(bodyKey, frame);
@@ -640,7 +663,7 @@ export class BattleScene extends Phaser.Scene {
         v.halo
           .setVisible(true)
           .setPosition(x, y - (c.hitH ?? 34) * v.size * 0.5)
-          .setScale(((c.hitH ?? 34) / 34) * v.size * 0.95 * 0.9 * pulse)
+          .setScale(((c.hitH ?? 34) / 34) * v.size * 0.6 * pulse)
           .setAlpha(0.6 + Math.sin(this.time.now / 260) * 0.12);
       }
       const top = y - (c.hitH ?? 34) * v.size - 10;
@@ -804,7 +827,7 @@ export class BattleScene extends Phaser.Scene {
         let spr: Phaser.GameObjects.Sprite;
         if (plop) {
           const pa = PLOP_ART[kind];
-          spr = this.add.sprite(x, y, `bplop-${pa.kind}`, 'idle').setOrigin(50 / PLOP_W, 100 / PLOP_H).setScale(pa.scale / PLOP_RES).setDepth(DEPTH.enemies);
+          spr = this.add.sprite(x, y, `bplop-${pa.kind}`, 'idle').setOrigin((50 + PLOP_PAD) / (PLOP_W + PLOP_PAD * 2), 100 / PLOP_H).setScale(pa.scale / PLOP_RES).setDepth(DEPTH.enemies);
         } else {
           const art = ENEMY_ART[kind];
           spr = this.add.sprite(x, y, art.tex, 'w0').setOrigin(art.ox, art.oy).setScale(art.scale).setDepth(DEPTH.enemies);
@@ -843,12 +866,15 @@ export class BattleScene extends Phaser.Scene {
       let rot = 0;
       let sx = 1;
       let sy = 1;
+      // landing from a jump: the big ones shake the ground (as the giants do in the levels)
+      const landed = onGround && v.air;
+      v.air = !onGround && !chute;
+      if (landed && kind === 'big') this.groundShake(x, y, 0.75);
       if (v.plop) {
-        if (onGround && v.air) {
+        if (landed) {
           v.land = 0.22;
-          if (kind !== 'small') this.fx.dust(x, y, kind === 'big' ? 6 : 3);
+          if (kind === 'medium') this.fx.dust(x, y, 3);
         }
-        v.air = !onGround && !chute;
         v.land = Math.max(0, v.land - dt);
         const ph = (v.anim * Math.PI) / 2; // a quarter turn per step
         if (!onGround && !chute) {
@@ -1063,7 +1089,12 @@ export class BattleScene extends Phaser.Scene {
         case 'prize': {
           const [text, col] = PRIZE_TEXT[e.kind];
           const v = this.views.get(e.id);
-          if (v) v.cheer = 0;
+          if (v) {
+            v.cheer = 0;
+            // a little burst of stars round whoever grabbed it
+            this.fx.stars(v.sprite.x, v.sprite.y - 24 * v.size, 10);
+            this.fx.sparkle(v.sprite.x, v.sprite.y - 30 * v.size, 10);
+          }
           this.fx.popText(e.x, e.y - 40, text, col, 18);
           this.fx.sparkle(e.x, e.y - 14, 12);
           if (v && e.kind === 'grow') this.cameras.main.shake(180, 0.006);
@@ -1097,7 +1128,8 @@ export class BattleScene extends Phaser.Scene {
           if (!e.roll) this.fx.debris(e.x, e.y - 8);
           if (e.big && !e.roll) this.fx.debris(e.x + 14, e.y - 12);
           (e.kind === 'anvil' || e.big ? sfx.thud : sfx.stomp)();
-          this.cameras.main.shake((e.kind === 'anvil' ? 200 : 110) * k, (e.kind === 'anvil' ? 0.008 : 0.004) * k);
+          // the ground shakes, like a giant landing in the levels
+          if (!e.roll) this.groundShake(e.x, e.y, (e.kind === 'anvil' ? 1 : 0.8) * k);
           break;
         }
         case 'throw':

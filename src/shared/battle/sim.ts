@@ -51,7 +51,7 @@ const STOMP_BOUNCE = 560;
 /** How much bigger "grow" makes you. */
 export const GROW = 1.8;
 const BOMBS_PER_PRIZE = 3;
-const MAX_PRIZES = 3;
+const MAX_PRIZES = 2;
 /** Once it has landed, a prize waits this long (blinking at the end), then it's gone. */
 export const PRIZE_LIFE = 7;
 
@@ -759,7 +759,7 @@ export class BattleSim {
   private stepPrizes(ev: BEvent[]) {
     this.dropIn -= DT;
     if (this.dropIn <= 0) {
-      this.dropIn = 4.5 + Math.random() * 3.5;
+      this.dropIn = 7 + Math.random() * 5;
       if (this.prizes.length < MAX_PRIZES) {
         let roll = Math.random() * PRIZE_ODDS.reduce((t, [, w]) => t + w, 0);
         let kind: PrizeKind = 'bomb';
@@ -1104,7 +1104,7 @@ export class BattleSim {
         continue;
       }
       // (a touch slower than everything else falls: time to get out of the way)
-      z.vy = Math.min(720, z.vy + 1000 * DT);
+      z.vy = Math.min(480, z.vy + 600 * DT);
       const prevY = z.y;
       z.y += z.vy * DT;
       // anyone underneath gets bonked (anvils and big ones hurt more)

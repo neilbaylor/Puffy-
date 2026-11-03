@@ -84,6 +84,7 @@ function demo(sim: BattleSim) {
     // two more on their way down
     z.prizes.push({ id: 910, kind: 'star', x: 7 * 32, y: -24, vy: 40, landed: false, age: 0 });
     z.prizes.push({ id: 911, kind: 'rapid', x: 25 * 32, y: 60, vy: 40, landed: false, age: 0 });
+    z.prizes.push({ id: 912, kind: 'heart', x: 20 * 32, y: 15 * 32, vy: 0, landed: true, age: 0 });
     z.hazards.push({ id: 990, kind: 'rock', big: true, x: 300, y: -60, vx: 0, vy: 0, warn: 4.5, rolling: 0 });
     z.hazards.push({ id: 991, kind: 'anvil', big: true, x: 24 * 32, y: -60, vx: 0, vy: 0, warn: 9, rolling: 0 });
     return;
