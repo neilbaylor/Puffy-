@@ -1216,14 +1216,18 @@ html.rotating body {
   color: #ff8a80;
 }
 .hoops-callout.turn {
-  /* down on the court, between the two shooters (clear of the hoop and scoreboard) */
-  top: 74%;
+  /* over the court on the hero's side: clear of the hoop, the scoreboard and the King */
+  top: 60%;
+  left: 33%;
   /* big enough to read at a glance on a phone */
   font-size: clamp(36px, 10vmin, 68px);
 }
 /* "1 of 5": white on a dark pill so it reads over the court or the crowd */
 .hoops-callout.turn small {
-  display: inline-block;
+  display: block;
+  width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
   margin-top: 10px;
   padding: 0.18em 0.75em 0.2em;
   border-radius: 999px;

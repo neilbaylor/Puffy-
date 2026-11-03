@@ -456,7 +456,7 @@ export class HoopsScene extends Phaser.Scene {
       const right = Math.max(this.king?.x ?? A(SPOTS.king.x, 0).x, A(SPOTS.king.x, 0).x) + 130;
       const xs = Phaser.Math.Clamp(x, right - vw / 2, Math.max(right - vw / 2, left + vw / 2));
       // (the arena's painted edge stops a little short of its very edge)
-      const xw = Phaser.Math.Clamp(Phaser.Math.Clamp(xs, jx1 - vw / 2, jx0 + vw / 2), vw / 2 + 40, Math.max(vw / 2 + 40, ARENA_W - 40 - vw / 2));
+      const xw = Phaser.Math.Clamp(Phaser.Math.Clamp(xs, jx1 - vw / 2, jx0 + vw / 2), vw / 2 + 90, Math.max(vw / 2 + 90, ARENA_W - 90 - vw / 2));
       x += (xw - x) * ease;
       y += (yw - y) * ease;
     }
