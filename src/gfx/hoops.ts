@@ -1379,24 +1379,6 @@ function segDigit(ctx: Ctx, ch: string, x: number, y: number, w: number, h: numb
   }
 }
 
-/** A two-digit LED score in a dark inset window centred at (cx, cy). */
-function ledScore(ctx: Ctx, n: number, cx: number, cy: number, col: string, dim: string) {
-  const dw = 21;
-  const dh = 36;
-  const gap = 6;
-  const bw = dw * 2 + gap + 16;
-  const bh = dh + 10;
-  ctx.fillStyle = '#05040a';
-  ctx.beginPath();
-  ctx.roundRect(cx - bw / 2, cy - bh / 2, bw, bh, 4);
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-  const str = String(Math.min(99, n)).padStart(2, ' ');
-  for (let i = 0; i < 2; i++) segDigit(ctx, str[i], cx - (dw * 2 + gap) / 2 + i * (dw + gap), cy - dh / 2, dw, dh, col, dim);
-}
-
 /** The scrolling news ticker along the bottom of the jumbotron. */
 function jumboTicker(ctx: Ctx, items: { text: string; color: string }[], t: number, y0: number, h: number, w: number) {
   const bar = ctx.createLinearGradient(0, y0, 0, y0 + h);
@@ -1463,8 +1445,8 @@ export function drawJumboScreen(ctx: Ctx, c: JumboContent, t = 0) {
   const { w, h } = JUMBO;
   const TICK_H = 18;
   const bg = ctx.createLinearGradient(0, 0, w, h);
-  bg.addColorStop(0, c.kind === 'big' ? c.bg : '#0e1240');
-  bg.addColorStop(1, c.kind === 'big' ? '#12061f' : '#240a40');
+  bg.addColorStop(0, c.kind === 'big' ? c.bg : c.kind === 'score' ? '#0d0c14' : '#0e1240');
+  bg.addColorStop(1, c.kind === 'big' ? '#12061f' : c.kind === 'score' ? '#17141f' : '#240a40');
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, w, h);
   ctx.textBaseline = 'middle';
@@ -1493,95 +1475,148 @@ export function drawJumboScreen(ctx: Ctx, c: JumboContent, t = 0) {
     ctx.fillStyle = '#ffffff';
     ctx.fillText(AS.jumboSub, 122, 60, JUMBO.w - 130);
   } else if (c.kind === 'score') {
+    // An arena centre-hung board: dot-matrix team names, big recessed 7-segment
+    // scores, a lit SHOT box with the possession arrow, and a row of bulbs per
+    // team (green = made, red = missed).
     const reg = c.regulation ?? 5;
     const ys = c.youShots ?? [];
     const ks = c.kingShots ?? [];
     const n = Math.max(reg, ys.length, ks.length);
-    // header strip
-    const hdr = ctx.createLinearGradient(0, 0, 0, 15);
-    hdr.addColorStop(0, c.sudden ? '#a0001a' : '#2a2160');
-    hdr.addColorStop(1, c.sudden ? '#5a0010' : '#161036');
-    ctx.fillStyle = hdr;
-    ctx.fillRect(0, 0, w, 15);
+    // brushed-metal frame band across the top
+    const band = ctx.createLinearGradient(0, 0, 0, 13);
+    band.addColorStop(0, c.sudden ? '#7a0012' : '#2b2840');
+    band.addColorStop(1, c.sudden ? '#3a0008' : '#15131f');
+    ctx.fillStyle = band;
+    ctx.fillRect(0, 0, w, 13);
+    ctx.fillStyle = 'rgba(255,255,255,0.18)';
+    ctx.fillRect(0, 0, w, 1);
     ctx.textAlign = 'center';
-    ctx.font = `400 12px ${DISPLAY_FONT}`;
-    ctx.fillStyle = c.sudden ? (Math.floor(t * 3) % 2 ? '#ffffff' : '#ffd23f') : '#ffd23f';
-    ctx.fillText(c.sudden ? '★ SUDDEN DEATH ★' : 'FREE THROW SHOWDOWN', w / 2, 8);
+    ctx.font = `400 10.5px ${DISPLAY_FONT}`;
+    ctx.fillStyle = c.sudden ? (Math.floor(t * 3) % 2 ? '#ffffff' : '#ffb340') : '#ffb340';
+    ctx.save();
+    ctx.shadowColor = '#ffb340';
+    ctx.shadowBlur = 4;
+    ctx.fillText(c.sudden ? '★ SUDDEN DEATH ★' : 'FREE THROW SHOWDOWN', w / 2, 7);
+    ctx.restore();
+    const youNext = ys.length <= ks.length;
     const panels = [
-      { x0: 6, name: c.name.toUpperCase(), n: c.you, shots: ys, col: '#7fe7ff', dim: 'rgba(127,231,255,0.07)', head: ['#1aa6e0', '#0b5e8c'], lead: c.you > c.king },
-      { x0: w - 6 - 160, name: 'KING PUFF BALL', n: c.king, shots: ks, col: '#ffd23f', dim: 'rgba(255,210,63,0.07)', head: ['#e8a91c', '#8a5a06'], lead: c.king > c.you },
+      { x0: 7, name: c.name.toUpperCase(), n: c.you, shots: ys, col: '#ff4a3d', dim: 'rgba(255,74,61,0.09)', next: youNext, lead: c.you > c.king },
+      { x0: w - 7 - 164, name: 'KING PUFF BALL', n: c.king, shots: ks, col: '#ffb340', dim: 'rgba(255,179,64,0.09)', next: !youNext, lead: c.king > c.you },
     ];
+    const pw = 164;
     for (const p of panels) {
-      const pw = 160;
-      // panel body
-      ctx.fillStyle = 'rgba(255,255,255,0.05)';
+      // team name on a black dot-matrix strip
+      ctx.fillStyle = '#050407';
       ctx.beginPath();
-      ctx.roundRect(p.x0, 18, pw, h - TICK_H - 21, 5);
+      ctx.roundRect(p.x0, 16, pw, 13, 2);
       ctx.fill();
-      // team header
-      const hg = ctx.createLinearGradient(0, 18, 0, 32);
-      hg.addColorStop(0, p.head[0]);
-      hg.addColorStop(1, p.head[1]);
-      ctx.fillStyle = hg;
-      ctx.beginPath();
-      ctx.roundRect(p.x0, 18, pw, 14, [5, 5, 0, 0]);
-      ctx.fill();
-      ctx.font = `400 12px ${DISPLAY_FONT}`;
+      ctx.save();
+      ctx.font = `400 11px ${DISPLAY_FONT}`;
       ctx.fillStyle = '#ffffff';
-      ctx.fillText(p.name, p.x0 + pw / 2, 25.5, pw - 10);
-      // big LED score
-      ledScore(ctx, p.n, p.x0 + 54, 56, p.col, p.dim);
-      if (p.lead) {
-        // the leader's panel glows
-        ctx.save();
-        ctx.globalAlpha = 0.55 + Math.sin(t * 5) * 0.3;
-        ctx.strokeStyle = p.col;
-        ctx.lineWidth = 1.5;
-        ctx.shadowColor = p.col;
-        ctx.shadowBlur = 6;
-        ctx.beginPath();
-        ctx.roundRect(p.x0 + 0.75, 18.75, pw - 1.5, h - TICK_H - 22.5, 5);
-        ctx.stroke();
-        ctx.restore();
-      }
-      // shot-by-shot lights (made = green, missed = red)
+      ctx.shadowColor = '#ffffff';
+      ctx.shadowBlur = 3;
+      ctx.fillText(p.name, p.x0 + pw / 2, 23, pw - 14);
+      ctx.restore();
+      // the big score, sunk into a bezel
+      const bx = p.x0 + 14;
+      const by = 32;
+      const bw = 70;
+      const bh = 48;
+      const bez = ctx.createLinearGradient(0, by, 0, by + bh);
+      bez.addColorStop(0, '#3a3746');
+      bez.addColorStop(1, '#121019');
+      ctx.fillStyle = bez;
+      ctx.beginPath();
+      ctx.roundRect(bx - 3, by - 3, bw + 6, bh + 6, 5);
+      ctx.fill();
+      ctx.fillStyle = '#020203';
+      ctx.beginPath();
+      ctx.roundRect(bx, by, bw, bh, 3);
+      ctx.fill();
+      ctx.save();
+      ctx.shadowColor = p.col;
+      ctx.shadowBlur = p.lead ? 10 + Math.sin(t * 5) * 4 : 6;
+      const str = String(Math.min(99, p.n)).padStart(2, ' ');
+      for (let i = 0; i < 2; i++) segDigit(ctx, str[i], bx + 8 + i * 29, by + 6, 25, 36, p.col, p.dim);
+      ctx.restore();
+      // shot bulbs: a little bank of lamps beside the score (two rows of five if it goes long)
       const per = Math.min(n, 10);
-      const rows = Math.ceil(per / 5);
       const first = Math.max(0, Math.min(p.shots.length, n) - per);
+      const lx0 = bx + bw + 14;
+      ctx.font = `400 8px ${DISPLAY_FONT}`;
+      ctx.fillStyle = 'rgba(255,255,255,0.45)';
+      ctx.fillText('SHOTS', lx0 + 30, 38);
       for (let i = 0; i < per; i++) {
         const shot = p.shots[first + i];
-        const cx = p.x0 + 102 + (i % 5) * 11.5;
-        const cy = 52 + Math.floor(i / 5) * 12 - (rows > 1 ? 6 : 0);
+        const cx = lx0 + 6 + (i % 5) * 12;
+        const cy = 51 + Math.floor(i / 5) * 13 + (per > 5 ? -3 : 3);
+        // socket
+        ctx.fillStyle = '#18161f';
         ctx.beginPath();
-        ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+        ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(cx, cy, 3.6, 0, Math.PI * 2);
         if (shot === undefined) {
-          ctx.fillStyle = 'rgba(255,255,255,0.12)';
+          ctx.fillStyle = '#2c2934';
           ctx.fill();
         } else {
+          const on = shot ? '#4dff7a' : '#ff3b4e';
           ctx.save();
-          ctx.fillStyle = shot ? '#4dff7a' : '#ff4d5e';
-          ctx.shadowColor = shot ? '#4dff7a' : '#ff4d5e';
-          ctx.shadowBlur = 6;
+          ctx.fillStyle = on;
+          ctx.shadowColor = on;
+          ctx.shadowBlur = 8;
           ctx.fill();
           ctx.restore();
+          ctx.fillStyle = 'rgba(255,255,255,0.75)';
+          ctx.beginPath();
+          ctx.arc(cx - 1.2, cy - 1.2, 1.1, 0, Math.PI * 2);
+          ctx.fill();
         }
       }
-      ctx.font = `400 9px ${DISPLAY_FONT}`;
-      ctx.fillStyle = 'rgba(255,255,255,0.5)';
-      ctx.fillText('SHOTS', p.x0 + 125, rows > 1 ? 72 : 66);
     }
-    // centre column: VS + which shot we're on
+    // centre: the SHOT box, and the arrow to whoever shoots next
     const done = Math.min(ys.length, ks.length);
     const shot = c.sudden ? done + 1 : Math.min(done + 1, reg);
-    ctx.font = `400 18px ${DISPLAY_FONT}`;
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.fillText('VS', w / 2, 36);
-    ctx.font = `400 9px ${DISPLAY_FONT}`;
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    ctx.fillText('SHOT', w / 2, 54);
-    ctx.font = `400 15px ${DISPLAY_FONT}`;
-    ctx.fillStyle = c.sudden ? '#ff6a7a' : '#ffffff';
-    ctx.fillText(c.sudden ? `SD ${shot - reg}` : `${shot}/${reg}`, w / 2, 68);
+    const cx0 = w / 2;
+    ctx.font = `400 8.5px ${DISPLAY_FONT}`;
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.fillText(c.sudden ? 'SUDDEN DEATH' : 'SHOT', cx0, 22);
+    ctx.fillStyle = '#3a3746';
+    ctx.beginPath();
+    ctx.roundRect(cx0 - 22, 28, 44, 34, 4);
+    ctx.fill();
+    ctx.fillStyle = '#020203';
+    ctx.beginPath();
+    ctx.roundRect(cx0 - 19, 31, 38, 28, 3);
+    ctx.fill();
+    ctx.save();
+    ctx.shadowColor = '#ffb340';
+    ctx.shadowBlur = 6;
+    segDigit(ctx, String(Math.min(9, c.sudden ? shot - reg : shot)), cx0 - 8, 34, 16, 22, '#ffb340', 'rgba(255,179,64,0.09)');
+    ctx.restore();
+    ctx.font = `400 8px ${DISPLAY_FONT}`;
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.fillText(c.sudden ? 'EXTRA' : `OF ${reg}`, cx0, 69);
+    // possession arrow (blinks gently)
+    ctx.save();
+    ctx.globalAlpha = 0.65 + Math.sin(t * 6) * 0.35;
+    ctx.fillStyle = '#ff3b4e';
+    ctx.shadowColor = '#ff3b4e';
+    ctx.shadowBlur = 6;
+    const ay = 80;
+    const d = youNext ? -1 : 1;
+    ctx.beginPath();
+    ctx.moveTo(cx0 + d * 16, ay);
+    ctx.lineTo(cx0 + d * 4, ay - 6);
+    ctx.lineTo(cx0 + d * 4, ay - 2.5);
+    ctx.lineTo(cx0 - d * 12, ay - 2.5);
+    ctx.lineTo(cx0 - d * 12, ay + 2.5);
+    ctx.lineTo(cx0 + d * 4, ay + 2.5);
+    ctx.lineTo(cx0 + d * 4, ay + 6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
   } else {
     ctx.textAlign = 'center';
     // bursting rays behind the big call
