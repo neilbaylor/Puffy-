@@ -1216,9 +1216,9 @@ html.rotating body {
   color: #ff8a80;
 }
 .hoops-callout.turn {
-  /* over the court on the hero's side: clear of the hoop, the scoreboard and the King */
-  top: 60%;
-  left: 33%;
+  /* centred on the screen, over the court below the hoop */
+  top: 58%;
+  left: 50%;
   /* big enough to read at a glance on a phone */
   font-size: clamp(36px, 10vmin, 68px);
 }

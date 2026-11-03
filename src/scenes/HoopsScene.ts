@@ -895,17 +895,19 @@ export class HoopsScene extends Phaser.Scene {
       const R = 1.5;
       const c = document.createElement('canvas');
       const fw = Math.round(BOOM_SIZE * R);
-      c.width = fw * BOOM_FRAMES.length;
-      c.height = fw;
+      // (a 4 × 3 grid: a single 12-frame strip is too wide for some phones' GPUs)
+      const COLS = 4;
+      c.width = fw * COLS;
+      c.height = fw * Math.ceil(BOOM_FRAMES.length / COLS);
       const ctx = c.getContext('2d')!;
       BOOM_FRAMES.forEach((_, i) => {
         ctx.save();
-        ctx.translate(i * fw, 0);
+        ctx.translate((i % COLS) * fw, Math.floor(i / COLS) * fw);
         ctx.scale(R, R);
         drawBoomFrame(ctx, i);
         ctx.restore();
       });
-      addCanvas(this, 'kingboom', c, (t) => BOOM_FRAMES.forEach((f, i) => t.add(f, 0, i * fw, 0, fw, fw)));
+      addCanvas(this, 'kingboom', c, (t) => BOOM_FRAMES.forEach((f, i) => t.add(f, 0, (i % COLS) * fw, Math.floor(i / COLS) * fw, fw, fw)));
     }
     const boom = this.add.image(cx, cy, 'kingboom', 'b0').setDepth(12.25).setScale(1.5 / 1.5);
     BOOM_FRAMES.forEach((f, i) => this.time.delayedCall(i * 70, () => boom.setFrame(f)));
