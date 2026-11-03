@@ -205,18 +205,7 @@ export class BattleUI {
     playLevelMusic(this.host.level());
   }
 
-  /** Tap the room code in the lobby: leave this room and pick another. */
-  private changeRoom() {
-    clearTimeout(this.retryT);
-    this.stopClock();
-    this.watch(false);
-    this.net?.close();
-    this.net = null;
-    this.host.game.events.off('battle-hud', this.onHud);
-    window.removeEventListener('pagehide', this.onPageHide);
-    this.lobby = null;
-    this.askCode();
-  }
+
 
   // ── lobby ──
 
@@ -227,7 +216,6 @@ export class BattleUI {
       <header class="bl-head">
         <h1 class="bl-title">Battle!</h1>
         <p class="bl-sub">Up to ${MAX_BATTLERS} friends</p>
-        <button class="bl-room" type="button" aria-label="Change room">Room <b>${esc(this.code)}</b> ✎</button>
       </header>
       <div class="bl-preview" hidden><b class="bl-live">● LIVE</b></div>
       <div class="bl-slots"></div>
@@ -260,10 +248,7 @@ export class BattleUI {
     </div>`);
     this.lobby = el;
     el.querySelector('.bl-back')!.addEventListener('click', () => this.leave());
-    el.querySelector('.bl-room')!.addEventListener('click', () => {
-      sfx.select();
-      this.changeRoom();
-    });
+
     const input = el.querySelector<HTMLInputElement>('.bl-namebox input')!;
     input.value = storedName();
     input.addEventListener('change', () => {
@@ -494,6 +479,7 @@ export class BattleUI {
     const old = this.lobby;
     this.lobby = null;
     this.warmed = false;
+    let curtainUp = true;
     // the arena starts underneath (it was built during the countdown, so this is quick)
     g.scene.start('Battle', { net });
     if (old?.isConnected && g.scene.isActive('Menu')) {
@@ -510,6 +496,11 @@ export class BattleUI {
       let frames = 0;
       const finish = () => {
         curtain.remove();
+        // the controls and scoreboard come in once the arena's uncovered
+        if (this.inBattle) {
+          this.host.touch(true);
+          if (this.hud) this.hud.style.visibility = '';
+        }
         cam.setViewport(0, 0, g.scale.width, g.scale.height);
         g.scene.stop('Menu');
         g.scene.bringToTop('Battle');
@@ -533,11 +524,12 @@ export class BattleUI {
     } else {
       g.scene.stop('Menu');
       this.host.setScreen(null);
+      curtainUp = false;
     }
     // the battle song, cued so it ends exactly when the clock hits 0
     this.lastTimeLeft = MATCH_SECS;
     playBattleMusic(() => this.lastTimeLeft, MATCH_SECS);
-    this.host.touch(true);
+    if (!curtainUp) this.host.touch(true);
     this.hud?.remove();
     this.hud = h(`<div class="bhud">
       <div class="bhud-time">2:00</div>
@@ -546,6 +538,7 @@ export class BattleUI {
       <button class="icon-btn bhud-leave" aria-label="Leave the battle">✕</button>
     </div>`);
     this.hud.querySelector('.bhud-leave')!.addEventListener('click', () => this.leave());
+    if (curtainUp) this.hud.style.visibility = 'hidden';
     this.host.root.appendChild(this.hud);
     sfx.whistle();
   }

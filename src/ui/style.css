@@ -1980,7 +1980,7 @@ kbd {
   z-index: 5;
 }
 .bhud-time {
-  font: 400 clamp(22px, 5vh, 32px) / 1 var(--display);
+  font: 400 clamp(34px, 9vh, 52px) / 1 var(--display);
   color: #fff;
   -webkit-text-stroke: 0.16em var(--ink);
   paint-order: stroke fill;
@@ -1994,7 +1994,19 @@ kbd {
 }
 .bhud-bombs[hidden] { display: none; }
 .bhud-time.low { color: #ff6b5e; animation: next-pulse 0.5s ease-in-out infinite; }
-.bhud-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+/* everyone's score: along the bottom, in the middle (between the touch controls) */
+.bhud-chips {
+  position: fixed;
+  left: 50%;
+  bottom: calc(24px + var(--safe-b));
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  width: max-content;
+  max-width: 56vw;
+}
 .bhud-chip {
   display: inline-flex;
   align-items: center;
@@ -2195,11 +2207,11 @@ kbd {
 .bc-box { --my: #f28a2e; width: 100%; height: clamp(48px, 11vh, 58px); box-sizing: border-box; }
 .bc-box input { flex: 1; min-width: 0; text-align: center; font-size: clamp(20px, 4.6vh, 26px); }
 
-/* your name and hero on one row, all the same height: the name box is as wide as the
-   first two player squares, the hero buttons spread across the other two */
+/* your name and hero on one row, all the same height: the name box is as wide as one and
+   a half player squares, the hero buttons spread across the rest */
 .battle-lobby { --rowh: clamp(46px, 11vh, 60px); --slotgap: clamp(8px, 1.6vw, 16px); }
 .bl-me { align-items: flex-end; flex-wrap: nowrap; width: min(100%, 780px); gap: var(--slotgap); }
-.battle-lobby:not(.watching) .bl-namecard { flex: 0 0 calc(50% - var(--slotgap) / 2); min-width: 0; }
+.battle-lobby:not(.watching) .bl-namecard { flex: 0 0 calc(37.5% - var(--slotgap) / 8); min-width: 0; }
 .battle-lobby:not(.watching) .bl-namebox { width: 100%; }
 .battle-lobby:not(.watching) .bl-namebox input { flex: 1; min-width: 0; width: auto; }
 .battle-lobby:not(.watching) .bl-heroes { flex: 1; justify-content: space-between; min-width: 0; }

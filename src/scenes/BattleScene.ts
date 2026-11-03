@@ -534,8 +534,8 @@ export class BattleScene extends Phaser.Scene {
       }
       const top = y - (c.hitH ?? 34) * v.size - 10;
       // the name just over the head, the hearts above the name
-      v.tag.setText(this.names.get(id) ?? '').setPosition(x, top + 4);
-      this.drawHearts(v.hearts, x, top - 18, p.hp, p.bombs);
+      v.tag.setText(this.names.get(id) ?? '').setPosition(x, top + 9);
+      this.drawHearts(v.hearts, x, top - 13, p.hp, p.bombs);
     }
     for (const [id, v] of this.views)
       if (!seen.has(id)) {

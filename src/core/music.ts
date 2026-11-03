@@ -219,3 +219,6 @@ export function stopMusic() {
 export function setMusicMuted(m: boolean) {
   if (playing) playing.gain.gain.value = m ? 0 : VOLUME;
 }
+
+// (for testing: what's playing)
+(window as unknown as { __music: () => unknown }).__music = () => ({ playing: playing?.t ?? null, want: want?.t ?? null, ctx: audioContext()?.state ?? 'none', decoded: [...decoded.keys()] });
