@@ -160,6 +160,8 @@ export class BattleNet {
   }
 
   close() {
+    // (tell the server we're going, so our square empties straight away)
+    if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify({ t: 'leave' }));
     this.closed = true;
     clearInterval(this.pingTimer);
     this.ws?.close();

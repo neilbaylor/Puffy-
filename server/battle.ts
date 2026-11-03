@@ -20,6 +20,8 @@ const AUTO_COUNTDOWN_SECS = Number(process.env.BATTLE_COUNTDOWN) > 0 ? Number(pr
 const RESULTS_SECS = 8;
 /** A dropped player keeps their place this long (phones drop the connection when backgrounded). */
 const REJOIN_SECS = 30;
+/** …but in the lobby a dropped player's square empties sooner. */
+const LOBBY_REJOIN_SECS = 8;
 /** Don't let a player's queued inputs pile up (a laggy phone catching up). */
 const MAX_QUEUE = 6;
 
@@ -154,6 +156,15 @@ class Room {
         c.name = cleanName(msg.name, c.slot);
         this.broadcastRoom();
         return;
+      case 'leave':
+        // left on purpose: the square empties now (no waiting for a rejoin)
+        {
+          const ws = c.ws;
+          c.ws = null; // (so the socket closing isn't taken for a dropped connection)
+          this.remove(c);
+          ws?.close();
+        }
+        return;
       case 'start':
         // (no "start now": a battle starts by itself when the countdown runs out)
         return;
@@ -211,7 +222,8 @@ class Room {
 
   tick() {
     const now = Date.now();
-    for (const c of [...this.clients.values()]) if (!c.ws && c.droppedAt && now - c.droppedAt > REJOIN_SECS * 1000) this.remove(c);
+    const hold = (this.phase === 'battle' ? REJOIN_SECS : LOBBY_REJOIN_SECS) * 1000;
+    for (const c of [...this.clients.values()]) if (!c.ws && c.droppedAt && now - c.droppedAt > hold) this.remove(c);
     if (this.phase === 'lobby' || this.phase === 'countdown') this.promoteWatchers();
     const ready = [...this.clients.values()].filter((c) => c.ws && c.slot >= 0).length;
     switch (this.phase) {

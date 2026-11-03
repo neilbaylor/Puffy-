@@ -71,11 +71,18 @@ export class BattleUI {
     this.net = new BattleNet(url, name, this.host.hero());
     this.net.onStatus = (s) => this.status(s);
     this.net.onRoom = (r) => this.room(r);
+    window.addEventListener('pagehide', this.onPageHide);
     this.host.game.events.on('battle-hud', this.onHud);
   }
 
+  /** Closing the page (not just switching apps) counts as leaving: free the square now. */
+  private onPageHide = (e: PageTransitionEvent) => {
+    if (!e.persisted) this.net?.close();
+  };
+
   /** Leave the room and go back to the start screen. */
   leave() {
+    window.removeEventListener('pagehide', this.onPageHide);
     clearTimeout(this.retryT);
     this.stopClock();
     this.watch(false);

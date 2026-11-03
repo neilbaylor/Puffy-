@@ -19,6 +19,8 @@ export type ClientMsg =
   /** Buttons for one tick (seq counts up by one per tick). */
   | { t: 'in'; s: number; b: number }
   | { t: 'start' }
+  /** Leaving on purpose (Back, or closing the page): free my spot now. */
+  | { t: 'leave' }
   | { t: 'ping'; c: number };
 
 export interface RoomPlayer {
