@@ -433,7 +433,8 @@ export class HoopsScene extends Phaser.Scene {
     const jTop = A(0, JUMBO.y).y - 16;
     // (wherever they're standing now: they shoot from different spots)
     const feet = Math.max(A(0, Math.max(SPOTS.hero.y, SPOTS.king.y)).y, this.hero?.y ?? 0, this.king?.y ?? 0) + 30;
-    const zWide = Math.min(z, this.scale.height / (feet - jTop), Math.max(this.scale.width / ARENA_W, this.scale.height / ARENA_H));
+    // (never wider than the arena's painted area)
+    const zWide = Math.max(Math.min(z, this.scale.height / (feet - jTop)), this.scale.width / (ARENA_W - 180), this.scale.height / ARENA_H);
     z += (zWide - z) * ease;
     // in cutscenes the camera follows the (already eased) glide exactly; in the
     // contest it drifts softly toward its target
