@@ -824,7 +824,6 @@ export class HoopsScene extends Phaser.Scene {
   /** Show something on the jumbotron (for `ms`, then back to the score). */
   private jumboShow(c: JumboContent, ms = 1500) {
     this.jumbo = c;
-    if (c.kind === 'big') this.ribbonMsg = { text: c.text, color: c.color, bg: c.bg, t0: this.clock / 1000 };
     this.jumboUntil = this.clock + ms;
     this.drawJumbo();
   }
@@ -1028,7 +1027,8 @@ export class HoopsScene extends Phaser.Scene {
       if (round === REGULATION && this.total('you') === this.total('king')) {
         this.renderScore();
         setMusicRate(1.5); // the band plays faster: sudden death!
-        await this.callout('TIED!<small>Sudden death</small>', 'title', 1400);
+        this.jumboShow({ kind: 'big', text: 'TIED!', sub: 'Sudden death', color: '#ffffff', bg: '#5a0b14' }, 1400);
+        await this.wait(1400);
       }
     }
     const won = this.total('you') > this.total('king');
@@ -1115,7 +1115,9 @@ export class HoopsScene extends Phaser.Scene {
     this.camFocus = { x: 800, y: 450, zoom: 1 };
     this.renderScore();
     this.jumboShow(this.scoreJumbo(), 0);
-    await this.callout(this.hard ? 'THE<br>REMATCH!<small>5 shots each · the King is sharper this time</small>' : 'FREE THROW<br>SHOWDOWN!<small>5 shots each · most baskets wins</small>', 'title', 1800);
+    // (the big calls are on the jumbotron only, not over the court as well)
+    this.jumboShow({ kind: 'big', text: this.hard ? 'THE REMATCH!' : 'SHOWDOWN!', sub: this.hard ? '5 shots each · the King is sharper' : '5 shots each · most baskets wins', color: '#ffd23f', bg: '#3d1478' }, 1800);
+    await this.wait(1800);
   }
 
   private total(who: 'you' | 'king') {
@@ -1530,7 +1532,7 @@ export class HoopsScene extends Phaser.Scene {
     this.confetti(160);
     this.excitedUntil = this.clock + 4000;
     this.heroAnim = { frames: ['jump', 'idle0'], fps: 5 };
-    await this.callout(`${this.hard ? 'YOU DESTROYED' : 'YOU BEAT'}<br>KING PUFF BALL!<small>${this.total('you')} – ${this.total('king')}</small>`, 'title', 2200);
+    await this.wait(2200);
     if (this.hard) await this.plopInvasion();
     fadeOutMusic(500);
     const result: ResultState = { ...this.hd.result, hoops: `${this.total('you')} – ${this.total('king')}`, level: this.hd.level ?? 1 };
@@ -1599,7 +1601,8 @@ export class HoopsScene extends Phaser.Scene {
     ev.remove();
     plops.forEach((p) => p.destroy());
     shadows.forEach((s2) => s2.destroy());
-    await this.callout('WORLD 2<br>PLOP INVASION<small>coming soon…</small>', 'title', 3000);
+    this.jumboShow({ kind: 'big', text: 'PLOP INVASION', sub: 'World 2 · coming soon…', color: '#ffe0a8', bg: '#4a2716' }, 1e9);
+    await this.wait(3000);
   }
 
   private async kingWins() {
@@ -1616,7 +1619,8 @@ export class HoopsScene extends Phaser.Scene {
     this.camFocus = { x: 800, y: 450, zoom: 1 };
     const hadLife = loseLife();
     const next = hadLife ? 'back to your last checkpoint' : 'no lives left';
-    await this.callout(`KING PUFF BALL WINS<small>${this.total('king')} – ${this.total('you')} · ${next}</small>`, 'title bad', 2400);
+    this.jumboShow({ kind: 'big', text: 'KING WINS', sub: `${this.total('king')} – ${this.total('you')} · ${next}`, color: '#ffd23f', bg: '#5a0b0b' }, 1e9);
+    await this.wait(2400);
     fadeOutMusic(500);
     if (!hadLife) {
       const ch = characterById(this.hd.charId);
