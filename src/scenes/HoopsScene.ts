@@ -485,10 +485,6 @@ export class HoopsScene extends Phaser.Scene {
   private callout(text: string, cls = '', ms = 1100) {
     const el = this.dom.querySelector<HTMLElement>('.hoops-callout')!;
     el.className = `hoops-callout show ${cls}`;
-    // "Your shot!" hangs just under the net (it follows the camera); the others use the CSS spot
-    this.pinTurn = cls === 'turn';
-    if (this.pinTurn) this.placeTurnCallout();
-    else el.style.removeProperty('top');
     if (cls.includes('speech')) this.kingTalkUntil = this.clock + Math.min(ms, 1500);
     el.innerHTML = text;
     void el.offsetWidth;
@@ -496,21 +492,6 @@ export class HoopsScene extends Phaser.Scene {
     return this.wait(ms).then(() => {
       if (token === this.calloutToken) el.className = 'hoops-callout';
     });
-  }
-
-  private pinTurn = false;
-
-  /** Put the turn callout's top edge just under the bottom of the net, centred on the hoop. */
-  private placeTurnCallout() {
-    const el = this.dom.querySelector<HTMLElement>('.hoops-callout')!;
-    const cam = this.cameras.main;
-    const net = A(HOOP.rimX, HOOP.rimY + 62);
-    const canvas = this.game.canvas;
-    const cr = canvas.getBoundingClientRect();
-    const dr = this.dom.getBoundingClientRect();
-    const k = cr.height / canvas.height;
-    const y = cr.top + ((net.y - cam.worldView.y) * cam.zoom + cam.y) * k - dr.top;
-    el.style.top = `${Math.round(y)}px`;
   }
 
   /** The jumbotron is the scoreboard: it shows the score between the big moments. */
@@ -540,7 +521,6 @@ export class HoopsScene extends Phaser.Scene {
     due.forEach((w) => w.res());
 
     this.fitCamera();
-    if (this.pinTurn) this.placeTurnCallout();
 
     // idle animation loops
     const k = this.kingAnim;
@@ -929,10 +909,11 @@ export class HoopsScene extends Phaser.Scene {
       });
       addCanvas(this, 'kingboom', c, (t) => BOOM_FRAMES.forEach((f, i) => t.add(f, 0, (i % COLS) * fw, Math.floor(i / COLS) * fw, fw, fw)));
     }
+    const FT = 95; // ms per frame (a beat longer than a quick pop)
     const boom = this.add.image(cx, cy, 'kingboom', 'b0').setDepth(12.25).setScale(1.5 / 1.5);
-    BOOM_FRAMES.forEach((f, i) => this.time.delayedCall(i * 70, () => boom.setFrame(f)));
-    this.tweens.add({ targets: boom, scale: 1.9 / 1.5, duration: BOOM_FRAMES.length * 70, ease: 'Sine.easeOut' });
-    this.tweens.add({ targets: boom, alpha: 0, delay: BOOM_FRAMES.length * 70 - 120, duration: 260, onComplete: () => boom.destroy() });
+    BOOM_FRAMES.forEach((f, i) => this.time.delayedCall(i * FT, () => boom.setFrame(f)));
+    this.tweens.add({ targets: boom, scale: 2 / 1.5, duration: BOOM_FRAMES.length * FT, ease: 'Sine.easeOut' });
+    this.tweens.add({ targets: boom, alpha: 0, delay: BOOM_FRAMES.length * FT - 100, duration: 380, onComplete: () => boom.destroy() });
     // fireball glow
     const glow = this.add.image(cx, cy, 'spot').setBlendMode(Phaser.BlendModes.ADD).setTint(0xffd27a).setDepth(12.2).setScale(0.2).setAlpha(1);
     this.tweens.add({ targets: glow, scale: 3.2, alpha: 0, duration: 900, ease: 'Cubic.easeOut', onComplete: () => glow.destroy() });
@@ -1194,7 +1175,9 @@ export class HoopsScene extends Phaser.Scene {
     const hk = this.hero.scaleY / this.heroScale;
     const hp = { x: this.hero.x, y: this.hero.y - 4 };
     const n = this.score.you.length;
-    await this.callout(n >= REGULATION ? 'Your shot!<small>Sudden death</small>' : `Your shot!<small>${n + 1} of ${REGULATION}</small>`, 'turn', 900);
+    // (the shot calls live on the scoreboard, not over the court)
+    this.jumboShow({ kind: 'big', text: 'YOUR SHOT', sub: n >= REGULATION ? 'Sudden death' : `Shot ${n + 1} of ${REGULATION}`, color: '#ffffff', bg: '#3d1478' }, 900);
+    await this.wait(900);
     const speed = (1.15 + Math.min(n, REGULATION - 1) * 0.12) * (this.hard ? HARDER.speed : 1); // sudden death doesn't speed up further
     const p = await this.lockMeter('power', speed);
     const a = await this.lockMeter('aim', speed * 1.1);
@@ -1242,13 +1225,13 @@ export class HoopsScene extends Phaser.Scene {
         this.lastShout = shout;
       }
       this.jumboShow({ kind: 'big', text: o === 'swish' ? shout : 'BUCKET!', sub: `${this.total('you')} – ${this.total('king')}`, color: '#8fff8a', bg: '#0b5e2a' });
-      await this.callout(shout, 'good', 1000);
+      await this.wait(1000);
     } else {
       this.heroAnim = { frames: ['hurt'], fps: 1 };
       this.kingAnim = { frames: ['laugh0', 'laugh1'], fps: 6 };
       sfx.groan();
       this.jumboShow({ kind: 'big', text: o === 'rimOut' ? 'RIMMED OUT' : o === 'wide' || o === 'short' ? 'AIR BALL!' : 'BRICK!', color: '#ff8a80', bg: '#5a0b14' }, 1300);
-      await this.callout(o === 'short' ? 'Too short!' : o === 'long' ? 'Too long!' : o === 'wide' ? 'Wide!' : 'Rimmed out!', 'bad', 1000);
+      await this.wait(1000);
     }
     this.heroAnim = { frames: ['idle0', 'idle1'], fps: 2 };
     this.kingAnim = { frames: ['idle0', 'idle1'], fps: 2.5 };
@@ -1263,7 +1246,8 @@ export class HoopsScene extends Phaser.Scene {
     const kk = this.king.scaleY / this.kingScale;
     const kp = { x: this.king.x, y: this.king.y - 6 };
     while (this.crownBusy) await this.wait(100);
-    await this.callout('King Puff Ball shoots…', 'turn king', 900);
+    this.jumboShow({ kind: 'big', text: 'KING’S SHOT', sub: 'King Puff Ball shoots…', color: '#ffd23f', bg: '#4a2a00' }, 900);
+    await this.wait(900);
     this.kingAnim = { frames: ['idle0', 'idle1'], fps: 5 };
     await this.wait(500);
     const r = Math.random();
@@ -1285,7 +1269,7 @@ export class HoopsScene extends Phaser.Scene {
       this.heroAnim = { frames: ['hurt'], fps: 1 };
       sfx.groan();
       this.jumboShow({ kind: 'big', text: 'KING SCORES', sub: `${this.total('you')} – ${this.total('king')}`, color: '#ffd23f', bg: '#4a2a00' });
-      await this.callout('The King scores!', 'bad', 1000);
+      await this.wait(1000);
     } else {
       this.kingAnim = { frames: ['sad'], fps: 1 };
       this.heroAnim = { frames: ['jump', 'idle0'], fps: 5 };
@@ -1293,7 +1277,7 @@ export class HoopsScene extends Phaser.Scene {
       // he stamps in a huff — sometimes his crown flies off
       if (this.crownState.falls < 2 && Math.random() < 0.4) this.time.delayedCall(250, () => this.crownFall());
       this.jumboShow({ kind: 'big', text: 'NO GOOD!', sub: 'The King misses', color: '#8fe8ff', bg: '#0b2a5e' }, 1300);
-      await this.callout('The King misses!', 'good', 1000);
+      await this.wait(1000);
     }
     this.heroAnim = { frames: ['idle0', 'idle1'], fps: 2 };
     this.kingAnim = { frames: ['idle0', 'idle1'], fps: 2.5 };
@@ -1516,9 +1500,9 @@ export class HoopsScene extends Phaser.Scene {
       // stay on the King and ease back a little so the whole BOOM fits, then go wide
       this.camFocus = { x: kp.x - 20, y: kp.y - 100, zoom: 1.3 };
       this.cheer(1.6);
-      await this.wait(950);
+      await this.wait(1300);
       this.camFocus = { x: 800, y: 450, zoom: 1 };
-      await this.wait(350);
+      await this.wait(400);
     } else {
       // the King runs off… stops at the edge of the court, turns, and gets the last word
       this.kingAnim = { frames: ['run0', 'run1'], fps: 10 };
@@ -1593,7 +1577,7 @@ export class HoopsScene extends Phaser.Scene {
     const t = this.add.text(1130, floorY - 330, 'POOPA!', { fontFamily: '"Lilita One", sans-serif', fontSize: '84px', color: '#ffe0a8', stroke: '#4a2716', strokeThickness: 14 }).setOrigin(0.5).setDepth(12.6).setScale(0.2);
     this.tweens.add({ targets: t, scale: 1, duration: 260, ease: 'Back.easeOut' });
     this.tweens.add({ targets: t, angle: { from: -6, to: 6 }, yoyo: true, repeat: 6, duration: 160 });
-    for (let r = 0; r < 3; r++) {
+    for (let r = 0; r < 4; r++) {
       plops.forEach((p, i) => {
         this.time.delayedCall(i * 70, () => {
           sfx.poopa(0.85 + i * 0.12);
@@ -1605,6 +1589,9 @@ export class HoopsScene extends Phaser.Scene {
       await this.wait(620);
     }
     this.tweens.add({ targets: t, alpha: 0, scale: 1.3, duration: 300, onComplete: () => t.destroy() });
+    // a long glare at you…
+    anim(['idle', 'yell0'], 2.5);
+    await this.wait(1100);
     // …and off they run, waving their little arms
     anim(['run0', 'run1'], 11);
     plops.forEach((p) => p.setFlipX(true));
@@ -1612,7 +1599,7 @@ export class HoopsScene extends Phaser.Scene {
     ev.remove();
     plops.forEach((p) => p.destroy());
     shadows.forEach((s2) => s2.destroy());
-    await this.callout('WORLD 2<br>PLOP INVASION<small>coming soon…</small>', 'title', 2400);
+    await this.callout('WORLD 2<br>PLOP INVASION<small>coming soon…</small>', 'title', 3000);
   }
 
   private async kingWins() {

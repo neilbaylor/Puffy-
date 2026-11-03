@@ -821,15 +821,13 @@ export class UI {
       <div class="panel">
         <h2>Paused</h2>
         <button class="btn" data-act="resume">Resume</button>
-        <button class="btn btn-alt" data-act="restart">Restart level</button>
-        <button class="btn btn-alt" data-act="hero">Pick another player</button>
+        <button class="btn btn-alt" data-act="hero">Home screen</button>
         <button class="btn btn-alt" data-act="sound">${isMuted() ? 'Sound: off' : 'Sound: on'}</button>
         ${usingTouch() ? '' : `<h3 class="ctl-title">Controls</h3>${controlsHtml()}`}
       </div>
     </div>`);
     const act = (a: string, fn: () => void) => el.querySelector(`[data-act=${a}]`)!.addEventListener('click', fn);
     act('resume', () => this.resume());
-    act('restart', () => this.startGame(this.session));
     act('hero', () => this.quitToStart());
     act('sound', () => {
       setMuted(!isMuted());

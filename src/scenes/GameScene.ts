@@ -856,6 +856,28 @@ export class GameScene extends Phaser.Scene {
     this.gRockets.add(r);
   }
 
+  /**
+   * The blast doesn't go through solid ground: a rocket that hits the step under a
+   * bad guy shouldn't knock them out. Walk from the bad guy's nearest point back to
+   * the blast and stop at the first solid tile (one-way platforms don't block).
+   */
+  private blastReaches(x: number, y: number, eb: Phaser.Physics.Arcade.Body) {
+    const layer = this.level.layer;
+    const tx = Phaser.Math.Clamp(x, eb.left + 3, eb.right - 3);
+    const ty = Phaser.Math.Clamp(y, eb.top + 3, eb.bottom - 3);
+    const d = Math.hypot(x - tx, y - ty);
+    const n = Math.ceil(d / 6);
+    for (let i = 0; i < n; i++) {
+      const k = i / n;
+      const px = tx + (x - tx) * k;
+      const py = ty + (y - ty) * k;
+      if (Math.hypot(px - x, py - y) < 6) break; // (the blast point itself sits against the wall it hit)
+      const t = layer.getTileAtWorldXY(px, py);
+      if (t && t.collideLeft && t.collideRight) return false;
+    }
+    return true;
+  }
+
   explode(x: number, y: number, owner: Player) {
     const r = owner.char.blastRadius;
     this.fx.explosion(x, y, r);
@@ -867,7 +889,7 @@ export class GameScene extends Phaser.Scene {
       const eb = e.body;
       const dx = Math.max(eb.left - x, 0, x - eb.right);
       const dy = Math.max(eb.top - y, 0, y - eb.bottom);
-      if (dx * dx + dy * dy < r * r) {
+      if (dx * dx + dy * dy < r * r && this.blastReaches(x, y, eb)) {
         // Big Muscles' first rocket on a tough enemy counts double
         const heavy = owner.char.heavyHitter && e.hp >= 3 && !e.heavyHit;
         if (heavy) e.heavyHit = true;
