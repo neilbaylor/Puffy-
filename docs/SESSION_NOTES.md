@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.84)
+## Where things stand (v0.85)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -33,6 +33,11 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   level is beaten, mute (top-left), full screen + **Battle** buttons (top-right, same height, side by side).
 - v0.84: a loading screen with a progress bar; behind it everything the start screen needs is prepared, so it's
   smooth from the first moment (on a 4× slowed CPU the first hero tap went from 3.7 s to under 0.6 s).
+  It draws the looks for both levels (so switching Part 1 / Part 2 on the start screen is instant).
+- v0.85: the start screen opens on the furthest level you've unlocked (`latestLevel()` in `levels.ts`); no
+  automatic full screen (the owner only wants the button, or installing the game); the start screen's song
+  tries to start without a tap (works where the browser allows it, e.g. Chrome with the game installed;
+  iPhones always need a first tap).
 
 ### Battle mode (v0.60 onwards)
 - Room codes (default `birchcliff`), 4 players + watchers, 25 s countdown with 2+ players, 150 s battles,
