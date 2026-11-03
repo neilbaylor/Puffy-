@@ -5,14 +5,18 @@ import { characterById } from '../data/characters';
 import { ART_RES, WALK_FRAMES } from '../gfx/draw';
 import { recolorForSlot } from '../gfx/recolor';
 import { addCanvas, hires } from '../gfx/textures';
-import { drawBombBall, drawChute, drawPrize } from '../gfx/prizes';
-import { drawAnvil, drawPellet, drawRock } from '../gfx/hazards';
+import { drawBombBall, drawChute, drawFireball, drawPrize } from '../gfx/prizes';
+import { PLOP_FRAMES, PLOP_H, PLOP_W, drawPlop, type PlopKind } from '../gfx/plops';
+import { canvas } from '../gfx/draw';
+import { STYLES } from '../gfx/handdrawn';
+import { SAW } from '../gfx/weapons';
+import { drawAnvil, drawIceBlock, drawPellet, drawPoo, drawRamp, drawRock } from '../gfx/hazards';
 import { W_RES } from '../gfx/weapons';
 import { soloSource } from '../input/devices';
 import type { BattleNet, Snapshot } from '../net/battleNet';
-import { buildArena } from '../shared/battle/arena';
+import { ARENA_RAMPS, buildArena } from '../shared/battle/arena';
 import { SLOT_COLORS, type SnapEnemy, type SnapHazard, type SnapPlayer } from '../shared/battle/protocol';
-import { ArenaMap, BTN, DT, ENEMY_BOX, HEARTS, POWER, sizeOf, stepMove, type BEvent, type BPlayer, type EnemyKind, type PrizeKind } from '../shared/battle/sim';
+import { ArenaMap, BTN, DT, ENEMY_BOX, HEARTS, POWER, landingY, sizeOf, stepMove, type BEvent, type BPlayer, type EnemyKind, type PrizeKind, type RocketKind } from '../shared/battle/sim';
 import { Background } from '../world/Background';
 import { Fx } from '../world/Fx';
 import { LevelView } from '../world/LevelView';
@@ -41,6 +45,8 @@ interface HeroView {
   face: FaceClock;
   /** A soft glow around your own hero, so you can find yourself in the scrum. */
   halo?: Phaser.GameObjects.Image;
+  /** The block of ice they're stuck in (someone grabbed the ice). */
+  ice: Phaser.GameObjects.Image;
 }
 
 const PRIZE_TEXT: Record<PrizeKind, [string, string]> = {
@@ -49,8 +55,18 @@ const PRIZE_TEXT: Record<PrizeKind, [string, string]> = {
   grow: ['GROW!', '#c39bff'],
   rapid: ['RAPID FIRE!', '#ff6b6b'],
   heart: ['+1 HEART', '#ff7eb6'],
+  ice: ['FREEZE!', '#7fdcff'],
+  fire: ['FIREBALLS!', '#ffb03a'],
 };
-const PRIZE_KINDS: PrizeKind[] = ['bomb', 'star', 'grow', 'rapid', 'heart'];
+const PRIZE_KINDS: PrizeKind[] = ['bomb', 'star', 'grow', 'rapid', 'heart', 'ice', 'fire'];
+
+/** Plops drawn for each size of bad guy: which Plop, and how big. */
+const PLOP_ART: Record<EnemyKind, { kind: PlopKind; scale: number }> = {
+  small: { kind: 'small', scale: 0.5 },
+  medium: { kind: 'medium', scale: 0.86 },
+  big: { kind: 'large', scale: 1.75 },
+};
+const PLOP_RES = 2;
 
 /** How each kind of bad guy is drawn: texture, scale, feet origin, gun size. */
 const ENEMY_ART: Record<EnemyKind, { tex: string; scale: number; ox: number; oy: number; gun: number }> = {
@@ -61,7 +77,13 @@ const ENEMY_ART: Record<EnemyKind, { tex: string; scale: number; ox: number; oy:
 
 interface EnemyView {
   spr: Phaser.GameObjects.Sprite;
+  plop: boolean;
+  /** What it's carrying (0 none, 1 blaster, 2 chainsaw, 3 ball and chain) and its pictures. */
+  weapon: number;
   gun: Phaser.GameObjects.Image | null;
+  saw: Phaser.GameObjects.Sprite | null;
+  ball: Phaser.GameObjects.Image | null;
+  chain: Phaser.GameObjects.Graphics | null;
   chute: Phaser.GameObjects.Image;
   anim: number;
   lastX: number;
@@ -87,7 +109,7 @@ export class BattleScene extends Phaser.Scene {
   private bg!: Background;
   fx!: Fx;
   private views = new Map<string, HeroView>();
-  private rocketViews = new Map<number, Phaser.GameObjects.Image>();
+  private rocketViews = new Map<number, Phaser.GameObjects.Image | Phaser.GameObjects.Sprite>();
   private prizeViews = new Map<number, { img: Phaser.GameObjects.Image; chute: Phaser.GameObjects.Image; glow: Phaser.GameObjects.Image; lastY: number; falling: number }>();
   private snaps: Snapshot[] = [];
   private me: BPlayer | null = null;
@@ -108,15 +130,19 @@ export class BattleScene extends Phaser.Scene {
     super('Battle');
   }
 
-  create(data: { net: BattleNet; spectate?: boolean }) {
+  create(data: { net: BattleNet; spectate?: boolean; warm?: boolean }) {
     this.net = data.net;
     this.spectate = !!data.spectate;
+    // warm: built ahead of time during the countdown, not shown (so the start is instant)
+    this.sys.setVisible(!data.warm);
     this.preview = null;
     this.enemyViews.clear();
     this.hazardViews.clear();
     const arena = buildArena();
     this.map = new ArenaMap(arena);
-    this.level = new LevelView(this, arena, { keep: this.spectate });
+    // (keep the start screen's terrain while it's still on screen: the curtain slides it away)
+    this.level = new LevelView(this, arena, { keep: this.spectate || this.scene.isActive('Menu') });
+    this.drawRamps();
     this.bg = new Background(this, this.level.heightPx - VIEW_H);
     this.fx = new Fx(this);
     this.views.clear();
@@ -158,7 +184,44 @@ export class BattleScene extends Phaser.Scene {
         ctx.arc(48, 48, 47, 0, Math.PI * 2);
         ctx.fill();
       }));
+    for (const k of PRIZE_KINDS) if (!this.textures.exists(`prize-chute-${k}`)) addCanvas(this, `prize-chute-${k}`, hires(30, 22, R, (ctx) => drawChute(ctx, k)));
+    if (!this.textures.exists('bfire')) addCanvas(this, 'bfire', hires(40, 26, R, (ctx) => drawFireball(ctx, 26, 13, 9, 1)));
+    if (!this.textures.exists('bpoo')) addCanvas(this, 'bpoo', hires(26, 24, R, (ctx) => drawPoo(ctx, 13, 21, 1)));
+    if (!this.textures.exists('bice')) addCanvas(this, 'bice', hires(60, 70, R, (ctx) => drawIceBlock(ctx, 60, 70)));
+    for (const kind of ['small', 'medium', 'large'] as PlopKind[]) {
+      const key = `bplop-${kind}`;
+      if (this.textures.exists(key)) continue;
+      const pw = Math.round(PLOP_W * PLOP_RES) + 4;
+      const { c, ctx } = canvas(pw * PLOP_FRAMES.length, Math.round(PLOP_H * PLOP_RES));
+      PLOP_FRAMES.forEach((f, i) => {
+        ctx.save();
+        ctx.translate(i * pw, 0);
+        ctx.scale(PLOP_RES, PLOP_RES);
+        drawPlop(ctx, 0, 0, f, STYLES.polished, kind);
+        ctx.restore();
+      });
+      addCanvas(this, key, c, (t) => PLOP_FRAMES.forEach((f, i) => t.add(f, 0, i * pw, 0, Math.round(PLOP_W * PLOP_RES), Math.round(PLOP_H * PLOP_RES))));
+    }
     if (!this.textures.exists('bpellet')) addCanvas(this, 'bpellet', hires(16, 16, R, (ctx) => drawPellet(ctx)));
+  }
+
+  /** The wooden ramp up to the middle island (its surface is the physics' ramp line). */
+  private drawRamps() {
+    for (const r of ARENA_RAMPS) {
+      const x0 = r.x0 - 10;
+      const y0 = r.y1 - 26;
+      const w = r.x1 + r.flat - x0 + 10;
+      const h = this.map.heightPx - y0;
+      const key = `bramp-${r.x0}-${r.y0}`;
+      if (!this.textures.exists(key))
+        addCanvas(this, key, hires(w, h, ART_RES, (ctx) => drawRamp(ctx, r, x0, y0, (x: number) => landingY(this.mapNoRamps, x))), undefined, { release: true });
+      this.add.image(x0, y0, key).setOrigin(0, 0).setScale(1 / ART_RES).setDepth(DEPTH.tiles + 1);
+    }
+  }
+
+  /** The arena without its ramps (where the ramp's legs stand). */
+  private get mapNoRamps() {
+    return new ArenaMap(this.map.data, []);
   }
 
   /** Watch the battle in a little window (a box on the lobby screen, in CSS px), or full screen (null). */
@@ -225,6 +288,7 @@ export class BattleScene extends Phaser.Scene {
       v.tag.destroy();
       v.hearts.destroy();
       v.halo?.destroy();
+      v.ice.destroy();
       v = undefined;
     }
     if (!v) {
@@ -238,7 +302,8 @@ export class BattleScene extends Phaser.Scene {
         .setResolution(2);
       const hearts = this.add.graphics().setDepth(DEPTH.text);
       const halo = p.id === this.net.myId ? this.add.image(p.x, p.y, 'bhalo').setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.players - 0.05) : undefined;
-      v = { sprite, tag, hearts, anim: 0, tilt: 0, slot: p.slot, hero: p.hero, size: 1, sparkT: 0, face: new FaceClock(), halo };
+      const ice = this.add.image(p.x, p.y, 'bice').setOrigin(0.5, 1).setScale(1 / ART_RES).setDepth(DEPTH.players + 0.2).setVisible(false);
+      v = { sprite, tag, hearts, anim: 0, tilt: 0, slot: p.slot, hero: p.hero, size: 1, sparkT: 0, face: new FaceClock(), halo, ice };
       this.views.set(p.id, v);
     }
     return v;
@@ -332,7 +397,7 @@ export class BattleScene extends Phaser.Scene {
   /** Where everyone else is right now: a smooth blend between two snapshots, a moment ago. */
   private othersAt(): {
     players: Map<string, SnapPlayer>;
-    rockets: Map<number, { x: number; y: number; dir: 1 | -1; kind: 'rocket' | 'bomb' | 'pellet' }>;
+    rockets: Map<number, { x: number; y: number; dir: 1 | -1; kind: RocketKind }>;
     prizes: [number, PrizeKind, number, number, number][];
     enemies: SnapEnemy[];
     hazards: SnapHazard[];
@@ -359,7 +424,7 @@ export class BattleScene extends Phaser.Scene {
       if (!pa || pa.respawn > 0 !== pb.respawn > 0 || Math.abs(pa.x - pb.x) > 120) players.set(pb.id, pb);
       else players.set(pb.id, { ...(k < 0.5 ? pa : pb), x: pa.x + (pb.x - pa.x) * k, y: pa.y + (pb.y - pa.y) * k, vx: pa.vx + (pb.vx - pa.vx) * k, vy: pa.vy + (pb.vy - pa.vy) * k });
     }
-    const rockets = new Map<number, { x: number; y: number; dir: 1 | -1; kind: 'rocket' | 'bomb' | 'pellet' }>();
+    const rockets = new Map<number, { x: number; y: number; dir: 1 | -1; kind: RocketKind }>();
     for (const rb of b.rockets) {
       const ra = a.rockets.find((r) => r.id === rb.id);
       rockets.set(rb.id, ra ? { x: ra.x + (rb.x - ra.x) * k, y: ra.y + (rb.y - ra.y) * k, dir: rb.dir, kind: rb.kind } : rb);
@@ -370,7 +435,7 @@ export class BattleScene extends Phaser.Scene {
     });
     const enemies = b.enemies.map((eb): SnapEnemy => {
       const ea = a.enemies.find((e) => e[0] === eb[0]);
-      return ea ? [eb[0], eb[1], ea[2] + (eb[2] - ea[2]) * k, ea[3] + (eb[3] - ea[3]) * k, eb[4], eb[5]] : eb;
+      return ea ? [eb[0], eb[1], ea[2] + (eb[2] - ea[2]) * k, ea[3] + (eb[3] - ea[3]) * k, eb[4], eb[5], eb[6], eb[7], eb[8]] : eb;
     });
     const hazards = b.hazards.map((hb): SnapHazard => {
       const ha = a.hazards.find((h) => h[0] === hb[0]);
@@ -398,6 +463,7 @@ export class BattleScene extends Phaser.Scene {
       v.tag.setVisible(!down);
       v.hearts.setVisible(!down);
       v.halo?.setVisible(!down);
+      v.ice.setVisible(!down && p.frozen > 0);
       if (down) continue;
       const c = characterById(p.hero);
       // pose, like the hero in the levels
@@ -442,10 +508,19 @@ export class BattleScene extends Phaser.Scene {
           v.sparkT = 0.06;
           this.fx.sparkle(x + (Math.random() - 0.5) * 30 * v.size, y - Math.random() * 40 * v.size, 1);
         }
-      } else if (v.sprite.isTinted && v.sprite.tintFill === false) v.sprite.clearTint();
+      } else if (p.frozen <= 0 && v.sprite.isTinted && v.sprite.tintFill === false) v.sprite.clearTint();
       if (p.power === POWER.rapid && v.sparkT <= 0) {
         v.sparkT = 0.09;
         this.fx.flameTrail(x + p.facing * 22 * c.scale, y - (c.muzzleY ?? 18), p.facing, 0.5);
+      }
+      if (p.frozen > 0) {
+        const c0 = characterById(p.hero);
+        const hh = (c0.hitH ?? 34) * v.size;
+        v.ice
+          .setPosition(x, y + 3)
+          .setDisplaySize(((c0.hitW ?? 22) * v.size + 22) * 1.15, hh + 22)
+          .setAlpha(p.frozen < 0.5 && Math.floor(this.time.now / 80) % 2 ? 0.45 : 0.9);
+        v.sprite.setTint(0xa8e6ff);
       }
       if (v.halo) {
         const pulse = 1 + Math.sin(this.time.now / 260) * 0.06;
@@ -465,6 +540,7 @@ export class BattleScene extends Phaser.Scene {
         v.tag.destroy();
         v.hearts.destroy();
         v.halo?.destroy();
+        v.ice.destroy();
         this.views.delete(id);
       }
     this.renderEnemies(cur.enemies, dt);
@@ -473,10 +549,22 @@ export class BattleScene extends Phaser.Scene {
     for (const [id, r] of cur.rockets) {
       let img = this.rocketViews.get(id);
       if (!img) {
-        img = this.add.image(r.x, r.y, r.kind === 'bomb' ? 'bbomb' : r.kind === 'pellet' ? 'bpellet' : 'rocket').setScale(1 / ART_RES).setDepth(DEPTH.projectiles).setFlipX(r.dir < 0);
+        if (r.kind === 'saw') img = this.add.sprite(r.x, r.y, 'w-saw', 's0').setScale(0.8 / W_RES).setDepth(DEPTH.projectiles);
+        else {
+          const tex = { bomb: 'bbomb', pellet: 'bpellet', fire: 'bfire', poo: 'bpoo', rocket: 'rocket' }[r.kind];
+          img = this.add.image(r.x, r.y, tex).setScale((r.kind === 'fire' ? 1.3 : r.kind === 'poo' ? 1.15 : 1) / ART_RES).setDepth(DEPTH.projectiles).setFlipX(r.dir < 0);
+        }
         this.rocketViews.set(id, img);
       }
-      if (r.kind === 'pellet') {
+      if (r.kind === 'fire') {
+        img.setPosition(r.x, r.y);
+        if (Math.random() < 0.8) this.fx.flameTrail(r.x - r.dir * 8, r.y, -r.dir, 0.6);
+      } else if (r.kind === 'poo') {
+        img.setPosition(r.x, r.y).setRotation(img.rotation + r.dir * dt * 9);
+      } else if (r.kind === 'saw') {
+        img.setPosition(r.x, r.y).setRotation(img.rotation + r.dir * dt * 16);
+        (img as Phaser.GameObjects.Sprite).setFrame(Math.floor(this.time.now / 40) % 2 ? 's0' : 's1');
+      } else if (r.kind === 'pellet') {
         img.setPosition(r.x, r.y);
         if (Math.random() < 0.4) this.fx.trail(r.x - r.dir * 6, r.y);
       } else if (r.kind === 'bomb') {
@@ -499,7 +587,7 @@ export class BattleScene extends Phaser.Scene {
       let pv = this.prizeViews.get(pid);
       if (!pv) {
         const glow = this.add.image(px, py, 'glow').setTint(0xfff3b0).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.6).setDepth(DEPTH.pickups - 0.1).setScale(0.85);
-        const chute = this.add.image(px, py, 'prize-chute').setScale(PRIZE_SCALE / ART_RES).setOrigin(0.5, 1).setDepth(DEPTH.pickups);
+        const chute = this.add.image(px, py, `prize-chute-${kind}`).setScale(PRIZE_SCALE / ART_RES).setOrigin(0.5, 1).setDepth(DEPTH.pickups);
         const img = this.add.image(px, py, `prize-${kind}`).setScale(PRIZE_SCALE / ART_RES).setOrigin(0.5, 1).setDepth(DEPTH.pickups + 0.1);
         pv = { img, chute, glow, lastY: py, falling: 1 };
         this.prizeViews.set(pid, pv);
@@ -533,6 +621,11 @@ export class BattleScene extends Phaser.Scene {
     const wv = cam.worldView;
     this.bg.update({ left: wv.x - 40, top: wv.y - 40, width: wv.width + 80, height: wv.height + 80 }, dt);
     this.level.animate(this.time.now / 1000, wv.x, wv.right);
+    // the last 10 seconds: the arena starts to shake, harder and harder
+    if (!this.spectate && cur.timeLeft > 0 && cur.timeLeft <= 10) {
+      const k = 1 - cur.timeLeft / 10;
+      this.cameras.main.shake(120, 0.0005 + k * k * 0.0055, true);
+    }
     this.hudT -= dt;
     if (this.hudT <= 0) {
       this.hudT = 0.2;
@@ -548,34 +641,85 @@ export class BattleScene extends Phaser.Scene {
   /** The bad guys: walking (or floating down under a parachute), some carrying a blaster. */
   private renderEnemies(list: SnapEnemy[], dt: number) {
     const seen = new Set<number>();
-    for (const [id, kind, x, y, dir, flags] of list) {
+    for (const [id, kind, x, y, dir, flags, race, weapon, ang] of list) {
       seen.add(id);
-      const art = ENEMY_ART[kind];
+      const plop = race === 1;
+      const [w, h] = ENEMY_BOX[kind];
       let v = this.enemyViews.get(id);
       if (!v) {
-        const spr = this.add.sprite(x, y, art.tex, 'w0').setOrigin(art.ox, art.oy).setScale(art.scale).setDepth(DEPTH.enemies);
-        const gun = flags & 2 ? this.add.image(x, y, 'w-blaster').setScale(art.gun / W_RES).setDepth(DEPTH.enemies + 0.1) : null;
+        let spr: Phaser.GameObjects.Sprite;
+        if (plop) {
+          const pa = PLOP_ART[kind];
+          spr = this.add.sprite(x, y, `bplop-${pa.kind}`, 'idle').setOrigin(50 / PLOP_W, 100 / PLOP_H).setScale(pa.scale / PLOP_RES).setDepth(DEPTH.enemies);
+        } else {
+          const art = ENEMY_ART[kind];
+          spr = this.add.sprite(x, y, art.tex, 'w0').setOrigin(art.ox, art.oy).setScale(art.scale).setDepth(DEPTH.enemies);
+        }
         const chute = this.add.image(x, y, 'chute').setOrigin(0.5, 1).setScale(1 / ART_RES).setDepth(DEPTH.enemies - 0.1);
-        v = { spr, gun, chute, anim: Math.random() * 4, lastX: x };
+        v = { spr, plop, weapon: 0, gun: null, saw: null, ball: null, chain: null, chute, anim: Math.random() * 4, lastX: x };
         this.enemyViews.set(id, v);
+      }
+      // what it carries (a chainsaw one throws it away when it's hurt)
+      if (v.weapon !== weapon) {
+        v.gun?.destroy();
+        v.saw?.destroy();
+        v.ball?.destroy();
+        v.chain?.destroy();
+        v.gun = v.saw = v.ball = v.chain = null;
+        const k = kind === 'small' ? 0.55 : 0.8;
+        if (weapon === 1) v.gun = this.add.image(x, y, 'w-blaster').setScale(k / W_RES).setDepth(DEPTH.enemies + 0.1);
+        if (weapon === 2) v.saw = this.add.sprite(x, y, 'w-saw', 's0').setScale(k / W_RES).setDepth(DEPTH.enemies + 0.1);
+        if (weapon === 3) {
+          v.chain = this.add.graphics().setDepth(DEPTH.enemies + 0.05);
+          v.ball = this.add.image(x, y, 'w-ball', 'open').setScale(0.85 / W_RES).setDepth(DEPTH.enemies + 0.15);
+        }
+        v.weapon = weapon;
       }
       const onGround = (flags & 1) !== 0;
       const chute = (flags & 4) !== 0;
       const moving = Math.abs(x - v.lastX) > 0.2;
       v.lastX = x;
       v.anim += dt * (moving ? 7 : 2);
-      const [, h] = ENEMY_BOX[kind];
-      const frame = kind === 'big' && !onGround && !chute ? 'air' : Math.floor(v.anim) % 2 ? 'w1' : 'w0';
-      v.spr.setFrame(frame).setPosition(x, y + 2).setFlipX(dir > 0);
+      let frame: string;
+      if (v.plop) frame = moving ? (Math.floor(v.anim) % 2 ? 'run0' : 'run1') : 'idle';
+      else frame = kind === 'big' && !onGround && !chute ? 'air' : Math.floor(v.anim) % 2 ? 'w1' : 'w0';
+      // (Plops are drawn facing right; the Puff Balls' art faces left)
+      v.spr.setFrame(frame).setPosition(x, y + 2).setFlipX(v.plop ? dir < 0 : dir > 0);
       if (flags & 8) v.spr.setTintFill(0xffffff);
       else v.spr.clearTint();
       v.chute.setVisible(chute).setPosition(x, y - h + 4).setRotation(Math.sin(this.time.now / 400 + id) * 0.12);
-      if (v.gun) v.gun.setPosition(x + dir * ENEMY_BOX[kind][0] * 0.55, y - h * 0.42).setFlipX(dir > 0);
+      const handX = x + dir * w * 0.55;
+      const handY = y - h * 0.42;
+      if (v.gun) v.gun.setPosition(handX, handY).setFlipX(dir > 0);
+      if (v.saw) {
+        v.saw
+          .setPosition(x + dir * (w * 0.5 + SAW.w * 0.18), handY)
+          .setFlipX(dir > 0)
+          .setFrame(Math.floor(this.time.now / (moving ? 35 : 80)) % 2 ? 's0' : 's1');
+      }
+      if (v.ball && v.chain) {
+        // the ball swings round on its chain (the same swing the server uses for hits)
+        const R = kind === 'small' ? 34 : 46;
+        const cy = y - h * 0.55;
+        const bx = x + Math.cos(ang) * R;
+        const by = cy + Math.sin(ang) * R * 0.8;
+        v.chain.clear();
+        v.chain.lineStyle(2.4, 0x3a2418, 1);
+        const hx = x + dir * w * 0.3;
+        for (let i = 1; i <= 6; i++) {
+          const t = i / 7;
+          v.chain.strokeCircle(hx + (bx - hx) * t, cy + (by - cy) * t, 1.6);
+        }
+        v.ball.setPosition(bx, by).setFrame(Math.floor(this.time.now / 160) % 2 ? 'open' : 'shut').setFlipX(bx > x);
+      }
     }
     for (const [id, v] of this.enemyViews)
       if (!seen.has(id)) {
         v.spr.destroy();
         v.gun?.destroy();
+        v.saw?.destroy();
+        v.ball?.destroy();
+        v.chain?.destroy();
         v.chute.destroy();
         this.enemyViews.delete(id);
       }
@@ -588,14 +732,8 @@ export class BattleScene extends Phaser.Scene {
       seen.add(id);
       let v = this.hazardViews.get(id);
       if (!v) {
-        // where it lands: the first ground or cloud below the sky
-        const tx = Math.floor(x / 32);
-        let landY = this.map.heightPx;
-        for (let ty = 0; ty < this.map.h; ty++)
-          if (this.map.solid(tx, ty) || this.map.oneWay(tx, ty)) {
-            landY = ty * 32;
-            break;
-          }
+        // where it lands: the ramp, or the first ground or cloud below the sky
+        const landY = landingY(this.map, x);
         const shadow = this.add.ellipse(x, landY, 40, 10, 0x2b1a12, 0.35).setDepth(DEPTH.pickups - 0.2);
         const img = this.add.image(x, y, kind === 'anvil' ? 'banvil' : 'brock').setOrigin(0.5, 1).setScale(HAZARD_SCALE / ART_RES).setDepth(DEPTH.projectiles + 0.5);
         v = { img, shadow, landY };
@@ -686,6 +824,8 @@ export class BattleScene extends Phaser.Scene {
             this.fx.stars(v.sprite.x, v.sprite.y - 30, 14);
             const col = by ? SLOT_COLORS[by.slot % SLOT_COLORS.length] : '#ffffff';
             this.fx.popText(v.sprite.x, v.sprite.y - 70, 'KO!', col, 30);
+            // knocked out by a bad guy or the sky (not a friend): that cost them a point
+            if (!by) this.fx.popText(v.sprite.x, v.sprite.y - 104, '−1', '#ff8a80', 22);
           }
           sfx.die();
           if (e.by === myId) sfx.cheer();
@@ -733,6 +873,28 @@ export class BattleScene extends Phaser.Scene {
           (e.kind === 'anvil' ? sfx.thud : sfx.stomp)();
           this.cameras.main.shake(e.kind === 'anvil' ? 200 : 110, e.kind === 'anvil' ? 0.008 : 0.004);
           break;
+        case 'throw':
+          sfx.whoosh();
+          if (e.kind === 'saw') sfx.saw();
+          break;
+        case 'stomp': {
+          sfx.stomp();
+          this.fx.stars(e.x, e.y, 7);
+          this.fx.popText(e.x, e.y - 18, 'STOMP!', '#ffffff', 18);
+          if (e.id === myId) this.cameras.main.shake(90, 0.004);
+          break;
+        }
+        case 'freeze': {
+          // everyone but the grabber turns to ice
+          sfx.clank();
+          this.cameras.main.flash(220, 190, 235, 255);
+          for (const [id, v] of this.views)
+            if (id !== e.by) {
+              this.fx.sparkle(v.sprite.x, v.sprite.y - 24, 10);
+              this.fx.popText(v.sprite.x, v.sprite.y - 64, 'FROZEN!', '#9fe6ff', 16);
+            }
+          break;
+        }
         case 'spawn': {
           const v = this.views.get(e.id);
           if (v) this.fx.fluffBurst(v.sprite.x, v.sprite.y - 20, 1);

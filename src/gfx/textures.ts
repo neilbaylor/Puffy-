@@ -300,9 +300,9 @@ function makeBackgrounds(scene: Phaser.Scene, pal: WorldPalette) {
   const k = (layer: Parameters<typeof bgKey>[0]) => bgKey(layer, pal.id);
   addCanvas(scene, k('sky'), hires(4, 512, 1, (ctx) => drawSky(ctx, 4, 512, pal)));
   const L = BG_LAYERS;
-  addCanvas(scene, k('far'), padV(hires(L.far.w, L.far.h, BG_RES, (ctx) => drawFarLayer(ctx, L.far.w, L.far.h, pal))));
-  addCanvas(scene, k('hills'), padV(hires(L.hills.w, L.hills.h, BG_RES, (ctx) => drawHillsLayer(ctx, L.hills.w, L.hills.h, pal))));
-  addCanvas(scene, k('near'), padV(hires(L.near.w, L.near.h, BG_RES, (ctx) => drawNearLayer(ctx, L.near.w, L.near.h, pal))));
+  addCanvas(scene, k('far'), padV(hires(L.far.w, L.far.h, BG_RES, (ctx) => drawFarLayer(ctx, L.far.w, L.far.h, pal))), undefined, { release: true });
+  addCanvas(scene, k('hills'), padV(hires(L.hills.w, L.hills.h, BG_RES, (ctx) => drawHillsLayer(ctx, L.hills.w, L.hills.h, pal))), undefined, { release: true });
+  addCanvas(scene, k('near'), padV(hires(L.near.w, L.near.h, BG_RES, (ctx) => drawNearLayer(ctx, L.near.w, L.near.h, pal))), undefined, { release: true });
 }
 
 /** Part 2's backgrounds for one mountain look (same layer sizes as Part 1's). */
@@ -310,9 +310,9 @@ function makeMountainBackgrounds(scene: Phaser.Scene, look: MountainLook) {
   const k = (layer: Parameters<typeof bgKey>[0]) => bgKey(layer, look.pal.id);
   addCanvas(scene, k('sky'), hires(4, 512, 1, (ctx) => drawSky(ctx, 4, 512, look.pal)));
   const L = BG_LAYERS;
-  addCanvas(scene, k('far'), padV(hires(L.far.w, L.far.h, BG_RES, (ctx) => drawMountainFar(ctx, L.far.w, L.far.h, look))));
-  addCanvas(scene, k('hills'), padV(hires(L.hills.w, L.hills.h, BG_RES, (ctx) => drawMountainMid(ctx, L.hills.w, L.hills.h, look))));
-  addCanvas(scene, k('near'), padV(hires(L.near.w, L.near.h, BG_RES, (ctx) => drawMountainNear(ctx, L.near.w, L.near.h, look))));
+  addCanvas(scene, k('far'), padV(hires(L.far.w, L.far.h, BG_RES, (ctx) => drawMountainFar(ctx, L.far.w, L.far.h, look))), undefined, { release: true });
+  addCanvas(scene, k('hills'), padV(hires(L.hills.w, L.hills.h, BG_RES, (ctx) => drawMountainMid(ctx, L.hills.w, L.hills.h, look))), undefined, { release: true });
+  addCanvas(scene, k('near'), padV(hires(L.near.w, L.near.h, BG_RES, (ctx) => drawMountainNear(ctx, L.near.w, L.near.h, look))), undefined, { release: true });
 }
 
 /** Make sure a look's background layers exist (built right now if the boot hasn't got to them yet). */

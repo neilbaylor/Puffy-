@@ -216,6 +216,7 @@ export class UI {
       else this.touch.hide();
     },
     bombs: (n) => this.touch.setBombs(n),
+    level: () => this.level,
   });
   }
   private selected = 0;
@@ -821,8 +822,8 @@ export class UI {
     const el = h(`<div class="screen modal">
       <div class="panel">
         <h2>Paused</h2>
-        <button class="btn" data-act="resume">Resume</button>
-        <button class="btn btn-alt" data-act="hero">Home screen</button>
+        <button class="btn btn-go" data-act="resume">Resume</button>
+        <button class="btn" data-act="hero">Home screen</button>
         <button class="btn btn-alt" data-act="sound">${isMuted() ? 'Sound: off' : 'Sound: on'}</button>
         ${usingTouch() ? '' : `<h3 class="ctl-title">Controls</h3>${controlsHtml()}`}
       </div>

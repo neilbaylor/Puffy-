@@ -48,9 +48,22 @@ interface Seed {
 
 interface Layer {
   id: LayerId;
-  /** The current look, and the next look fading in on top of it. */
-  a: Phaser.GameObjects.TileSprite;
-  b: Phaser.GameObjects.TileSprite;
+  /**
+   * The current look, and the next look fading in on top of it: each a row of
+   * plain images side by side (all sharing one GPU texture). Not TileSprites:
+   * those keep their own big canvas copy of the picture, and re-make a canvas
+   * whenever their width changes (every frame of a zooming fly-over), which is
+   * what was running iPhones out of memory.
+   */
+  a: Phaser.GameObjects.Image[];
+  b: Phaser.GameObjects.Image[];
+  keyA: string;
+  keyB: string;
+  depth: number;
+  /** Width of one picture in world px (they repeat side by side). */
+  w: number;
+  /** Where the row sits this frame (top edge, world px). */
+  y: number;
   /** Horizontal parallax factor: 0 = fixed to screen, 1 = moves with the world. */
   fx: number;
   /** Vertical parallax factor. */
@@ -84,6 +97,8 @@ export class Background {
   private cloudCol = { fill: 0xffffff, shade: 0xe3dcf7, ink: 0x9486c8 };
   private t = 0;
   private cloudScroll = 0;
+  private showB = false;
+  private wB = 0;
 
   constructor(
     private scene: Phaser.Scene,
@@ -108,14 +123,14 @@ export class Background {
   }
 
   private add(id: LayerId, h: number, fx: number, fy: number, anchor: number, drift: number, depth: number) {
-    const mk = () => {
-      const s = this.scene.add.tileSprite(0, 0, 100, h + 4 / BG_RES, bgKey(id, 'puff')).setOrigin(0, 0).setDepth(depth);
-      s.setTileScale(1 / BG_RES, 1 / BG_RES);
-      return s;
-    };
-    const a = mk();
-    const b = mk().setVisible(false);
-    this.layers.push({ id, a, b, fx, fy, anchor, drift, offset: 0, h: h + 4 / BG_RES });
+    const key = bgKey(id, 'puff');
+    this.layers.push({ id, a: [], b: [], keyA: key, keyB: key, depth, w: BG_LAYERS[id].w, y: 0, fx, fy, anchor, drift, offset: 0, h: h + 4 / BG_RES });
+  }
+
+  /** Make sure a row has `n` pictures (they're only ever added: a handful at most). */
+  private row(imgs: Phaser.GameObjects.Image[], key: string, n: number, depth: number) {
+    while (imgs.length < n) imgs.push(this.scene.add.image(0, 0, key).setOrigin(0, 0).setScale(1 / BG_RES).setDepth(depth));
+    return imgs;
   }
 
   /** Show look `a`, with look `b` faded in on top by `w`. */
@@ -125,16 +140,24 @@ export class Background {
     if (m.a !== this.themeA) {
       this.themeA = m.a;
       this.skyA.setTexture(bgKey('sky', m.a));
-      for (const l of this.layers) l.a.setTexture(bgKey(l.id, m.a));
+      for (const l of this.layers) {
+        l.keyA = bgKey(l.id, m.a);
+        for (const img of l.a) img.setTexture(l.keyA);
+      }
     }
     const showB = m.w > 0.001 && m.b !== m.a;
     if (showB && m.b !== this.themeB) {
       this.themeB = m.b;
       this.skyB.setTexture(bgKey('sky', m.b));
-      for (const l of this.layers) l.b.setTexture(bgKey(l.id, m.b));
+      for (const l of this.layers) {
+        l.keyB = bgKey(l.id, m.b);
+        for (const img of l.b) img.setTexture(l.keyB);
+      }
     }
     this.skyB.setVisible(showB).setAlpha(m.w);
-    for (const l of this.layers) l.b.setVisible(showB).setAlpha(m.w);
+    this.showB = showB;
+    this.wB = m.w;
+    for (const l of this.layers) for (const img of l.b) img.setVisible(showB).setAlpha(m.w);
     this.fill.setFillStyle(mixSea(m));
     const pa = PALETTES[m.a];
     const pb = PALETTES[m.b];
@@ -236,16 +259,23 @@ export class Background {
     this.drawSeeds(view, dt);
     for (const l of this.layers) {
       l.offset += l.drift * dt;
-      const screenY = view.height * l.anchor + camUp * l.fy;
-      for (const s of [l.a, l.b]) {
-        s.setPosition(view.left - 2, view.top + screenY);
-        s.width = view.width + 4;
-        s.tilePositionX = (view.left * l.fx + l.offset) * BG_RES;
+      l.y = view.top + view.height * l.anchor + camUp * l.fy;
+      // the row scrolls by (camera × parallax + drift), wrapping every picture-width
+      const shift = view.left * l.fx + l.offset;
+      const x0 = view.left - 2 - (((shift % l.w) + l.w) % l.w);
+      const n = Math.ceil((view.width + 4 + l.w) / l.w) + 1;
+      const a = this.row(l.a, l.keyA, n, l.depth);
+      const b = this.row(l.b, l.keyB, n, l.depth);
+      for (let i = 0; i < a.length; i++) {
+        const on = i < n;
+        // (a hair of overlap so no seam shows between neighbours)
+        a[i].setVisible(on).setPosition(x0 + i * l.w - 0.3 * i, l.y);
+        b[i].setVisible(on && this.showB).setAlpha(this.wB).setPosition(x0 + i * l.w - 0.3 * i, l.y);
       }
     }
     // solid fill under the nearest layer so the bottom of the screen is always covered
     const near = this.layers[this.layers.length - 1];
-    const fillTop = near.a.y + near.h - 2;
+    const fillTop = near.y + near.h - 2;
     this.fill.setPosition(view.left - 2, fillTop);
     this.fill.setSize(view.width + 4, Math.max(0, view.top + view.height - fillTop + 4));
   }

@@ -26,6 +26,9 @@ export function unlockAudio() {
   if (ctx.state === 'suspended') void ctx.resume();
 }
 
+/** The shared audio context (made on the first tap), for the music too. */
+export const audioContext = () => ctx;
+
 export function setMuted(m: boolean) {
   muted = m;
   try {

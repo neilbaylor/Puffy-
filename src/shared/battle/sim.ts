@@ -9,13 +9,14 @@
 import { CHARACTERS, type CharacterDef } from '../../data/characters';
 import type { LevelData } from '../../level/builder';
 import { ONE_WAY_TILES, SOLID_TILES } from '../../level/tiles';
-import { ARENA_SPAWNS } from './arena';
+import { ARENA_RAMPS, ARENA_SPAWNS, type Ramp } from './arena';
 
 export const TICK_HZ = 30;
 export const DT = 1 / TICK_HZ;
 export const TILE_PX = 32;
 export const HEARTS = 3;
-export const MATCH_SECS = 120;
+/** 2½ minutes (the battle song is cued to end exactly on 0). */
+export const MATCH_SECS = 150;
 export const WIN_KOS = 5;
 export const RESPAWN_SECS = 2.4;
 
@@ -31,22 +32,28 @@ const EXHAUSTED_UNTIL = 0.3;
 const ROCKET_LIFE = 1.4;
 
 /** Prizes that drop into the arena (a race to grab each one). */
-export type PrizeKind = 'bomb' | 'star' | 'grow' | 'rapid' | 'heart';
+export type PrizeKind = 'bomb' | 'star' | 'grow' | 'rapid' | 'heart' | 'ice' | 'fire';
 /** How often each kind turns up (out of the total). */
 const PRIZE_ODDS: [PrizeKind, number][] = [
-  ['bomb', 24],
-  ['rapid', 22],
-  ['grow', 20],
-  ['star', 16],
-  ['heart', 18],
+  ['bomb', 20],
+  ['rapid', 17],
+  ['grow', 16],
+  ['star', 13],
+  ['heart', 15],
+  ['ice', 10],
+  ['fire', 14],
 ];
-/** Timed powers: 0 none, 1 star (invincible), 2 grow (big & strong), 3 rapid fire. */
-export const POWER = { none: 0, star: 1, grow: 2, rapid: 3 } as const;
-const POWER_SECS: Record<number, number> = { 1: 6, 2: 8, 3: 7 };
+/** Timed powers: 0 none, 1 star (invincible), 2 grow (big & strong), 3 rapid fire, 4 fireballs. */
+export const POWER = { none: 0, star: 1, grow: 2, rapid: 3, fire: 4 } as const;
+const POWER_SECS: Record<number, number> = { 1: 10, 2: 8, 3: 7, 4: 8 };
+/** Grabbing ice freezes everyone else this long. */
+export const FREEZE_SECS = 2;
+/** Landing on someone's head: a hit, and you bounce off. */
+const STOMP_BOUNCE = 560;
 /** How much bigger "grow" makes you. */
 export const GROW = 1.45;
 const BOMBS_PER_PRIZE = 3;
-const MAX_PRIZES = 3;
+const MAX_PRIZES = 4;
 const PRIZE_LIFE = 15;
 
 /** Bad guys' collision boxes [w, h] (feet at y), matching their art in the levels. */
@@ -89,13 +96,15 @@ export interface BPlayer {
   /** POWER.* and the seconds it has left. */
   power: number;
   powerT: number;
+  /** > 0: frozen solid (someone grabbed the ice): seconds left. */
+  frozen: number;
 }
 
 export interface BRocket {
   id: number;
   owner: string;
-  /** (pellets are the armed bad guys' shots) */
-  kind: 'rocket' | 'bomb' | 'pellet';
+  /** (pellets, poo and thrown chainsaws are the bad guys'; fire is the fireball power) */
+  kind: RocketKind;
   x: number;
   y: number;
   vx: number;
@@ -108,11 +117,18 @@ export interface BRocket {
   damage: number;
 }
 
-/** Bad guys who drop in to cause trouble for everyone. */
+export type RocketKind = 'rocket' | 'bomb' | 'pellet' | 'fire' | 'poo' | 'saw';
+
+/** Bad guys who drop in to cause trouble for everyone: Puff Balls and Plops, in three sizes. */
 export type EnemyKind = 'small' | 'medium' | 'big';
+export type EnemyRace = 'puff' | 'plop';
+/** What an armed bad guy carries (like in the levels). */
+export type EnemyWeapon = 'gun' | 'saw' | 'flail';
 export interface BEnemy {
   id: number;
   kind: EnemyKind;
+  race: EnemyRace;
+  weapon: EnemyWeapon | null;
   x: number;
   y: number;
   vx: number;
@@ -165,6 +181,9 @@ export type BEvent =
   | { k: 'ehit'; id: number }
   | { k: 'edie'; kind: EnemyKind; x: number; y: number }
   | { k: 'eshot'; x: number; y: number; dir: 1 | -1 }
+  | { k: 'throw'; x: number; y: number; kind: 'poo' | 'saw' }
+  | { k: 'stomp'; id: string; on: string | number; x: number; y: number }
+  | { k: 'freeze'; by: string }
   | { k: 'crash'; kind: 'rock' | 'anvil'; x: number; y: number };
 
 const charOf = (hero: string): CharacterDef => CHARACTERS.find((c) => c.id === hero) ?? CHARACTERS[0];
@@ -183,7 +202,10 @@ export class ArenaMap {
   readonly h: number;
   readonly widthPx: number;
   readonly heightPx: number;
-  constructor(readonly data: LevelData) {
+  constructor(
+    readonly data: LevelData,
+    readonly ramps: Ramp[] = ARENA_RAMPS,
+  ) {
     this.w = data.width;
     this.h = data.height;
     this.widthPx = this.w * TILE_PX;
@@ -203,13 +225,33 @@ export class ArenaMap {
   solidAt(px: number, py: number) {
     return this.solid(Math.floor(px / TILE_PX), Math.floor(py / TILE_PX));
   }
+  /** The ramp's walking surface at x (world px), or null if there's no ramp there. */
+  rampY(x: number): number | null {
+    for (const r of this.ramps) {
+      if (x >= r.x0 && x <= r.x1) return r.y0 + ((r.y1 - r.y0) * (x - r.x0)) / (r.x1 - r.x0);
+      if (x > r.x1 && x <= r.x1 + r.flat) return r.y1;
+    }
+    return null;
+  }
+  /**
+   * Standing on (or landing on) a ramp: the surface to put your feet on, or null.
+   * Coming down onto it from above lands; walking along it sticks to it (up or
+   * down a bit each tick); from underneath you go straight through.
+   */
+  rampLand(x: number, prevY: number, y: number, vy: number, wasGround: boolean): number | null {
+    if (vy < 0) return null;
+    const ry = this.rampY(x);
+    if (ry === null) return null;
+    const stick = wasGround ? 14 : 0;
+    return prevY <= ry + 1 + stick && y >= ry - stick ? ry : null;
+  }
 }
 
 export function newPlayer(id: string, hero: string, slot: number): BPlayer {
   return {
     id, hero, slot, x: 0, y: 0, vx: 0, vy: 0, facing: 1, onGround: false, airJumps: 1, coyote: 0, jumpBuf: 0,
     jumping: false, prevBtn: 0, fireCd: 0, stamina: 1, exhausted: false, running: false, stun: 0, invuln: 0,
-    shotAgo: 9, hp: HEARTS, respawn: 0, kos: 0, deaths: 0, lastHitBy: null, bombs: 0, power: 0, powerT: 0,
+    shotAgo: 9, hp: HEARTS, respawn: 0, kos: 0, deaths: 0, lastHitBy: null, bombs: 0, power: 0, powerT: 0, frozen: 0,
   };
 }
 
@@ -230,6 +272,7 @@ export function stepMove(p: BPlayer, btn: number, map: ArenaMap, ev?: BEvent[], 
   const jumpPressed = jumpHeld && !(p.prevBtn & BTN.jump);
   p.stun = Math.max(0, p.stun - dt);
   p.invuln = Math.max(0, p.invuln - dt);
+  p.frozen = Math.max(0, p.frozen - dt);
   p.shotAgo += dt;
   if (p.power) {
     p.powerT -= dt;
@@ -238,7 +281,7 @@ export function stepMove(p: BPlayer, btn: number, map: ArenaMap, ev?: BEvent[], 
       p.powerT = 0;
     }
   }
-  const ctl = p.stun <= 0;
+  const ctl = p.stun <= 0 && p.frozen <= 0;
   const dir = ctl ? ((btn & BTN.right) ? 1 : 0) - ((btn & BTN.left) ? 1 : 0) : 0;
 
   // stamina: running drains it, it refills when you stop
@@ -268,6 +311,8 @@ export function stepMove(p: BPlayer, btn: number, map: ArenaMap, ev?: BEvent[], 
     p.facing = dir as 1 | -1;
   } else if (ctl) {
     vx = approach(vx, 0, (p.onGround ? c.accel * 1.4 : c.airAccel * 0.3) * dt);
+  } else if (p.frozen > 0) {
+    vx = approach(vx, 0, 900 * dt); // a block of ice just slides to a stop
   }
   p.vx = vx;
 
@@ -320,6 +365,7 @@ export function stepMove(p: BPlayer, btn: number, map: ArenaMap, ev?: BEvent[], 
 }
 
 function moveAndCollide(p: BPlayer, c: CharacterDef, map: ArenaMap) {
+  const wasGround = p.onGround;
   const w = boxW(c, sizeOf(p));
   const h = boxH(c, sizeOf(p));
   const T = TILE_PX;
@@ -351,6 +397,8 @@ function moveAndCollide(p: BPlayer, c: CharacterDef, map: ArenaMap) {
   // vertical
   const prevY = p.y;
   p.y += p.vy * DT;
+  const movedY = p.y;
+  const movedVy = p.vy;
   p.onGround = false;
   const tx0 = Math.floor((p.x - w / 2 + 1) / T);
   const tx1 = Math.floor((p.x + w / 2 - 1) / T);
@@ -376,11 +424,33 @@ function moveAndCollide(p: BPlayer, c: CharacterDef, map: ArenaMap) {
         break;
       }
   }
+  // the ramp (it wins over the floor where it's the higher of the two: walking onto it)
+  {
+    const ry = map.rampLand(p.x, prevY, movedY, movedVy, wasGround);
+    if (ry !== null && (!p.onGround || ry < p.y)) {
+      p.y = ry;
+      p.vy = 0;
+      p.onGround = true;
+    }
+  }
   // fell out of the arena (shouldn't happen: there are no pits) — put back on top
   if (p.y > map.heightPx + 200) {
     p.y = 0;
     p.vy = 0;
   }
+}
+
+/** Where something dropped at x first lands: the ramp, or the first ground or cloud below the sky. */
+export function landingY(map: ArenaMap, x: number) {
+  const tx = Math.floor(x / TILE_PX);
+  let y = map.heightPx;
+  for (let ty = 0; ty < map.h; ty++)
+    if (map.solid(tx, ty) || map.oneWay(tx, ty)) {
+      y = ty * TILE_PX;
+      break;
+    }
+  const ry = map.rampY(x);
+  return ry !== null && ry < y ? ry : y;
 }
 
 /** The whole match (server side). */
@@ -446,6 +516,7 @@ export class BattleSim {
     p.bombs = 0;
     p.power = 0;
     p.powerT = 0;
+    p.frozen = 0;
   }
 
   /** Most shots in the air at once (rapid fire allows more). */
@@ -482,12 +553,17 @@ export class BattleSim {
           p.bombs--;
           this.rockets.push({ id: this.nextRocket++, owner: p.id, kind: 'bomb', x: rx, y: ry, vx: p.facing * 300 + p.vx * 0.35, vy: -430, dir: p.facing, age: 0, speed: 0, radius: 118 * (big ? 1.25 : 1), damage: 2 });
           ev.push({ k: 'fire', id: p.id, x: rx, y: ry, dir: p.facing, bomb: true });
+        } else if (p.power === POWER.fire) {
+          // a fireball: lobbed forward, it arcs down and bursts into flames
+          this.rockets.push({ id: this.nextRocket++, owner: p.id, kind: 'fire', x: rx, y: ry, vx: p.facing * 430 + p.vx * 0.3, vy: -300, dir: p.facing, age: 0, speed: 0, radius: 58, damage: 1 });
+          ev.push({ k: 'fire', id: p.id, x: rx, y: ry, dir: p.facing });
         } else {
           this.rockets.push({ id: this.nextRocket++, owner: p.id, kind: 'rocket', x: rx, y: ry, vx: p.facing * c.rocketSpeed * 0.45, vy: 0, dir: p.facing, age: 0, speed: c.rocketSpeed, radius: c.blastRadius * (big ? 1.4 : 1), damage: big ? 2 : 1 });
           ev.push({ k: 'fire', id: p.id, x: rx, y: ry, dir: p.facing });
         }
       }
     }
+    this.stomps(ev);
     this.stepPrizes(ev);
     this.starContacts(ev);
     this.stepEnemies(ev);
@@ -513,12 +589,23 @@ export class BattleSim {
           r.vx *= 0.72;
         }
         boom = r.age > 1.6 || r.y > this.map.heightPx + 60;
+      } else if (r.kind === 'fire' || r.kind === 'poo' || r.kind === 'saw') {
+        // lobbed things: an arc, and they burst (or splat) on whatever they land on
+        r.vy = Math.min(MAX_FALL, r.vy + (r.kind === 'saw' ? 900 : 1150) * DT);
+        const prevY = r.y;
+        r.x += r.vx * DT;
+        r.y += r.vy * DT;
+        const tx = Math.floor(r.x / TILE_PX);
+        const ty = Math.floor(r.y / TILE_PX);
+        const landed = r.vy > 0 && this.map.oneWay(tx, ty) && prevY <= ty * TILE_PX + 0.5;
+        boom = r.age > 2.4 || r.x < -40 || r.x > this.map.widthPx + 40 || r.y > this.map.heightPx + 40 || this.map.solidAt(r.x, r.y) || landed;
       } else {
         if (r.kind === 'rocket') r.vx += (r.dir * r.speed - r.vx) * Math.min(1, DT * 7);
         r.x += r.vx * DT;
         boom = r.age > ROCKET_LIFE * (r.kind === 'pellet' ? 1.6 : 1) || r.x < -40 || r.x > this.map.widthPx + 40 || this.map.solidAt(r.x + r.dir * 6, r.y);
       }
-      if (!boom && r.kind !== 'pellet')
+      const enemyShot = r.kind === 'pellet' || r.kind === 'poo' || r.kind === 'saw';
+      if (!boom && !enemyShot)
         for (const e of this.enemies) {
           const [w, h] = ENEMY_BOX[e.kind];
           if (Math.abs(r.x - e.x) < w / 2 + 6 && r.y > e.y - h - 3 && r.y < e.y + 3) {
@@ -526,7 +613,7 @@ export class BattleSim {
             break;
           }
         }
-      if (!boom && (r.kind === 'rocket' || r.age > 0.2))
+      if (!boom && (r.kind === 'rocket' || r.kind === 'fire' || enemyShot || r.age > 0.2))
         for (const p of this.players.values()) {
           if (p.id === r.owner || p.respawn > 0) continue;
           const c = charOf(p.hero);
@@ -549,7 +636,7 @@ export class BattleSim {
     const bx = r.x + (r.kind === 'rocket' ? r.dir * 6 : 0);
     ev.push({ k: 'boom', x: bx, y: r.y, r: r.radius });
     // heroes' blasts pop the bad guys too
-    if (r.kind !== 'pellet')
+    if (r.kind !== 'pellet' && r.kind !== 'poo' && r.kind !== 'saw')
       for (const e of this.enemies) {
         const [w, h] = ENEMY_BOX[e.kind];
         const d = Math.hypot(e.x - bx, e.y - h / 2 - r.y);
@@ -586,8 +673,61 @@ export class BattleSim {
       p.deaths++;
       const killer = this.players.get(by);
       if (killer) killer.kos++;
+      // knocked out by a bad guy or something from the sky (not a friend): you lose a point (never below 0)
+      else p.kos = Math.max(0, p.kos - 1);
       ev.push({ k: 'ko', id: p.id, by });
     }
+  }
+
+  /** Coming down on someone's head (a hero or a bad guy): that's a hit, and you bounce off. */
+  private stomps(ev: BEvent[]) {
+    for (const a of this.players.values()) {
+      if (a.respawn > 0 || a.vy < 60 || a.onGround) continue;
+      const ca = charOf(a.hero);
+      const ka = sizeOf(a);
+      const half = boxW(ca, ka) / 2;
+      let bounced = false;
+      for (const b of this.players.values()) {
+        if (b === a || b.respawn > 0) continue;
+        const cb = charOf(b.hero);
+        const kb = sizeOf(b);
+        const top = b.y - boxH(cb, kb);
+        if (Math.abs(a.x - b.x) < half + boxW(cb, kb) / 2 - 2 && a.y >= top - 2 && a.y <= top + 16) {
+          ev.push({ k: 'stomp', id: a.id, on: b.id, x: b.x, y: top });
+          this.hurt(b, a.id, a.x, 1, 0.5, ev);
+          bounced = true;
+          break;
+        }
+      }
+      if (!bounced)
+        for (const e of this.enemies) {
+          if (e.chute) continue;
+          const [w, h] = ENEMY_BOX[e.kind];
+          const top = e.y - h;
+          if (Math.abs(a.x - e.x) < half + w / 2 - 2 && a.y >= top - 2 && a.y <= top + 18) {
+            ev.push({ k: 'stomp', id: a.id, on: e.id, x: e.x, y: top });
+            this.hurtEnemy(e, a.power === POWER.grow ? 2 : 1, ev);
+            bounced = true;
+            break;
+          }
+        }
+      if (bounced) {
+        a.vy = -STOMP_BOUNCE;
+        a.airJumps = 1;
+        a.y -= 2;
+        a.invuln = Math.max(a.invuln, 0.25); // (no getting hurt by the one you just landed on)
+      }
+    }
+  }
+
+  /** Ice: everyone else freezes solid for a moment (unless they're invincible). */
+  private freezeOthers(by: BPlayer, ev: BEvent[]) {
+    for (const p of this.players.values()) {
+      if (p === by || p.respawn > 0 || p.power === POWER.star) continue;
+      p.frozen = FREEZE_SECS;
+      p.vy = Math.max(p.vy, 0);
+    }
+    ev.push({ k: 'freeze', by: by.id });
   }
 
   /** Running into someone while invincible knocks them flying. */
@@ -610,7 +750,7 @@ export class BattleSim {
   private stepPrizes(ev: BEvent[]) {
     this.dropIn -= DT;
     if (this.dropIn <= 0) {
-      this.dropIn = 4 + Math.random() * 3;
+      this.dropIn = 2.6 + Math.random() * 2.4;
       if (this.prizes.length < MAX_PRIZES) {
         let roll = Math.random() * PRIZE_ODDS.reduce((t, [, w]) => t + w, 0);
         let kind: PrizeKind = 'bomb';
@@ -640,7 +780,11 @@ export class BattleSim {
         z.y += z.vy * DT;
         const tx = Math.floor(z.x / TILE_PX);
         const ty = Math.floor(z.y / TILE_PX);
-        if (ty >= 0 && (this.map.solid(tx, ty) || (this.map.oneWay(tx, ty) && prevY <= ty * TILE_PX + 0.5))) {
+        const ry = this.map.rampLand(z.x, prevY, z.y, z.vy, false);
+        if (ry !== null) {
+          z.y = ry;
+          z.landed = true;
+        } else if (ty >= 0 && (this.map.solid(tx, ty) || (this.map.oneWay(tx, ty) && prevY <= ty * TILE_PX + 0.5))) {
           z.y = ty * TILE_PX;
           z.landed = true;
         }
@@ -651,7 +795,7 @@ export class BattleSim {
         const c = charOf(p.hero);
         const k = sizeOf(p);
         if (Math.abs(p.x - z.x) < boxW(c, k) / 2 + 22 && z.y > p.y - boxH(c, k) - 10 && z.y - 44 < p.y) {
-          this.grant(p, z.kind);
+          this.grant(p, z.kind, ev);
           ev.push({ k: 'prize', id: p.id, kind: z.kind, x: z.x, y: z.y });
           z.age = 1e9;
           break;
@@ -661,8 +805,15 @@ export class BattleSim {
     this.prizes = this.prizes.filter((z) => z.age < PRIZE_LIFE);
   }
 
-  private grant(p: BPlayer, kind: PrizeKind) {
+  private grant(p: BPlayer, kind: PrizeKind, ev: BEvent[]) {
     switch (kind) {
+      case 'ice':
+        this.freezeOthers(p, ev);
+        break;
+      case 'fire':
+        p.power = POWER.fire;
+        p.powerT = POWER_SECS[POWER.fire];
+        break;
       case 'bomb':
         p.bombs = Math.min(6, p.bombs + BOMBS_PER_PRIZE);
         break;
@@ -686,17 +837,19 @@ export class BattleSim {
 
   // ── bad guys ──
 
-  /** Room for one more? At most one big one, or two small / medium ones. */
+  /** Room for one more? Up to three at once, at most one of them big. */
   private enemyBudget(): EnemyKind | null {
-    if (this.enemies.some((e) => e.kind === 'big') || this.enemies.length >= 2) return null;
+    if (this.enemies.length >= 3) return null;
+    const hasBig = this.enemies.some((e) => e.kind === 'big');
     const r = Math.random();
-    if (this.enemies.length === 0 && r < 0.18) return 'big';
-    return r < 0.6 ? 'small' : 'medium';
+    if (!hasBig && r < 0.32) return 'big';
+    return Math.random() < 0.55 ? 'small' : 'medium';
   }
 
   private spawnEnemy(ev: BEvent[]) {
     const kind = this.enemyBudget();
     if (!kind) return;
+    const race: EnemyRace = Math.random() < 0.45 ? 'plop' : 'puff';
     const chute = kind !== 'big' && Math.random() < 0.5;
     const T = TILE_PX;
     let x: number;
@@ -711,10 +864,16 @@ export class BattleSim {
       x = left ? 1.5 * T : this.map.widthPx - 1.5 * T;
       y = (this.map.h - 3) * T;
     }
-    const armed = kind !== 'big' && Math.random() < 1 / 3;
-    const hp = kind === 'big' ? 5 : kind === 'medium' ? (armed ? 3 : 2) : 1;
+    // 1 in 3 (not the big ones) carry a weapon: Puff Balls a blaster, chainsaw or ball and chain
+    // (small ones just the blaster); Plops any of the three. Armed ones take one more hit.
+    let weapon: EnemyWeapon | null = null;
+    if (kind !== 'big' && Math.random() < 1 / 3) {
+      const opts: EnemyWeapon[] = kind === 'small' && race === 'puff' ? ['gun'] : ['gun', 'saw', 'flail'];
+      weapon = opts[Math.floor(Math.random() * opts.length)];
+    }
+    const hp = (kind === 'big' ? 5 : kind === 'medium' ? 2 : 1) + (weapon ? 1 : 0);
     const dir: 1 | -1 = x < this.map.widthPx / 2 ? 1 : -1;
-    this.enemies.push({ id: this.nextThing++, kind, x, y, vx: 0, vy: 0, dir, hp, onGround: !chute, armed, chute, fireCd: 1.5 + Math.random(), jumpCd: 1, hurtT: 0 });
+    this.enemies.push({ id: this.nextThing++, kind, race, weapon, x, y, vx: 0, vy: 0, dir, hp, onGround: !chute, armed: !!weapon, chute, fireCd: 1.5 + Math.random(), jumpCd: 1, hurtT: 0 });
     ev.push({ k: 'espawn', kind, x, chute });
   }
 
@@ -740,10 +899,29 @@ export class BattleSim {
     return best;
   }
 
+  /** Where a ball-and-chain's ball is right now (it swings round the bad guy's hand). */
+  flailBall(e: BEnemy) {
+    const [, h] = ENEMY_BOX[e.kind];
+    const a = this.tick * 0.16 + e.id * 1.7;
+    const R = e.kind === 'small' ? 34 : 46;
+    return { x: e.x + Math.cos(a) * R, y: e.y - h * 0.55 + Math.sin(a) * R * 0.8, a };
+  }
+
+  /** Lob something at (tx, ty) from (x, y): poo, or a thrown chainsaw. */
+  private lob(e: BEnemy, kind: 'poo' | 'saw', x: number, y: number, tx: number, ty: number, ev: BEvent[]) {
+    const tFlight = 0.85;
+    const g = kind === 'saw' ? 900 : 1150;
+    const vx = Math.max(-420, Math.min(420, (tx - x) / tFlight));
+    const vy = Math.max(-720, Math.min(-260, (ty - 20 - y) / tFlight - 0.5 * g * tFlight));
+    const big = e.kind === 'big';
+    this.rockets.push({ id: this.nextRocket++, owner: `e${e.id}`, kind, x, y, vx, vy, dir: vx >= 0 ? 1 : -1, age: 0, speed: 0, radius: kind === 'saw' ? 26 : big ? 34 : 22, damage: 1 });
+    ev.push({ k: 'throw', x, y, kind });
+  }
+
   private stepEnemies(ev: BEvent[]) {
     this.enemyIn -= DT;
     if (this.enemyIn <= 0) {
-      this.enemyIn = 7 + Math.random() * 6;
+      this.enemyIn = 4.5 + Math.random() * 4.5;
       this.spawnEnemy(ev);
     }
     const T = TILE_PX;
@@ -759,17 +937,30 @@ export class BattleSim {
         e.vx = Math.sin((this.tick + e.id * 17) * 0.06) * 30;
       } else {
         const dx = tgt ? tgt.x - e.x : 0;
+        const dy = tgt ? tgt.y - e.y : 0;
         if (tgt && Math.abs(dx) > 8) e.dir = dx > 0 ? 1 : -1;
-        const speed = e.kind === 'big' ? 55 : e.kind === 'medium' ? 82 : 70;
-        // an armed one plants its feet to shoot when it has a clear line
-        const aiming = e.armed && tgt && Math.abs(tgt.y - e.y) < 70 && Math.abs(dx) < 360;
-        if (e.onGround) e.vx = aiming && e.fireCd < 0.5 ? 0 : e.dir * speed;
+        let speed = e.kind === 'big' ? 55 : e.kind === 'medium' ? 82 : 70;
+        if (e.weapon === 'saw') speed *= 1.35; // chainsaw ones chase harder
+        // hurt twice, a chainsaw one loses its temper and THROWS the chainsaw at you
+        if (e.weapon === 'saw' && e.hp <= 1 && tgt) {
+          e.weapon = null;
+          this.lob(e, 'saw', e.x + e.dir * w * 0.5, e.y - h * 0.5, tgt.x, tgt.y - 16, ev);
+        }
+        // a blaster: plant your feet and shoot when there's a clear line
+        const aiming = e.weapon === 'gun' && tgt && Math.abs(dy) < 70 && Math.abs(dx) < 360;
+        // a Plop (no weapon) throws poo, in an arc
+        const throwing = e.race === 'plop' && !e.weapon && tgt && Math.abs(dx) < 430 && Math.abs(dx) > 40 && dy > -220;
+        if (e.onGround) e.vx = (aiming || throwing) && e.fireCd < 0.4 ? 0 : e.dir * speed;
         if (aiming && e.fireCd <= 0) {
           e.fireCd = 2.4 + Math.random() * 0.8;
           const mx = e.x + e.dir * w * 0.7;
           const my = e.y - h * 0.5;
           this.rockets.push({ id: this.nextRocket++, owner: `e${e.id}`, kind: 'pellet', x: mx, y: my, vx: e.dir * 300, vy: 0, dir: e.dir, age: 0, speed: 300, radius: 14, damage: 1 });
           ev.push({ k: 'eshot', x: mx, y: my, dir: e.dir });
+        }
+        if (throwing && e.fireCd <= 0 && e.onGround) {
+          e.fireCd = (e.kind === 'big' ? 1.8 : 2.3) + Math.random() * 1;
+          this.lob(e, 'poo', e.x + e.dir * w * 0.3, e.y - h * 0.8, tgt.x, tgt.y, ev);
         }
         // hop up steps, over gaps and up to you
         const ahead = e.x + e.dir * (w / 2 + 4);
@@ -791,7 +982,14 @@ export class BattleSim {
       e.y += e.vy * DT;
       const wasAir = !e.onGround;
       e.onGround = false;
-      if (e.vy >= 0) {
+      const onRamp = this.map.rampLand(e.x, prevY, e.y, e.vy, !wasAir);
+      if (onRamp !== null) {
+        e.y = onRamp;
+        e.vy = 0;
+        e.onGround = true;
+        if (e.chute) e.chute = false;
+      }
+      if (e.vy >= 0 && !e.onGround) {
         const ty = Math.floor(e.y / T);
         for (const tx of [Math.floor((e.x - w / 2 + 2) / T), Math.floor((e.x + w / 2 - 2) / T)])
           if (this.map.solid(tx, ty) || (this.map.oneWay(tx, ty) && prevY <= ty * T + 0.5)) {
@@ -809,16 +1007,21 @@ export class BattleSim {
           }
       }
       if (e.y > this.map.heightPx + 100) e.hp = 0;
-      // bumping into a bad guy hurts
+      // bumping into a bad guy hurts (a chainsaw reaches further in front; a ball and chain swings round)
+      const ball = e.weapon === 'flail' && !e.chute ? this.flailBall(e) : null;
       for (const p of this.players.values()) {
         if (p.respawn > 0) continue;
         const c = charOf(p.hero);
         const k = sizeOf(p);
         const pw = boxW(c, k);
         const ph = boxH(c, k);
-        if (Math.abs(p.x - e.x) < (pw + w) / 2 - 4 && p.y - ph < e.y - 4 && e.y - h < p.y - 4) {
+        const reachF = e.weapon === 'saw' ? 22 : 0;
+        const front = (p.x - e.x) * e.dir > 0;
+        const touch = Math.abs(p.x - e.x) < (pw + w) / 2 - 4 + (front ? reachF : 0) && p.y - ph < e.y - 4 && e.y - h < p.y - 4;
+        const ballHit = !!ball && Math.abs(p.x - ball.x) < pw / 2 + 12 && ball.y > p.y - ph - 12 && ball.y < p.y + 6;
+        if (touch || ballHit) {
           if (p.power === POWER.star) this.hurtEnemy(e, 5, ev);
-          else this.hurt(p, 'enemy', e.x, 1, 1, ev);
+          else this.hurt(p, 'enemy', ballHit ? ball!.x : e.x, 1, 1, ev);
         }
       }
     }
@@ -830,9 +1033,13 @@ export class BattleSim {
   private stepHazards(ev: BEvent[]) {
     this.hazardIn -= DT;
     if (this.hazardIn <= 0) {
-      this.hazardIn = 3.5 + Math.random() * 3.5;
-      const x = (2 + Math.random() * (this.map.w - 4)) * TILE_PX;
-      this.hazards.push({ id: this.nextThing++, kind: Math.random() < 0.35 ? 'anvil' : 'rock', x, y: -40, vy: 0, warn: 1.1 });
+      this.hazardIn = 2.2 + Math.random() * 2.3;
+      // now and then a shower of two or three
+      const n = Math.random() < 0.3 ? 2 + Math.floor(Math.random() * 2) : 1;
+      for (let i = 0; i < n; i++) {
+        const x = (2 + Math.random() * (this.map.w - 4)) * TILE_PX;
+        this.hazards.push({ id: this.nextThing++, kind: Math.random() < 0.35 ? 'anvil' : 'rock', x, y: -40, vy: 0, warn: 1.1 + i * 0.35 });
+      }
     }
     const T = TILE_PX;
     for (const z of this.hazards) {
@@ -857,7 +1064,11 @@ export class BattleSim {
       }
       const ty = Math.floor(z.y / T);
       const tx = Math.floor(z.x / T);
-      if (z.y > 0 && (this.map.solid(tx, ty) || (this.map.oneWay(tx, ty) && prevY <= ty * T + 0.5))) {
+      const ry = this.map.rampLand(z.x, prevY, z.y, z.vy, false);
+      if (ry !== null) {
+        ev.push({ k: 'crash', kind: z.kind, x: z.x, y: ry });
+        z.warn = -99;
+      } else if (z.y > 0 && (this.map.solid(tx, ty) || (this.map.oneWay(tx, ty) && prevY <= ty * T + 0.5))) {
         ev.push({ k: 'crash', kind: z.kind, x: z.x, y: ty * T });
         z.warn = -99; // done
       }
@@ -867,9 +1078,7 @@ export class BattleSim {
 
   /** Where something dropped at x first lands (top of the first ground or cloud below the sky). */
   landingY(x: number) {
-    const tx = Math.floor(x / TILE_PX);
-    for (let ty = 0; ty < this.map.h; ty++) if (this.map.solid(tx, ty) || this.map.oneWay(tx, ty)) return ty * TILE_PX;
-    return this.map.heightPx;
+    return landingY(this.map, x);
   }
 
   rocketsOf(id: string) {

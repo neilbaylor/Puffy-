@@ -5,8 +5,11 @@
  */
 import type Phaser from 'phaser';
 import { sfx } from '../core/sfx';
+import { fadeOutMusic, playBattleMusic, playLevelMusic, preloadBattleMusic } from '../core/music';
+import { MATCH_SECS } from '../shared/battle/sim';
 import { CHARACTERS, characterById } from '../data/characters';
 import { drawPortrait } from '../gfx/draw';
+import { FaceClock, faceFromKey } from '../gfx/face';
 import { recolorForSlot } from '../gfx/recolor';
 import { BattleNet, battleUrl, type NetStatus } from '../net/battleNet';
 import type { BattleHud } from '../scenes/BattleScene';
@@ -23,6 +26,8 @@ export interface BattleHost {
   touch(show: boolean): void;
   /** Show the touch BOMB button with this many bombs (0 hides it). */
   bombs(n: number): void;
+  /** The level picked on the start screen (the lobby plays its song). */
+  level(): number;
 }
 
 const h = (html: string) => {
@@ -42,12 +47,12 @@ function storedName() {
   }
 }
 
-/** A hero portrait in a player slot's colour. */
-function slotPortrait(target: HTMLCanvasElement, hero: string, slot: number) {
+/** A hero portrait in a player slot's colour (in a pose, with a face). */
+function slotPortrait(target: HTMLCanvasElement, hero: string, slot: number, pose: 'idle0' | 'idle1' = 'idle0', faceKey: string | null = null) {
   const tmp = document.createElement('canvas');
   tmp.width = target.width;
   tmp.height = target.height;
-  drawPortrait(tmp, characterById(hero));
+  drawPortrait(tmp, characterById(hero), pose, faceKey ? faceFromKey(faceKey) : undefined, 'idle0');
   const out = recolorForSlot(tmp, slot);
   const ctx = target.getContext('2d')!;
   ctx.clearRect(0, 0, target.width, target.height);
@@ -72,6 +77,8 @@ export class BattleUI {
     this.showLobby();
     if (!url) return this.status('offline', 'Online battles work on the game’s web address (not a saved copy).');
     this.status('connecting');
+    playLevelMusic(this.host.level());
+    preloadBattleMusic();
     this.net = new BattleNet(url, name, this.host.hero());
     this.net.onStatus = (s) => this.status(s);
     this.net.onRoom = (r) => this.room(r);
@@ -216,9 +223,34 @@ export class BattleUI {
         <b>${p ? esc(p.name) : 'Waiting…'}</b>
         <small>${p ? `${me ? 'You · ' : ''}${characterById(p.hero).name}` : SLOT_NAMES[slot]}</small>
       </div>`);
-      if (p) slotPortrait(el.querySelector('canvas')!, p.hero, slot);
+      if (p) this.liveSlot(el.querySelector('canvas')!, p.hero, slot);
       box.appendChild(el);
     }
+  }
+
+  /** The heroes in the squares stand there breathing, blinking and glancing about, like on the start screen. */
+  private liveSlot(cv: HTMLCanvasElement, hero: string, slot: number) {
+    const face = new FaceClock();
+    let pose: 'idle0' | 'idle1' = 'idle0';
+    let shown = '';
+    let t = Math.random() * 0.6;
+    const draw = () => {
+      const k = `${pose}|${face.key}`;
+      if (k === shown) return;
+      shown = k;
+      slotPortrait(cv, hero, slot, pose, face.key);
+    };
+    draw();
+    const iv = window.setInterval(() => {
+      if (!cv.isConnected) return clearInterval(iv);
+      face.tick(0.1);
+      t += 0.1;
+      if (t >= 0.625) {
+        t -= 0.625;
+        pose = pose === 'idle0' ? 'idle1' : 'idle0';
+      }
+      draw();
+    }, 100);
   }
 
   // ── the room changed (someone joined, the match started or ended…) ──
@@ -233,11 +265,17 @@ export class BattleUI {
       return;
     }
     if (r.phase === 'results' && this.inBattle) {
-      if (phaseChanged) this.showResults(r);
+      if (phaseChanged) {
+        fadeOutMusic(700);
+        this.showResults(r);
+      }
       return;
     }
     // lobby / countdown / watching someone else's match
-    if (this.inBattle || !this.lobby || !this.lobby.isConnected) this.showLobby();
+    if (this.inBattle || !this.lobby || !this.lobby.isConnected) {
+      if (this.inBattle) playLevelMusic(this.host.level());
+      this.showLobby();
+    }
     const lobby = this.lobby!;
     // (your name card wears your colour)
     const spectator = !!me && me.slot < 0;
@@ -263,6 +301,8 @@ export class BattleUI {
     lobby.querySelector<HTMLElement>('.bl-clock')!.hidden = !counting;
     if (counting) this.runClock(r.timer, phaseChanged);
     else this.stopClock();
+    // (the countdown stopped without a battle: drop the warmed-up arena)
+    if (!counting && !watching && this.warmed) this.coolDown();
   }
 
   // ── the countdown clock: a ring that runs down, the screen shakes near 0 ──
@@ -295,6 +335,8 @@ export class BattleUI {
         clock.classList.toggle('hot', sec <= 3);
         if (sec <= 3) sfx.select();
       }
+      // a few seconds before the start, get the arena ready (invisibly), so it starts without a hitch
+      if (left < 6 && !this.warmed && !this.spectating) this.warmUp();
       // the last few seconds: a rumble that builds up to the start
       const k = Math.max(0, Math.min(1, (4 - left) / 4));
       const a = k * k * 7;
@@ -303,6 +345,20 @@ export class BattleUI {
       this.clockRaf = requestAnimationFrame(tick);
     };
     this.clockRaf = requestAnimationFrame(tick);
+  }
+
+  /** Build the arena now (hidden), while the countdown runs. */
+  private warmed = false;
+  private warmUp() {
+    const g = this.host.game;
+    if (!this.net || g.scene.isActive('Battle')) return;
+    this.warmed = true;
+    g.scene.start('Battle', { net: this.net, spectate: true, warm: true });
+  }
+  private coolDown() {
+    this.warmed = false;
+    const g = this.host.game;
+    if (!this.inBattle && !this.spectating && g.scene.isActive('Battle')) g.scene.stop('Battle');
   }
 
   private stopClock() {
@@ -354,29 +410,50 @@ export class BattleUI {
     const net = this.net;
     const old = this.lobby;
     this.lobby = null;
-    // the lobby (and the start screen behind it) slides away to unveil the arena:
-    // a picture of the start screen goes on a curtain with the lobby, then the arena starts underneath
-    let done = false;
-    const go = (img?: HTMLImageElement) => {
-      if (done) return;
-      done = true;
-      if (!this.inBattle) return; // (left before it started)
-      const curtain = img && old ? h(`<div class="bl-curtain"></div>`) : null;
-      g.scene.stop('Menu');
-      g.scene.start('Battle', { net });
+    this.warmed = false;
+    // the arena starts underneath (it was built during the countdown, so this is quick)
+    g.scene.start('Battle', { net });
+    if (old?.isConnected && g.scene.isActive('Menu')) {
+      // the lobby, and the start screen behind it, slide up together like a curtain to unveil it:
+      // the start screen keeps drawing on top, its camera moving up in step with the lobby
+      g.scene.bringToTop('Menu');
       this.host.setScreen(null);
-      if (curtain && old && img) {
-        curtain.style.backgroundImage = `url(${img.src})`;
-        curtain.appendChild(old);
-        this.host.root.appendChild(curtain);
-        requestAnimationFrame(() => requestAnimationFrame(() => curtain.classList.add('away')));
-        window.setTimeout(() => curtain.remove(), 1100);
-      }
-    };
-    if (old?.isConnected) {
-      g.renderer.snapshot((snap) => go(snap as HTMLImageElement));
-      window.setTimeout(() => go(), 1000);
-    } else go();
+      const curtain = h(`<div class="bl-curtain"></div>`);
+      curtain.appendChild(old);
+      this.host.root.appendChild(curtain);
+      const cam = g.scene.getScene('Menu').cameras.main;
+      const D = 850;
+      let t0 = 0;
+      let frames = 0;
+      const finish = () => {
+        curtain.remove();
+        cam.setViewport(0, 0, g.scale.width, g.scale.height);
+        g.scene.stop('Menu');
+        g.scene.bringToTop('Battle');
+      };
+      const step = (now: number) => {
+        if (!this.inBattle) return finish();
+        // (two still frames first: the arena's first frame gets drawn behind the curtain)
+        if (frames++ < 2) {
+          t0 = now;
+          return requestAnimationFrame(step);
+        }
+        const t = Math.min(1, (now - t0) / D);
+        const p = t * t * (2.4 * t - 1.4); // a little dip, then away it goes
+        const y = -p * 1.12;
+        curtain.style.transform = `translateY(${y * 100}%)`;
+        cam.setViewport(0, Math.round(y * g.scale.height), g.scale.width, g.scale.height);
+        if (t < 1) requestAnimationFrame(step);
+        else finish();
+      };
+      requestAnimationFrame(step);
+    } else {
+      g.scene.stop('Menu');
+      this.host.setScreen(null);
+    }
+    // the battle song, cued so it ends exactly when the clock hits 0
+    this.lastTimeLeft = MATCH_SECS;
+    playBattleMusic(() => this.lastTimeLeft);
     this.host.touch(true);
     this.hud?.remove();
     this.hud = h(`<div class="bhud">
@@ -403,7 +480,9 @@ export class BattleUI {
     this.host.touch(false);
   }
 
+  private lastTimeLeft = MATCH_SECS;
   private renderHud(s: BattleHud) {
+    this.lastTimeLeft = s.timeLeft;
     if (!this.hud) return;
     const t = Math.ceil(s.timeLeft);
     const time = this.hud.querySelector<HTMLElement>('.bhud-time')!;
@@ -412,7 +491,7 @@ export class BattleUI {
     // bombs you're carrying: a counter (with the key to press on a keyboard), and the touch button
     const bombs = this.hud.querySelector<HTMLElement>('.bhud-bombs')!;
     bombs.hidden = s.bombs <= 0;
-    const bt = `💣 ×${s.bombs}${usingTouchNow() ? '' : ' · press B'}`;
+    const bt = `💣 ×${s.bombs}${usingTouchNow() ? '' : ' · B or Enter to throw'}`;
     if (s.bombs > 0 && bombs.textContent !== bt) bombs.textContent = bt;
     this.host.bombs(s.bombs);
     const names = new Map((this.net?.room?.players ?? []).map((p) => [p.id, p.name]));

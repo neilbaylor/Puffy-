@@ -203,8 +203,8 @@ export class GameScene extends Phaser.Scene {
     this.waves = [];
     this.checkpoints = [];
     this.goal = undefined;
-    // restarting at a checkpoint gives you one nuggie to start with
-    this.aura = this.retry ? 1 : 0;
+    // every level (and every restart at a checkpoint) starts you with one nuggie
+    this.aura = 1;
     this.ended = false;
     this.cineZoom = 1;
     this.lastHud = '';

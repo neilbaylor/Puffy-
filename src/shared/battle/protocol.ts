@@ -1,7 +1,7 @@
 /**
  * Messages between the game and the battle server (JSON over a WebSocket at /battle).
  */
-import type { BEvent, BPlayer, EnemyKind, PrizeKind } from './sim';
+import type { BEvent, BPlayer, EnemyKind, PrizeKind, RocketKind } from './sim';
 
 export const MAX_BATTLERS = 4;
 
@@ -50,14 +50,19 @@ export type SnapPlayer = Omit<BPlayer, 'lastHitBy'> & { ack: number };
 export interface SnapRocket {
   id: number;
   owner: string;
-  kind: 'rocket' | 'bomb' | 'pellet';
+  kind: RocketKind;
   x: number;
   y: number;
   dir: 1 | -1;
 }
 
-/** A bad guy: [id, kind, x, y (feet), dir, flags: 1 on ground · 2 armed · 4 parachute · 8 just hurt]. */
-export type SnapEnemy = [number, EnemyKind, number, number, 1 | -1, number];
+/**
+ * A bad guy: [id, kind, x, y (feet), dir, flags: 1 on ground · 2 armed · 4 parachute · 8 just hurt,
+ * race (0 Puff Ball, 1 Plop), weapon (0 none, 1 blaster, 2 chainsaw, 3 ball and chain),
+ * where the ball and chain's ball is (angle)].
+ */
+export type SnapEnemy = [number, EnemyKind, number, number, 1 | -1, number, number, number, number];
+export const WEAPON_CODE = { gun: 1, saw: 2, flail: 3 } as const;
 /** Something falling from the sky: [id, kind, x, y, seconds of warning left (> 0: just a shadow)]. */
 export type SnapHazard = [number, 'rock' | 'anvil', number, number, number];
 
@@ -73,7 +78,7 @@ export type ServerMsg =
   | { t: 'pong'; c: number };
 
 // ── compact player encoding (a snapshot goes out 30 times a second) ──
-const NUM_FIELDS = ['x', 'y', 'vx', 'vy', 'facing', 'airJumps', 'coyote', 'jumpBuf', 'prevBtn', 'fireCd', 'stamina', 'stun', 'invuln', 'shotAgo', 'hp', 'respawn', 'kos', 'deaths', 'slot', 'ack', 'bombs', 'power', 'powerT'] as const;
+const NUM_FIELDS = ['x', 'y', 'vx', 'vy', 'facing', 'airJumps', 'coyote', 'jumpBuf', 'prevBtn', 'fireCd', 'stamina', 'stun', 'invuln', 'shotAgo', 'hp', 'respawn', 'kos', 'deaths', 'slot', 'ack', 'bombs', 'power', 'powerT', 'frozen'] as const;
 const BOOL_FIELDS = ['onGround', 'jumping', 'exhausted', 'running'] as const;
 export type PackedPlayer = [string, string, ...number[]];
 

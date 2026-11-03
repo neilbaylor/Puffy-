@@ -12,11 +12,11 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import { CHARACTERS } from '../src/data/characters';
 import { buildArena } from '../src/shared/battle/arena';
 import { BattleSim, DT, TICK_HZ } from '../src/shared/battle/sim';
-import { MAX_BATTLERS, packPlayer, type ClientMsg, type Phase, type RoomPlayer, type RoomState, type ServerMsg, type SnapEnemy, type SnapHazard, type SnapPrize } from '../src/shared/battle/protocol';
+import { MAX_BATTLERS, WEAPON_CODE, packPlayer, type ClientMsg, type Phase, type RoomPlayer, type RoomState, type ServerMsg, type SnapEnemy, type SnapHazard, type SnapPrize } from '../src/shared/battle/protocol';
 
 /** (BATTLE_COUNTDOWN lengthens it, for taking screenshots) */
 /** Once two or more friends are in, the next battle counts down from this on its own. */
-const AUTO_COUNTDOWN_SECS = Number(process.env.BATTLE_COUNTDOWN) > 0 ? Number(process.env.BATTLE_COUNTDOWN) : 15;
+const AUTO_COUNTDOWN_SECS = Number(process.env.BATTLE_COUNTDOWN) > 0 ? Number(process.env.BATTLE_COUNTDOWN) : 25;
 const RESULTS_SECS = 8;
 /** A dropped player keeps their place this long (phones drop the connection when backgrounded). */
 const REJOIN_SECS = 30;
@@ -273,7 +273,13 @@ class Room {
         const r1 = (v: number) => Math.round(v * 10) / 10;
         const rockets = sim.rockets.map((r) => ({ id: r.id, owner: r.owner, kind: r.kind, x: r1(r.x), y: r1(r.y), dir: r.dir }));
         const prizes = sim.prizes.map((z): SnapPrize => [z.id, z.kind, r1(z.x), r1(z.y), r1(z.age)]);
-        const enemies = sim.enemies.map((e): SnapEnemy => [e.id, e.kind, r1(e.x), r1(e.y), e.dir, (e.onGround ? 1 : 0) | (e.armed ? 2 : 0) | (e.chute ? 4 : 0) | (e.hurtT > 0 ? 8 : 0)]);
+        const enemies = sim.enemies.map((e): SnapEnemy => [
+          e.id, e.kind, r1(e.x), r1(e.y), e.dir,
+          (e.onGround ? 1 : 0) | (e.weapon ? 2 : 0) | (e.chute ? 4 : 0) | (e.hurtT > 0 ? 8 : 0),
+          e.race === 'plop' ? 1 : 0,
+          e.weapon ? WEAPON_CODE[e.weapon] : 0,
+          e.weapon === 'flail' ? Math.round(sim.flailBall(e).a * 100) / 100 : 0,
+        ]);
         const hazards = sim.hazards.map((z): SnapHazard => [z.id, z.kind, r1(z.x), r1(z.y), r1(z.warn)]);
         this.broadcast({ t: 'snap', k: sim.tick, tl: r1(sim.timeLeft), p: players, r: rockets, z: prizes, n: enemies, h: hazards, e: events });
         const anyone = [...this.clients.values()].some((c) => c.playing && c.ws);

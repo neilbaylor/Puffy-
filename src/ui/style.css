@@ -1817,16 +1817,17 @@ kbd {
   top: calc(10px + var(--safe-t));
   right: calc(12px + var(--safe-r));
   width: auto;
-  padding: 0 14px 0 12px;
+  height: clamp(48px, 9.5vmin, 64px);
+  padding: 0 18px 0 15px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font: 900 clamp(15px, 2.8vmin, 19px) / 1 var(--display);
+  gap: 7px;
+  font: 900 clamp(18px, 3.5vmin, 24px) / 1 var(--display);
   letter-spacing: 0.02em;
   background: linear-gradient(180deg, #ffe27a, var(--gold));
 }
 .battle-btn span { font-size: 1.15em; }
-.start .fs-btn { right: calc(12px + var(--safe-r) + clamp(110px, 20vmin, 132px)); }
+.start .fs-btn { right: calc(12px + var(--safe-r) + clamp(132px, 24vmin, 162px)); }
 
 .battle-lobby {
   justify-content: center;
@@ -2172,9 +2173,14 @@ kbd {
 }
 .bl-sub b { color: var(--gold); }
 
-/* your name and hero on one row, all the same height */
+/* your name and hero on one row, all the same height; the name box stretches so its
+   left edge lines up with the first player square */
 .battle-lobby { --rowh: clamp(46px, 11vh, 60px); }
-.bl-me { align-items: flex-end; flex-wrap: nowrap; }
+.bl-me { align-items: flex-end; flex-wrap: nowrap; width: min(100%, 780px); }
+.battle-lobby:not(.watching) .bl-namecard { flex: 1; min-width: 0; }
+.battle-lobby:not(.watching) .bl-namebox { width: 100%; }
+.battle-lobby:not(.watching) .bl-namebox input { flex: 1; min-width: 0; width: auto; }
+.bl-heroes { flex: none; }
 .bl-namebox { height: var(--rowh); box-sizing: border-box; }
 .bl-heroes { gap: 8px; }
 .bl-hero {
@@ -2200,7 +2206,7 @@ kbd {
 
 /* only one here: waiting for someone else */
 .bl-waitmsg {
-  margin: 0;
+  margin: 8px 0 0;
   padding: 6px 20px 8px;
   border-radius: 999px;
   background: #1c0f3ad9;
@@ -2253,12 +2259,10 @@ kbd {
   position: absolute;
   inset: 0;
   z-index: 60;
-  background-size: 100% 100%;
   box-shadow: 0 10px 0 var(--ink), 0 30px 40px #0006;
-  transition: transform 0.85s cubic-bezier(0.6, -0.15, 0.7, 0.4);
   pointer-events: none;
+  will-change: transform;
 }
-.bl-curtain.away { transform: translateY(-115%); }
 
 /* the arena's full: its own little screen */
 .battle-lobby.full > :not(.bl-head):not(.bl-back):not(.bl-fullcard) { display: none; }

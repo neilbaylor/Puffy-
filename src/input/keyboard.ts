@@ -61,7 +61,7 @@ class KeyboardSource implements InputSource {
       jump: any(l.jump),
       fire: any(l.fire) || (this.id === 'kb' && mouseFire),
       run: any(l.run),
-      bomb: this.id === 'kb' && any(['KeyB', 'KeyE']),
+      bomb: this.id === 'kb' && any(['KeyB', 'KeyE', 'Enter', 'NumpadEnter']),
     };
   }
   connected() {
