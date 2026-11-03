@@ -215,6 +215,7 @@ export class UI {
       if (on && usingTouch()) this.touch.show();
       else this.touch.hide();
     },
+    bombs: (n) => this.touch.setBombs(n),
   });
   }
   private selected = 0;

@@ -30,6 +30,7 @@ class GamepadSource implements InputSource {
       jump: b(0),
       fire: b(2) || b(3),
       run: b(1) || b(5) || b(7) || Math.abs(ax) > RUN_TILT,
+      bomb: b(3),
     };
   }
 }

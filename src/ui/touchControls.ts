@@ -23,6 +23,7 @@ export class TouchControls {
   private knob: HTMLDivElement;
   private jumpBtn: HTMLDivElement;
   private fireBtn: HTMLDivElement;
+  private bombBtn: HTMLDivElement;
   private stickId: number | null = null;
   private origin = { x: 0, y: 0 };
   private radius = 56;
@@ -37,6 +38,7 @@ export class TouchControls {
         <div class="stick-base"><div class="stick-run-ring"></div><div class="stick-knob"></div></div>
       </div>
       <div class="touch-right">
+        <div class="tbtn tbtn-bomb" aria-label="Bomb" hidden><span>BOMB</span><b>0</b></div>
         <div class="tbtn tbtn-fire" aria-label="Fire"><span>FIRE</span></div>
         <div class="tbtn tbtn-jump" aria-label="Jump"><span>JUMP</span></div>
       </div>`;
@@ -47,6 +49,7 @@ export class TouchControls {
     this.knob = q('.stick-knob');
     this.jumpBtn = q('.tbtn-jump');
     this.fireBtn = q('.tbtn-fire');
+    this.bombBtn = q('.tbtn-bomb');
 
     const zone = this.zone;
     zone.addEventListener('pointerdown', (e) => {
@@ -129,24 +132,39 @@ export class TouchControls {
     };
     const j = centre(this.jumpBtn);
     const f = centre(this.fireBtn);
+    const bb = this.bombBtn.hidden ? null : centre(this.bombBtn);
     let jump = false;
     let fire = false;
+    let bomb = false;
     for (const p of this.buttonPointers.values()) {
       const dj = Math.hypot(p.x - j.x, p.y - j.y) / j.r;
       const df = Math.hypot(p.x - f.x, p.y - f.y) / f.r;
-      if (Math.min(dj, df) > 2.1) continue; // generous: near-misses still press the closest button
-      if (dj <= df) jump = true;
+      const db = bb ? Math.hypot(p.x - bb.x, p.y - bb.y) / bb.r : Infinity;
+      if (Math.min(dj, df, db) > 2.1) continue; // generous: near-misses still press the closest button
+      if (db < dj && db < df) bomb = true;
+      else if (dj <= df) jump = true;
       else fire = true;
     }
-    if (pressed && ((jump && !touchState.jump) || (fire && !touchState.fire))) navigator.vibrate?.(8);
+    if (pressed && ((jump && !touchState.jump) || (fire && !touchState.fire) || (bomb && !touchState.bomb))) navigator.vibrate?.(8);
     touchState.jump = jump;
     touchState.fire = fire;
+    touchState.bomb = bomb;
     this.jumpBtn.classList.toggle('down', jump);
     this.fireBtn.classList.toggle('down', fire);
+    this.bombBtn.classList.toggle('down', bomb);
   }
 
   show() {
     this.root.hidden = false;
+  }
+
+  /** Online battles: the BOMB button shows (with how many) once you've picked some up. */
+  setBombs(n: number) {
+    const show = n > 0;
+    if (this.bombBtn.hidden === show) this.bombBtn.hidden = !show;
+    const b = this.bombBtn.querySelector('b')!;
+    if (b.textContent !== String(n)) b.textContent = String(n);
+    if (!show) touchState.bomb = false;
   }
 
   hide() {
@@ -157,9 +175,10 @@ export class TouchControls {
   reset() {
     this.stickId = null;
     this.buttonPointers.clear();
-    touchState.left = touchState.right = touchState.run = touchState.jump = touchState.fire = false;
+    touchState.left = touchState.right = touchState.run = touchState.jump = touchState.fire = touchState.bomb = false;
     this.root.classList.remove('stick-active', 'running');
     this.jumpBtn.classList.remove('down');
     this.fireBtn.classList.remove('down');
+    this.bombBtn.classList.remove('down');
   }
 }

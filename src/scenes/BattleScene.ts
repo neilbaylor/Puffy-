@@ -16,10 +16,15 @@ import { ArenaMap, BTN, DT, ENEMY_BOX, HEARTS, POWER, sizeOf, stepMove, type BEv
 import { Background } from '../world/Background';
 import { Fx } from '../world/Fx';
 import { LevelView } from '../world/LevelView';
+import { FaceClock } from '../gfx/face';
 import { mixTint, themeClock, themeMix } from '../world/theme';
 
 /** How far behind the newest snapshot the other players are shown (ticks): smooth, ~100 ms. */
 const INTERP_TICKS = 3;
+
+/** Prizes and things falling from the sky are drawn this much bigger than their art. */
+const PRIZE_SCALE = 1.6;
+const HAZARD_SCALE = 1.4;
 
 interface HeroView {
   sprite: Phaser.GameObjects.Sprite;
@@ -32,6 +37,10 @@ interface HeroView {
   /** Drawn size (eases to big when they grow). */
   size: number;
   sparkT: number;
+  /** Blinks, glances and breathing, like in the levels (just for looks: not sent over the net). */
+  face: FaceClock;
+  /** A soft glow around your own hero, so you can find yourself in the scrum. */
+  halo?: Phaser.GameObjects.Image;
 }
 
 const PRIZE_TEXT: Record<PrizeKind, [string, string]> = {
@@ -61,6 +70,8 @@ interface EnemyView {
 export interface BattleHud {
   timeLeft: number;
   players: { id: string; kos: number; hp: number; slot: number; down: boolean }[];
+  /** Bombs you're carrying (they go on their own button). */
+  bombs: number;
 }
 
 /**
@@ -133,6 +144,20 @@ export class BattleScene extends Phaser.Scene {
     if (!this.textures.exists('bbomb')) addCanvas(this, 'bbomb', hires(24, 24, R, (ctx) => drawBombBall(ctx, 11, 13, 7)));
     if (!this.textures.exists('brock')) addCanvas(this, 'brock', hires(42, 42, R, (ctx) => drawRock(ctx)));
     if (!this.textures.exists('banvil')) addCanvas(this, 'banvil', hires(42, 40, R, (ctx) => drawAnvil(ctx)));
+    if (!this.textures.exists('bhalo'))
+      addCanvas(this, 'bhalo', hires(96, 96, R, (ctx) => {
+        // a soft white-gold glow with a brighter ring at its edge
+        const g = ctx.createRadialGradient(48, 48, 10, 48, 48, 47);
+        g.addColorStop(0, 'rgba(255,248,210,0)');
+        g.addColorStop(0.55, 'rgba(255,240,170,0.18)');
+        g.addColorStop(0.8, 'rgba(255,236,150,0.55)');
+        g.addColorStop(0.9, 'rgba(255,255,235,0.8)');
+        g.addColorStop(1, 'rgba(255,236,150,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(48, 48, 47, 0, Math.PI * 2);
+        ctx.fill();
+      }));
     if (!this.textures.exists('bpellet')) addCanvas(this, 'bpellet', hires(16, 16, R, (ctx) => drawPellet(ctx)));
   }
 
@@ -176,12 +201,30 @@ export class BattleScene extends Phaser.Scene {
     return key;
   }
 
+  /** The hero's face frames (blink, glance, mouth) in this player's colour. */
+  private faceTextureFor(hero: string, slot: number) {
+    if (slot === 0) return `char-${hero}-face`;
+    const key = `bchar-${hero}-${slot}-face`;
+    if (!this.textures.exists(key)) {
+      const src = this.textures.get(`char-${hero}-face`);
+      const canvas = recolorForSlot(src.getSourceImage() as HTMLCanvasElement, slot);
+      addCanvas(this, key, canvas, (t) => {
+        for (const name of src.getFrameNames()) {
+          const f = src.get(name);
+          t.add(name, 0, f.cutX, f.cutY, f.cutWidth, f.cutHeight);
+        }
+      });
+    }
+    return key;
+  }
+
   private viewFor(p: SnapPlayer): HeroView {
     let v = this.views.get(p.id);
     if (v && (v.hero !== p.hero || v.slot !== p.slot)) {
       v.sprite.destroy();
       v.tag.destroy();
       v.hearts.destroy();
+      v.halo?.destroy();
       v = undefined;
     }
     if (!v) {
@@ -194,7 +237,8 @@ export class BattleScene extends Phaser.Scene {
         .setDepth(DEPTH.text)
         .setResolution(2);
       const hearts = this.add.graphics().setDepth(DEPTH.text);
-      v = { sprite, tag, hearts, anim: 0, tilt: 0, slot: p.slot, hero: p.hero, size: 1, sparkT: 0 };
+      const halo = p.id === this.net.myId ? this.add.image(p.x, p.y, 'bhalo').setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.players - 0.05) : undefined;
+      v = { sprite, tag, hearts, anim: 0, tilt: 0, slot: p.slot, hero: p.hero, size: 1, sparkT: 0, face: new FaceClock(), halo };
       this.views.set(p.id, v);
     }
     return v;
@@ -228,7 +272,8 @@ export class BattleScene extends Phaser.Scene {
 
   private buttons() {
     const i = soloSource.poll();
-    return (i.left ? BTN.left : 0) | (i.right ? BTN.right : 0) | (i.jump ? BTN.jump : 0) | (i.fire ? BTN.fire : 0) | (i.run ? BTN.run : 0);
+    // (the bomb button wins over fire on a gamepad's Y, which does both in the levels)
+    return (i.left ? BTN.left : 0) | (i.right ? BTN.right : 0) | (i.jump ? BTN.jump : 0) | (i.fire && !i.bomb ? BTN.fire : 0) | (i.run ? BTN.run : 0) | (i.bomb ? BTN.bomb : 0);
   }
 
   private myRockets() {
@@ -247,12 +292,12 @@ export class BattleScene extends Phaser.Scene {
     if (me.respawn > 0) return;
     const ev: BEvent[] = [];
     const max = characterById(me.hero).maxRockets + (me.power === POWER.rapid ? 3 : 0);
-    const fired = stepMove(me, b, this.map, ev, () => me.bombs > 0 || this.myRockets() < max);
+    const fired = stepMove(me, b, this.map, ev, () => this.myRockets() < max);
     for (const e of ev) if (e.k === 'jump') this.jumpFx(me.x, me.y, e.air, true);
     if (fired) {
       const c = characterById(me.hero);
       const k = sizeOf(me);
-      if (me.bombs > 0) {
+      if (fired === 2) {
         me.bombs--;
         sfx.whoosh();
       } else {
@@ -275,7 +320,7 @@ export class BattleScene extends Phaser.Scene {
     const max = characterById(me.hero).maxRockets + (me.power === POWER.rapid ? 3 : 0);
     const mineInFlight = s.rockets.filter((r) => r.owner === me.id).length;
     for (const [, b] of this.pending)
-      if (me.respawn <= 0 && stepMove(me, b, this.map, undefined, () => me.bombs > 0 || mineInFlight < max) && me.bombs > 0) me.bombs--;
+      if (me.respawn <= 0 && stepMove(me, b, this.map, undefined, () => mineInFlight < max) === 2) me.bombs--;
     if (before && me.respawn <= 0) {
       this.fix.x += before.x - me.x;
       this.fix.y += before.y - me.y;
@@ -352,6 +397,7 @@ export class BattleScene extends Phaser.Scene {
       v.sprite.setVisible(!down);
       v.tag.setVisible(!down);
       v.hearts.setVisible(!down);
+      v.halo?.setVisible(!down);
       if (down) continue;
       const c = characterById(p.hero);
       // pose, like the hero in the levels
@@ -367,6 +413,12 @@ export class BattleScene extends Phaser.Scene {
         v.anim += dt * 1.6;
         frame = `idle${Math.floor(v.anim) % 2}`;
       }
+      // standing about: blink, glance around, breathe (the face frames, as in the levels)
+      v.face.tick(dt);
+      const fk = frame.startsWith('idle') ? v.face.key : null;
+      const bodyKey = this.textureFor(p.hero, v.slot);
+      if (fk) v.sprite.setTexture(this.faceTextureFor(p.hero, v.slot), fk);
+      else if (v.sprite.texture.key !== bodyKey) v.sprite.setTexture(bodyKey, frame);
       const targetTilt = (p.vx / c.runSpeed) * (p.onGround ? 0.14 : 0.06);
       v.tilt += (targetTilt - v.tilt) * Math.min(1, dt * 12);
       // growing / shrinking back eases in, with a little wobble
@@ -374,8 +426,8 @@ export class BattleScene extends Phaser.Scene {
       v.size += (size - v.size) * Math.min(1, dt * 9);
       const wob = Math.abs(v.size - size) > 0.02 ? 1 + Math.sin(this.time.now / 30) * 0.04 : 1;
       const star = p.power === POWER.star;
+      if (!fk) v.sprite.setFrame(frame);
       v.sprite
-        .setFrame(frame)
         .setPosition(x, y + 2)
         .setFlipX(p.facing < 0)
         .setRotation(v.tilt)
@@ -395,6 +447,14 @@ export class BattleScene extends Phaser.Scene {
         v.sparkT = 0.09;
         this.fx.flameTrail(x + p.facing * 22 * c.scale, y - (c.muzzleY ?? 18), p.facing, 0.5);
       }
+      if (v.halo) {
+        const pulse = 1 + Math.sin(this.time.now / 260) * 0.06;
+        v.halo
+          .setVisible(true)
+          .setPosition(x, y - (c.hitH ?? 34) * v.size * 0.5)
+          .setScale(((c.hitH ?? 34) / 34) * v.size * 0.95 * pulse)
+          .setAlpha(0.55 + Math.sin(this.time.now / 260) * 0.12);
+      }
       const top = y - (c.hitH ?? 34) * v.size - 10;
       v.tag.setText(this.names.get(id) ?? '').setPosition(x, top - 9);
       this.drawHearts(v.hearts, x, top, p.hp, p.bombs);
@@ -404,6 +464,7 @@ export class BattleScene extends Phaser.Scene {
         v.sprite.destroy();
         v.tag.destroy();
         v.hearts.destroy();
+        v.halo?.destroy();
         this.views.delete(id);
       }
     this.renderEnemies(cur.enemies, dt);
@@ -437,9 +498,9 @@ export class BattleScene extends Phaser.Scene {
       live.add(pid);
       let pv = this.prizeViews.get(pid);
       if (!pv) {
-        const glow = this.add.image(px, py, 'glow').setTint(0xfff3b0).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.6).setDepth(DEPTH.pickups - 0.1).setScale(0.55);
-        const chute = this.add.image(px, py, 'prize-chute').setScale(1 / ART_RES).setOrigin(0.5, 1).setDepth(DEPTH.pickups);
-        const img = this.add.image(px, py, `prize-${kind}`).setScale(1 / ART_RES).setOrigin(0.5, 1).setDepth(DEPTH.pickups + 0.1);
+        const glow = this.add.image(px, py, 'glow').setTint(0xfff3b0).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.6).setDepth(DEPTH.pickups - 0.1).setScale(0.85);
+        const chute = this.add.image(px, py, 'prize-chute').setScale(PRIZE_SCALE / ART_RES).setOrigin(0.5, 1).setDepth(DEPTH.pickups);
+        const img = this.add.image(px, py, `prize-${kind}`).setScale(PRIZE_SCALE / ART_RES).setOrigin(0.5, 1).setDepth(DEPTH.pickups + 0.1);
         pv = { img, chute, glow, lastY: py, falling: 1 };
         this.prizeViews.set(pid, pv);
       }
@@ -450,8 +511,8 @@ export class BattleScene extends Phaser.Scene {
       const bob = falling ? Math.sin(t * 3) * 1.5 : -3 - Math.abs(Math.sin(t * 2.6)) * 4;
       const sway = falling ? Math.sin(t * 2) * 0.12 : 0;
       pv.img.setPosition(px, py + bob).setRotation(sway);
-      pv.chute.setPosition(px, py + bob - 26).setRotation(sway).setAlpha(pv.falling).setVisible(pv.falling > 0.05);
-      pv.glow.setPosition(px, py + bob - 15).setAlpha(0.45 + Math.sin(t * 5) * 0.15);
+      pv.chute.setPosition(px, py + bob - 26 * PRIZE_SCALE).setRotation(sway).setAlpha(pv.falling).setVisible(pv.falling > 0.05);
+      pv.glow.setPosition(px, py + bob - 15 * PRIZE_SCALE).setAlpha(0.45 + Math.sin(t * 5) * 0.15);
       const blink = age > 12 && Math.floor(this.time.now / 110) % 2 === 0;
       pv.img.setVisible(!blink);
       pv.glow.setVisible(!blink);
@@ -477,6 +538,7 @@ export class BattleScene extends Phaser.Scene {
       this.hudT = 0.2;
       const hud: BattleHud = {
         timeLeft: cur.timeLeft,
+        bombs: this.me?.bombs ?? 0,
         players: [...cur.players.values()].map((p) => ({ id: p.id, kos: p.kos, hp: p.id === this.net.myId && this.me ? this.me.hp : p.hp, slot: p.slot, down: p.respawn > 0 })),
       };
       this.game.events.emit('battle-hud', hud);
@@ -535,7 +597,7 @@ export class BattleScene extends Phaser.Scene {
             break;
           }
         const shadow = this.add.ellipse(x, landY, 40, 10, 0x2b1a12, 0.35).setDepth(DEPTH.pickups - 0.2);
-        const img = this.add.image(x, y, kind === 'anvil' ? 'banvil' : 'brock').setOrigin(0.5, 1).setScale(1 / ART_RES).setDepth(DEPTH.projectiles + 0.5);
+        const img = this.add.image(x, y, kind === 'anvil' ? 'banvil' : 'brock').setOrigin(0.5, 1).setScale(HAZARD_SCALE / ART_RES).setDepth(DEPTH.projectiles + 0.5);
         v = { img, shadow, landY };
         this.hazardViews.set(id, v);
         sfx.whoosh();

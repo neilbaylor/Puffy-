@@ -28,6 +28,7 @@ export const soloSource: InputSource = {
       s.jump ||= p.jump;
       s.fire ||= p.fire;
       s.run ||= p.run;
+      s.bomb ||= !!p.bomb;
     }
     return s;
   },

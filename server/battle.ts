@@ -145,7 +145,7 @@ class Room {
       case 'in':
         if (this.phase !== 'battle' || !c.playing) return;
         if (typeof msg.s !== 'number' || typeof msg.b !== 'number' || msg.s <= c.lastSeq) return;
-        c.queue.push([msg.s, msg.b & 31]);
+        c.queue.push([msg.s, msg.b & 63]);
         return;
       case 'hero':
         if (this.phase === 'battle' && c.playing) return;

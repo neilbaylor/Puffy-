@@ -53,7 +53,7 @@ const PRIZE_LIFE = 15;
 export const ENEMY_BOX: Record<EnemyKind, [number, number]> = { small: [22, 30], medium: [36, 68], big: [104, 176] };
 
 /** Buttons, as bits (what the game sends the server each tick). */
-export const BTN = { left: 1, right: 2, jump: 4, fire: 8, run: 16 } as const;
+export const BTN = { left: 1, right: 2, jump: 4, fire: 8, run: 16, bomb: 32 } as const;
 
 export interface BPlayer {
   id: string;
@@ -218,12 +218,13 @@ export function newPlayer(id: string, hero: string, slot: number): BPlayer {
  * the game can run exactly this for its own hero ahead of the server.
  * Returns true when it wants to fire (the caller makes the rocket).
  */
-export function stepMove(p: BPlayer, btn: number, map: ArenaMap, ev?: BEvent[], canFire: () => boolean = () => true): boolean {
+/** Returns 0, or 1 if a rocket went off, or 2 if a bomb was thrown (its own button). */
+export function stepMove(p: BPlayer, btn: number, map: ArenaMap, ev?: BEvent[], canFire: () => boolean = () => true): 0 | 1 | 2 {
   const c = charOf(p.hero);
   const dt = DT;
   if (p.respawn > 0) {
     p.prevBtn = btn;
-    return false;
+    return 0;
   }
   const jumpHeld = (btn & BTN.jump) !== 0;
   const jumpPressed = jumpHeld && !(p.prevBtn & BTN.jump);
@@ -302,10 +303,15 @@ export function stepMove(p: BPlayer, btn: number, map: ArenaMap, ev?: BEvent[], 
 
   // fire?
   p.fireCd -= dt;
-  let fire = false;
-  if (ctl && (btn & BTN.fire) && p.fireCd <= 0 && canFire()) {
+  let fire: 0 | 1 | 2 = 0;
+  if (ctl && (btn & BTN.bomb) && !(p.prevBtn & BTN.bomb) && p.bombs > 0) {
+    // a bomb: one per press of the bomb button
+    fire = 2;
+    p.vx -= p.facing * 40;
+    p.shotAgo = 0;
+  } else if (ctl && (btn & BTN.fire) && p.fireCd <= 0 && canFire()) {
     p.fireCd = c.fireRate * (p.power === POWER.rapid ? 0.4 : 1);
-    fire = true;
+    fire = 1;
     p.vx -= p.facing * 80; // recoil push
     p.shotAgo = 0;
   }
@@ -464,14 +470,14 @@ export class BattleSim {
         continue;
       }
       const c = charOf(p.hero);
-      const fire = stepMove(p, inputs.get(p.id) ?? 0, this.map, ev, () => p.bombs > 0 || this.rocketsOf(p.id) < this.maxShots(p));
+      const fire = stepMove(p, inputs.get(p.id) ?? 0, this.map, ev, () => this.rocketsOf(p.id) < this.maxShots(p));
       if (fire) {
         const k = sizeOf(p);
         const s = c.scale * k;
         const rx = p.x + p.facing * 18 * s;
         const ry = p.y - (c.muzzleY ?? 18) * k;
         const big = p.power === POWER.grow;
-        if (p.bombs > 0) {
+        if (fire === 2) {
           // a lobbed bomb: bounces about, then a big blast
           p.bombs--;
           this.rockets.push({ id: this.nextRocket++, owner: p.id, kind: 'bomb', x: rx, y: ry, vx: p.facing * 300 + p.vx * 0.35, vy: -430, dir: p.facing, age: 0, speed: 0, radius: 118 * (big ? 1.25 : 1), damage: 2 });
@@ -644,7 +650,7 @@ export class BattleSim {
         if (p.respawn > 0) continue;
         const c = charOf(p.hero);
         const k = sizeOf(p);
-        if (Math.abs(p.x - z.x) < boxW(c, k) / 2 + 13 && z.y > p.y - boxH(c, k) - 6 && z.y - 26 < p.y) {
+        if (Math.abs(p.x - z.x) < boxW(c, k) / 2 + 22 && z.y > p.y - boxH(c, k) - 10 && z.y - 44 < p.y) {
           this.grant(p, z.kind);
           ev.push({ k: 'prize', id: p.id, kind: z.kind, x: z.x, y: z.y });
           z.age = 1e9;
@@ -837,7 +843,7 @@ export class BattleSim {
       z.vy = Math.min(1100, z.vy + GRAVITY * DT);
       const prevY = z.y;
       z.y += z.vy * DT;
-      const r = z.kind === 'anvil' ? 18 : 14;
+      const r = z.kind === 'anvil' ? 25 : 20;
       // anyone underneath gets bonked (anvils hurt more)
       for (const p of this.players.values()) {
         if (p.respawn > 0) continue;

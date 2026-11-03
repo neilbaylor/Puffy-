@@ -21,6 +21,8 @@ export interface BattleHost {
   /** The hero picked on the start screen. */
   hero(): string;
   touch(show: boolean): void;
+  /** Show the touch BOMB button with this many bombs (0 hides it). */
+  bombs(n: number): void;
 }
 
 const h = (html: string) => {
@@ -28,6 +30,8 @@ const h = (html: string) => {
   t.innerHTML = html.trim();
   return t.content.firstElementChild as HTMLElement;
 };
+/** On a phone or tablet the bomb is a button; on a computer, a key. */
+const usingTouchNow = () => matchMedia('(pointer: coarse)').matches;
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 function storedName() {
@@ -377,6 +381,7 @@ export class BattleUI {
     this.hud?.remove();
     this.hud = h(`<div class="bhud">
       <div class="bhud-time">2:00</div>
+      <div class="bhud-bombs" hidden></div>
       <div class="bhud-chips"></div>
       <button class="icon-btn bhud-leave" aria-label="Leave the battle">✕</button>
     </div>`);
@@ -394,6 +399,7 @@ export class BattleUI {
     if (!g.scene.isActive('Menu')) g.scene.start('Menu', { silent: true });
     this.hud?.remove();
     this.hud = null;
+    this.host.bombs(0);
     this.host.touch(false);
   }
 
@@ -403,6 +409,12 @@ export class BattleUI {
     const time = this.hud.querySelector<HTMLElement>('.bhud-time')!;
     time.textContent = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
     time.classList.toggle('low', t <= 10);
+    // bombs you're carrying: a counter (with the key to press on a keyboard), and the touch button
+    const bombs = this.hud.querySelector<HTMLElement>('.bhud-bombs')!;
+    bombs.hidden = s.bombs <= 0;
+    const bt = `💣 ×${s.bombs}${usingTouchNow() ? '' : ' · press B'}`;
+    if (s.bombs > 0 && bombs.textContent !== bt) bombs.textContent = bt;
+    this.host.bombs(s.bombs);
     const names = new Map((this.net?.room?.players ?? []).map((p) => [p.id, p.name]));
     const chips = this.hud.querySelector('.bhud-chips')!;
     const html = [...s.players]

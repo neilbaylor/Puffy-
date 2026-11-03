@@ -9,6 +9,8 @@ export interface InputState {
   run: boolean;
   jump: boolean;
   fire: boolean;
+  /** Throw a bomb (online battles, when you've picked some up). */
+  bomb?: boolean;
 }
 
 export const emptyInput = (): InputState => ({
