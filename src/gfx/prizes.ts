@@ -5,8 +5,6 @@
  */
 import type { PrizeKind } from '../shared/battle/sim';
 import type { Ctx } from './draw';
-import { drawRocket } from './bazooka';
-import { STYLES } from './handdrawn';
 
 const INK = '#3a2418';
 
@@ -277,25 +275,35 @@ export function drawPrize(ctx: Ctx, kind: PrizeKind) {
       break;
     }
     case 'rapid': {
-      // three of the heroes' own rockets streaking along, one after another
-      const rocket = (x: number, y: number, k: number) => {
-        ctx.strokeStyle = '#ffffffd8';
-        ctx.lineWidth = 1.2;
+      // a lightning bolt with speed lines
+      ctx.strokeStyle = '#ffffffcc';
+      ctx.lineWidth = 1.2;
+      for (const [y, l] of [[-4, 5], [1, 7], [6, 4.5]] as const) {
         ctx.beginPath();
-        ctx.moveTo(x - 11.5 * k, y - 1.6 * k);
-        ctx.lineTo(x - 7 * k, y - 1.6 * k);
-        ctx.moveTo(x - 12.5 * k, y + 1.6 * k);
-        ctx.lineTo(x - 8 * k, y + 1.6 * k);
+        ctx.moveTo(cx - 11, cy + y);
+        ctx.lineTo(cx - 11 + l, cy + y);
         ctx.stroke();
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.scale(k, k);
-        drawRocket(ctx, STYLES.polished, 0, 0);
-        ctx.restore();
-      };
-      rocket(cx + 3.4, cy - 5.6, 0.56);
-      rocket(cx + 5.8, cy + 0.6, 0.56);
-      rocket(cx + 1, cy + 6.6, 0.56);
+      }
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = 1.25;
+      ctx.fillStyle = '#ffd23f';
+      ctx.beginPath();
+      ctx.moveTo(cx + 3.4, cy - 10.5);
+      ctx.lineTo(cx - 5, cy + 1.6);
+      ctx.lineTo(cx + 0.4, cy + 1.6);
+      ctx.lineTo(cx - 2.4, cy + 10.6);
+      ctx.lineTo(cx + 7.4, cy - 2.4);
+      ctx.lineTo(cx + 2, cy - 2.4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#fff6c8';
+      ctx.beginPath();
+      ctx.moveTo(cx + 2.6, cy - 8.4);
+      ctx.lineTo(cx - 2.6, cy + 0.2);
+      ctx.lineTo(cx - 1.2, cy + 0.2);
+      ctx.closePath();
+      ctx.fill();
       break;
     }
     case 'heart': {

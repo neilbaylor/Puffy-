@@ -16,7 +16,7 @@ import { soloSource } from '../input/devices';
 import type { BattleNet, Snapshot } from '../net/battleNet';
 import { ARENA_RAMPS, buildArena } from '../shared/battle/arena';
 import { SLOT_COLORS, type SnapEnemy, type SnapHazard, type SnapPlayer } from '../shared/battle/protocol';
-import { ArenaMap, BTN, DT, ENEMY_BOX, HEARTS, POWER, landingY, sizeOf, stepMove, type BEvent, type BPlayer, type EnemyKind, type PrizeKind, type RocketKind } from '../shared/battle/sim';
+import { ArenaMap, BTN, DT, ENEMY_BOX, HEARTS, POWER, PRIZE_LIFE, landingY, sizeOf, stepMove, type BEvent, type BPlayer, type EnemyKind, type PrizeKind, type RocketKind } from '../shared/battle/sim';
 import { Background } from '../world/Background';
 import { Fx } from '../world/Fx';
 import { LevelView } from '../world/LevelView';
@@ -26,13 +26,61 @@ import { mixTint, themeClock, themeMix } from '../world/theme';
 /** How far behind the newest snapshot the other players are shown (ticks): smooth, ~100 ms. */
 const INTERP_TICKS = 3;
 
+type PrizeView = {
+  img: Phaser.GameObjects.Image;
+  chute: Phaser.GameObjects.Image;
+  glow: Phaser.GameObjects.Image;
+  shadow: Phaser.GameObjects.Ellipse;
+  landY: number;
+  lastY: number;
+  /** 1 while it floats down, easing to 0 once it's landed. */
+  falling: number;
+  /** Counts down after it lands: the little squash and bounce. */
+  land: number;
+};
+
+/** Playing, the camera is this much closer in than the whole-arena view. */
+const FOLLOW_ZOOM = 1.25;
 /** Prizes and things falling from the sky are drawn this much bigger than their art. */
 const PRIZE_SCALE = 1.6;
 /** Rocks and anvils: most medium, 1 in 3 big (drawn to match their size in the rules). */
 const HAZARD_SCALE = 1.75;
 const HAZARD_BIG = 1.55;
 
+/**
+ * Grabbing a bonus: a happy hop, like picking a hero on the start screen
+ * (crouch, spring up, squashy landing); Scruffy does his backflip at the top.
+ * t in seconds since the grab; null once it's over.
+ */
+function cheerPose(t: number, flip: boolean): { up: number; sx: number; sy: number; spin: number; frame: string } | null {
+  const len = flip ? 0.84 : 0.75;
+  const u = t / len;
+  if (u >= 1) return null;
+  // [time, height (0..1), squash x, squash y]
+  const keys: [number, number, number, number][] = flip
+    ? [[0, 0, 1, 1], [0.13, 0, 1.1, 0.88], [0.42, 1, 0.97, 1.04], [0.68, 0, 1, 1], [0.77, 0, 1.12, 0.87], [0.88, 0, 0.97, 1.03], [1, 0, 1, 1]]
+    : [[0, 0, 1, 1], [0.14, 0, 1.08, 0.9], [0.44, 1, 0.95, 1.07], [0.72, 0, 1.02, 0.98], [0.8, 0, 1.1, 0.88], [0.9, 0, 0.97, 1.03], [1, 0, 1, 1]];
+  let i = 0;
+  while (i < keys.length - 2 && u > keys[i + 1][0]) i++;
+  const [t0, h0, x0, y0] = keys[i];
+  const [t1, h1, x1, y1] = keys[i + 1];
+  let f = (u - t0) / (t1 - t0);
+  // springing up eases out, falling back eases in
+  f = h1 > h0 ? 1 - (1 - f) * (1 - f) : h1 < h0 ? f * f : f * f * (3 - 2 * f);
+  const up = h0 + (h1 - h0) * f;
+  const sx = x0 + (x1 - x0) * f;
+  const sy = y0 + (y1 - y0) * f;
+  // the spin: one whole turn backwards, from just after the crouch to near the top of the hop
+  const sp = Math.max(0, Math.min(1, (u - 0.17) / (0.58 - 0.17)));
+  const spin = flip ? sp * sp * (3 - 2 * sp) : 0;
+  const peak = flip ? 0.42 : 0.44;
+  const frame = u < (flip ? 0.13 : 0.14) ? 'idle0' : u < peak ? 'jump' : up > 0.02 ? 'fall' : 'idle0';
+  return { up, sx, sy, spin, frame };
+}
+
 interface HeroView {
+  /** Seconds since this hero grabbed a bonus (the celebration hop), or -1. */
+  cheer: number;
   sprite: Phaser.GameObjects.Sprite;
   tag: Phaser.GameObjects.Text;
   hearts: Phaser.GameObjects.Graphics;
@@ -89,7 +137,13 @@ interface EnemyView {
   chute: Phaser.GameObjects.Image;
   anim: number;
   lastX: number;
+  /** Was in the air last frame; and the squash after landing (counts down). */
+  air: boolean;
+  land: number;
 }
+
+/** Plop walk speed, in steps of the four-step walk per second: the small ones scurry, the big ones plod. */
+const PLOP_STEP_FPS: Record<EnemyKind, number> = { small: 11, medium: 8.5, big: 6.5 };
 
 export interface BattleHud {
   timeLeft: number;
@@ -112,7 +166,7 @@ export class BattleScene extends Phaser.Scene {
   fx!: Fx;
   private views = new Map<string, HeroView>();
   private rocketViews = new Map<number, Phaser.GameObjects.Image | Phaser.GameObjects.Sprite>();
-  private prizeViews = new Map<number, { img: Phaser.GameObjects.Image; chute: Phaser.GameObjects.Image; glow: Phaser.GameObjects.Image; lastY: number; falling: number }>();
+  private prizeViews = new Map<number, PrizeView>();
   private snaps: Snapshot[] = [];
   private me: BPlayer | null = null;
   private pending: [number, number][] = [];
@@ -127,6 +181,9 @@ export class BattleScene extends Phaser.Scene {
   /** Just watching (joined mid-battle): no hero of your own, shown in a little window. */
   private spectate = false;
   private preview: { x: number; y: number; w: number; h: number } | null = null;
+  /** The zoom that fits the whole arena; playing, the camera is a little closer and follows you. */
+  private fitZoom = 1;
+  private camC: { x: number; y: number } | null = null;
 
   constructor() {
     super('Battle');
@@ -245,8 +302,32 @@ export class BattleScene extends Phaser.Scene {
     // (the empty sky above the highest cloud is trimmed off, so the heroes are bigger)
     const SKY = 56;
     const zoom = Math.min(W / this.map.widthPx, H / (this.map.heightPx - SKY));
+    this.fitZoom = zoom;
     cam.setZoom(zoom);
     cam.centerOn(this.map.widthPx / 2, (this.map.heightPx + SKY) / 2);
+    this.camC = null;
+  }
+
+  /** Playing: a little closer in than the whole arena, gently following your hero (most of the arena still in view). */
+  private followCamera(dt: number) {
+    if (this.spectate || this.preview || !this.me) return;
+    const cam = this.cameras.main;
+    const SKY = 56;
+    const zoom = this.fitZoom * FOLLOW_ZOOM;
+    cam.setZoom(zoom);
+    const vw = cam.width / zoom;
+    const vh = cam.height / zoom;
+    const clamp = (v: number, lo: number, hi: number) => (lo > hi ? (lo + hi) / 2 : Math.max(lo, Math.min(hi, v)));
+    const p = this.me;
+    const tx = clamp(p.x + this.fix.x + p.vx * 0.12, vw / 2, this.map.widthPx - vw / 2);
+    const ty = clamp(p.y + this.fix.y - 40, SKY + vh / 2, this.map.heightPx - vh / 2);
+    if (!this.camC) this.camC = { x: tx, y: ty };
+    else if (p.respawn <= 0) {
+      const k = 1 - Math.exp(-dt * 3.2);
+      this.camC.x += (tx - this.camC.x) * k;
+      this.camC.y += (ty - this.camC.y) * k;
+    }
+    cam.centerOn(this.camC.x, this.camC.y);
   }
 
   /** The hero's picture in this player's colour (made once per hero + colour). */
@@ -305,7 +386,7 @@ export class BattleScene extends Phaser.Scene {
       const hearts = this.add.graphics().setDepth(DEPTH.text);
       const halo = p.id === this.net.myId ? this.add.image(p.x, p.y, 'bhalo').setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.players - 0.05) : undefined;
       const ice = this.add.image(p.x, p.y, 'bice').setOrigin(0.5, 1).setScale(1 / ART_RES).setDepth(DEPTH.players + 0.2).setVisible(false);
-      v = { sprite, tag, hearts, anim: 0, tilt: 0, slot: p.slot, hero: p.hero, size: 1, sparkT: 0, face: new FaceClock(), halo, ice };
+      v = { cheer: -1, sprite, tag, hearts, anim: 0, tilt: 0, slot: p.slot, hero: p.hero, size: 1, sparkT: 0, face: new FaceClock(), halo, ice };
       this.views.set(p.id, v);
     }
     return v;
@@ -314,7 +395,7 @@ export class BattleScene extends Phaser.Scene {
   update(_t: number, deltaMs: number) {
     const dt = Math.min(deltaMs / 1000, 0.1);
     // names from the room list
-    for (const rp of this.net.room?.players ?? []) this.names.set(rp.id, rp.id === this.net.myId ? `${rp.name} (you)` : rp.name);
+    for (const rp of this.net.room?.players ?? []) this.names.set(rp.id, rp.name);
 
     // ── new snapshots from the server ──
     if (this.net.inbox.length) {
@@ -494,12 +575,42 @@ export class BattleScene extends Phaser.Scene {
       v.size += (size - v.size) * Math.min(1, dt * 9);
       const wob = Math.abs(v.size - size) > 0.02 ? 1 + Math.sin(this.time.now / 30) * 0.04 : 1;
       const star = p.power === POWER.star;
-      if (!fk) v.sprite.setFrame(frame);
+      // the celebration hop after grabbing a bonus (just for show: the hero itself doesn't move)
+      let cheer: ReturnType<typeof cheerPose> = null;
+      if (v.cheer >= 0) {
+        v.cheer += dt;
+        cheer = cheerPose(v.cheer, p.hero === 'scruffy');
+        if (!cheer) v.cheer = -1;
+      }
+      let sx = 1;
+      let sy = 1;
+      let hx = 0;
+      let hy = 0;
+      let rot = v.tilt;
+      if (cheer) {
+        sx = cheer.sx;
+        sy = cheer.sy;
+        const hh = (c.hitH ?? 34) * v.size;
+        hy = -cheer.up * hh * 0.75;
+        if (p.onGround && cheer.frame !== 'idle0') {
+          frame = cheer.frame;
+          if (v.sprite.texture.key !== bodyKey) v.sprite.setTexture(bodyKey, frame);
+        }
+        if (cheer.spin > 0) {
+          // a backflip turns round the middle of the body (the sprite turns round its feet)
+          const a = -2 * Math.PI * cheer.spin * (p.facing < 0 ? -1 : 1);
+          const hc = hh * 0.55;
+          rot += a;
+          hx += -Math.sin(a) * hc;
+          hy += -hc + Math.cos(a) * hc;
+        }
+      }
+      if (v.sprite.texture.key === bodyKey) v.sprite.setFrame(frame);
       v.sprite
-        .setPosition(x, y + 2)
+        .setPosition(x + hx, y + 2 + hy)
         .setFlipX(p.facing < 0)
-        .setRotation(v.tilt)
-        .setScale((c.scale / ART_RES) * v.size * wob, (c.scale / ART_RES) * v.size / wob)
+        .setRotation(rot)
+        .setScale((c.scale / ART_RES) * v.size * wob * sx, ((c.scale / ART_RES) * v.size / wob) * sy)
         .setAlpha(p.invuln > 0 && !star ? (Math.floor(this.time.now / 70) % 2 ? 0.45 : 1) : 1);
       // invincible: rainbow shimmer and sparkles; rapid fire: sparks off the bazooka
       v.sparkT -= dt;
@@ -529,13 +640,13 @@ export class BattleScene extends Phaser.Scene {
         v.halo
           .setVisible(true)
           .setPosition(x, y - (c.hitH ?? 34) * v.size * 0.5)
-          .setScale((((c.hitH ?? 34) / 34) * v.size * 0.72 * pulse) / ART_RES)
-          .setAlpha(0.37 + Math.sin(this.time.now / 260) * 0.07);
+          .setScale(((c.hitH ?? 34) / 34) * v.size * 0.95 * 0.9 * pulse)
+          .setAlpha(0.6 + Math.sin(this.time.now / 260) * 0.12);
       }
       const top = y - (c.hitH ?? 34) * v.size - 10;
       // the name just over the head, the hearts above the name
       v.tag.setText(this.names.get(id) ?? '').setPosition(x, top + 9);
-      this.drawHearts(v.hearts, x, top - 13, p.hp, p.bombs);
+      this.drawHearts(v.hearts, x, top - 13, p.hp);
     }
     for (const [id, v] of this.views)
       if (!seen.has(id)) {
@@ -583,7 +694,8 @@ export class BattleScene extends Phaser.Scene {
         img.destroy();
         this.rocketViews.delete(id);
       }
-    // prizes: float down under a little parachute, bob about once they land, blink before they go
+    // prizes: sway down under a parachute (a shadow growing where they'll land), squash
+    // and bounce when they touch down, bob there glowing, blink for their last 2 s
     const live = new Set<number>();
     for (const [pid, kind, px, py, age] of cur.prizes) {
       live.add(pid);
@@ -597,21 +709,51 @@ export class BattleScene extends Phaser.Scene {
           .setAlpha(0.6)
           .setDepth(DEPTH.pickups - 1)
           .setScale(1.5);
+        const landY = landingY(this.map, px);
+        const shadow = this.add.ellipse(px, landY, 30, 7, 0x2b1a12, 0.3).setDepth(DEPTH.pickups - 0.2);
         const chute = this.add.image(px, py, `prize-chute-${kind}`).setScale(PRIZE_SCALE / ART_RES).setOrigin(0.5, 1).setDepth(DEPTH.pickups);
         const img = this.add.image(px, py, `prize-${kind}`).setScale(PRIZE_SCALE / ART_RES).setOrigin(0.5, 1).setDepth(DEPTH.pickups + 0.1);
-        pv = { img, chute, glow, lastY: py, falling: 1 };
+        pv = { img, chute, glow, shadow, landY, lastY: py, falling: age < 0 ? 1 : 0, land: 0 };
         this.prizeViews.set(pid, pv);
       }
-      const falling = py > pv.lastY + 0.01;
-      pv.falling += ((falling ? 1 : 0) - pv.falling) * Math.min(1, dt * 6);
+      // (the server says age -1 while it's still falling)
+      const falling = age < 0;
+      if (!falling && pv.falling > 0.9) {
+        pv.land = 0.42;
+        this.fx.dust(px, py, 5);
+        this.fx.sparkle(px, py - 16, 5);
+      }
+      pv.falling += ((falling ? 1 : 0) - pv.falling) * Math.min(1, dt * 7);
       pv.lastY = py;
+      pv.land = Math.max(0, pv.land - dt);
       const t = this.time.now / 1000 + pid;
-      const bob = falling ? Math.sin(t * 3) * 1.5 : -3 - Math.abs(Math.sin(t * 2.6)) * 4;
-      const sway = falling ? Math.sin(t * 2) * 0.12 : 0;
-      pv.img.setPosition(px, py + bob).setRotation(sway);
-      pv.chute.setPosition(px, py + bob - 26 * PRIZE_SCALE).setRotation(sway).setAlpha(pv.falling).setVisible(pv.falling > 0.05);
-      pv.glow.setPosition(px, py + bob - 15 * PRIZE_SCALE).setScale(1.45 + Math.sin(t * 4) * 0.15).setAlpha(0.6);
-      const blink = age > 12 && Math.floor(this.time.now / 110) % 2 === 0;
+      // under the chute it swings like a pendulum, drifting a little side to side
+      const swing = Math.sin(t * 2.3) * pv.falling;
+      const sway = swing * 0.2;
+      const drift = Math.sin(t * 1.15) * 5 * pv.falling;
+      // landed: a squash on touchdown, then a gentle bob
+      const lk = pv.land / 0.42;
+      const squash = Math.sin(lk * Math.PI) * 0.22 * lk;
+      const bob = falling ? 0 : -3 - Math.abs(Math.sin(t * 2.6)) * 4 * (1 - lk);
+      const k = PRIZE_SCALE / ART_RES;
+      const ix = px + drift;
+      const iy = py + bob;
+      pv.img.setPosition(ix, iy).setRotation(sway).setScale(k * (1 + squash), k * (1 - squash));
+      // the chute hangs from the bonus; it sags and folds away as it lands
+      pv.chute
+        .setPosition(ix - Math.sin(sway) * 26 * PRIZE_SCALE, iy - 26 * PRIZE_SCALE + (1 - pv.falling) * 10)
+        .setRotation(sway * 1.25)
+        .setScale(k * (0.6 + pv.falling * 0.4), k * pv.falling)
+        .setAlpha(pv.falling)
+        .setVisible(pv.falling > 0.05);
+      pv.glow.setPosition(ix, iy - 15 * PRIZE_SCALE).setScale(1.45 + Math.sin(t * 4) * 0.15).setAlpha(0.6);
+      // the shadow on the ground tightens and darkens as it gets near
+      const near = Math.max(0, Math.min(1, 1 - (pv.landY - py) / 420));
+      pv.shadow
+        .setPosition(ix, pv.landY + 1)
+        .setSize(16 + near * 20 - (falling ? 0 : 4), 5 + near * 3)
+        .setAlpha(0.12 + near * 0.22);
+      const blink = age > PRIZE_LIFE - 2 && Math.floor(this.time.now / (age > PRIZE_LIFE - 0.8 ? 70 : 130)) % 2 === 0;
       pv.img.setVisible(!blink);
       pv.glow.setVisible(!blink);
     }
@@ -620,6 +762,7 @@ export class BattleScene extends Phaser.Scene {
         pv.img.destroy();
         pv.chute.destroy();
         pv.glow.destroy();
+        pv.shadow.destroy();
         this.prizeViews.delete(pid);
       }
     // scenery + HUD (the looks drift slowly, like in the levels)
@@ -627,6 +770,7 @@ export class BattleScene extends Phaser.Scene {
     const look = themeMix(themeClock.t);
     this.bg.setTheme(look);
     this.level.setTint(mixTint(look));
+    this.followCamera(dt);
     const cam = this.cameras.main;
     const wv = cam.worldView;
     this.bg.update({ left: wv.x - 40, top: wv.y - 40, width: wv.width + 80, height: wv.height + 80 }, dt);
@@ -666,7 +810,7 @@ export class BattleScene extends Phaser.Scene {
           spr = this.add.sprite(x, y, art.tex, 'w0').setOrigin(art.ox, art.oy).setScale(art.scale).setDepth(DEPTH.enemies);
         }
         const chute = this.add.image(x, y, 'chute').setOrigin(0.5, 1).setScale(1 / ART_RES).setDepth(DEPTH.enemies - 0.1);
-        v = { spr, plop, weapon: 0, gun: null, saw: null, ball: null, chain: null, chute, anim: Math.random() * 4, lastX: x };
+        v = { spr, plop, weapon: 0, gun: null, saw: null, ball: null, chain: null, chute, anim: Math.random() * 4, lastX: x, air: false, land: 0 };
         this.enemyViews.set(id, v);
       }
       // what it carries (a chainsaw one throws it away when it's hurt)
@@ -689,35 +833,54 @@ export class BattleScene extends Phaser.Scene {
       const chute = (flags & 4) !== 0;
       const moving = Math.abs(x - v.lastX) > 0.2;
       v.lastX = x;
-      v.anim += dt * (moving ? 7 : 2);
+      v.anim += dt * (moving ? (plop ? PLOP_STEP_FPS[kind] : 7) : 2);
       let frame: string;
-      // each size of Plop has its own walk: the small ones hop, the middle ones waddle,
-      // the big ones stomp (squashing down on every step); standing still, they shout
+      // each size of Plop has its own walk on top of the four-step walk: the small ones hop
+      // along, the middle ones waddle, the big ones stomp (squashing down on every step,
+      // kicking up dust); standing still, they shout; landing from a jump, they squash
       const ox = 0;
       let oy = 0;
       let rot = 0;
       let sx = 1;
       let sy = 1;
       if (v.plop) {
-        frame = moving ? (Math.floor(v.anim) % 2 ? 'run0' : 'run1') : onGround && !chute ? (Math.floor(v.anim * 2) % 2 ? 'yell0' : 'yell1') : 'idle';
-        const ph = v.anim * Math.PI;
-        if (moving && onGround) {
+        if (onGround && v.air) {
+          v.land = 0.22;
+          if (kind !== 'small') this.fx.dust(x, y, kind === 'big' ? 6 : 3);
+        }
+        v.air = !onGround && !chute;
+        v.land = Math.max(0, v.land - dt);
+        const ph = (v.anim * Math.PI) / 2; // a quarter turn per step
+        if (!onGround && !chute) {
+          frame = 'walk3';
+          sy = 1.06;
+          sx = 0.95;
+        } else if (moving && onGround) {
+          frame = `walk${Math.floor(v.anim) % 4}`;
+          const contact = Math.abs(Math.cos(ph)); // 1 when a foot hits the ground
           if (kind === 'small') {
-            oy = -Math.abs(Math.sin(ph * 1.5)) * 7;
-            sy = 1 + Math.sin(ph * 3) * 0.06;
+            oy = -Math.abs(Math.sin(ph)) * 6;
+            sy = 1 + (1 - contact) * 0.07 - contact * 0.05;
             sx = 2 - sy;
+            rot = dir * 0.08;
           } else if (kind === 'medium') {
-            rot = Math.sin(ph) * 0.13;
-            oy = -Math.abs(Math.sin(ph)) * 2;
+            rot = Math.sin(ph) * 0.11 + dir * 0.05;
+            oy = -Math.abs(Math.sin(ph)) * 1.5;
           } else {
-            const step = Math.abs(Math.cos(ph));
-            sy = 0.93 + step * 0.07;
-            sx = 1.06 - step * 0.06;
-            rot = Math.sin(ph) * 0.04;
-            if (step < 0.12 && Math.random() < 0.5) this.fx.dust(x + (Math.random() - 0.5) * w, y, 2);
+            sy = 1 - contact * contact * 0.07;
+            sx = 1 + contact * contact * 0.06;
+            rot = Math.sin(ph) * 0.04 + dir * 0.03;
+            const step = Math.floor(v.anim) % 2 === 0 && v.anim % 1 < 0.2;
+            if (step && Math.random() < 0.35) this.fx.dust(x + (Math.random() - 0.5) * w, y, 2);
           }
-        } else if (onGround) {
+        } else if (onGround && !chute) {
+          frame = Math.floor(v.anim * 2) % 2 ? 'yell0' : 'yell1';
           sy = 1 + Math.sin(this.time.now / 300 + id) * 0.025; // breathing
+        } else frame = 'idle';
+        if (v.land > 0) {
+          const q = Math.sin((v.land / 0.22) * Math.PI) * (kind === 'big' ? 0.16 : 0.12);
+          sy *= 1 - q;
+          sx *= 1 + q;
         }
         const base = PLOP_ART[kind].scale / PLOP_RES;
         v.spr.setScale(base * sx, base * sy).setRotation(rot);
@@ -900,6 +1063,7 @@ export class BattleScene extends Phaser.Scene {
         case 'prize': {
           const [text, col] = PRIZE_TEXT[e.kind];
           const v = this.views.get(e.id);
+          if (v) v.cheer = 0;
           this.fx.popText(e.x, e.y - 40, text, col, 18);
           this.fx.sparkle(e.x, e.y - 14, 12);
           if (v && e.kind === 'grow') this.cameras.main.shake(180, 0.006);

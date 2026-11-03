@@ -35,26 +35,25 @@ const ROCKET_LIFE = 1.4;
 export type PrizeKind = 'bomb' | 'star' | 'grow' | 'rapid' | 'heart' | 'ice' | 'fire';
 /** How often each kind turns up (out of the total). */
 const PRIZE_ODDS: [PrizeKind, number][] = [
-  ['bomb', 20],
-  ['rapid', 17],
-  ['grow', 16],
-  ['star', 13],
-  ['heart', 15],
-  ['ice', 10],
-  ['fire', 14],
+  ['bomb', 24],
+  ['rapid', 22],
+  ['grow', 20],
+  ['star', 16],
+  ['heart', 18],
 ];
 /** Timed powers: 0 none, 1 star (invincible), 2 grow (big & strong), 3 rapid fire, 4 fireballs. */
 export const POWER = { none: 0, star: 1, grow: 2, rapid: 3, fire: 4 } as const;
-const POWER_SECS: Record<number, number> = { 1: 10, 2: 8, 3: 7, 4: 8 };
+const POWER_SECS: Record<number, number> = { 1: 14, 2: 8, 3: 7, 4: 8 };
 /** Grabbing ice freezes everyone else this long. */
 export const FREEZE_SECS = 2;
 /** Landing on someone's head: a hit, and you bounce off. */
 const STOMP_BOUNCE = 560;
 /** How much bigger "grow" makes you. */
-export const GROW = 1.45;
+export const GROW = 1.8;
 const BOMBS_PER_PRIZE = 3;
-const MAX_PRIZES = 4;
-const PRIZE_LIFE = 15;
+const MAX_PRIZES = 3;
+/** Once it has landed, a prize waits this long (blinking at the end), then it's gone. */
+export const PRIZE_LIFE = 7;
 
 /** Bad guys' collision boxes [w, h] (feet at y), matching their art in the levels. */
 export const ENEMY_BOX: Record<EnemyKind, [number, number]> = { small: [22, 30], medium: [36, 68], big: [104, 176] };
@@ -141,6 +140,8 @@ export interface BEnemy {
   chute: boolean;
   fireCd: number;
   jumpCd: number;
+  /** A second hop in the air (to climb up to someone on a higher level). */
+  hop: number;
   /** Seconds left of the white "ouch" flash. */
   hurtT: number;
 }
@@ -758,7 +759,7 @@ export class BattleSim {
   private stepPrizes(ev: BEvent[]) {
     this.dropIn -= DT;
     if (this.dropIn <= 0) {
-      this.dropIn = 2.6 + Math.random() * 2.4;
+      this.dropIn = 4.5 + Math.random() * 3.5;
       if (this.prizes.length < MAX_PRIZES) {
         let roll = Math.random() * PRIZE_ODDS.reduce((t, [, w]) => t + w, 0);
         let kind: PrizeKind = 'bomb';
@@ -786,8 +787,8 @@ export class BattleSim {
     for (const z of this.prizes) {
       z.age += DT;
       if (!z.landed) {
-        // a gentle float down (so everyone can race for it)
-        z.vy = Math.min(150, z.vy + 300 * DT);
+        // a slow, gentle float down under its parachute (so everyone can race for it)
+        z.vy = Math.min(92, z.vy + 180 * DT);
         const prevY = z.y;
         z.y += z.vy * DT;
         const tx = Math.floor(z.x / TILE_PX);
@@ -796,9 +797,11 @@ export class BattleSim {
         if (ry !== null) {
           z.y = ry;
           z.landed = true;
+          z.age = 0;
         } else if (ty >= 0 && (this.map.solid(tx, ty) || (this.map.oneWay(tx, ty) && prevY <= ty * TILE_PX + 0.5))) {
           z.y = ty * TILE_PX;
           z.landed = true;
+          z.age = 0;
         }
       }
       // grabbed?
@@ -814,7 +817,8 @@ export class BattleSim {
         }
       }
     }
-    this.prizes = this.prizes.filter((z) => z.age < PRIZE_LIFE);
+    // (age counts from when it landed)
+    this.prizes = this.prizes.filter((z) => (z.landed ? z.age < PRIZE_LIFE : z.age < 40));
   }
 
   private grant(p: BPlayer, kind: PrizeKind, ev: BEvent[]) {
@@ -885,7 +889,7 @@ export class BattleSim {
     }
     const hp = (kind === 'big' ? 5 : kind === 'medium' ? 2 : 1) + (weapon ? 1 : 0);
     const dir: 1 | -1 = x < this.map.widthPx / 2 ? 1 : -1;
-    this.enemies.push({ id: this.nextThing++, kind, race, weapon, x, y, vx: 0, vy: 0, dir, hp, onGround: !chute, armed: !!weapon, chute, fireCd: 1.5 + Math.random(), jumpCd: 1, hurtT: 0 });
+    this.enemies.push({ id: this.nextThing++, kind, race, weapon, x, y, vx: 0, vy: 0, dir, hp, onGround: !chute, armed: !!weapon, chute, fireCd: 1.5 + Math.random(), jumpCd: 1, hop: 1, hurtT: 0 });
     ev.push({ k: 'espawn', kind, x, chute });
   }
 
@@ -945,7 +949,7 @@ export class BattleSim {
       const tgt = this.nearest(e.x, e.y);
       if (e.chute) {
         // drifting down, swaying a little
-        e.vy = 75;
+        e.vy = 55;
         e.vx = Math.sin((this.tick + e.id * 17) * 0.06) * 30;
       } else {
         const dx = tgt ? tgt.x - e.x : 0;
@@ -974,14 +978,20 @@ export class BattleSim {
           e.fireCd = (e.kind === 'big' ? 1.8 : 2.3) + Math.random() * 1;
           this.lob(e, 'poo', e.x + e.dir * w * 0.3, e.y - h * 0.8, tgt.x, tgt.y, ev);
         }
-        // hop up steps, over gaps and up to you
+        // hop up steps, over gaps and up to you: if you're on a higher level they jump
+        // for it (up through clouds and the island from underneath), with a second
+        // hop near the top of the jump if you're still above them
         const ahead = e.x + e.dir * (w / 2 + 4);
         const wall = this.map.solidAt(ahead, e.y - 4);
-        const higher = tgt ? tgt.y < e.y - 40 && Math.abs(dx) < 220 : false;
+        const higher = tgt ? tgt.y < e.y - 40 && Math.abs(dx) < 260 : false;
         if (e.onGround && e.jumpCd <= 0 && (wall || higher || (e.kind === 'big' && Math.random() < 0.01))) {
-          e.vy = e.kind === 'big' ? -640 : -600;
+          e.vy = e.kind === 'big' ? -730 : -710;
           e.onGround = false;
-          e.jumpCd = e.kind === 'big' ? 2.2 : 0.9;
+          e.hop = 1;
+          e.jumpCd = e.kind === 'big' ? 1.8 : 0.8;
+        } else if (!e.onGround && e.hop > 0 && e.vy > -120 && tgt && tgt.y < e.y - 30) {
+          e.vy = e.kind === 'big' ? -620 : -560;
+          e.hop = 0;
         }
       }
       // move and land (on solid ground and clouds)
@@ -1004,7 +1014,7 @@ export class BattleSim {
       if (e.vy >= 0 && !e.onGround) {
         const ty = Math.floor(e.y / T);
         for (const tx of [Math.floor((e.x - w / 2 + 2) / T), Math.floor((e.x + w / 2 - 2) / T)])
-          if (this.map.solid(tx, ty) || (this.map.oneWay(tx, ty) && prevY <= ty * T + 0.5)) {
+          if ((this.map.solid(tx, ty) || this.map.oneWay(tx, ty)) && prevY <= ty * T + 0.5) {
             e.y = ty * T;
             e.vy = 0;
             e.onGround = true;
@@ -1093,7 +1103,8 @@ export class BattleSim {
         }
         continue;
       }
-      z.vy = Math.min(1100, z.vy + GRAVITY * DT);
+      // (a touch slower than everything else falls: time to get out of the way)
+      z.vy = Math.min(720, z.vy + 1000 * DT);
       const prevY = z.y;
       z.y += z.vy * DT;
       // anyone underneath gets bonked (anvils and big ones hurt more)

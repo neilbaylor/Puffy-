@@ -9,8 +9,18 @@
 import type { Ctx } from './draw';
 import { ellipsePts, type Fill, type Pt, type Style } from './handdrawn';
 
-export type PlopFrame = 'idle' | 'run0' | 'run1' | 'yell0' | 'yell1';
-export const PLOP_FRAMES: PlopFrame[] = ['idle', 'run0', 'run1', 'yell0', 'yell1'];
+export type PlopFrame = 'idle' | 'run0' | 'run1' | 'yell0' | 'yell1' | 'walk0' | 'walk1' | 'walk2' | 'walk3';
+export const PLOP_FRAMES: PlopFrame[] = ['idle', 'run0', 'run1', 'yell0', 'yell1', 'walk0', 'walk1', 'walk2', 'walk3'];
+/**
+ * A proper four-step walk: [stride, front foot lift, back foot lift, body bob, arm swing].
+ * Contact (feet apart, body low) → passing (one foot up, body high) → the other contact → passing.
+ */
+const WALK: Record<'walk0' | 'walk1' | 'walk2' | 'walk3', [number, number, number, number, number]> = {
+  walk0: [9, 0, 2, 1.5, 1],
+  walk1: [0, 0, 8, -3.5, 0],
+  walk2: [-9, 2, 0, 1.5, -1],
+  walk3: [0, 8, 0, -3.5, 0],
+};
 export const PLOP_W = 96;
 export const PLOP_H = 104;
 
@@ -51,15 +61,20 @@ export function drawPlop(ctx: Ctx, ox: number, oy: number, f: PlopFrame, st: Sty
   const BODY = kind === 'large' ? BIG_BODY : kind === 'small' ? SMALL_BODY : BODY0;
   const ground = oy + 100;
   const cx = ox + 50;
-  const run = f === 'run0' || f === 'run1';
+  const walk = f in WALK ? WALK[f as keyof typeof WALK] : null;
+  const run = f === 'run0' || f === 'run1' || !!walk;
   const yell = f === 'yell0' || f === 'yell1';
-  const bob = f === 'run1' || f === 'yell1' ? -3 : 0;
-  const stride = f === 'run0' ? 7 : f === 'run1' ? -7 : 0;
+  const bob = walk ? walk[3] : f === 'run1' || f === 'yell1' ? -3 : 0;
+  const stride = walk ? walk[0] : f === 'run0' ? 7 : f === 'run1' ? -7 : 0;
+  const liftF = walk ? walk[1] : stride > 0 ? 4 : 0;
+  const liftB = walk ? walk[2] : stride < 0 ? 4 : 0;
+  // (the arms swing against the legs)
+  const swing = walk ? walk[4] * 0.32 : 0;
 
   // legs (behind the body)
   const botY = ground - 30 + bob;
-  leg(ctx, st, cx + 10, botY + 8, ground, -stride, stride < 0 ? 4 : 0, 2001);
-  leg(ctx, st, cx - 12, botY + 8, ground, stride, stride > 0 ? 4 : 0, 2002);
+  leg(ctx, st, cx + 10, botY + 8, ground, -stride, liftB, 2001);
+  leg(ctx, st, cx - 12, botY + 8, ground, stride, liftF, 2002);
 
   // the King's royal cape, behind him
   if (kind === 'king') {
@@ -76,8 +91,8 @@ export function drawPlop(ctx: Ctx, ox: number, oy: number, f: PlopFrame, st: Sty
     st.shape(ctx, [[x, y], [x + Math.cos(ang) * len * 0.5 + nx, y + Math.sin(ang) * len * 0.5 + ny], tip, [x + Math.cos(ang) * len * 0.5 - nx, y + Math.sin(ang) * len * 0.5 - ny]], BODY, seed, { lw: 1 });
   };
   const wave = f === 'yell1' ? 0.35 : 0;
-  arm(cx - 30, botY - 4, Math.PI + (yell ? 0.95 + wave : run ? 0.45 : 0.75), 2010);
-  arm(cx + 30, botY - 4, yell ? -0.95 - wave : run ? -0.3 : -0.75, 2011);
+  arm(cx - 30, botY - 4, Math.PI + (yell ? 0.95 + wave : run ? 0.45 - swing : 0.75), 2010);
+  arm(cx + 30, botY - 4, yell ? -0.95 - wave : run ? -0.3 - swing : -0.75, 2011);
 
   // top tier: a smaller dome (behind the bottom tier, like the sketch), with the swirl tip
   const topY = botY - 27;

@@ -111,6 +111,20 @@ export class BattleUI {
     if (!e.persisted) this.net?.close();
   };
 
+  /** Tapping the room code in the lobby: leave this room and pick another (the room code window). */
+  private changeRoom() {
+    window.removeEventListener('pagehide', this.onPageHide);
+    clearTimeout(this.retryT);
+    this.stopClock();
+    this.watch(false);
+    this.net?.close();
+    this.net = null;
+    this.host.game.events.off('battle-hud', this.onHud);
+    this.stopBattle();
+    this.lobby = null;
+    this.askCode();
+  }
+
   /** Leave the room and go back to the start screen. */
   leave() {
     window.removeEventListener('pagehide', this.onPageHide);
@@ -222,7 +236,7 @@ export class BattleUI {
     this.stopBattle();
     const el = h(`<div class="screen battle-lobby">
       <button class="icon-btn bl-back" aria-label="Back">‹</button>
-      <div class="bl-roomtag" aria-label="Room code">Room <b>${esc(this.code)}</b></div>
+      <button class="bl-roomtag" aria-label="Room code (change room)">Room <b>${esc(this.code)}</b></button>
       <header class="bl-head">
         <h1 class="bl-title">Battle!</h1>
         <p class="bl-sub">Up to ${MAX_BATTLERS} friends</p>
@@ -258,6 +272,10 @@ export class BattleUI {
     </div>`);
     this.lobby = el;
     el.querySelector('.bl-back')!.addEventListener('click', () => this.leave());
+    el.querySelector('.bl-roomtag')!.addEventListener('click', () => {
+      sfx.select();
+      this.changeRoom();
+    });
 
     const input = el.querySelector<HTMLInputElement>('.bl-namebox input')!;
     input.value = storedName();

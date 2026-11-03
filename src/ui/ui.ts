@@ -446,9 +446,11 @@ export class UI {
             ).join('')}</div>`
           : ''
       }
-      <button class="icon-btn fs-btn" data-act="fs" aria-label="Full screen" hidden>⛶</button>
       <button class="icon-btn mute-btn" data-act="mute" aria-label="Sound on or off"></button>
-      <button class="icon-btn battle-btn" data-act="battle" aria-label="Online battle with friends">Battle</button>
+      <div class="start-tr">
+        <button class="icon-btn fs-btn" data-act="fs" aria-label="Full screen" hidden>⛶</button>
+        <button class="icon-btn battle-btn" data-act="battle" aria-label="Online battle with friends">Battle</button>
+      </div>
       <p class="version">v${VERSION}</p>
       <div class="start-foot">
         <button class="btn btn-big btn-go" data-act="play">Play</button>

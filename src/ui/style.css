@@ -1814,20 +1814,27 @@ kbd {
 
 /* the Battle button, top right of the start screen (full screen sits to its left) */
 .battle-btn {
-  position: absolute;
-  top: calc(10px + var(--safe-t));
-  right: calc(12px + var(--safe-r));
+  /* (as tall as the full-screen button beside it; just wider, for the word) */
   width: auto;
-  height: clamp(48px, 9.5vmin, 64px);
-  padding: 0 20px;
+  padding: 0 18px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font: 900 clamp(22px, 4.4vmin, 30px) / 1 var(--display);
+  font: 900 clamp(21px, 4vmin, 28px) / 1 var(--display);
   letter-spacing: 0.02em;
   background: linear-gradient(180deg, #ffe27a, var(--gold));
 }
-.start .fs-btn { right: calc(12px + var(--safe-r) + clamp(120px, 22vmin, 150px)); }
+/* full screen and Battle, side by side in the top right, the same height and lined up */
+.start-tr {
+  position: absolute;
+  top: calc(10px + var(--safe-t));
+  right: calc(12px + var(--safe-r));
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.start-tr .fs-btn { position: static; }
+.start-tr .fs-btn[hidden] { display: none; }
 
 .battle-lobby {
   justify-content: center;
@@ -2205,13 +2212,17 @@ kbd {
   position: absolute;
   top: calc(12px + var(--safe-t));
   right: calc(14px + var(--safe-r));
-  padding: 4px 12px 5px;
+  padding: 4.5px 12px 5px;
+  border: 0;
   border-radius: 999px;
   background: #1c0f3ad9;
+  cursor: pointer;
   color: #fff;
   font: 800 clamp(11px, 2.4vmin, 14px) / 1.2 var(--body);
 }
 .bl-roomtag b { color: var(--gold); font-weight: 900; }
+.bl-roomtag:hover { background: #2c1a52e6; }
+.bl-roomtag:active { transform: scale(0.96); }
 .battle-lobby.loading .bl-roomtag,
 .battle-lobby.full .bl-roomtag { display: none; }
 /* last battle's score, on each player's square */

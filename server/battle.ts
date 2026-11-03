@@ -74,19 +74,21 @@ function demo(sim: BattleSim) {
     return;
   }
   if (process.env.BATTLE_DEMO === 'prizes') {
-    // every bonus sitting in a row, a big boulder dropped onto the ramp, a big anvil
+    // every bonus sitting in a row, two floating down, a big boulder and a big anvil
     const z = sim as unknown as { prizes: unknown[]; hazards: unknown[]; dropIn: number; hazardIn: number };
     z.dropIn = 1e9;
     z.hazardIn = 1e9;
-    (['bomb', 'star', 'grow', 'rapid', 'heart', 'ice', 'fire'] as const).forEach((kind, i) =>
-      z.prizes.push({ id: 900 + i, kind, x: (13.2 + i * 1.1) * 32, y: 9 * 32, vy: 0, landed: true, age: 0 }),
+    (['bomb', 'star', 'grow', 'rapid', 'heart'] as const).forEach((kind, i) =>
+      z.prizes.push({ id: 900 + i, kind, x: (13.6 + i * 1.2) * 32, y: 9 * 32, vy: 0, landed: true, age: 0 }),
     );
+    // two more on their way down
+    z.prizes.push({ id: 910, kind: 'star', x: 7 * 32, y: -24, vy: 40, landed: false, age: 0 });
+    z.prizes.push({ id: 911, kind: 'rapid', x: 25 * 32, y: 60, vy: 40, landed: false, age: 0 });
     z.hazards.push({ id: 990, kind: 'rock', big: true, x: 300, y: -60, vx: 0, vy: 0, warn: 4.5, rolling: 0 });
     z.hazards.push({ id: 991, kind: 'anvil', big: true, x: 24 * 32, y: -60, vx: 0, vy: 0, warn: 9, rolling: 0 });
     return;
   }
   if (ps[0]) s.grant(ps[0], 'fire', []);
-  setTimeout(() => ps[1] && s.grant(ps[1], 'ice', []), 2500);
 }
 
 class Room {
@@ -313,7 +315,7 @@ class Room {
         });
         const r1 = (v: number) => Math.round(v * 10) / 10;
         const rockets = sim.rockets.map((r) => ({ id: r.id, owner: r.owner, kind: r.kind, x: r1(r.x), y: r1(r.y), dir: r.dir }));
-        const prizes = sim.prizes.map((z): SnapPrize => [z.id, z.kind, r1(z.x), r1(z.y), r1(z.age)]);
+        const prizes = sim.prizes.map((z): SnapPrize => [z.id, z.kind, r1(z.x), r1(z.y), z.landed ? r1(z.age) : -1]);
         const enemies = sim.enemies.map((e): SnapEnemy => [
           e.id, e.kind, r1(e.x), r1(e.y), e.dir,
           (e.onGround ? 1 : 0) | (e.weapon ? 2 : 0) | (e.chute ? 4 : 0) | (e.hurtT > 0 ? 8 : 0),
