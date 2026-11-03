@@ -324,7 +324,7 @@ export class BattleScene extends Phaser.Scene {
     const me = this.me;
     const d = me && !this.spectate ? Math.hypot(me.x - x, (me.y - y) * 0.7) : 300;
     const near = d < 350 ? 1 : Math.max(0.35, 1 - (d - 350) / 900);
-    this.cameras.main.shake(240 * k * (0.6 + 0.4 * near), 0.012 * k * near);
+    this.cameras.main.shake(170 * k * (0.6 + 0.4 * near), 0.0045 * k * near);
   }
 
   /** Playing: a little closer in than the whole arena, gently following your hero (most of the arena still in view). */
