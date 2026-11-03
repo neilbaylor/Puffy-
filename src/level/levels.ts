@@ -23,6 +23,16 @@ export const levelName = (id: number) => `${levelInfo(id).title} · ${levelInfo(
 
 const KEY = 'puffy.beaten';
 
+/**
+ * The level the start screen picks when the game opens: the furthest one you've
+ * unlocked (beaten Part 1 → Part 2; beaten Part 2 → Part 3 once it exists).
+ */
+export function latestLevel(): number {
+  const built = LEVELS.filter((l) => l.build).map((l) => l.id);
+  const unlocked = built.filter((id) => id <= progress.beaten + 1);
+  return unlocked.length ? Math.max(...unlocked) : 1;
+}
+
 /** Which levels you've beaten (unlocks picking where to start). */
 export const progress = {
   get beaten(): number {
