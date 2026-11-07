@@ -968,6 +968,31 @@ export class GameScene extends Phaser.Scene {
         }
       p.goo = goo;
     }
+    // bad guys that fall in sink too: slowly, struggling, then they're gone (BLUB!)
+    for (const e of this.enemies) {
+      if (!e.active || e.dead) continue;
+      const b = e.body;
+      const pd = this.puddles.find((q) => e.x > q.x0 && e.x < q.x1 && b.bottom > q.y + 2);
+      if (!pd) continue;
+      if (!e.inPoo) {
+        e.inPoo = true;
+        b.setAllowGravity(false);
+        // (caught at the surface, however fast it fell in: then the whole sink shows)
+        const over = b.bottom - (pd.y + 4);
+        if (over > 0) b.y -= over; // (the sprite follows the body when physics next syncs it)
+        this.fx.pooSplat(e.x, pd.y, 8 + b.width / 5);
+        sfx.dribble(0.6);
+      }
+      b.setVelocity(0, 14 + b.height * 0.08); // (about 2 s for a small Plop, 5–6 s for a Giant)
+      e.setAngle(Math.sin(this.time.now / 70 + e.x) * 7);
+      if (Math.random() < 0.08) this.fx.pooSplat(e.x + (Math.random() - 0.5) * b.width, pd.y, 3);
+      if (b.top > pd.y + 4) {
+        this.fx.pooSplat(e.x, pd.y, 10 + b.width / 4);
+        this.fx.popText(e.x, pd.y - 26, 'BLUB!', '#c99064', 16 + Math.min(10, b.height / 15));
+        sfx.dribble(1);
+        e.kill('fall');
+      }
+    }
     const left = this.view.left - 40;
     const right = this.view.left + this.view.width + 40;
     for (const pd of this.puddles) {

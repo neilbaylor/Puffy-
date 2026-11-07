@@ -83,6 +83,9 @@ export abstract class Enemy extends Phaser.Physics.Arcade.Sprite {
     return true;
   }
 
+  /** Fallen into a puddle of poo (Plop Invasion): sinking, like quicksand. */
+  inPoo = false;
+
   /** Per-frame behaviour, only called while awake and alive. */
   abstract tick(dt: number): void;
 
@@ -93,8 +96,9 @@ export abstract class Enemy extends Phaser.Physics.Arcade.Sprite {
       this.clearTint();
       this.flashUntil = 0;
     }
-    if (this.awake) this.tick(dt);
-    this.weapon?.update(dt, this.awake);
+    // (stuck in a poo puddle, sinking: no more walking about; the scene does the sinking)
+    if (this.awake && !this.inPoo) this.tick(dt);
+    this.weapon?.update(dt, this.awake && !this.inPoo);
     if (!this.dead && this.active) this.animateMouth(dt);
     if (this.y > this.gs.level.heightPx + 120) this.kill('fall');
   }

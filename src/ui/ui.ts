@@ -750,7 +750,6 @@ export class UI {
       input?.addEventListener('input', () => asking(false));
     }
     this.setScreen(el);
-    name?.focus();
   }
 
   private select(i: number, quiet = false) {
