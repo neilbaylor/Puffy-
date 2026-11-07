@@ -400,6 +400,8 @@ export class UI {
     });
     game.events.on('wrestle-fight', () => {
       this.showHud();
+      // (no HUD in the ring, just the pause button: your hearts are over your head)
+      this.hud.classList.add('bare');
       this.touch.setFire(false);
     });
     game.events.on('level-complete', (r: ResultState) => this.showResults(r));
@@ -1006,6 +1008,7 @@ export class UI {
 
   private showHud() {
     this.hud.hidden = false;
+    this.hud.classList.remove('bare');
     const hero = characterById(this.session.players[0]?.characterId ?? 'puffy');
     const cv = this.hud.querySelector('canvas')!;
     // the hero's own standing animation (the same two frames as in the game, at the

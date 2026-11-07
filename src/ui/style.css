@@ -2534,9 +2534,12 @@ kbd {
 .wr-callout.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 .wr-callout.bad { color: #ff8a80; }
 /* a speech bubble over someone's head (placed by the scene; --tail points it at them) */
+.hud.bare .hud-hero { display: none; }
 .wr-speech {
   position: absolute;
-  transform: translate(-50%, -100%);
+  /* (lifted clear of the head: the tail's tip is the point it was placed at) */
+  transform: translate(-50%, calc(-100% - 20px));
+  animation: wr-speech-in 0.32s cubic-bezier(0.2, 1.5, 0.4, 1);
   max-width: min(80vw, 520px);
   padding: 12px 22px 11px;
   border-radius: 20px;
@@ -2550,13 +2553,22 @@ kbd {
 }
 .wr-speech[hidden] { display: none; }
 .wr-speech b { font-weight: 400; color: #fff; }
+/* the tail: a rounded wedge in the bubble's own colours, joined to it (no seam) */
 .wr-speech::after {
   content: '';
   position: absolute;
-  left: calc(50% + var(--tail, 0px) - 14px);
-  bottom: -22px;
-  border: 14px solid transparent;
-  border-top: 18px solid #fff3d6;
+  left: calc(50% + var(--tail, 0px));
+  bottom: -13px;
+  width: 20px;
+  height: 20px;
+  background: #5c3118;
+  border-right: 4px solid #fff3d6;
+  border-bottom: 4px solid #fff3d6;
+  border-bottom-right-radius: 5px;
+  transform: translateX(-50%) rotate(45deg);
+}
+@keyframes wr-speech-in {
+  from { opacity: 0; transform: translate(-50%, calc(-100% - 8px)) scale(0.7); }
 }
 .wr-skip {
   position: absolute;
