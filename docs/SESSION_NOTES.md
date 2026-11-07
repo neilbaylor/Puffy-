@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v1.01)
+## Where things stand (v1.02)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -101,9 +101,10 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - `LevelInfo.speech` (the hero's line after the fly-over), `hoops` (basketball finale or not), `button`.
 - No finale yet (ends at the gate). The owner wants a boss battle at the end later.
 
-### Player accounts (v1.00–v1.01)
-- Optional (playing never needs one). Start screen: account button by the sound toggle → sign in / "New player"
-  (`ui.showAccount`), or, signed in, the player's stats and Sign out.
+### Player accounts (v1.00–v1.02)
+- Optional (playing never needs one). Start screen: account button by the sound toggle (signed in: name + root
+  beer count) → one Sign in button; a name that doesn't exist yet (login 404 `unknown`) asks "Make a new player?",
+  OK registers it. Signed in, straight back to the start screen (no message). Names ≤ 10 characters.
 - Server: `server/users.ts` (bundled to `dist-server/users.mjs`, loaded by `server.mjs`). SQLite via Node's built-in
   `node:sqlite` (Node ≥ 22.13; `engines` says so), JSON-file fallback otherwise. The file and tables are created on
   start-up if missing; new columns are added with ALTER TABLE (see `kills`). File: `DB_PATH`, else

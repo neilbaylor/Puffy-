@@ -1,3 +1,2 @@
 
-- v1.00: optional player accounts (a tiny user database)
-- v1.01: accounts count bad guys defeated, saved at the end of each level
+- v1.02: simpler sign-in, root beer on the name button, steadier start screen camera
