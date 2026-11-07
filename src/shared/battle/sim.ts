@@ -474,9 +474,9 @@ export class BattleSim {
   timeLeft = MATCH_SECS;
   private nextRocket = 1;
   private nextPrize = 1;
-  private dropIn = 3;
+  private dropIn = 5;
   private nextThing = 1;
-  private enemyIn = 7;
+  private enemyIn = 10;
   private hazardIn = 5;
 
   constructor(data: LevelData) {
@@ -759,7 +759,7 @@ export class BattleSim {
   private stepPrizes(ev: BEvent[]) {
     this.dropIn -= DT;
     if (this.dropIn <= 0) {
-      this.dropIn = 7 + Math.random() * 5;
+      this.dropIn = 11 + Math.random() * 7; // (fewer than before: they're worth fighting over)
       if (this.prizes.length < MAX_PRIZES) {
         let roll = Math.random() * PRIZE_ODDS.reduce((t, [, w]) => t + w, 0);
         let kind: PrizeKind = 'bomb';
@@ -855,7 +855,7 @@ export class BattleSim {
 
   /** Room for one more? Up to three at once, at most one of them big. */
   private enemyBudget(): EnemyKind | null {
-    if (this.enemies.length >= 3) return null;
+    if (this.enemies.length >= 2) return null;
     const hasBig = this.enemies.some((e) => e.kind === 'big');
     const r = Math.random();
     if (!hasBig && r < 0.32) return 'big';
@@ -937,7 +937,7 @@ export class BattleSim {
   private stepEnemies(ev: BEvent[]) {
     this.enemyIn -= DT;
     if (this.enemyIn <= 0) {
-      this.enemyIn = 4.5 + Math.random() * 4.5;
+      this.enemyIn = 9 + Math.random() * 9; // (half as often as before: every 13.5 s on average, was 6.75)
       this.spawnEnemy(ev);
     }
     const T = TILE_PX;
@@ -1050,7 +1050,7 @@ export class BattleSim {
     this.enemies = this.enemies.filter((e) => e.hp > 0);
   }
 
-  // ── rocks and anvils from the sky ──
+  // ── rocks from the sky ──
 
   private stepHazards(ev: BEvent[]) {
     this.hazardIn -= DT;
@@ -1060,7 +1060,8 @@ export class BattleSim {
       const n = Math.random() < 0.3 ? 2 + Math.floor(Math.random() * 2) : 1;
       for (let i = 0; i < n; i++) {
         const x = (2 + Math.random() * (this.map.w - 4)) * TILE_PX;
-        this.hazards.push({ id: this.nextThing++, kind: Math.random() < 0.35 ? 'anvil' : 'rock', big: Math.random() < 1 / 3, x, y: -40, vx: 0, vy: 0, warn: 1.1 + i * 0.35, rolling: 0 });
+        // (rocks only: no more anvils)
+        this.hazards.push({ id: this.nextThing++, kind: 'rock', big: Math.random() < 1 / 3, x, y: -40, vx: 0, vy: 0, warn: 1.1 + i * 0.35, rolling: 0 });
       }
     }
     const T = TILE_PX;

@@ -165,7 +165,29 @@ export interface BattleHud {
  * with the same rules (then quietly corrects to what the server says), shows
  * everyone else smoothly a moment behind, and plays all the effects.
  */
+/** A battle Plop's little moments while it stands about (as in Plop Invasion), and when it was last hit. */
+interface PlopMood {
+  moodNext?: number;
+  moodUntil?: number;
+  moodFace?: string;
+  hurtAt?: number;
+}
+
 export class BattleScene extends Phaser.Scene {
+  /** A standing Plop's face: breathing, and every few seconds a blink, a glance, a sly grin or a yell. */
+  private plopStanding(m: PlopMood, anim: number): string {
+    const t = this.time.now / 1000;
+    if (m.moodNext === undefined) m.moodNext = t + 0.5 + Math.random() * 2.5;
+    if (t >= (m.moodUntil ?? 0) && t >= m.moodNext) {
+      const r = Math.random();
+      m.moodFace = r < 0.4 ? 'blink' : r < 0.6 ? 'look' : r < 0.75 ? 'grin' : 'yell';
+      m.moodUntil = t + (m.moodFace === 'blink' ? 0.13 : m.moodFace === 'yell' ? 1.1 : 0.8 + Math.random() * 0.5);
+      m.moodNext = m.moodUntil + 1.2 + Math.random() * 2.5;
+    }
+    if (t < (m.moodUntil ?? 0)) return m.moodFace === 'yell' ? (Math.floor(anim * 2) % 2 ? 'yell0' : 'yell1') : m.moodFace!;
+    return Math.floor(t * 1.5) % 2 ? 'idle1' : 'idle';
+  }
+
   private net!: BattleNet;
   private map!: ArenaMap;
   private level!: LevelView;
@@ -1036,7 +1058,8 @@ export class BattleScene extends Phaser.Scene {
             if (step && Math.random() < 0.35) this.fx.dust(x + (Math.random() - 0.5) * w, y, 2);
           }
         } else if (onGround && !chute) {
-          frame = Math.floor(v.anim * 2) % 2 ? 'yell0' : 'yell1';
+          // standing about: breathing, blinking, a glance, a grin — and now and then a yell
+          frame = this.plopStanding(v as unknown as PlopMood, v.anim);
           sy = 1 + Math.sin(this.time.now / 300 + id) * 0.025; // breathing
         } else frame = 'idle';
         if (v.land > 0) {
@@ -1047,6 +1070,12 @@ export class BattleScene extends Phaser.Scene {
         const base = PLOP_ART[kind].scale / PLOP_RES;
         v.spr.setScale(base * sx, base * sy).setRotation(rot);
       } else frame = kind === 'big' && !onGround && !chute ? 'air' : Math.floor(v.anim) % 2 ? 'w1' : 'w0';
+      // just hit: a Plop squeezes its eyes shut ("ow!") for a moment
+      if (v.plop) {
+        const m = v as unknown as PlopMood;
+        if (flags & 8) m.hurtAt = this.time.now;
+        if (this.time.now - (m.hurtAt ?? -1e9) < 320) frame = 'hurt';
+      }
       // (the Plops' art faces left, like the Puff Balls')
       v.spr.setFrame(frame).setPosition(x + ox, y + 2 + oy).setFlipX(dir > 0);
       if (flags & 8) v.spr.setTintFill(0xffffff);

@@ -5,6 +5,11 @@ import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve } from 'node:path';
 import { gzipSync } from 'node:zlib';
 
+// (Node's built-in SQLite, used for player accounts, is still labelled "experimental" and says so
+// at start-up; it works fine, so that one warning is skipped to keep the logs clean)
+const emitWarning = process.emitWarning;
+process.emitWarning = (w, ...rest) => (/SQLite/.test(String(w?.message ?? w)) ? undefined : emitWarning.call(process, w, ...rest));
+
 const ROOT = resolve('dist');
 const PORT = Number(process.env.PORT) || 8080;
 const TYPES = {
