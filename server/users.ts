@@ -10,7 +10,7 @@
  *
  * HTTP API (JSON), all under /api:
  *   POST /api/register  { name, password }            → 201 { token, user }
- *   POST /api/login     { name, password }            → { token, user }
+ *   POST /api/login     { name, password }            → { token, user } (404 { unknown: true } if no such player)
  *   GET  /api/me        (Authorization: Bearer token) → { user }
  *   PUT  /api/progress  (Bearer) { rootbeer, nuggies, kills, level } → { user }
  *   POST /api/logout    (Bearer)                      → 204
@@ -159,7 +159,8 @@ export async function openStore(file = dbPath()): Promise<Store> {
 
 // ───────────────────────────────────────────── the API ──
 
-const NAME_RE = /^[A-Za-z0-9 _-]{2,16}$/;
+/** New names: 2–10 letters, numbers, spaces, - or _ (signing in accepts any name that exists). */
+const NAME_RE = /^[A-Za-z0-9 _-]{2,10}$/;
 const sha = (s: string) => createHash('sha256').update(s).digest('hex');
 const pub = (u: UserRow): PublicUser => ({ name: u.name, rootbeer: u.rootbeer, nuggies: u.nuggies, kills: u.kills, level: u.level });
 const int = (v: unknown, lo: number, hi: number) => Math.max(lo, Math.min(hi, Math.floor(Number(v) || 0)));
@@ -237,7 +238,8 @@ export async function createUserApi() {
         const body = await readBody(req);
         const name = String(body.name ?? '').trim();
         const password = String(body.password ?? '');
-        if (!NAME_RE.test(name)) return void send(res, 400, { error: 'Names are 2–16 letters, numbers, spaces, - or _.' }), true;
+        if (route === 'POST /api/register' && !NAME_RE.test(name)) return void send(res, 400, { error: 'Names are 2–10 letters, numbers, spaces, - or _.' }), true;
+        if (name.length < 2 || name.length > 16) return void send(res, 400, { error: 'Type your name.' }), true;
         if (password.length < 4 || password.length > 64) return void send(res, 400, { error: 'Passwords are 4–64 characters.' }), true;
         if (route === 'POST /api/register') {
           if (store.byName(name)) return void send(res, 409, { error: 'That name is taken.' }), true;
@@ -246,10 +248,10 @@ export async function createUserApi() {
           return void send(res, 201, { token: newSession(u), user: pub(u) }), true;
         }
         const u = store.byName(name);
-        // (the same amount of work whether or not the name exists)
-        const salt = u ? Buffer.from(u.salt, 'hex') : randomBytes(16);
-        const hash = Buffer.from(await hashPassword(password, salt), 'hex');
-        if (!u || !timingSafeEqual(hash, Buffer.from(u.hash, 'hex'))) return void send(res, 401, { error: 'Wrong name or password.' }), true;
+        // (no player by that name: the game offers to make one)
+        if (!u) return void send(res, 404, { error: 'No player with that name yet.', unknown: true }), true;
+        const hash = Buffer.from(await hashPassword(password, Buffer.from(u.salt, 'hex')), 'hex');
+        if (!timingSafeEqual(hash, Buffer.from(u.hash, 'hex'))) return void send(res, 401, { error: 'Wrong password.' }), true;
         return void send(res, 200, { token: newSession(u), user: pub(u) }), true;
       }
       if (route === 'GET /api/me') {

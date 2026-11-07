@@ -96,13 +96,16 @@ export const account = {
     if (r.ok) await merge(r.data.user as AccountUser);
     else if (r.status === 401) signedOut();
   },
-  /** Sign in (or make a new account). Returns an error message, or null if it worked. */
-  async signIn(name: string, password: string, create: boolean): Promise<string | null> {
+  /**
+   * Sign in (or, with `create`, make a new player). `unknown`: there's no player by that
+   * name yet (the game then offers to make one).
+   */
+  async signIn(name: string, password: string, create: boolean): Promise<{ error: string | null; unknown?: boolean }> {
     const r = await api('POST', create ? '/api/register' : '/api/login', { name: name.trim(), password });
-    if (!r.ok) return String(r.data.error ?? 'Something went wrong.');
+    if (!r.ok) return { error: String(r.data.error ?? 'Something went wrong.'), unknown: !!r.data.unknown };
     saveToken(String(r.data.token));
     await merge(r.data.user as AccountUser);
-    return null;
+    return { error: null };
   },
   /**
    * Save this browser's progress to the account (at the end of a level, while the results
