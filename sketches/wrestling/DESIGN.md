@@ -21,8 +21,8 @@ The concept screens are in this folder (`wide`, `plan`, `entrance`, `fight`, `fi
   the ending) use close-ups and zooms, like the basketball intro.
 
 ## You
-- **3 hearts, shown over your head** (like Battle mode). No HUD and no nuggies in the ring (just
-  the pause button). A hit costs a heart; **hearts turn up in the ring** to win them back. Out of
+- **5 hearts, shown over your head** (like Battle mode), up to 6 with pick-ups. No HUD and no nuggies in the ring (just
+  the pause button). A hit costs a heart; **hearts turn up in the ring** often (every 4–7 s) until you have 6. Out of
   hearts costs a life from the full game.
 - **The folding chair** (folded flat, grey steel) drops into the ring a few times a fight ("CHAIR!" on
   the jumbotron). Walk over it to pick it up: the hero bends down and holds it up over their head in
