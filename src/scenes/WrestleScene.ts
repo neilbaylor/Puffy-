@@ -134,7 +134,7 @@ class Queen {
   chargeV = 0;
   moodNext = 1.5;
   cdBlock = 0;
-  cdHeave = 3;
+  cdHeave = 5;
   fallVy = 0;
   counterNext = false;
 
@@ -291,7 +291,7 @@ class Queen {
         this.spr.setX(this.spr.x + Math.sin(s.time.now / 12) * 0.7);
         if (this.t <= 0) {
           s.heaveAt(this, p.x);
-          this.cdHeave = 3.8 + Math.random() * 2;
+          this.cdHeave = 5 + Math.random() * 2.5;
           this.setMode('idle', 0.25);
         }
         break;
@@ -316,7 +316,7 @@ class Queen {
         if (s.heroPerched() && this.cdLob <= 0) {
           // stay up there too long and she'll throw poo at you
           s.lobAt(this, p.x, p.bottom - 20);
-          this.cdLob = 1.0;
+          this.cdLob = 1.6;
         }
         if (!s.heroOnRopes() && !s.heroDiving()) this.setMode('idle', 0.2);
         break;
@@ -429,7 +429,7 @@ export class WrestleScene extends Phaser.Scene {
   private lobs: Lob[] = [];
   /** A heart to pick up in the ring (instead of nuggies), and when the next one comes. */
   private heartPick: { img: Phaser.GameObjects.Image; t: number; y: number } | null = null;
-  private heartIn = 4;
+  private heartIn = 3;
   private heartsG!: Phaser.GameObjects.Graphics;
   /** The folding chair: falls into the ring now and then; pick it up and hit her with it (two hits). */
   private chair: {
@@ -515,7 +515,7 @@ export class WrestleScene extends Phaser.Scene {
     this.waves = [];
     this.lobs = [];
     this.heartPick = null;
-    this.heartIn = 4;
+    this.heartIn = 3;
     this.chair = null;
     this.chairIn = 8;
     this.chairsLeft = CHAIRS;
@@ -1291,7 +1291,7 @@ export class WrestleScene extends Phaser.Scene {
       this.heartIn = 2;
       return;
     }
-    this.heartIn = 3 + Math.random() * 3;
+    this.heartIn = 2 + Math.random() * 2;
     const x = this.ringSpot();
     const y = MAT_Y - 30 - Math.random() * 60;
     const img = this.add.image(x, y, 'prize-heart').setScale(0.9 / ART_RES).setDepth(DEPTH.pickups);
