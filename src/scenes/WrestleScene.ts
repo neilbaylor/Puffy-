@@ -29,7 +29,7 @@ import type { GameOverState, HudState, ResultState } from './GameScene';
  * The fight is the platformer's own: the same hero, controls and jumps (no bazooka in the ring),
  * side-on across the mat. The ropes at either end are springy (run into them and you're flung
  * back), and you can climb them to the top turnbuckle and dive off (land on her: two hits); there's
- * no leaving the ring. You have 3 hearts (shown over your head; more turn up in the ring), there's
+ * no leaving the ring. You have 5 hearts (shown over your head; more turn up in the ring, up to 6), there's
  * a folding chair now and then (hit her with it: two hits), and she takes 20 hits, counted down on
  * the jumbotron.
  */
@@ -69,6 +69,9 @@ const Q_RES = 4;
 const Q_PAD = 18;
 const Q_TOP = 24;
 const HITS = 20;
+/** Your hearts in the ring: you start with 5, and pick-ups can take you up to 6. */
+const HEARTS_START = 5;
+const HEARTS_MAX = 6;
 /** The poo puddle on the mat (world x): you sink into it, like the level's. */
 const PUD_X0 = WX(PUDDLE.x - PUDDLE.w * 0.78);
 const PUD_X1 = WX(PUDDLE.x + PUDDLE.w * 0.78);
@@ -423,7 +426,7 @@ export class WrestleScene extends Phaser.Scene {
   private lobs: Lob[] = [];
   /** A heart to pick up in the ring (instead of nuggies), and when the next one comes. */
   private heartPick: { img: Phaser.GameObjects.Image; t: number; y: number } | null = null;
-  private heartIn = 8;
+  private heartIn = 5;
   private heartsG!: Phaser.GameObjects.Graphics;
   /** The folding chair: falls into the ring now and then; pick it up and hit her with it (two hits). */
   private chair: {
@@ -441,7 +444,7 @@ export class WrestleScene extends Phaser.Scene {
     hit: boolean;
   } | null = null;
   private chairIn = 12;
-  private hearts = 3;
+  private hearts = HEARTS_START;
   private ended = false;
   private fighting = false;
   private crowd!: Phaser.GameObjects.Image;
@@ -500,10 +503,10 @@ export class WrestleScene extends Phaser.Scene {
     this.waves = [];
     this.lobs = [];
     this.heartPick = null;
-    this.heartIn = 8;
+    this.heartIn = 5;
     this.chair = null;
     this.chairIn = 12;
-    this.hearts = 3;
+    this.hearts = HEARTS_START;
     this.ended = false;
     this.fighting = false;
     this.inRing = true;
@@ -1225,7 +1228,7 @@ export class WrestleScene extends Phaser.Scene {
     if (q.dangerous) this.hurtPlayer(q.x);
   }
 
-  /** Hearts turn up in the ring (instead of nuggies): grab one for a heart back. */
+  /** Hearts turn up in the ring (instead of nuggies), often, until you've got 6: grab one for a heart. */
   private updateHearts(dt: number) {
     const p = this.player;
     if (this.heartPick) {
@@ -1234,7 +1237,7 @@ export class WrestleScene extends Phaser.Scene {
       n.img.y = n.y + Math.sin(n.t * 3) * 4;
       n.img.setAlpha(n.t > 7 && Math.floor(n.t * 8) % 2 ? 0.35 : 1);
       if (p.alive && this.fighting && Math.abs(p.x - n.img.x) < 20 && Math.abs(p.y - n.img.y) < 26) {
-        this.hearts = Math.min(3, this.hearts + 1);
+        this.hearts = Math.min(HEARTS_MAX, this.hearts + 1);
         sfx.rootbeer();
         this.fx.auraSparkle(n.img.x, n.img.y, 12);
         this.fx.popText(n.img.x, n.img.y - 20, '+1 ♥', '#ff7eb6', 18);
@@ -1249,12 +1252,12 @@ export class WrestleScene extends Phaser.Scene {
     if (!this.fighting) return;
     this.heartIn -= dt;
     if (this.heartIn > 0) return;
-    // (only when you've lost one)
-    if (this.hearts >= 3) {
+    // (not when you have the most you can hold)
+    if (this.hearts >= HEARTS_MAX) {
       this.heartIn = 2;
       return;
     }
-    this.heartIn = 7 + Math.random() * 5;
+    this.heartIn = 4 + Math.random() * 3;
     const x = this.ringSpot();
     const y = MAT_Y - 30 - Math.random() * 60;
     const img = this.add.image(x, y, 'prize-heart').setScale(0.9 / ART_RES).setDepth(DEPTH.pickups);
@@ -1276,10 +1279,12 @@ export class WrestleScene extends Phaser.Scene {
     const g = this.heartsG.clear();
     const p = this.player;
     if (!this.fighting || !p.alive) return;
-    const w = 9;
-    const x0 = p.x - w;
+    // (5 slots, and a 6th when you've got one)
+    const n = Math.max(HEARTS_START, this.hearts);
+    const w = 8.5;
+    const x0 = p.x - ((n - 1) * w) / 2;
     const y = p.body.top - 12;
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < n; i++) {
       const cx = x0 + i * w;
       const full = i < this.hearts;
       g.fillStyle(0x2b1a12, 0.85).fillCircle(cx - 1.8, y - 1, 3.4).fillCircle(cx + 1.8, y - 1, 3.4).fillTriangle(cx - 5, y, cx + 5, y, cx, y + 5.4);
