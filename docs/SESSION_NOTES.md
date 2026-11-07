@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v1.02)
+## Where things stand (v1.03)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -101,10 +101,13 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - `LevelInfo.speech` (the hero's line after the fly-over), `hoops` (basketball finale or not), `button`.
 - No finale yet (ends at the gate). The owner wants a boss battle at the end later.
 
-### Player accounts (v1.00–v1.02)
+### Player accounts (v1.00–v1.03)
 - Optional (playing never needs one). Start screen: account button by the sound toggle (signed in: name + root
   beer count) → one Sign in button; a name that doesn't exist yet (login 404 `unknown`) asks "Make a new player?",
-  OK registers it. Signed in, straight back to the start screen (no message). Names ≤ 10 characters.
+  OK registers it. Signed in, straight back to the start screen (no message). Names ≤ 10 characters (front end
+  only; the server takes 2–16). The modal has no explanatory text (the owner wants just title, boxes, buttons).
+- Name + password are kept in localStorage `puffy.account`; `account.restore()` uses the token, else signs in
+  with them, and re-registers if the player is gone (fresh database). Battle uses the player's name (read-only).
 - Server: `server/users.ts` (bundled to `dist-server/users.mjs`, loaded by `server.mjs`). SQLite via Node's built-in
   `node:sqlite` (Node ≥ 22.13; `engines` says so), JSON-file fallback otherwise. The file and tables are created on
   start-up if missing; new columns are added with ALTER TABLE (see `kills`). File: `DB_PATH`, else

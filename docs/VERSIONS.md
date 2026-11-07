@@ -1,2 +1,2 @@
 
-- v1.02: simpler sign-in, root beer on the name button, steadier start screen camera
+- v1.03: signs you back in by itself; battles use your player's name
