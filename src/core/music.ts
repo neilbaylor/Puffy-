@@ -163,6 +163,11 @@ export const playLevelSong = (level = 1) => play(levelTrack(level), true);
 export const playLevelMusic = (level = 1) => play(levelTrack(level), false);
 
 export const playHoops = () => play('hoops', true);
+/**
+ * The boss song (basketball's, which Queen Plop's ring borrows for now) decoded ahead of time, near
+ * the end of a level: otherwise it only starts seconds into the boss's entrance.
+ */
+export const preloadHoopsMusic = () => void decode('hoops');
 
 /** The start screen's song ("Game Ready"): loops; keeps going if it's already on. */
 export const playMenuMusic = () => play('menu', false);

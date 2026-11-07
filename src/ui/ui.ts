@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { CHARACTERS, characterById, type CharacterDef } from '../data/characters';
 import type { Session } from '../core/session';
-import { fadeOutMusic, playLevelClear, playLevelMusic, playLevelSong, playMenuMusic, primeMusic, setMusicMuted, stopMusic } from '../core/music';
+import { fadeOutMusic, playLevelClear, playLevelMusic, playLevelSong, playMenuMusic, preloadHoopsMusic, primeMusic, setMusicMuted, stopMusic } from '../core/music';
 import { isMuted, setMuted, sfx, unlockAudio } from '../core/sfx';
 import { drawHeroCard, drawPortrait, renderPoseSet } from '../gfx/draw';
 import { NEUTRAL_FACE, type Face } from '../gfx/face';
@@ -978,6 +978,7 @@ export class UI {
     }
     unlockAudio();
     primeMusic();
+    preloadHoopsMusic();
     const hero = CHARACTERS[this.selected];
     store.set('puffy.hero', hero.id);
     sfx.select();
