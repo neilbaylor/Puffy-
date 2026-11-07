@@ -73,8 +73,8 @@ const HITS = 15;
 const HEARTS_START = 5;
 const HEARTS_MAX = 6;
 /** Folding chairs in a match, and (for each one after the first) how few hits she has left when it comes, at the latest. */
-const CHAIRS = 4;
-const CHAIR_AT_HP = [-1, 11, 7, 4];
+const CHAIRS = 5;
+const CHAIR_AT_HP = [-1, 12, 9, 6, 3];
 /** The poo puddle on the mat (world x): you sink into it, like the level's. */
 const PUD_X0 = WX(PUDDLE.x - PUDDLE.w * 0.78);
 const PUD_X1 = WX(PUDDLE.x + PUDDLE.w * 0.78);
@@ -445,6 +445,8 @@ export class WrestleScene extends Phaser.Scene {
     swing: number;
     cd: number;
     hit: boolean;
+    /** pressed again during a swing: another swing follows */
+    again?: boolean;
   } | null = null;
   private chairIn = 8;
   /** Chairs still to come this match (4 in all), and the hits-left mark that brings each one early. */
@@ -1363,11 +1365,11 @@ export class WrestleScene extends Phaser.Scene {
     if (!c) {
       if (!this.fighting || this.chairsLeft <= 0) return;
       this.chairIn -= dt;
-      // (one every 11–15 s, or sooner as she weakens: all 4 come before she's done)
+      // (one every 10–13 s, or sooner as she weakens: all 5 come before she's done)
       const n = CHAIRS - this.chairsLeft;
       if (this.chairIn > 0 && q.hp > CHAIR_AT_HP[n]) return;
       this.chairsLeft--;
-      this.chairIn = 11 + Math.random() * 4;
+      this.chairIn = 10 + Math.random() * 3;
       // one comes flying in from the crowd: CHAIR!
       const x = this.ringSpot();
       const img = this.add.image(x, this.cameras.main.worldView.top - 50, 'wr-chair').setScale(SC).setDepth(DEPTH.pickups);
@@ -1458,11 +1460,20 @@ export class WrestleScene extends Phaser.Scene {
         c.hit = true;
         if (inReach && toward === p.facing && this.chairHit()) return;
       }
-      if (t > UP + DOWN + 0.12) {
-        c.swing = -1;
-        c.cd = 0.35;
+      // (press again mid-swing and the next one follows straight on)
+      if (this.firePressed && c.hit) c.again = true;
+      if (t > UP + DOWN + 0.04) {
         c.a = -1.75;
-        p.frameOverride = null;
+        if (c.again) {
+          c.again = false;
+          c.swing = 0;
+          c.hit = false;
+          sfx.whoosh();
+        } else {
+          c.swing = -1;
+          c.cd = 0.05;
+          p.frameOverride = null;
+        }
       }
     }
     // the chair, gripped in both hands, carrying on along the arms
