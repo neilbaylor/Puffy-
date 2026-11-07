@@ -127,3 +127,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.122: folded grey chair held overhead + swung (hero carry frames), Queen name card, shorter intro
 - v0.123: Queen fight hearts: start 5, max 6, pick-ups every 4-7 s
 - v0.124: Queen fight: shooting back, CHAIR button while holding the chair, 15 hits, slightly calmer
+- v0.125: Queen fight uses the basketball song (placeholder), preloaded so it starts on time

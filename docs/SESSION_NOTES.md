@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.124)
+## Where things stand (v0.125)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -187,6 +187,10 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   deferred art + MenuScene's quiet jobs (`takeQuietJobs`) + 24 warm-up frames under the loading bar
   (two-phase bar); the boot screen is the manifest blue with the rainbow PUFFY logo. Results after the last
   level: Play again + Home screen. Account card: Sign out bottom-left.
+- v0.125 music: the Queen fight plays the basketball song (`playHoops`) as a placeholder (to be
+  replaced). `preloadHoopsMusic()` decodes it once the hero is two-thirds through a boss level
+  (GameScene `bossSongReady`) and on the Wrestle test button, so it starts with her entrance instead
+  of ~5 s in. `window.__music()` shows what's playing (tests: tmus.cjs, t100m.cjs).
 - v0.124: HITS 15. Bazooka back in the ring (the input wrapper only blanks `fire` while the chair is
   held; rockets overlap her sprite → `explode()` → 1 hit + knock-back). Holding the chair: the scene
   reads the raw input (`rawInput`, `firePressed`) and FIRE swings it (no auto swing; hits only if
