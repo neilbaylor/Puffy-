@@ -26,7 +26,7 @@ import type { GameOverState, HudState, ResultState } from './GameScene';
 /**
  * Part 3's boss: Queen Plop, in a wrestling ring in the Poo Palace (see sketches/wrestling/DESIGN.md).
  *
- * The fight is the platformer's own: the same hero, controls, jumps and bazooka (a rocket = a hit),
+ * The fight is the platformer's own: the same hero, controls, jumps and bazooka (two rockets = a hit),
  * side-on across the mat. The ropes at either end are springy (run into them and you're flung
  * back), and you can climb them to the top turnbuckle and dive off (land on her: two hits); there's
  * no leaving the ring. You have 5 hearts (shown over your head; more turn up in the ring, up to 6), there's
@@ -451,6 +451,8 @@ export class WrestleScene extends Phaser.Scene {
   private chairsLeft = CHAIRS;
   /** Hits she's landed on you while you hold the chair (two and you drop it). */
   private chairHurts = 0;
+  /** A rocket's landed and the next one counts a hit (two rockets = one hit). */
+  private rocketHalf = false;
   private hearts = HEARTS_START;
   private ended = false;
   private fighting = false;
@@ -518,6 +520,7 @@ export class WrestleScene extends Phaser.Scene {
     this.chairIn = 8;
     this.chairsLeft = CHAIRS;
     this.chairHurts = 0;
+    this.rocketHalf = false;
     this.hearts = HEARTS_START;
     this.ended = false;
     this.fighting = false;
@@ -1125,7 +1128,12 @@ export class WrestleScene extends Phaser.Scene {
   /** A hit on her: counts down the jumbotron; the 8th is the end of her. */
   private hitQueen(n: number, how: 'dive' | 'stomp' | 'chair' | 'rocket', fromX: number) {
     const q = this.queen;
+    // (a rocket is half a hit: it knocks her back every time, but it takes two to count one off.
+    // Nothing shows halves: the count just goes down on every second rocket)
+    const rocketCounts = how === 'rocket' && this.rocketHalf;
+    if (how === 'rocket') n = rocketCounts ? 1 : 0;
     if (!this.fighting || !q.hit(n, fromX)) return false;
+    if (how === 'rocket') this.rocketHalf = !this.rocketHalf;
     const big = how === 'dive' || how === 'chair';
     const words = how === 'dive' ? 'TOP ROPE! ×2' : how === 'chair' ? 'CHAIR SHOT! ×2' : how === 'stomp' ? ['BONK!', 'SPLAT!', 'BOING!'][q.hp % 3] : ['POW!', 'BAM!', 'KABOOM!'][q.hp % 3];
     this.fx.popText(q.x, q.top - 16, words, big ? '#ffd23f' : '#ffffff', big ? 26 : 20);
