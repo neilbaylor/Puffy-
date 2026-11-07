@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v1.04)
+## Where things stand (v0.105)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -87,6 +87,9 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Giant Plops = Giant Puff behaviour plus an occasional poo lob (every 7–10 s). Giants stop at overhangs they
   can't fit under (`Giant.lowCeiling`); keep low islands ≥ 4 tiles away from a ledge a Giant can walk off.
   `L.spawn('bigplop', x, h, { weapon: 'saw' })` forces a weapon (`createBadGuy`).
+- Plop frames (gfx/plops.ts): idle, idle1 (breathing), blink, look, grin, hurt, yell0/1, walk0–3, run0/1;
+  `idleFace` in Plops.ts picks the idle moments, `hurtAt` shows "ow!" for 0.3 s, `loiter` makes patrollers pause.
+- Version numbers stay v0.x (the owner's wish): after v0.99 came v0.100, v0.101 … (commits v1.00–v1.04 = v0.100–v0.104).
 - Bad guys that fall into a puddle sink too (`Enemy.inPoo`, handled in `GameScene.updatePuddles`; caught at the
   surface by moving the physics body, then 14 + height × 0.08 px/s, killed with 'fall' when under).
 - Enemies walk down 1–2 tile steps (`Enemy.pitAt`: only a real drop counts as a gap); Big Puffs / Big Plops
@@ -103,7 +106,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - `LevelInfo.speech` (the hero's line after the fly-over), `hoops` (basketball finale or not), `button`.
 - No finale yet (ends at the gate). The owner wants a boss battle at the end later.
 
-### Player accounts (v1.00–v1.03)
+### Player accounts (v0.100–v0.103)
 - Optional (playing never needs one). Start screen: account button by the sound toggle (signed in: name + root
   beer count) → one Sign in button; a name that doesn't exist yet (login 404 `unknown`) asks "Make a new player?",
   OK registers it. Signed in, straight back to the start screen (no message). Names ≤ 10 characters (front end
