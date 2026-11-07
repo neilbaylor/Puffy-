@@ -15,6 +15,7 @@ import { drawNuggie, drawRootBeer } from '../gfx/collectibles';
 import { VERSION } from '../version';
 import { LEVELS, latestLevel, levelInfo, levelName, progress } from '../level/levels';
 import { account } from '../core/account';
+import { bank } from '../core/bank';
 
 /** Text safe to put in HTML. */
 const esc = (t: string) => t.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -637,7 +638,7 @@ export class UI {
   /** The account button's label: your name once signed in, else "Sign in". */
   private accountLabel() {
     const u = account.user;
-    return `${PERSON}<span>${u ? esc(u.name) : 'Sign in'}</span>`;
+    return u ? `${PERSON}<span>${esc(u.name)}</span><small class="acct-rb"><i class="rb-ico"></i>${Math.max(u.rootbeer, bank.rootbeer)}</small>` : `${PERSON}<span>Sign in</span>`;
   }
 
   /**
@@ -665,14 +666,17 @@ export class UI {
           <button class="btn btn-go" data-act="back">Done</button>
         </div>`
             : `<h2>Sign in</h2>
-        <p class="acct-note">No need to sign in to play! With a name and password, your root beer, nuggies and level are saved, on any phone or tablet.</p>
-        <label class="bl-namebox acct-box"><input name="name" maxlength="16" placeholder="Name" autocomplete="username" autocapitalize="off" spellcheck="false" aria-label="Name"></label>
+        <p class="acct-note">No need to sign in to play! With a name and password, your root beer, nuggies and level are saved, on any phone or tablet. A new name makes a new player.</p>
+        <label class="bl-namebox acct-box"><input name="name" maxlength="10" placeholder="Name" autocomplete="username" autocapitalize="off" spellcheck="false" aria-label="Name"></label>
         <label class="bl-namebox acct-box"><input name="pw" type="password" maxlength="64" placeholder="Password" autocomplete="current-password" aria-label="Password"></label>
         <p class="acct-err" hidden></p>
-        <div class="row">
+        <div class="row acct-main">
           <button class="btn btn-alt" data-act="back">Back</button>
-          <button class="btn btn-alt" data-act="new">New player</button>
           <button class="btn btn-go" data-act="in">Sign in</button>
+        </div>
+        <div class="row acct-confirm" hidden>
+          <button class="btn btn-alt" data-act="cancel">Cancel</button>
+          <button class="btn btn-go" data-act="ok">OK</button>
         </div>`
         }
       </div>
@@ -690,36 +694,62 @@ export class UI {
     const name = el.querySelector<HTMLInputElement>('input[name=name]');
     const pw = el.querySelector<HTMLInputElement>('input[name=pw]');
     const err = el.querySelector<HTMLElement>('.acct-err');
+    const main = el.querySelector<HTMLElement>('.acct-main');
+    const confirm = el.querySelector<HTMLElement>('.acct-confirm');
     const btns = [...el.querySelectorAll<HTMLButtonElement>('.row .btn')];
+    const say = (text: string, kind: 'error' | 'ask') => {
+      if (!err) return;
+      err.textContent = text;
+      err.hidden = false;
+      err.classList.toggle('ask', kind === 'ask');
+    };
+    // a name nobody has yet: say so; OK makes the new player
+    const asking = (on: boolean) => {
+      if (main) main.hidden = on;
+      if (confirm) confirm.hidden = !on;
+      if (!on && err) err.hidden = true;
+    };
     const go = async (create: boolean) => {
-      if (!name || !pw || !err) return;
+      if (!name || !pw) return;
       if (name.value.trim().length < 2 || pw.value.length < 4) {
-        err.textContent = name.value.trim().length < 2 ? 'Type your name (at least 2 letters).' : 'Passwords are at least 4 characters.';
-        err.hidden = false;
+        say(name.value.trim().length < 2 ? 'Type your name (at least 2 letters).' : 'Passwords are at least 4 characters.', 'error');
         sfx.bump();
         return;
       }
       btns.forEach((b) => (b.disabled = true));
-      const problem = await account.signIn(name.value, pw.value, create);
+      const r = await account.signIn(name.value, pw.value, create);
       btns.forEach((b) => (b.disabled = false));
-      if (problem) {
-        err.textContent = problem;
-        err.hidden = false;
+      if (r.unknown && !create) {
+        say(`There's no player called “${name.value.trim()}” yet. Make a new player with this name and password?`, 'ask');
+        asking(true);
+        sfx.select();
+        return;
+      }
+      if (r.error) {
+        asking(false);
+        say(r.error, 'error');
         sfx.bump();
         return;
       }
+      // signed in: straight back to the start screen
       sfx.select();
       this.level = latestLevel();
       this.showStart();
-      this.showBanner(`${create ? 'Welcome' : 'Welcome back'}, ${esc(account.user?.name ?? '')}!`, 1800);
     };
     el.querySelector('[data-act=in]')?.addEventListener('click', () => go(false));
-    el.querySelector('[data-act=new]')?.addEventListener('click', () => go(true));
-    for (const input of [name, pw])
+    el.querySelector('[data-act=ok]')?.addEventListener('click', () => go(true));
+    el.querySelector('[data-act=cancel]')?.addEventListener('click', () => {
+      sfx.back();
+      asking(false);
+    });
+    for (const input of [name, pw]) {
       input?.addEventListener('keydown', (e) => {
         e.stopPropagation(); // typing isn't playing
-        if (e.key === 'Enter') go(false);
+        if (e.key === 'Enter') go(!!confirm && !confirm.hidden);
       });
+      // changing the name or password after the question: ask again
+      input?.addEventListener('input', () => asking(false));
+    }
     this.setScreen(el);
     name?.focus();
   }

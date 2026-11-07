@@ -128,6 +128,8 @@ export class MenuScene extends Phaser.Scene {
     return id === 2 ? 86 * 32 : id === 3 ? 0 : 0;
   }
   private top: number | null = null;
+  /** The ground height the camera last followed (kept over a long gap). */
+  private lastSurf = 0;
 
   private build(id: number) {
     if (this.levelId !== id) this.prevId = this.levelId;
@@ -210,7 +212,15 @@ export class MenuScene extends Phaser.Scene {
     // follow the terrain up and down (the mountain climbs), smoothly
     const H = this.level.heightPx;
     const cx = this.x + vw / 2;
-    const surf = (this.level.surfaceY(cx - vw * 0.3) + this.level.surfaceY(cx) + this.level.surfaceY(cx + vw * 0.3)) / 3;
+    // (the ground across the view, leaving out holes and pits: there's no ground in those, and
+    // counting them as the bottom of the level made the camera dive into every gap)
+    const ys: number[] = [];
+    for (let k = -0.4; k <= 0.4001; k += 0.1) {
+      const y = this.level.surfaceY(cx + vw * k);
+      if (y < H - 1) ys.push(y);
+    }
+    const surf = ys.length ? ys.reduce((a, y) => a + y, 0) / ys.length : this.lastSurf;
+    this.lastSurf = surf;
     const want = Phaser.Math.Clamp(surf - vh * 0.7, Math.min(0, H - vh), H - vh);
     this.top = this.top === null || this.x < this.x0 + 1 ? want : this.top + (want - this.top) * (1 - Math.exp(-dt * 1.5));
     const top = this.top + 26 * Math.sin(t * 0.17 + 0.7) + 9 * Math.sin(t * 0.41);
