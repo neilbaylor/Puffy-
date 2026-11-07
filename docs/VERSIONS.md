@@ -1,2 +1,2 @@
 
-- v0.98: side-on beach volleyball, two games in a row, a faster boulder
+- v0.99: Giant Plops as fierce as Giant Puffs, chainsaws, more nuggies

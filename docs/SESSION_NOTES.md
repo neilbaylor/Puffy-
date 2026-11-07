@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.98)
+## Where things stand (v0.99)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -60,7 +60,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   tries to start without a tap (works where the browser allows it, e.g. Chrome with the game installed;
   iPhones always need a first tap).
 
-### Plop Invasion · Part 1 (level 3, v0.91–v0.98)
+### Plop Invasion · Part 1 (level 3, v0.91–v0.99)
 - World 2. `src/level/level3.ts` (downhill, 378 × 52; two volleyball games in a row; 4 checkpoints, 5 Giant Plops; jump sections "Poo Pits"
   (3-wide pillars in poo, every puddle climbable) and "The Pits" (2-wide pillars over bottomless pits); tested
   per jump with each hero: a walking jump + double jump works everywhere), terrain palette `poo` and looks `p-muck` / `p-dusk` /
@@ -72,8 +72,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Builder: `L.puddle(x0, x1, h)` (quicksand: `Player.goo`, sink 22 px/s scaled by hero height so every hero
   goes under in ~1.75 s; hop `GOO_HOP` 440, weaker the deeper you are) and `L.chase(x0, x1, speed)` (boulder
   chase in `GameScene.updateChase`: rock radius 115, too tall to clear with a double jump; speed = that hero's
-  walk × speed (1.65 / 1.9, ≤ run × 0.95); while more than 70 px behind it closes at up to run × 1.4, so it ends
-  ~15-30 px behind a hero running flat out; at the end it drops straight down the middle of the hole (`updateRockFall`) or, if a
+  walk × speed (1.53 / 1.76, ≤ run × 0.95); while more than 70 px behind it closes at up to run × 1.3; at the end it drops straight down the middle of the hole (`updateRockFall`) or, if a
   puddle fills it, sinks in the poo. The end holes must be ≥ 8 tiles wide. The camera eases out to 78% zoom
   (`chaseZoom`) and looks back up the hill a little during a run, so the rock and the end jump are both in view. `Player.freeRun` = no stamina drain). Tested: all 3 heroes escape both runs.
   Put the far side of a puddle at the poo's height.
@@ -85,6 +84,9 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   hops on the whistle, a ball shadow. Terrain chunks are 800 px wide (`LevelView` CHUNK).
 - `poogoat` (poo-covered goat, spits poo: `PooGoat` in Plops.ts, sheet `goat-poo`). Drips: `GameScene.updateDrips`.
 - Music: `src/assets/plop-invasion.m4a` (`levelTrack(3) = 'plop'`). Sudden-death basketball plays at 1.3×.
+- Giant Plops = Giant Puff behaviour plus an occasional poo lob (every 7–10 s). Giants stop at overhangs they
+  can't fit under (`Giant.lowCeiling`); keep low islands ≥ 4 tiles away from a ledge a Giant can walk off.
+  `L.spawn('bigplop', x, h, { weapon: 'saw' })` forces a weapon (`createBadGuy`).
 - Enemies walk down 1–2 tile steps (`Enemy.pitAt`: only a real drop counts as a gap); Big Puffs / Big Plops
   rumble the ground on heavy landings. Waves stop at a step up and are lifted out of the ground at spawn.
 - Loading: the start screen keeps every Part within two of the one shown (and the one you just left) ready —
