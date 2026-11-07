@@ -681,7 +681,11 @@ export class GameScene extends Phaser.Scene {
     const cam = this.cameras.main;
     // Fit VIEW_H world px vertically, but always show at least MIN_VIEW_W across
     // (so 4:3 iPads and 16:10 Android tablets see enough of the level ahead).
-    const zoom = Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W) * this.cineZoom;
+    // a boulder run: the camera eases out so you can see the rock behind you AND the jump
+    // at the bottom coming; it eases back in once the rock has gone into the hole
+    const chaseTarget = this.rock ? 0.78 : 1;
+    this.chaseZoom = snap ? chaseTarget : this.chaseZoom + (chaseTarget - this.chaseZoom) * (1 - Math.exp(-dt * 1.6));
+    const zoom = Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W) * this.cineZoom * this.chaseZoom;
     cam.setZoom(zoom);
     cam.setRotation(this.uphill);
     const vw = this.scale.width / zoom;
@@ -703,13 +707,15 @@ export class GameScene extends Phaser.Scene {
       // look ahead in the direction of travel, so you can see what's coming; with a boulder
       // rolling after you, look back a bit instead and up the hill, so you can see it coming
       const R = this.rock && !this.rock.falling ? this.rock : null;
-      const lookTarget = R ? -vw * 0.16 : tracked.length === 1 ? Phaser.Math.Clamp(sumVx / 3, -90, 90) : 0;
+      const lookTarget = R ? -vw * 0.08 : tracked.length === 1 ? Phaser.Math.Clamp(sumVx / 3, -90, 90) : 0;
       this.lookAhead += (lookTarget - this.lookAhead) * (snap ? 1 : 1 - Math.exp(-dt * 2.5));
       const tx = (minX + maxX) / 2 + this.lookAhead;
       // keep the hero's feet ~62% down the screen: above the touch controls
       const feet = sumBottom / tracked.length;
       let tTop = feet - vh * 0.62;
-      if (R) tTop = Math.max(Math.min(tTop, R.y - R.r - 40), feet - vh * 0.8);
+      // (the run goes downhill: the jump at the bottom is ahead and below you, so you stay
+      // well up the screen; the rock's top is shown if there's room)
+      if (R) tTop = Math.max(Math.min(feet - vh * 0.55, R.y - R.r - 30), feet - vh * 0.66);
       this.camX += (tx - this.camX) * (snap ? 1 : 1 - Math.exp(-dt * 7));
       this.camTop += (tTop - this.camTop) * (snap ? 1 : 1 - Math.exp(-dt * 4));
     }
@@ -1548,6 +1554,8 @@ export class GameScene extends Phaser.Scene {
 
   /** Extra camera zoom for cinematic moments. */
   cineZoom = 1;
+  /** Eased out during a boulder run (see updateCamera). */
+  private chaseZoom = 1;
 
   private emitHud(force = false) {
     const p = this.players[0];
