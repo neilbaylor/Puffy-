@@ -7,7 +7,7 @@
  * same Puffy can be shown in every look-development option.
  */
 import type { Ctx, Pose } from './draw';
-import { gait } from './draw';
+import { carry, carryArms, gait } from './draw';
 import { drawBazooka } from './bazooka';
 import { ellipsePts, paddlePts, type Fill, type Pt, type Style } from './handdrawn';
 import { face } from './face';
@@ -95,8 +95,10 @@ function drawPuffyPose(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style, 
   const tilt = hurt ? -0.2 : 0.12;
   const seed = pose.length * 7 + (pose.charCodeAt(pose.length - 1) % 13); // stable per pose
 
-  // back arm
-  st.shape(ctx, paddlePts(cx - 7, cy + 3, 14, 7, Math.PI + 0.2 - armBack), PUFFY.limb, seed + 1, { lw: 0.85 });
+  // back arm (or both arms up, carrying something)
+  const ca = carry.on ? carryArms('puffy', ox, oy) : null;
+  if (ca) st.shape(ctx, paddlePts(ca.back.x, ca.back.y, ca.back.len, 7, ca.back.rot), PUFFY.limb, seed + 1, { lw: 0.85 });
+  else st.shape(ctx, paddlePts(cx - 7, cy + 3, 14, 7, Math.PI + 0.2 - armBack), PUFFY.limb, seed + 1, { lw: 0.85 });
 
   const leg = (hx: number, dx: number, lift: number, fill: Fill, s: number) => {
     const fx = cx + hx + dx;
@@ -160,6 +162,10 @@ function drawPuffyPose(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style, 
 
   leg(5, legR, liftR, PUFFY.body, seed + 7);
 
+  if (ca) {
+    st.shape(ctx, paddlePts(ca.front.x, ca.front.y, ca.front.len, 7.5, ca.front.rot), PUFFY.body, seed + 11, { lw: 0.85 });
+    return;
+  }
   // bazooka, tucked low under the front arm (kicks back 3 units when firing)
   const by = cy + 9;
   const kick = recoil ? 3 : 0;

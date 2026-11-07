@@ -4,7 +4,7 @@
  * tiny arms and short legs with round feet. Same hand-drawn styles as Puffy.
  */
 import type { Ctx, Pose } from './draw';
-import { gait } from './draw';
+import { carry, carryArms, gait } from './draw';
 import { ellipsePts, paddlePts, type Fill, type Pt, type Style } from './handdrawn';
 import { drawBazooka } from './bazooka';
 import { face } from './face';
@@ -87,8 +87,10 @@ function drawScruffyPose(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style
   const cy = hipY - ry + 2;
   const seed = pose.length * 5 + (pose.charCodeAt(pose.length - 1) % 11) + 900;
 
-  // back arm
-  st.shape(ctx, paddlePts(cx - rx + 3, cy + 3, 9, 5, Math.PI - armBack), SCRUFFY.limb, seed + 1, { lw: 0.8 });
+  // back arm (or both arms up, carrying something)
+  const ca = carry.on ? carryArms('scruffy', ox, oy) : null;
+  if (ca) st.shape(ctx, paddlePts(ca.back.x, ca.back.y, ca.back.len, 5, ca.back.rot), SCRUFFY.limb, seed + 1, { lw: 0.8 });
+  else st.shape(ctx, paddlePts(cx - rx + 3, cy + 3, 9, 5, Math.PI - armBack), SCRUFFY.limb, seed + 1, { lw: 0.8 });
 
   const leg = (hx: number, dx: number, lift: number, fill: Fill, s: number) => {
     const fx = cx + hx + dx;
@@ -152,6 +154,10 @@ function drawScruffyPose(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style
 
   leg(4, legR, liftR, SCRUFFY.body, seed + 7);
 
+  if (ca) {
+    st.shape(ctx, paddlePts(ca.front.x, ca.front.y, ca.front.len, 5, ca.front.rot), SCRUFFY.body, seed + 11, { lw: 0.8 });
+    return;
+  }
   // a smaller bazooka, held low
   const by = cy + ry - 1.5;
   const kick = recoil ? 2.5 : 0;

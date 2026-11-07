@@ -24,8 +24,10 @@ The concept screens are in this folder (`wide`, `plan`, `entrance`, `fight`, `fi
 - **3 hearts, shown over your head** (like Battle mode). No HUD and no nuggies in the ring (just
   the pause button). A hit costs a heart; **hearts turn up in the ring** to win them back. Out of
   hearts costs a life from the full game.
-- **The folding chair** drops into the ring a few times a fight ("CHAIR!" on the jumbotron). Pick it
-  up and hit her with it: **2 hits**, it bends and it's gone. Leave it and it fades away.
+- **The folding chair** (folded flat, grey steel) drops into the ring a few times a fight ("CHAIR!" on
+  the jumbotron). Walk over it to pick it up: the hero bends down and holds it up over their head in
+  both hands (no bazooka). When she's in reach they swing it down onto her: **2 hits**, it bends
+  and it's gone. Leave it and it fades away; get hit and you drop it.
 - **The ropes:**
   - **Run into them and bounce off** fast, like a springboard.
   - **Climb them to the top turnbuckle.** Climbing has to look and feel good (hand over hand, a

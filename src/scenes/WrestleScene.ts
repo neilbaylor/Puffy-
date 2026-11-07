@@ -6,7 +6,7 @@ import { fadeOutMusic, playHoops } from '../core/music';
 import { sfx } from '../core/sfx';
 import { loseLife, lives } from '../core/lives';
 import { bank } from '../core/bank';
-import { ART_RES, canvas } from '../gfx/draw';
+import { ART_RES, CARRY_SWING, CHAR_H, CHAR_W, canvas, carryHand } from '../gfx/draw';
 import { ARENA_H, ARENA_W, CROWD_H, FRONT_H, JUMBO, RIBBON, STAGE_OX, STAGE_OY, drawArena, drawArenaFront, drawCrowd, drawCameraFlash, drawRibbonScreen, drawSpotlight, setArenaStyle, type JumboContent } from '../gfx/hoops';
 import { PLOP_FRAMES, PLOP_H, PLOP_W, drawPlop, drawQueen, type PlopFrame } from '../gfx/plops';
 import { POOWAVE_H, POOWAVE_W, drawPooWave } from '../gfx/plopworld';
@@ -14,7 +14,7 @@ import { drawPoo } from '../gfx/hazards';
 import { drawPrize } from '../gfx/prizes';
 import { STYLES } from '../gfx/handdrawn';
 import { CHAIR_H, CHAIR_W, KING_SEAT, POO_PALACE, drawFoldingChair, POST_BOX, PUDDLE, RING, RING_BOX, ROPE_COL, TUNNEL, backX, drawArenaPoo, drawFrontPost, drawRing, drawRingFloor, drawRingside, drawTunnel, drawWrestleJumbo } from '../gfx/wrestle';
-import { addCanvas, hires } from '../gfx/textures';
+import { HERO_SHEET_M, addCanvas, hires, makeCarrySheet } from '../gfx/textures';
 import { Player } from '../entities/Player';
 import { Rocket } from '../entities/Rocket';
 import { Fx } from '../world/Fx';
@@ -426,7 +426,20 @@ export class WrestleScene extends Phaser.Scene {
   private heartIn = 8;
   private heartsG!: Phaser.GameObjects.Graphics;
   /** The folding chair: falls into the ring now and then; pick it up and hit her with it (two hits). */
-  private chair: { img: Phaser.GameObjects.Image; shadow: Phaser.GameObjects.Image; state: 'fall' | 'lie' | 'held'; vy: number; t: number; bounced: boolean } | null = null;
+  private chair: {
+    img: Phaser.GameObjects.Image;
+    shadow: Phaser.GameObjects.Image;
+    state: 'fall' | 'lie' | 'held';
+    vy: number;
+    t: number;
+    bounced: boolean;
+    /** held: the arms' angle (see `carry` in gfx/draw) */
+    a: number;
+    /** held: seconds into a swing (−1 none, −2 picking it up) */
+    swing: number;
+    cd: number;
+    hit: boolean;
+  } | null = null;
   private chairIn = 12;
   private hearts = 3;
   private ended = false;
@@ -566,6 +579,8 @@ export class WrestleScene extends Phaser.Scene {
     noFire.poll = () => ({ ...src.poll(), fire: false });
     this.player = new Player(this, characterById(spec.characterId), noFire, WX(330), MAT_Y - 30);
     this.player.facing = 1;
+    // (their chair-carrying frames, ready for when a chair comes in)
+    makeCarrySheet(this, this.player.char);
     this.physics.add.collider(this.player.hitbox, this.statics);
     this.gRockets = this.physics.add.group({ allowGravity: false });
     this.physics.add.collider(this.gRockets, this.statics, (r) => (r as Rocket).explode());
@@ -585,6 +600,7 @@ export class WrestleScene extends Phaser.Scene {
     this.dom.className = 'wrestle';
     this.dom.innerHTML = `
       <div class="wr-callout"></div>
+      <div class="hoops-l3 wr-l3"><b></b><span></span></div>
       <div class="wr-speech" hidden></div>
       <button class="wr-skip" hidden>Skip ›</button>`;
     document.getElementById('ui')!.appendChild(this.dom);
@@ -1192,13 +1208,8 @@ export class WrestleScene extends Phaser.Scene {
     const a = p.body;
     const b = q.body;
     // (a dive off the top rope is generous: coming down near her counts)
-    const reach = this.dive ? 22 : this.chair?.state === 'held' ? 12 : 0;
+    const reach = this.dive ? 22 : 0;
     if (a.right < b.left - reach || a.left > b.right + reach || a.bottom < b.top - (this.dive ? 10 : 0) || a.top > b.bottom) return;
-    // with the chair: WHACK
-    if (this.chair?.state === 'held') {
-      this.chairHit();
-      return;
-    }
     // (she's leaping up to meet you: that's a headbutt, not a stomp — except off the top rope)
     const rising = b.velocity.y < -250 && !this.dive;
     // (where you were last frame counts too: on a slow phone you can drop right past her head in one frame)
@@ -1278,10 +1289,38 @@ export class WrestleScene extends Phaser.Scene {
 
   // ── the folding chair ──
 
+  /** The chair sprite's scale (world px per chair unit / the texture's resolution). */
+  private static CHAIR_S = 1.0;
+
+  /** Where the hero's hands are (world), carrying at arm angle a. */
+  private heroHand(a: number): [number, number] {
+    const p = this.player;
+    const v = p.view;
+    const k = Math.abs(v.scaleX) * ART_RES;
+    const [hx, hy] = carryHand(p.char.id, a);
+    const dx = (hx + HERO_SHEET_M - (CHAR_W + HERO_SHEET_M * 2) / 2) * k;
+    const dy = (hy - CHAR_H) * Math.abs(v.scaleY) * ART_RES;
+    return [v.x + (p.facing < 0 ? -dx : dx), v.y + dy];
+  }
+
+  /** The carry frame nearest arm angle a (for the pick-up and the swing). */
+  private static carryFrame(a: number) {
+    let best = 'sw0';
+    let d = Infinity;
+    for (const [f, fa] of Object.entries(CARRY_SWING))
+      if (Math.abs(fa - a) < d) {
+        d = Math.abs(fa - a);
+        best = f;
+      }
+    return best;
+  }
+
   private updateChair(dt: number) {
     const p = this.player;
+    const q = this.queen;
     const c = this.chair;
-    const SC = 0.85 / ART_RES;
+    const SC = WrestleScene.CHAIR_S / ART_RES;
+    const LEN = CHAIR_H * WrestleScene.CHAIR_S;
     if (!c) {
       if (!this.fighting) return;
       this.chairIn -= dt;
@@ -1289,9 +1328,9 @@ export class WrestleScene extends Phaser.Scene {
       this.chairIn = 18 + Math.random() * 8;
       // one comes flying in from the crowd: CHAIR!
       const x = this.ringSpot();
-      const img = this.add.image(x, this.cameras.main.worldView.top - 40, 'wr-chair').setOrigin(0.5, 1).setScale(SC).setDepth(DEPTH.pickups);
+      const img = this.add.image(x, this.cameras.main.worldView.top - 50, 'wr-chair').setScale(SC).setDepth(DEPTH.pickups);
       const shadow = this.add.image(x, MAT_Y + 2, 'softshadow').setDepth(DEPTH_W.shadows).setDisplaySize(10, 4).setAlpha(0.2);
-      this.chair = { img, shadow, state: 'fall', vy: 60, t: 0, bounced: false };
+      this.chair = { img, shadow, state: 'fall', vy: 60, t: 0, bounced: false, a: -1.75, swing: -1, cd: 0, hit: false };
       this.flashJumbo({ kind: 'big', text: 'CHAIR!', sub: 'GRAB IT: IT COUNTS DOUBLE', color: '#ffd23f', bg: '#3a4652' }, 1800);
       this.ribbonMsg = { text: 'CHAIR! CHAIR! CHAIR!', color: '#e2e7ec', bg: '#3a4652', t0: this.clock / 1000 };
       this.excitedUntil = this.clock + 1800;
@@ -1299,25 +1338,26 @@ export class WrestleScene extends Phaser.Scene {
       return;
     }
     c.t += dt;
+    // (lying flat on the mat, it's this high off it at its middle)
+    const lieY = MAT_Y - (CHAIR_W * WrestleScene.CHAIR_S) / 2 + 2;
     if (c.state === 'fall') {
       c.vy += GRAVITY * 0.8 * dt;
       c.img.y += c.vy * dt;
       c.img.rotation += dt * (c.bounced ? 3 : 7);
       const h = Math.max(0, MAT_Y - c.img.y);
-      c.shadow.setDisplaySize(30 + 30 * Math.max(0, 1 - h / 300), 8).setAlpha(0.15 + 0.3 * Math.max(0, 1 - h / 300));
-      if (c.img.y >= MAT_Y) {
-        c.img.y = MAT_Y;
+      c.shadow.setDisplaySize(40 + 40 * Math.max(0, 1 - h / 300), 9).setAlpha(0.15 + 0.3 * Math.max(0, 1 - h / 300));
+      if (c.img.y >= lieY) {
+        c.img.y = lieY;
         if (!c.bounced && c.vy > 200) {
           c.bounced = true;
-          c.vy = -c.vy * 0.32;
-          c.img.rotation = 0.5;
+          c.vy = -c.vy * 0.3;
           sfx.clank();
           this.fx.dust(c.img.x, MAT_Y, 6);
           this.shakeRopes(2);
         } else {
           c.state = 'lie';
           c.t = 0;
-          c.img.rotation = 0.12;
+          c.img.rotation = Math.PI / 2 - 0.04;
           sfx.clank();
         }
       }
@@ -1329,33 +1369,76 @@ export class WrestleScene extends Phaser.Scene {
         this.chair = null;
         return;
       }
-      if (this.fighting && p.alive && Math.abs(p.x - c.img.x) < 22 && p.bottom > MAT_Y - 40 && p.bottom < MAT_Y + 12) {
+      if (this.fighting && p.alive && Math.abs(p.x - c.img.x) < LEN / 2 + 6 && p.bottom > MAT_Y - 40 && p.bottom < MAT_Y + 12) {
+        // pick it up: bend down, grab it by the feet, and up over your head it goes
         c.state = 'held';
-        c.img.setAlpha(1).setDepth(DEPTH.players + 0.5);
+        c.a = CARRY_SWING.lift;
+        c.img.setAlpha(1).setDepth(DEPTH.players - 0.1).setOrigin(0.5, (CHAIR_H - 2) / (CHAIR_H + 4));
         c.shadow.setVisible(false);
+        p.sheet = makeCarrySheet(this, p.char);
         sfx.clank();
         this.fx.popText(p.x, p.body.top - 20, 'CHAIR!', '#e2e7ec', 18);
+        c.swing = -2; // (-2: lifting)
+        c.t = 0;
       }
     }
-    if (c.state === 'held') {
-      // up over your shoulder, ready to swing
-      const f = p.facing;
-      c.img.setFlipX(f < 0);
-      c.img.setPosition(p.x - f * 6, p.body.top + 18);
-      c.img.rotation = -f * (0.55 + Math.sin(this.clock / 160) * 0.05);
+    if (c.state !== 'held') return;
+    // ── held: up over your head; when she's in reach, you swing it (automatically) ──
+    c.cd -= dt;
+    const toward = (Math.sign(q.x - p.x) || p.facing) as Side;
+    const gap = Math.abs(q.x - p.x) - q.body.halfWidth;
+    const inReach = q.hp > 0 && gap < LEN * 0.85 && q.top < p.bottom + 6 && q.bottom > p.body.top - LEN * 0.7;
+    if (c.swing === -2) {
+      // lifting
+      const u = Math.min(1, c.t / 0.24);
+      c.a = CARRY_SWING.lift + (-1.75 - CARRY_SWING.lift) * (u * u * (3 - 2 * u));
+      p.frameOverride = u < 1 ? WrestleScene.carryFrame(c.a) : null;
+      if (u >= 1) c.swing = -1;
+    } else if (c.swing < 0 && c.cd <= 0 && inReach && (toward === p.facing || gap < 20) && !this.climb) {
+      c.swing = 0;
+      c.hit = false;
+      p.facing = toward;
+      sfx.whoosh();
     }
+    if (c.swing >= 0) {
+      // wind up (back), then over the top and down onto her
+      c.swing += dt;
+      const t = c.swing;
+      const UP = 0.09;
+      const DOWN = 0.17;
+      if (t < UP) c.a = -1.75 + (CARRY_SWING.sw0 + 1.75) * (t / UP);
+      else c.a = CARRY_SWING.sw0 + (CARRY_SWING.sw3 - CARRY_SWING.sw0) * Math.min(1, (t - UP) / DOWN) ** 1.4;
+      p.frameOverride = WrestleScene.carryFrame(c.a);
+      if (!c.hit && c.a > -0.75) {
+        c.hit = true;
+        if (inReach && this.chairHit()) return;
+      }
+      if (t > UP + DOWN + 0.12) {
+        c.swing = -1;
+        c.cd = 0.35;
+        c.a = -1.75;
+        p.frameOverride = null;
+      }
+    }
+    // the chair, gripped in both hands, carrying on along the arms
+    const [hx, hy] = this.heroHand(c.a);
+    const dirA = p.facing > 0 ? c.a : Math.PI - c.a;
+    c.img.setPosition(hx, hy).setRotation(dirA + Math.PI / 2).setFlipX(p.facing < 0);
   }
 
   /** Hurt while holding the chair: you drop it (and it won't be there long). */
   private dropChair() {
     const c = this.chair;
     if (!c || c.state !== 'held') return;
+    const p = this.player;
+    p.sheet = null;
+    p.frameOverride = null;
     c.state = 'fall';
     c.vy = -200;
     c.bounced = true;
     c.t = 0;
-    c.img.setDepth(DEPTH.pickups);
-    c.shadow.setVisible(true);
+    c.img.setDepth(DEPTH.pickups).setOrigin(0.5);
+    c.shadow.setVisible(true).setX(c.img.x);
     this.time.delayedCall(10, () => {
       if (this.chair === c) c.t = 3.5;
     });
@@ -1366,18 +1449,22 @@ export class WrestleScene extends Phaser.Scene {
     const c = this.chair!;
     const q = this.queen;
     const p = this.player;
-    if (!this.hitQueen(2, 'chair', p.x)) return;
+    if (!this.hitQueen(2, 'chair', p.x)) return false;
     this.chair = null;
+    p.sheet = null;
+    p.frameOverride = null;
     c.shadow.destroy();
-    c.img.setTexture('wr-chair-bent').setPosition(q.x - p.facing * 10, q.top + 30).setRotation(0);
+    const [x, y] = [c.img.x, c.img.y];
+    c.img.setTexture('wr-chair-bent').setOrigin(0.5).setPosition(x + p.facing * 30, Math.min(y, q.top + 10));
     sfx.clank();
     this.time.delayedCall(70, () => sfx.clank());
     this.cameras.main.shake(260, 0.012);
     this.fx.stars(q.x, q.top + 6, 10);
     this.fx.debris(q.x, q.top + 10);
     const dir = p.facing;
-    this.tweens.add({ targets: c.img, x: c.img.x + dir * 90, y: MAT_Y - 10, rotation: dir * 5, duration: 650, ease: 'Quad.easeOut' });
-    this.tweens.add({ targets: c.img, alpha: 0, delay: 400, duration: 350, onComplete: () => c.img.destroy() });
+    this.tweens.add({ targets: c.img, x: c.img.x + dir * 110, y: MAT_Y - 14, rotation: c.img.rotation + dir * 4, duration: 700, ease: 'Quad.easeOut' });
+    this.tweens.add({ targets: c.img, alpha: 0, delay: 450, duration: 350, onComplete: () => c.img.destroy() });
+    return true;
   }
 
   // ── her heavier moves ──
@@ -1498,6 +1585,15 @@ export class WrestleScene extends Phaser.Scene {
     this.game.events.emit('hud', s);
   }
 
+  /** TV-style name card in the corner (null hides it), like the King's in basketball. */
+  private lowerThird(name: string | null, sub = '') {
+    const el = this.dom.querySelector<HTMLElement>('.wr-l3')!;
+    if (!name) return el.classList.remove('show');
+    el.querySelector('b')!.textContent = name;
+    el.querySelector('span')!.textContent = sub;
+    el.classList.add('show');
+  }
+
   private calloutToken = 0;
   private callout(html: string, cls = '', ms = 1200) {
     const el = this.dom.querySelector<HTMLElement>('.wr-callout')!;
@@ -1519,11 +1615,12 @@ export class WrestleScene extends Phaser.Scene {
       const k = css.width / this.scale.width;
       const sx = (wx - cam.worldView.x) * cam.zoom * k;
       const sy = (wy - cam.worldView.y) * cam.zoom * k;
-      const x = Phaser.Math.Clamp(sx, 150, css.width - 150);
+      const half = el.offsetWidth / 2 + 10;
+      const x = Phaser.Math.Clamp(sx, half, Math.max(half, css.width - half));
       el.style.left = `${x}px`;
       // (never off the top of the screen)
       el.style.top = `${Math.max(el.offsetHeight + 30, sy)}px`;
-      el.style.setProperty('--tail', `${sx - x}px`);
+      el.style.setProperty('--tail', `${Phaser.Math.Clamp(sx - x, -(half - 34), half - 34)}px`);
     };
     place();
     const ev = this.time.addEvent({ delay: 16, loop: true, callback: place });
@@ -1669,13 +1766,13 @@ export class WrestleScene extends Phaser.Scene {
     sfx.cheer();
     this.flashbulbs(24, 1900);
     this.ribbonMsg = { text: 'QUEEN PLOP ♛ QUEEN PLOP', color: '#ff9ccf', bg: '#5a1030', t0: this.clock / 1000 };
-    await this.camTo(jx, jy + 6, 2.35, 1900, -0.018, 'Sine.easeInOut');
+    await this.camTo(jx, jy + 6, 2.35, 1600, -0.018, 'Sine.easeInOut');
 
     // ── 2. a crash zoom out to the ring… lights down, BOOM: a spotlight finds her ──
     if (!this.skipping) {
       this.setDark(0.82, 350);
       for (const img of this.sweeps) this.tweens.add({ targets: img, alpha: 0.25, duration: 300 });
-      await this.camTo(startX - 40, MAT_Y - 95, 1.0, 650, 0.025, 'Quad.easeIn');
+      await this.camTo(startX - 40, MAT_Y - 95, 1.0, 550, 0.025, 'Quad.easeIn');
     }
     if (!this.skipping) {
       this.jumbo = { kind: 'title' };
@@ -1690,6 +1787,7 @@ export class WrestleScene extends Phaser.Scene {
       this.pyro(startX - 40, MAT_Y);
       this.pyro(startX + 40, MAT_Y);
       this.flashbulbs(14, 900);
+      this.lowerThird('QUEEN PLOP', 'Queen of the Poo Palace · undefeated');
     }
 
     // ── 3. she struts to her corner ("POOPA!"), the camera swinging in alongside her ──
@@ -1707,7 +1805,7 @@ export class WrestleScene extends Phaser.Scene {
       const fromX = q.spr.x;
       q.facing = 1;
       q.spr.setFlipX(true);
-      const ms = 1450;
+      const ms = 1500;
       await this.glide(ms, (u) => {
         const x = fromX + (climbX - fromX) * u;
         // a strut: a little bounce in every step
@@ -1758,6 +1856,7 @@ export class WrestleScene extends Phaser.Scene {
     for (const img of this.sweeps) this.tweens.killTweensOf(img);
 
     // ── 5. on top: pyro, everyone up, and a word from Her Majesty (plenty of room over her head) ──
+    this.lowerThird(null);
     if (!this.skipping) {
       q.facing = -1;
       q.spr.setFlipX(false).setFrame('yell1');
@@ -1773,14 +1872,15 @@ export class WrestleScene extends Phaser.Scene {
       for (const img of this.sweeps) this.tweens.add({ targets: img, rotation: this.aimSweep(img, POST_R, POST_TOP - 40), duration: 300 });
       void this.camTo(POST_R - 70, POST_TOP - 100, 1.5, 450, -0.012, 'Quad.easeOut').then(() => this.camTo(POST_R - 55, POST_TOP - 102, 1.62, 1900, 0.01, 'Sine.easeInOut'));
       const yell = this.time.addEvent({ delay: 140, loop: true, callback: () => q.spr.setFrame(q.spr.frame.name === 'yell0' ? 'yell1' : 'yell0') });
-      await this.iwait(200);
-      if (!this.skipping) await Promise.race([this.say('“Welcome to MY <b>Poo Palace</b>!”', POST_R, POST_TOP - 136, 2200), this.iwait(2200)]);
+      await this.iwait(80);
+      if (!this.skipping) await Promise.race([this.say('“Welcome to MY <b>Poo Palace</b>!”', POST_R, POST_TOP - 136, 2000), this.iwait(2000)]);
       yell.remove();
     }
     this.dom.querySelector<HTMLElement>('.wr-speech')!.hidden = true;
 
     // ── 7. she leaps into the ring ──
     this.inIntro = false;
+    this.lowerThird(null);
     skip.hidden = true;
     this.tweens.killTweensOf(this.spot);
     for (const img of this.sweeps) {
@@ -1868,6 +1968,8 @@ export class WrestleScene extends Phaser.Scene {
       this.chair.shadow.destroy();
       this.chair = null;
     }
+    p.sheet = null;
+    p.frameOverride = null;
     this.heartPick?.img.destroy();
     this.heartPick = null;
     await this.wait(500);
