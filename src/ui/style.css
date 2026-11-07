@@ -401,7 +401,8 @@ html:has(body.booting) body { background: #5fc4ff; }
   .start { justify-content: flex-start; gap: 0; padding-top: calc(clamp(6px, 4.4vh, 22px) + var(--safe-t)); padding-bottom: calc(clamp(6px, 3vh, 14px) + var(--safe-b)); }
   .start .cards { margin-top: clamp(8px, 3.6vh, 18px); }
   .start .levels { margin-top: clamp(20px, 8.6vh, 40px); }
-  .start .start-foot { margin-top: clamp(6px, 2.4vh, 12px); }
+  /* (a bit lower under the Part buttons: they shouldn't crowd Play) */
+  .start .start-foot { margin-top: clamp(14px, 5vh, 22px); }
   /* no Part 1 / Part 2 picker yet (first play): Play sits lower, under the cards */
   .start.no-levels .cards { margin-top: clamp(14px, 7.5vh, 36px); }
   .start.no-levels .start-foot { margin-top: clamp(18px, 9vh, 44px); }
