@@ -28,7 +28,7 @@ export const LEVELS: LevelInfo[] = [
     world: 'World 2',
     title: 'Plop Invasion',
     part: 'Part 1',
-    button: 'Plop Invasion',
+    button: 'Part 3',
     build: buildLevel3,
     speech: 'Oh no, the Plops have taken over Puff Ball Planet!',
   },

@@ -41,6 +41,8 @@ type PrizeView = {
 
 /** Room either side of a Plop's frame for its arms. */
 const PLOP_PAD = 16;
+/** Headroom over the art (the big Plops' swirl tip pokes up past the art's frame). */
+const PLOP_TOP = 22;
 
 /** Playing, the camera is this much closer in than the whole-arena view. */
 const FOLLOW_ZOOM = 1.2;
@@ -262,15 +264,15 @@ export class BattleScene extends Phaser.Scene {
       // (a margin each side: the leaf arms reach past the art's own frame)
       const fw = Math.round((PLOP_W + PLOP_PAD * 2) * PLOP_RES);
       const pw = fw + 4;
-      const { c, ctx } = canvas(pw * PLOP_FRAMES.length, Math.round(PLOP_H * PLOP_RES));
+      const { c, ctx } = canvas(pw * PLOP_FRAMES.length, Math.round((PLOP_H + PLOP_TOP) * PLOP_RES));
       PLOP_FRAMES.forEach((f, i) => {
         ctx.save();
         ctx.translate(i * pw, 0);
         ctx.scale(PLOP_RES, PLOP_RES);
-        drawPlop(ctx, PLOP_PAD, 0, f, STYLES.polished, kind);
+        drawPlop(ctx, PLOP_PAD, PLOP_TOP, f, STYLES.polished, kind);
         ctx.restore();
       });
-      addCanvas(this, key, c, (t) => PLOP_FRAMES.forEach((f, i) => t.add(f, 0, i * pw, 0, fw, Math.round(PLOP_H * PLOP_RES))));
+      addCanvas(this, key, c, (t) => PLOP_FRAMES.forEach((f, i) => t.add(f, 0, i * pw, 0, fw, Math.round((PLOP_H + PLOP_TOP) * PLOP_RES))));
     }
     if (!this.textures.exists('bpellet')) addCanvas(this, 'bpellet', hires(16, 16, R, (ctx) => drawPellet(ctx)));
   }
@@ -961,7 +963,7 @@ export class BattleScene extends Phaser.Scene {
         let spr: Phaser.GameObjects.Sprite;
         if (plop) {
           const pa = PLOP_ART[kind];
-          spr = this.add.sprite(x, y, `bplop-${pa.kind}`, 'idle').setOrigin((50 + PLOP_PAD) / (PLOP_W + PLOP_PAD * 2), 100 / PLOP_H).setScale(pa.scale / PLOP_RES).setDepth(DEPTH.enemies);
+          spr = this.add.sprite(x, y, `bplop-${pa.kind}`, 'idle').setOrigin((50 + PLOP_PAD) / (PLOP_W + PLOP_PAD * 2), (100 + PLOP_TOP) / (PLOP_H + PLOP_TOP)).setScale(pa.scale / PLOP_RES).setDepth(DEPTH.enemies);
         } else {
           const art = ENEMY_ART[kind];
           spr = this.add.sprite(x, y, art.tex, 'w0').setOrigin(art.ox, art.oy).setScale(art.scale).setDepth(DEPTH.enemies);

@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { DEPTH, GRAVITY, MAX_FALL_SPEED, MIN_VIEW_W, TILE, VIEW_H } from '../config';
 import { PROP_RES, addCanvas, ensureLevelLooks, freeLooksExcept, hires } from '../gfx/textures';
+import { PALETTES } from '../gfx/world';
 import { drawRock } from '../gfx/hazards';
 import { POO, POO_DARK } from '../gfx/plopworld';
 import { characterById } from '../data/characters';
@@ -14,6 +15,7 @@ import { Player } from '../entities/Player';
 import { Rocket } from '../entities/Rocket';
 import { SoccerMatch } from '../entities/Soccer';
 import { HockeyMatch } from '../entities/Hockey';
+import { VolleyMatch } from '../entities/Volley';
 import { soloSource, sourceById } from '../input/devices';
 import type { EnemyKind } from '../level/builder';
 import { levelInfo } from '../level/levels';
@@ -145,6 +147,7 @@ export class GameScene extends Phaser.Scene {
   players: Player[] = [];
   private matches: SoccerMatch[] = [];
   private hockey: HockeyMatch[] = [];
+  private volleys: VolleyMatch[] = [];
   /** Bad guys waiting to drop in by parachute (they fall when you get near), and the ones in the air. */
   private paraWaiting: { kind: EnemyKind; x: number }[] = [];
   private paras: { e: Enemy; chute: Phaser.GameObjects.Image; t: number }[] = [];
@@ -157,6 +160,10 @@ export class GameScene extends Phaser.Scene {
   private gRootbeer!: Group;
   private checkpoints: Checkpoint[] = [];
   private goal?: Goal;
+  /** Plop Invasion: where poo drips from (edges of the poo-covered ground, undersides of islands), and the drops falling. */
+  private dripFrom: { x: number; y: number }[] = [];
+  private drops: { img: Phaser.GameObjects.Image; vy: number; grow: number }[] = [];
+  private dripT = 0;
   /** Puddles of poo (quicksand): their extent, surface, and the picture. */
   private puddles: { x0: number; x1: number; y: number; g: Phaser.GameObjects.Graphics; t: number }[] = [];
   /** Boulder chases: where they start and end, how fast; and the rock while it's rolling. */
@@ -205,6 +212,7 @@ export class GameScene extends Phaser.Scene {
     this.players = [];
     this.matches = [];
     this.hockey = [];
+    this.volleys = [];
     this.paraWaiting = [];
     this.paras = [];
     this.enemies = [];
@@ -216,6 +224,8 @@ export class GameScene extends Phaser.Scene {
     this.checkpoints = [];
     this.goal = undefined;
     this.puddles = [];
+    this.dripFrom = [];
+    this.drops = [];
     this.chases = [];
     this.rock = null;
     // every level (and every restart at a checkpoint) starts you with one nuggie
@@ -300,6 +310,9 @@ export class GameScene extends Phaser.Scene {
           this.puddles.push({ x0, x1, y: s.y * TILE + 10, g, t: Math.random() * 10 });
           break;
         }
+        case 'volley':
+          this.volleys.push(new VolleyMatch(this, cx, surface(s.y), Number(s.opts?.w ?? 14)));
+          break;
         case 'chase':
           this.chases.push({ x0: s.x * TILE, x1: Number(s.opts?.to ?? s.x + 40) * TILE, speed: Number(s.opts?.speed ?? 1.1), started: false });
           break;
@@ -316,6 +329,39 @@ export class GameScene extends Phaser.Scene {
         default:
           this.addEnemy(createBadGuy(this, s.type as EnemyKind, cx, surface(s.y) - 40), surface(s.y));
       }
+    }
+
+    // ── Plop Invasion: poo drips off the edges of the ground and the undersides of islands ──
+    if (data.pal && PALETTES[data.pal]?.poo) {
+      const solid = (x: number, y: number) => x >= 0 && y >= 0 && x < data.width && y < data.height && data.cells[y][x] === 'ground';
+      for (let y = 1; y < data.height - 1; y++)
+        for (let x = 0; x < data.width; x++) {
+          if (!solid(x, y)) continue;
+          const top = !solid(x, y - 1);
+          if (top && !solid(x + 1, y)) this.dripFrom.push({ x: (x + 1) * TILE - 3, y: y * TILE + 8 });
+          if (top && !solid(x - 1, y)) this.dripFrom.push({ x: x * TILE + 3, y: y * TILE + 8 });
+          // (the underside of a floating island)
+          if (!solid(x, y + 1) && y + 1 < data.height - 1) this.dripFrom.push({ x: x * TILE + 16, y: (y + 1) * TILE + 2 });
+        }
+      if (!this.textures.exists('pdrop'))
+        addCanvas(this, 'pdrop', hires(8, 12, 3, (ctx) => {
+          ctx.fillStyle = POO.shade;
+          ctx.beginPath();
+          ctx.moveTo(4, 0.5);
+          ctx.quadraticCurveTo(7.6, 7, 4, 11.5);
+          ctx.quadraticCurveTo(0.4, 7, 4, 0.5);
+          ctx.fill();
+          ctx.fillStyle = POO.base;
+          ctx.beginPath();
+          ctx.moveTo(4, 1.5);
+          ctx.quadraticCurveTo(6.6, 7, 4, 10.5);
+          ctx.quadraticCurveTo(1.4, 7, 4, 1.5);
+          ctx.fill();
+          ctx.fillStyle = '#ffffffaa';
+          ctx.beginPath();
+          ctx.ellipse(3.2, 7.4, 0.8, 1.4, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }));
     }
 
     // ── The hero (single player for now; the code supports more later) ──
@@ -341,6 +387,11 @@ export class GameScene extends Phaser.Scene {
       this.physics.add.overlap(this.gRockets, m.ball, (r) => {
         (r as Rocket).explode();
         m.popBall();
+      });
+    for (const v of this.volleys)
+      this.physics.add.overlap(this.gRockets, v.ball, (r) => {
+        (r as Rocket).explode();
+        v.popBall();
       });
     this.physics.add.overlap(this.gPlayers, this.gAuras, (h, a) => this.collectAura(this.playerOf(h), a as Aura));
     this.physics.add.overlap(this.gPlayers, this.gRootbeer, (h, r) => this.collectRootbeer(this.playerOf(h), r as RootBeer));
@@ -435,6 +486,7 @@ export class GameScene extends Phaser.Scene {
     if (this.intro) return this.updateIntro(dt);
 
     this.updatePuddles(dt);
+    this.updateDrips(dt);
     for (const p of this.players) {
       p.update(dt);
       if (p.alive && p.body.top > this.level.heightPx + 40) p.faint(true);
@@ -469,6 +521,7 @@ export class GameScene extends Phaser.Scene {
     this.updateWaves(dt);
     for (const m of this.matches) m.update(dt);
     for (const h of this.hockey) h.update(dt);
+    for (const v of this.volleys) v.update(dt);
     this.updateParachutes(dt);
 
     themeClock.t += dt;
@@ -892,17 +945,39 @@ export class GameScene extends Phaser.Scene {
       // the body of the puddle, all the way down (whatever sinks in it, disappears)
       const pts: Phaser.Types.Math.Vector2Like[] = [];
       for (let x = pd.x0 - 2; x <= pd.x1 + 2; x += 6) pts.push({ x, y: y + Math.sin(x * 0.07 + pd.t * 2.2) * 1.8 + Math.sin(x * 0.19 - pd.t * 3.1) * 0.9 });
-      g.fillStyle(hexOf(POO_DARK.shade), 1).fillRect(pd.x0 - 2, y + 8, pd.x1 - pd.x0 + 4, bottom - y);
+      const w = pd.x1 - pd.x0 + 4;
+      // deeper = darker, in soft bands (it's thick and glossy, not a slab)
+      g.fillStyle(hexOf(POO_DARK.base), 1).fillRect(pd.x0 - 2, y + 8, w, bottom - y);
       g.fillStyle(hexOf(POO.base), 1);
       g.beginPath();
-      g.moveTo(pd.x0 - 2, bottom);
+      g.moveTo(pd.x0 - 2, y + 92);
       for (const q of pts) g.lineTo(q.x, q.y);
-      g.lineTo(pd.x1 + 2, bottom);
+      g.lineTo(pd.x1 + 2, y + 92);
       g.closePath();
       g.fillPath();
-      // darker further down, a glossy rim along the top
-      g.fillStyle(hexOf(POO.shade), 0.8).fillRect(pd.x0 - 2, y + 16, pd.x1 - pd.x0 + 4, 14);
-      g.fillStyle(hexOf(POO_DARK.base), 1).fillRect(pd.x0 - 2, y + 30, pd.x1 - pd.x0 + 4, bottom - y - 30);
+      for (let k = 0; k < 14; k++) g.fillStyle(hexOf(POO_DARK.base), 0.07 + k * 0.066).fillRect(pd.x0 - 2, y + 22 + k * 5, w, 5);
+      // slow swirls stirring in it
+      for (let i = 0; i < Math.max(2, Math.round(w / 60)); i++) {
+        const sx = pd.x0 + ((i + 0.5) / Math.max(2, Math.round(w / 60))) * w + Math.sin(pd.t * 0.5 + i * 2) * 8;
+        const sy = y + 20 + ((i * 17) % 3) * 9 + Math.sin(pd.t * 0.8 + i) * 2;
+        const a = pd.t * (i % 2 ? 0.9 : -0.9) + i;
+        g.lineStyle(2, hexOf(POO.light), 0.32);
+        g.beginPath();
+        for (let k = 0; k <= 18; k++) {
+          const ang = a + k * 0.55;
+          const rr = 1.5 + k * 0.45;
+          const px = sx + Math.cos(ang) * rr * 1.5;
+          const py = sy + Math.sin(ang) * rr * 0.55;
+          if (k) g.lineTo(px, py);
+          else g.moveTo(px, py);
+        }
+        g.strokePath();
+      }
+      // glossy streaks just under the surface, drifting
+      for (let i = 0; i < Math.max(1, Math.round(w / 90)); i++) {
+        const lx = pd.x0 + (((i * 0.43 + pd.t * 0.03) % 1) * (w - 30)) + 6;
+        g.fillStyle(0xffffff, 0.16).fillRoundedRect(lx, y + 6 + (i % 2) * 3, 18 + (i % 3) * 6, 2.5, 1.2);
+      }
       g.lineStyle(2, 0x3a2418, 1).strokePoints(pts);
       g.lineStyle(1.5, hexOf(POO.light), 0.9);
       g.beginPath();
@@ -920,6 +995,41 @@ export class GameScene extends Phaser.Scene {
       for (const p of this.players)
         if (p.goo > 0) g.lineStyle(1.5, hexOf(POO.light), 0.7).strokeEllipse(p.x, y + 2, 26 + Math.sin(pd.t * 6) * 4, 5);
     }
+  }
+
+  /** Now and then a drop of poo swells at an edge, stretches, falls and splats. */
+  private updateDrips(dt: number) {
+    if (!this.dripFrom.length) return;
+    this.dripT -= dt;
+    if (this.dripT <= 0 && this.drops.length < 12) {
+      this.dripT = 0.12 + Math.random() * 0.2;
+      const v = this.view;
+      const near = this.dripFrom.filter((d) => d.x > v.left && d.x < v.left + v.width && d.y > v.top && d.y < v.top + v.height);
+      if (near.length) {
+        const d = near[Math.floor(Math.random() * near.length)];
+        const img = this.add.image(d.x, d.y, 'pdrop').setOrigin(0.5, 0.1).setScale(0.5 / 3, 0.2 / 3).setDepth(DEPTH.tiles + 0.6);
+        this.drops.push({ img, vy: 0, grow: 0.5 + Math.random() * 0.6 });
+      }
+    }
+    this.drops = this.drops.filter((d) => {
+      if (d.grow > 0) {
+        // swelling, stretching...
+        d.grow -= dt;
+        d.img.setScale(0.6 / 3, Math.min(1, d.img.scaleY * 3 + dt * 1.6) / 3);
+        return true;
+      }
+      // ...then off it goes
+      d.vy = Math.min(700, d.vy + 1400 * dt);
+      d.img.y += d.vy * dt;
+      d.img.setScale(0.55 / 3, 1.1 / 3);
+      const hit = this.level.isSolidAt(d.img.x, d.img.y + 4);
+      if (hit || d.img.y > this.view.top + this.view.height + 40) {
+        if (hit) this.fx.pooSplat(d.img.x, d.img.y, 3);
+        d.img.destroy();
+        return false;
+      }
+      return true;
+    });
   }
 
   /** The first solid ground at or below (x, fromY), or null (a pit). */
@@ -946,10 +1056,10 @@ export class GameScene extends Phaser.Scene {
     const R = this.rock;
     for (const p of this.players) p.freeRun = !!R && !R.falling;
     if (!R) return;
-    // it hangs right behind you: if you've got well ahead it rolls faster (nearly a run)
+    // it hangs right behind you: if you've got well ahead it rolls faster (a bit faster than a run)
     // to stay close; at its own pace it's faster than walking, so keep running!
     const lead = hero ? hero.x - (R.x + R.r) : 0;
-    const want = hero && lead > 190 && !R.falling ? Math.max(R.target, Math.min(Math.abs(hero.body.velocity.x) + 50, hero.char.runSpeed * 1.08)) : R.target;
+    const want = hero && lead > 150 && !R.falling ? Math.max(R.target, Math.min(Math.abs(hero.body.velocity.x) + 140, hero.char.runSpeed * 1.3)) : R.target;
     R.v += (want - R.v) * (1 - Math.exp(-dt * 1.5));
     R.x += R.v * dt;
     R.img.rotation += (R.v * dt) / R.r;
@@ -1023,7 +1133,8 @@ export class GameScene extends Phaser.Scene {
         }),
       );
     const r = 54;
-    const x = this.view.left - r - 8;
+    // (it bursts in from the edge of the screen, half in view)
+    const x = this.view.left - r * 0.5;
     const gy = this.groundUnder(x, this.view.top) ?? hero.bottom;
     const target = Math.min(hero.char.walkSpeed * c.speed, hero.char.runSpeed * 0.92);
     const img = this.add.image(x, gy - r, 'bigrock').setScale((2 * r) / 42 / 7).setDepth(DEPTH.enemies + 2);

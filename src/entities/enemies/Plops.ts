@@ -1,10 +1,11 @@
 import Phaser from 'phaser';
 import { DEPTH, TILE } from '../../config';
 import { sfx } from '../../core/sfx';
-import { PLOP_PAD, PLOP_RES } from '../../gfx/textures';
+import { PLOP_PAD, PLOP_RES, PLOP_TOP } from '../../gfx/textures';
+import { PLOP_H } from '../../gfx/plops';
 import type { EnemyKind } from '../../level/builder';
 import type { GameScene } from '../../scenes/GameScene';
-import { BigPuff, Giant, Glob, Puffball, colHash, createEnemy, type DeathKind, type Enemy } from './Enemy';
+import { BigPuff, Giant, Glob, Goat, Puffball, colHash, createEnemy, type DeathKind, type Enemy } from './Enemy';
 
 /**
  * The Plops (World 2: Plop Invasion) — they've taken over Puff Ball Planet.
@@ -35,7 +36,9 @@ function plopBody(e: Phaser.Physics.Arcade.Sprite, size: Size) {
   const s = k / PLOP_RES;
   e.setScale(s);
   const cx = (50 + PLOP_PAD) * PLOP_RES;
-  const feet = 100 * PLOP_RES;
+  const feet = (100 + PLOP_TOP) * PLOP_RES;
+  // (the sprite's anchor stays at the middle of the art, as before the headroom was added)
+  e.setOrigin(0.5, (52 + PLOP_TOP) / (PLOP_H + PLOP_TOP));
   const bw = w / s;
   const bh = h / s;
   (e.body as Body).setSize(bw, bh, false).setOffset(cx - bw / 2, feet - bh);
@@ -164,6 +167,9 @@ export class Plop extends Puffball {
   constructor(gs: GameScene, x: number, y: number) {
     super(gs, x, y, 'gplop-small');
     plopBody(this, 'small');
+    // (a Plop holds it out at the end of its arm, low, clear of its face)
+    this.handAt = { x: -24, y: 9 };
+    this.weaponK = 0.82;
   }
   setFrame(frame: string | number, updateSize?: boolean, updateOrigin?: boolean) {
     return super.setFrame(plopFrame(this, String(frame), 10), updateSize, updateOrigin);
@@ -192,6 +198,8 @@ export class BigPlop extends BigPuff {
   constructor(gs: GameScene, x: number, y: number) {
     super(gs, x, y, 'gplop-medium');
     plopBody(this, 'medium');
+    this.handAt = { x: -38, y: 14 };
+    this.weaponK = 0.9;
   }
   setFrame(frame: string | number, updateSize?: boolean, updateOrigin?: boolean) {
     return super.setFrame(plopFrame(this, String(frame), 8), updateSize, updateOrigin);
@@ -318,6 +326,15 @@ export class GiantPlop extends Giant {
   }
 }
 
+/** A mountain goat in Plop Invasion: covered in poo, and it spits poo. */
+export class PooGoat extends Goat {
+  readonly kind: EnemyKind = 'poogoat';
+  constructor(gs: GameScene, x: number, y: number) {
+    super(gs, x, y, 'goat-poo');
+    this.spitStyle = { tex: 'poo', scale: 0.9, spin: 10, poo: true, r: 6 };
+  }
+}
+
 /** Any bad guy by kind: the Plops here, the Puff Balls and the rest in Enemy.ts. */
 export function createBadGuy(gs: GameScene, kind: EnemyKind, x: number, y: number): Enemy {
   const h = colHash(x);
@@ -337,5 +354,6 @@ export function createBadGuy(gs: GameScene, kind: EnemyKind, x: number, y: numbe
     return e;
   }
   if (kind === 'giantplop') return new GiantPlop(gs, x, y);
+  if (kind === 'poogoat') return new PooGoat(gs, x, y);
   return createEnemy(gs, kind, x, y);
 }

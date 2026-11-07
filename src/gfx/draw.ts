@@ -185,22 +185,25 @@ export function drawHeroCard(target: HTMLCanvasElement, ch: CharacterDef, pose: 
  * A hero portrait, centred and sized by the actual drawing (not the frame), so
  * every hero sits in the middle of the badge whatever their size or shape.
  */
+/** Room round a hero when it's drawn on its own (the bazooka's tip pokes out past the 56-unit cell). */
+const EDGE = 12;
+
 /** Each hero + pose's drawn outline, measured once (so redrawing a new face is cheap). */
 const portraitBox = new Map<string, [number, number, number, number]>();
 
 export function drawPortrait(target: HTMLCanvasElement, ch: CharacterDef, pose: Pose = 'idle0', f?: Face, boxPose: Pose = pose) {
   const R = 4;
-  const { c: tmp, ctx: t } = canvas(CHAR_W * R, CHAR_H * R);
+  const { c: tmp, ctx: t } = canvas((CHAR_W + EDGE * 2) * R, (CHAR_H + EDGE) * R);
   t.scale(R, R);
-  drawCharacter(t, 0, 0, ch, pose, f);
+  drawCharacter(t, EDGE, EDGE, ch, pose, f);
   // find the drawing's bounding box (with the neutral face, once per hero + pose)
   // (frames of one animation share the box of `boxPose`, so they don't jump in size)
   const key = `${ch.id}:${boxPose}`;
   let box = portraitBox.get(key);
   if (!box) {
-    const { c: m, ctx: mc } = canvas(CHAR_W * R, CHAR_H * R);
+    const { c: m, ctx: mc } = canvas((CHAR_W + EDGE * 2) * R, (CHAR_H + EDGE) * R);
     mc.scale(R, R);
-    drawCharacter(mc, 0, 0, ch, boxPose);
+    drawCharacter(mc, EDGE, EDGE, ch, boxPose);
     const data = mc.getImageData(0, 0, m.width, m.height).data;
     let x0 = m.width, y0 = m.height, x1 = 0, y1 = 0;
     for (let y = 0; y < m.height; y += 2)
@@ -234,9 +237,9 @@ export function drawPortrait(target: HTMLCanvasElement, ch: CharacterDef, pose: 
 export function renderPoseSet(ch: CharacterDef, poses: Pose[], size: number): Record<string, HTMLCanvasElement> {
   const R = 4;
   const drawn = poses.map((pose) => {
-    const { c, ctx } = canvas(CHAR_W * R, CHAR_H * R);
+    const { c, ctx } = canvas((CHAR_W + EDGE * 2) * R, (CHAR_H + EDGE) * R);
     ctx.scale(R, R);
-    drawCharacter(ctx, 0, 0, ch, pose);
+    drawCharacter(ctx, EDGE, EDGE, ch, pose);
     return c;
   });
   // the union of every pose's outline

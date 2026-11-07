@@ -17,8 +17,12 @@ const RESPAWN_INVULN = 1.5;
 /** After running the meter dry you have to let it refill this much before running again. */
 const EXHAUSTED_UNTIL = 0.3;
 const RECOIL_TIME = 0.16;
-/** How fast you sink in a puddle of poo (px/s). */
-const GOO_SINK = 28;
+/** How fast you sink in a puddle of poo (px/s, for a hero of the usual height). */
+const GOO_SINK = 22;
+/** Wading speed in poo, the hop out of it, and how fast you carry on through the air after the hop (the same for all heroes). */
+const GOO_WADE = 75;
+const GOO_HOP = 480;
+const GOO_AIR = 165;
 
 const HIT_W = 22;
 const HIT_H = 34;
@@ -48,6 +52,8 @@ export class Player {
   /** How deep in a puddle of poo you are (px; 0 = not in one). Set by the scene each frame. */
   goo = 0;
   private wasInGoo = false;
+  /** In the air after a hop out of poo (everyone carries on at the same speed). */
+  private gooHop = false;
   exhausted = false;
   running = false;
 
@@ -153,16 +159,19 @@ export class Player {
     }
     this.wasInGoo = inGoo;
     // sinking slowly and steadily (it's thick): no gravity in it, just the sink — about
-    // a second and a half to go right under; a hop out falls back with gravity as usual
+    // nearly two seconds to go right under; a hop out falls back with gravity as usual
     if (inGoo && b.velocity.y >= 0) {
       b.setAllowGravity(false);
-      b.setVelocityY(GOO_SINK);
+      // (the same for every hero: a taller one sinks a bit faster, so all go under in the same time)
+      b.setVelocityY(GOO_SINK * ((c.hitH ?? HIT_H) / HIT_H));
     } else if (!b.allowGravity) b.setAllowGravity(true);
 
     // ── Horizontal movement ──
     let maxSpeed = this.running ? c.runSpeed : c.walkSpeed;
-    if (inGoo) maxSpeed = c.walkSpeed * 0.45;
     if (!onGround) maxSpeed = Math.max(maxSpeed, Math.min(this.launchSpeed, c.runSpeed)); // keep run-jump momentum
+    if (onGround) this.gooHop = false;
+    if (inGoo) maxSpeed = GOO_WADE;
+    else if (this.gooHop) maxSpeed = GOO_AIR;
     let vx = b.velocity.x;
     if (dir !== 0) {
       let accel = onGround ? c.accel : c.airAccel;
@@ -186,9 +195,11 @@ export class Player {
     if (inGoo && controllable && this.jumpBuffer > 0) {
       // a squelchy hop up out of the poo (weaker the deeper you've sunk)
       jumpedNow = true;
+      // (the same hop for every hero, so the puddles are just as hard whoever you are)
       const depth = Phaser.Math.Clamp(this.goo / (c.hitH ?? HIT_H), 0, 1);
-      b.setVelocity(vx, -c.jump * (0.8 - depth * 0.25));
-      this.launchSpeed = c.walkSpeed;
+      b.setVelocity(vx, -GOO_HOP * (1 - depth * 0.3));
+      this.launchSpeed = GOO_AIR;
+      this.gooHop = true;
       this.jumpBuffer = 0;
       this.jumping = true;
       this.airJumps = 1;

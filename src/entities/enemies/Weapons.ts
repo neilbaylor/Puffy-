@@ -46,7 +46,7 @@ export class Weapon {
     readonly kind: WeaponKind,
     private size: 'small' | 'big',
   ) {
-    this.k = kind === 'gun' ? (size === 'small' ? 0.52 : 0.8) : kind === 'saw' ? 0.82 : 0.9;
+    this.k = (kind === 'gun' ? (size === 'small' ? 0.52 : 0.8) : kind === 'saw' ? 0.82 : 0.9) * owner.weaponK;
     const key = kind === 'gun' ? 'w-blaster' : kind === 'saw' ? 'w-saw' : 'w-ball';
     if (kind === 'flail') {
       this.chain = gs.add.graphics().setDepth(owner.depth + 0.15);
@@ -63,7 +63,7 @@ export class Weapon {
   }
 
   private get hand() {
-    const h = HAND[this.size];
+    const h = this.owner.handAt ?? HAND[this.size];
     return { x: this.owner.x + h.x * -this.facing, y: this.owner.y + h.y };
   }
 

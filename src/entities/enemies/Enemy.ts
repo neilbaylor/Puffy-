@@ -28,6 +28,10 @@ export abstract class Enemy extends Phaser.Physics.Arcade.Sprite {
   heavyHit = false;
   /** Some bad guys carry a weapon (gun, chainsaw, ball and chain). */
   weapon: Weapon | null = null;
+  /** Where its front hand is, if not the usual spot for its size (frame units from the middle, facing left). */
+  handAt?: { x: number; y: number };
+  /** How big its weapon is drawn (× the usual for its size). */
+  weaponK = 1;
   /** Can be killed by jumping on it. */
   stompable = true;
   /** Landing on top just bounces you off (no damage either way). */
@@ -599,13 +603,15 @@ export class Giant extends Enemy {
  */
 export class Goat extends Enemy {
   readonly kind: EnemyKind = 'goat';
+  /** What it spits (Plop Invasion's goats spit poo). */
+  protected spitStyle: GlobStyle | undefined;
   private dir = -1;
   private mode: 'walk' | 'windup' | 'spit' = 'walk';
   private timer = 0;
   private cooldown = 1.2;
 
-  constructor(gs: GameScene, x: number, y: number) {
-    super(gs, x, y, 'goat', 'w0');
+  constructor(gs: GameScene, x: number, y: number, texture = 'goat') {
+    super(gs, x, y, texture, 'w0');
     hiRes(this, 40, 38, 12, 24);
     this.hp = 1;
     this.stompable = true;
@@ -670,7 +676,7 @@ export class Goat extends Enemy {
     let vx = (tx - sx) / T;
     if (Math.sign(vx) !== this.dir) vx = this.dir * 60;
     const vy = (ty - sy - 0.5 * G * T * T) / T;
-    new Glob(this.gs, sx, sy, vx, vy, G);
+    new Glob(this.gs, sx, sy, vx, vy, G, this.spitStyle);
     sfx.spit();
     this.gs.fx.drip(sx, sy);
   }
