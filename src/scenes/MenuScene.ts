@@ -39,6 +39,9 @@ export class MenuScene extends Phaser.Scene {
         this.children.removeAll(true);
         this.build(id);
         cam.fadeIn(380, c[0], c[1], c[2]);
+        // (the start screen's title pops its new letters in only now, once the new scenery has
+        // been drawn the first time: doing both at once made the letters stutter)
+        this.events.once(Phaser.Scenes.Events.RENDER, () => requestAnimationFrame(() => this.game.events.emit('menu-level-built', id)));
       });
     };
     this.game.events.on('menu-level', onLevel);

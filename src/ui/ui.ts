@@ -205,6 +205,8 @@ export class UI {
   private gameScene: GameScene | null = null;
   private pickRaf = 0;
   private subtitleTimer = 0;
+  /** Which subtitle change is the latest (a quick second pick cancels the first one's pop-in). */
+  private subtitleToken = 0;
   private hudFace: FaceLife | null = null;
   private hudIdle = 0;
   /** The online battle screens (made the first time you tap Battle). */
@@ -548,7 +550,26 @@ export class UI {
           seg.classList.add('swap-out');
         }
       });
-      this.subtitleTimer = window.setTimeout(() => {
+      // the new words pop in once the old ones have hopped away AND the new level's scenery behind
+      // has been built and drawn (building it is heavy: the letters would stutter through it); if
+      // the scenery doesn't change (or takes too long), they go in anyway
+      const token = ++this.subtitleToken;
+      const out = new Promise<void>((res) => (this.subtitleTimer = window.setTimeout(res, 260)));
+      const built = new Promise<void>((res) => {
+        const done = () => {
+          this.game.events.off('menu-level-built', done);
+          res();
+        };
+        this.game.events.on('menu-level-built', done);
+        window.setTimeout(done, 1500);
+      });
+      void Promise.all([out, built]).then(() => {
+        if (token !== this.subtitleToken) return;
+        // where the words that stay are now (the line re-centres when a part's length changes:
+        // they glide to their new place instead of jumping)
+        const stay = [...wn.querySelectorAll<HTMLElement>('.sep')];
+        segs.forEach((seg, k) => !changed.includes(k) && stay.push(...seg.querySelectorAll<HTMLElement>('.w')));
+        const before = stay.map((e) => e.getBoundingClientRect().left);
         let i = 0;
         segs.forEach((seg, k) => {
           if (changed.includes(k)) {
@@ -559,7 +580,11 @@ export class UI {
           }
           i += parts[k].replace(/ /g, '').length;
         });
-      }, 260);
+        stay.forEach((e, n) => {
+          const dx = before[n] - e.getBoundingClientRect().left;
+          if (Math.abs(dx) > 0.5) e.animate([{ transform: `translateX(${dx}px)` }, { transform: 'none' }], { duration: 420, easing: 'cubic-bezier(0.25, 0.9, 0.3, 1)' });
+        });
+      });
     };
     el.querySelectorAll<HTMLButtonElement>('.lvl').forEach((b) =>
       b.addEventListener('click', () => {
