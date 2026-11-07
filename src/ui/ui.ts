@@ -662,7 +662,7 @@ export class UI {
             <dt>Root beer <i class="rb-ico"></i></dt><dd>${Math.max(u.rootbeer, bank.rootbeer)}</dd>
             <dt>Nuggies eaten <i class="aura-ico"></i></dt><dd>${Math.max(u.nuggies, bank.nuggies)}</dd>
             <dt>Bad guys beaten</dt><dd>${Math.max(u.kills, bank.kills)}</dd>
-            <dt>Up to</dt><dd>${esc(levelName(latestLevel()))}</dd>
+            <dt>Current level</dt><dd>${esc(levelName(this.level))}</dd>
           </dl>
           <div class="row">
             <button class="btn btn-alt" data-act="out">Sign out</button>
