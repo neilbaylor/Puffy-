@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.123)
+## Where things stand (v0.124)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -187,6 +187,12 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   deferred art + MenuScene's quiet jobs (`takeQuietJobs`) + 24 warm-up frames under the loading bar
   (two-phase bar); the boot screen is the manifest blue with the rainbow PUFFY logo. Results after the last
   level: Play again + Home screen. Account card: Sign out bottom-left.
+- v0.124: HITS 15. Bazooka back in the ring (the input wrapper only blanks `fire` while the chair is
+  held; rockets overlap her sprite → `explode()` → 1 hit + knock-back). Holding the chair: the scene
+  reads the raw input (`rawInput`, `firePressed`) and FIRE swings it (no auto swing; hits only if
+  she's in reach in front); `wrestle-chair` event → `touch.setChair(on)` relabels the button CHAIR
+  (grey, `.tbtn-fire.chair`). Calmer: speed 108, hops 0.35–0.85 s, lunges 30%, charge cd 1.7–3 s,
+  heave cd 3.8–5.8 s, slam 3.5%, block jump cd 1.9–2.9 s. Test: t108.
 - v0.123 hearts: `HEARTS_START` 5, `HEARTS_MAX` 6 in WrestleScene; heart pick-ups every 4–7 s (first
   at 5 s) whenever you have fewer than 6; the over-the-head row shows 5 slots (+ a 6th when you have
   it). Test: t107.
