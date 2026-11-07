@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.90)
+## Where things stand (v0.91)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -59,6 +59,19 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   automatic full screen (the owner only wants the button, or installing the game); the start screen's song
   tries to start without a tap (works where the browser allows it, e.g. Chrome with the game installed;
   iPhones always need a first tap).
+
+### Plop Invasion · Part 1 (level 3, v0.91)
+- World 2. `src/level/level3.ts` (downhill, 290 × 52), terrain palette `poo` and looks `p-muck` / `p-dusk` /
+  `p-stink` (`gfx/plopLooks.ts`); poo touches in `gfx/world.ts` for palettes with `poo: true`
+  (drips, poo caps on trees, swirls, soft-serve hills, sludge sea), helpers in `gfx/plopworld.ts`.
+- Plops in `entities/enemies/Plops.ts`: `plop` / `bigplop` / `giantplop` reuse the Puffball / BigPuff / Giant
+  behaviour with Plop frames (`plopFrame`); unarmed ones throw poo (`Glob`), Giant Plops send poo waves
+  (`GameScene.spawnPooWave`) and lob poo lumps. Bad guys are created with `createBadGuy`.
+- Builder: `L.puddle(x0, x1, h)` (quicksand: `Player.goo`, sink 28 px/s, hop out) and `L.chase(x0, x1, speed)`
+  (boulder chase in `GameScene.updateChase`: rock speed = walk × speed, catches up to ~190 px behind you,
+  `Player.freeRun` = no stamina drain). Put the far side of a puddle at the poo's height.
+- `LevelInfo.speech` (the hero's line after the fly-over), `hoops` (basketball finale or not), `button`.
+- No finale yet (ends at the gate); plays Part 1's song. Ideas: King Plop finale, its own music.
 
 ### Battle mode (v0.60 onwards)
 - Room codes (default `birchcliff`), 4 players + watchers, 25 s countdown with 2+ players, 150 s battles,
