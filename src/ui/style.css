@@ -364,7 +364,9 @@ html:has(body.booting) body { background: #5fc4ff; }
 .start.no-levels .start-foot { margin-top: clamp(16px, 4vh, 40px); }
 /* a small, even margin under Play (it used to be nudged past the padding and
    could hang off the bottom of tablets) */
-.start { padding-bottom: calc(clamp(10px, 2vmin, 18px) + var(--safe-b)); }
+.start { padding-bottom: calc(max(4px, clamp(10px, 2vmin, 18px) - 10px) + var(--safe-b)); }
+/* a bit more room under the subtitle: the cards (and everything under them) sit 10px lower */
+.start .cards { margin-top: 10px; }
 .keys-hint {
   margin: 0;
   font-size: 12px;
@@ -398,13 +400,13 @@ html:has(body.booting) body { background: #5fc4ff; }
   .start h2 { display: none; }
   /* the title sits a little way down; the rows below it are packed snugly
      (the cards take up the slack), with only a small margin under Play */
-  .start { justify-content: flex-start; gap: 0; padding-top: calc(clamp(6px, 4.4vh, 22px) + var(--safe-t)); padding-bottom: calc(clamp(6px, 3vh, 14px) + var(--safe-b)); }
-  .start .cards { margin-top: clamp(8px, 3.6vh, 18px); }
+  .start { justify-content: flex-start; gap: 0; padding-top: calc(clamp(6px, 4.4vh, 22px) + var(--safe-t)); padding-bottom: calc(max(4px, clamp(6px, 3vh, 14px) - 8px) + var(--safe-b)); }
+  .start .cards { margin-top: calc(clamp(8px, 3.6vh, 18px) + 8px); }
   .start .levels { margin-top: clamp(20px, 8.6vh, 40px); }
   /* (a bit lower under the Part buttons: they shouldn't crowd Play) */
   .start .start-foot { margin-top: clamp(14px, 5vh, 22px); }
   /* no Part 1 / Part 2 picker yet (first play): Play sits lower, under the cards */
-  .start.no-levels .cards { margin-top: clamp(14px, 7.5vh, 36px); }
+  .start.no-levels .cards { margin-top: calc(clamp(14px, 7.5vh, 36px) + 8px); }
   .start.no-levels .start-foot { margin-top: clamp(18px, 9vh, 44px); }
   .logo { font-size: clamp(30px, 11vh, 52px); }
   .world-name { font-size: clamp(11px, 3.6vh, 16px); }
@@ -2279,7 +2281,7 @@ kbd {
 .bc-panel h2 { margin: 0; }
 .bc-help { margin: 0; font-weight: 700; color: var(--ink-soft); }
 .bc-box { --my: #f28a2e; width: 100%; height: clamp(56px, 13vh, 68px); box-sizing: border-box; margin: 0 0 clamp(6px, 2vh, 14px); }
-.bc-box input { flex: 1; min-width: 0; text-align: center; font-size: clamp(20px, 4.6vh, 26px); }
+.bc-box input { flex: 1; min-width: 0; text-align: left; font-size: clamp(20px, 4.6vh, 26px); }
 
 /* your name and hero on one row, all the same height: the name box is as wide as one and
    a half player squares, the hero buttons spread across the rest */
@@ -2503,6 +2505,11 @@ kbd {
    (a little space above it), and the hero lined up with the table (not the whole card) */
 .acct-card { position: relative; align-items: flex-start; }
 .acct-card .acct-out { position: absolute; left: 22px; bottom: 28px; }
+/* (the same size as Done, and level with it: on the panel's bottom padding) */
+.acct-card .acct-out { font-size: clamp(18px, 3.4vmin, 24px); padding: 10px 26px 9px; bottom: 22px; }
+@media (max-height: 500px) {
+  .acct-card .acct-out { bottom: 16px; padding-left: 16px; padding-right: 16px; }
+}
 .acct-card .results-hero { margin-top: clamp(22px, 5vmin, 40px); }
 .acct-card .row { justify-content: flex-end; margin-top: 26px; }
 @media (max-height: 500px) {

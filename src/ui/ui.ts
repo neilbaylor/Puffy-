@@ -707,7 +707,7 @@ export class UI {
     const el = u
       ? h(`<div class="screen modal acct">
       <div class="panel results acct-card">
-        <button class="btn btn-alt btn-small acct-out" data-act="out">Sign out</button>
+        <button class="btn btn-alt acct-out" data-act="out">Sign out</button>
         <div class="results-hero"><canvas width="160" height="160"></canvas></div>
         <div class="results-body">
           <p class="eyebrow">Your player</p>
@@ -716,7 +716,7 @@ export class UI {
             <dt>Root beer <i class="rb-ico"></i></dt><dd>${Math.max(u.rootbeer, bank.rootbeer)}</dd>
             <dt>Nuggies eaten <i class="aura-ico"></i></dt><dd>${Math.max(u.nuggies, bank.nuggies)}</dd>
             <dt>Bad guys beaten</dt><dd>${Math.max(u.kills, bank.kills)}</dd>
-            <dt>Current level</dt><dd>${esc(levelName(this.level))}</dd>
+            <dt>Current level</dt><dd>${esc(levelName(latestLevel()))}</dd>
           </dl>
           <div class="row">
             <button class="btn btn-go" data-act="back">Done</button>

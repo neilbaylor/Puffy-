@@ -55,13 +55,15 @@ const cleanRoom = (c: string) =>
     .replace(/[^a-z0-9-]/g, '')
     .slice(0, 12) || DEFAULT_ROOM;
 
-/** Your battle name: your player's name if you're signed in, else the one you typed last. */
+/** Where the battle name you typed is kept (signed in: per player, so it starts as your player's name). */
+const nameKey = () => (account.user ? `puffy.name.${account.user.name}` : 'puffy.name');
+
+/** Your battle name: the one you typed last; signed in, your player's name until you change it. */
 function storedName() {
-  if (account.user) return account.user.name.slice(0, 10);
   try {
-    return localStorage.getItem('puffy.name') ?? '';
+    return (localStorage.getItem(nameKey()) ?? account.user?.name ?? '').slice(0, 10);
   } catch {
-    return '';
+    return (account.user?.name ?? '').slice(0, 10);
   }
 }
 
@@ -289,17 +291,12 @@ export class BattleUI {
     });
 
     const input = el.querySelector<HTMLInputElement>('.bl-namebox input')!;
+    // (signed in, it starts as your player's name; you can still change it for battles)
     input.value = storedName();
-    // signed in: you battle under your player's name
-    if (account.user) {
-      input.readOnly = true;
-      input.title = 'Your player’s name';
-      el.querySelector('.bl-namebox')!.classList.add('locked');
-    }
     input.addEventListener('change', () => {
       const v = input.value.trim().slice(0, 10);
       try {
-        localStorage.setItem('puffy.name', v);
+        localStorage.setItem(nameKey(), v);
       } catch {
         /* private mode */
       }
