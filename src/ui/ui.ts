@@ -17,6 +17,11 @@ import { LEVELS, latestLevel, levelInfo, levelName, progress } from '../level/le
 import { account } from '../core/account';
 import { bank } from '../core/bank';
 
+/** A count kept short where space is tight: 1000 and up as 1.0k, 10.4k… (rounded down, so it never shows more than you have). */
+export function shortCount(n: number): string {
+  return n < 1000 ? String(n) : `${(Math.floor(n / 100) / 10).toFixed(1)}k`;
+}
+
 /** Text safe to put in HTML. */
 const esc = (t: string) => t.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 /** A little person icon (the account button). */
@@ -640,7 +645,7 @@ export class UI {
   /** The account button's label: your name once signed in, else "Sign in". */
   private accountLabel() {
     const u = account.user;
-    return u ? `${PERSON}<span>${esc(u.name)}</span><small class="acct-rb"><i class="rb-ico"></i>${Math.max(u.rootbeer, bank.rootbeer)}</small>` : `${PERSON}<span>Sign in</span>`;
+    return u ? `${PERSON}<span>${esc(u.name)}</span><small class="acct-rb"><i class="rb-ico"></i>${shortCount(Math.max(u.rootbeer, bank.rootbeer))}</small>` : `${PERSON}<span>Sign in</span>`;
   }
 
   /**
@@ -959,8 +964,9 @@ export class UI {
     this.hud.querySelector('.hud-aura span')!.textContent = String(s.aura);
     this.hud.querySelector('.hud-aura')!.classList.toggle('has', s.aura > 0);
     const rb = this.hud.querySelector('.hud-rb span')!;
-    if (rb.textContent !== String(s.rootbeer)) {
-      rb.textContent = String(s.rootbeer);
+    if ((rb as HTMLElement).dataset.n !== String(s.rootbeer)) {
+      (rb as HTMLElement).dataset.n = String(s.rootbeer);
+      rb.textContent = shortCount(s.rootbeer);
       const box = this.hud.querySelector('.hud-rb')!;
       box.classList.remove('bump');
       void (box as HTMLElement).offsetWidth;
