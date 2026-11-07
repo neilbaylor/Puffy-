@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.120)
+## Where things stand (v0.121)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -187,6 +187,19 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   deferred art + MenuScene's quiet jobs (`takeQuietJobs`) + 24 warm-up frames under the loading bar
   (two-phase bar); the boot screen is the manifest blue with the rainbow PUFFY logo. Results after the last
   level: Play again + Home screen. Account card: Sign out bottom-left.
+- v0.121 Queen Plop round 2 (`WrestleScene.ts`): HITS 20 (rage = 1 + lost/HITS·0.8). Bigger,
+  more frequent hops/lunges (−430…−760); `queenLanded()` rumbles camera + ropes on landings over
+  300 px/s (like the Giant Plops). New 'heave' mode: `heaveAt()` throws a big lump of poo (`Lob.big`)
+  that trails poo, lands ~75 px short of you and starts a rolling wave (`spawnWave`, which slams use
+  too). No HUD in the ring (ui.ts adds `.hud.bare`: only the pause button) and no nuggies: 3 hearts
+  drawn over the hero (`drawHeroHearts`, Battle's style), heart pickups (`prize-heart`, only while
+  you're below 3) every 7–12 s. Folding chair (`drawFoldingChair` in gfx/wrestle.ts, + bent): drops
+  ~12 s in, then every 18–26 s; lies 6.5 s (blinks, fades); touch to hold; touching her while
+  holding = `chairHit()` (2 hits, it bends and flies off); hurt = you drop it. Jumbotron: "FROM THE
+  TOP ROPE!" stays on a dive hit (plus the small pop text), "CHAIR SHOT!". Stomps also use last
+  frame's hero bottom (`prevHeroBottom`) so low frame rates can't skip the head. Intro cut to ~9 s with
+  the camera always moving (crowd → jumbotron sweep, crash zoom, strut, rising climb, speech framed
+  with headroom). Speech bubble: lifted 20 px, rounded joined tail. Tests: t105 (chair/hearts/heave).
 - v0.120 Queen Plop round (`src/scenes/WrestleScene.ts`): a long, skippable entrance in `intro()`
   (jumbotron push-in, crowd pan with flashbulbs and sweeping rafter beams, lights down, spotlight
   strut with "POOPA!", she climbs the right corner ropes with rope sag, "Welcome to MY Poo Palace!",
