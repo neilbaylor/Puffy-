@@ -1,2 +1,2 @@
 
-- v0.97: Plop Invasion gets longer, harder and a nicer beach
+- v0.98: side-on beach volleyball, two games in a row, a faster boulder
