@@ -3,6 +3,7 @@ import hoopsUrl from '../assets/hoops.m4a';
 import mountainUrl from '../assets/mountain-climb.m4a';
 import menuUrl from '../assets/game-ready.m4a';
 import battleUrl from '../assets/battle.m4a';
+import plopUrl from '../assets/plop-invasion.m4a';
 import { audioContext, isMuted, unlockAudio } from './sfx';
 
 /**
@@ -16,8 +17,8 @@ import { audioContext, isMuted, unlockAudio } from './sfx';
  * Songs are fetched once (small compressed files) and decoded when needed, in
  * mono at 32 kHz to keep memory down; only the last two decoded songs are kept.
  */
-type Track = 'levelClear' | 'hoops' | 'mountain' | 'menu' | 'battle';
-const urls: Record<Track, string> = { levelClear: levelClearUrl, hoops: hoopsUrl, mountain: mountainUrl, menu: menuUrl, battle: battleUrl };
+type Track = 'levelClear' | 'hoops' | 'mountain' | 'menu' | 'battle' | 'plop';
+const urls: Record<Track, string> = { levelClear: levelClearUrl, hoops: hoopsUrl, mountain: mountainUrl, menu: menuUrl, battle: battleUrl, plop: plopUrl };
 const VOLUME = 0.85;
 const RATE = 32000;
 const KEEP = 2;
@@ -147,8 +148,7 @@ export function primeMusic() {
 export const playLevelClear = () => play('levelClear', true);
 
 /** Each level's own song (Part 1: Level Clear, Part 2: Mountain Climb). */
-const levelTrack = (level: number): Track => (level === 2 ? 'mountain' : 'levelClear');
-// (Plop Invasion plays Part 1's song for now: Puff Ball Planet, taken over)
+const levelTrack = (level: number): Track => (level === 2 ? 'mountain' : level === 3 ? 'plop' : 'levelClear');
 
 /** Start a level's song from the top. */
 export const playLevelSong = (level = 1) => play(levelTrack(level), true);

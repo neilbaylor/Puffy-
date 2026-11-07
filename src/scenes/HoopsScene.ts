@@ -1026,7 +1026,7 @@ export class HoopsScene extends Phaser.Scene {
       if (this.decided(round, 'king')) break;
       if (round === REGULATION && this.total('you') === this.total('king')) {
         this.renderScore();
-        setMusicRate(1.5); // the band plays faster: sudden death!
+        setMusicRate(1.3); // the band plays faster: sudden death!
         this.jumboShow({ kind: 'big', text: 'TIED!', sub: 'Sudden death', color: '#ffffff', bg: '#5a0b14' }, 1400);
         await this.wait(1400);
       }

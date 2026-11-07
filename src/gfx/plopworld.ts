@@ -13,6 +13,7 @@ import type { Ctx } from './draw';
 import { STYLES, ellipsePts, type Fill, type Pt } from './handdrawn';
 
 const ST = STYLES.polished;
+const INK = ST.ink;
 
 /** Fresh, glossy poo. */
 export const POO: Fill = { base: '#8a5232', shade: '#5c3118', light: '#c99064' };
@@ -192,4 +193,112 @@ export function drawStink(ctx: Ctx) {
     else ctx.lineTo(x, y);
   }
   ctx.stroke();
+}
+
+/** Poo all over a mountain goat (drawn over its frame, 64 × 64). Not on the frames where it's flipped over. */
+export function drawPooOnGoat(ctx: Ctx, frame: string) {
+  if (frame.startsWith('flop')) return;
+  const head = frame === 'c0' || frame === 'c1' || frame === 'sp0' || frame === 'sp1' ? (frame[0] === 'c' ? [12, 30] : [13, 16]) : [13, 18];
+  // a swirl on its back, splats on its coat and head, drips down its side
+  const blob = (x: number, y: number, rx: number, ry: number, f: Fill, seed: number) => ST.shape(ctx, ellipsePts(x, y, rx, ry, 0.3, 14), f, seed, { lw: 0.55, light: [x - rx * 0.3, y - ry * 0.4] });
+  blob(44, 30, 5, 3, POO_DARK, 5101);
+  blob(33, 34, 3.4, 2.2, POO, 5102);
+  blob(head[0] + 1, head[1] - 7, 4.2, 2.6, POO, 5103);
+  drawDrip(ctx, 46, 31, 6, 2.2, POO_DARK);
+  drawDrip(ctx, 31, 35, 5, 1.8);
+  drawPooSwirl(ctx, 40, 25, 11, POO, 5104);
+}
+
+/** A beach volleyball (yellow, blue and white panels), centre (cx, cy), radius r. */
+export function drawVolleyball(ctx: Ctx, cx: number, cy: number, r: number) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+  ctx.clip();
+  // three curved panels of colour sweeping round
+  for (const [a, col] of [[0, '#ffd23f'], [2.1, '#3f8fe8'], [4.2, '#ffd23f']] as const) {
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    for (let t = 0; t <= 1; t += 0.1) ctx.lineTo(cx + Math.cos(a + t * 1.2) * r * 1.2, cy + Math.sin(a + t * 1.2) * r * 1.2);
+    for (let t = 1; t >= 0; t -= 0.1) ctx.lineTo(cx + Math.cos(a + 0.5 + t * 1.2) * r * 0.45, cy + Math.sin(a + 0.5 + t * 1.2) * r * 0.45);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // seams
+  ctx.strokeStyle = '#3a2418aa';
+  ctx.lineWidth = r * 0.07;
+  for (const a of [0, 2.1, 4.2]) {
+    ctx.beginPath();
+    ctx.arc(cx + Math.cos(a + 1.6) * r * 0.9, cy + Math.sin(a + 1.6) * r * 0.9, r * 0.95, a - 0.4, a + 1.4);
+    ctx.stroke();
+  }
+  // shading + shine
+  const g = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.1, cx, cy, r);
+  g.addColorStop(0, '#ffffff66');
+  g.addColorStop(0.6, '#ffffff00');
+  g.addColorStop(1, '#00000033');
+  ctx.fillStyle = g;
+  ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+  ctx.restore();
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = r * 0.12;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+/** The volleyball court's net (wooden posts, a mesh, the white tape), standing on y = h, centred at x = w/2. */
+export function drawVolleyNet(ctx: Ctx, w: number, h: number, netH: number) {
+  const cx = w / 2;
+  const top = h - netH;
+  // posts
+  for (const s of [-1, 1]) {
+    const px = cx + s * 9;
+    ST.shape(ctx, [[px - 2.2, h + 2], [px + 2.2, h + 2], [px + 1.8, top - 4], [px - 1.8, top - 4]], { base: '#b07a4a', shade: '#7a4e2c', light: '#d8a87a' }, 5201 + s, { lw: 0.9 });
+  }
+  // the mesh (between the posts, from the tape down to just above the sand)
+  const meshTop = top;
+  const meshBot = top + netH * 0.48;
+  ctx.fillStyle = '#ffffff22';
+  ctx.fillRect(cx - 9, meshTop, 18, meshBot - meshTop);
+  ctx.strokeStyle = '#3a2418aa';
+  ctx.lineWidth = 0.5;
+  for (let y = meshTop; y <= meshBot; y += 3) {
+    ctx.beginPath();
+    ctx.moveTo(cx - 9, y);
+    ctx.lineTo(cx + 9, y);
+    ctx.stroke();
+  }
+  for (let x = cx - 9; x <= cx + 9; x += 3) {
+    ctx.beginPath();
+    ctx.moveTo(x, meshTop);
+    ctx.lineTo(x, meshBot);
+    ctx.stroke();
+  }
+  ST.shape(ctx, [[cx - 10.5, meshTop - 1.6], [cx + 10.5, meshTop - 1.6], [cx + 10.5, meshTop + 1.6], [cx - 10.5, meshTop + 1.6]], { base: '#ffffff', shade: '#e6dccb', light: '#ffffff' }, 5205, { lw: 0.6, plain: true });
+  ST.line(ctx, [[cx - 10, meshBot], [cx + 10, meshBot]], 5206, 0.7);
+}
+
+/** A striped beach umbrella stuck in the sand, foot at (x, groundY). */
+export function drawBeachUmbrella(ctx: Ctx, x: number, groundY: number) {
+  ST.line(ctx, [[x, groundY], [x + 2, groundY - 52]], 5301, 1.6, '#8a6a4a');
+  const cx = x + 2;
+  const cy = groundY - 52;
+  const R = 26;
+  for (let i = 0; i < 6; i++) {
+    const a0 = Math.PI + (i / 6) * Math.PI;
+    const a1 = Math.PI + ((i + 1) / 6) * Math.PI;
+    const pts: Pt[] = [[cx, cy - 2]];
+    for (let t = 0; t <= 1; t += 0.25) {
+      const a = a0 + (a1 - a0) * t;
+      pts.push([cx + Math.cos(a) * R, cy + Math.sin(a) * R * 0.55 + 6]);
+    }
+    ST.shape(ctx, pts, i % 2 ? { base: '#ffffff', shade: '#e8dcc8', light: '#ffffff' } : { base: '#ff6a5c', shade: '#d23a30', light: '#ffb0a8' }, 5310 + i, { lw: 0.7, plain: true });
+  }
+  ST.line(ctx, [[cx - R, cy + 6], [cx + R, cy + 6]], 5320, 0.4);
+  // a poo on top, of course
+  drawPooSwirl(ctx, cx, cy - 11, 8, POO, 5321);
 }
