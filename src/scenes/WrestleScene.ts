@@ -7,7 +7,7 @@ import { sfx } from '../core/sfx';
 import { loseLife, lives } from '../core/lives';
 import { bank } from '../core/bank';
 import { ART_RES, canvas } from '../gfx/draw';
-import { ARENA_H, ARENA_W, CROWD_H, FRONT_H, JUMBO, RIBBON, STAGE_OX, STAGE_OY, drawArena, drawArenaFront, drawCrowd, drawRibbonScreen, drawSpotlight, setArenaStyle, type JumboContent } from '../gfx/hoops';
+import { ARENA_H, ARENA_W, CROWD_H, FRONT_H, JUMBO, RIBBON, STAGE_OX, STAGE_OY, drawArena, drawArenaFront, drawCrowd, drawCameraFlash, drawRibbonScreen, drawSpotlight, setArenaStyle, type JumboContent } from '../gfx/hoops';
 import { PLOP_FRAMES, PLOP_H, PLOP_W, drawPlop, drawQueen, type PlopFrame } from '../gfx/plops';
 import { POOWAVE_H, POOWAVE_W, drawPooWave } from '../gfx/plopworld';
 import { drawPoo } from '../gfx/hazards';
@@ -26,11 +26,11 @@ import type { GameOverState, HudState, ResultState } from './GameScene';
 /**
  * Part 3's boss: Queen Plop, in a wrestling ring in the Poo Palace (see sketches/wrestling/DESIGN.md).
  *
- * The fight is the platformer's own: the same hero, controls, jumps and bazooka, side-on across
- * the mat. The ring is a little level: the ropes at either end are springy (run into them and you're
- * flung back), you can climb them to the top turnbuckle and dive off (land on her: two hits), and
- * you can go over them to the floor outside and climb the steel steps back up. You have 3 hearts
- * plus your nuggies (a hit costs a nuggie first); she takes 8 hits, counted down on the jumbotron.
+ * The fight is the platformer's own: the same hero, controls and jumps (no bazooka in the ring),
+ * side-on across the mat. The ropes at either end are springy (run into them and you're flung
+ * back), and you can climb them to the top turnbuckle and dive off (land on her: two hits); there's
+ * no leaving the ring. You have 3 hearts plus your nuggies (a hit costs a nuggie first); she takes
+ * 10 hits, counted down on the jumbotron.
  */
 export interface WrestleData {
   session: Session;
@@ -64,15 +64,13 @@ const POST_TOP = WY(RING.frontY - RING.post);
 
 /** Queen Plop: art units → world, and her texture's resolution. */
 const QS = 1.3;
-const Q_RES = 2.4;
+const Q_RES = 4;
 const Q_PAD = 18;
 const Q_TOP = 24;
 const HITS = 10;
 /** The poo puddle on the mat (world x): you sink into it, like the level's. */
 const PUD_X0 = WX(PUDDLE.x - PUDDLE.w * 0.78);
 const PUD_X1 = WX(PUDDLE.x + PUDDLE.w * 0.78);
-/** (the fight camera's own height is worked out in updateCamera) */
-const FIGHT_CAM_Y = MAT_Y;
 
 const RES = 2;
 type Side = -1 | 1;
@@ -125,6 +123,8 @@ class Queen {
   airborne = false;
   chargeV = 0;
   moodNext = 1.5;
+  cdBlock = 0;
+  counterNext = false;
 
   constructor(private s: WrestleScene, x: number, bottom: number) {
     this.spr = s.physics.add.sprite(x, bottom, 'wr-queen', 'idle').setDepth(DEPTH_W.queen);
@@ -155,7 +155,7 @@ class Queen {
   }
   /** Tougher as she gets hurt. */
   get rage() {
-    return 1 + (HITS - this.hp) * 0.07;
+    return 1 + (HITS - this.hp) * 0.08;
   }
 
   setMode(m: Queen['mode'], t = 0) {
@@ -171,10 +171,11 @@ class Queen {
     this.cdCharge -= dt;
     this.cdSlam -= dt;
     this.cdLob -= dt;
+    this.cdBlock -= dt;
     const dx = p.x - this.x;
     const towards: Side = dx < 0 ? -1 : 1;
     const ground = this.onGround;
-    const speed = 92 * this.rage;
+    const speed = 118 * this.rage;
     let frame: PlopFrame | null = null;
 
     switch (this.mode) {
@@ -185,7 +186,16 @@ class Queen {
       case 'hurt':
         if (ground) b.setVelocityX(b.velocity.x * 0.86);
         frame = 'hurt';
-        if (this.t <= 0) this.setMode('idle', 0.25);
+        if (this.t <= 0) {
+          // she hits back: often straight into a charge
+          if (this.counterNext && Math.abs(dx) < 360) {
+            this.counterNext = false;
+            this.dir = towards;
+            this.setMode('windup', 0.32 / this.rage);
+            s.fx.popText(this.x, this.top - 14, 'GRRR!', '#ff8a80', 20);
+            sfx.roar();
+          } else this.setMode('idle', 0.15);
+        }
         break;
       case 'idle':
         b.setVelocityX(0);
@@ -203,19 +213,27 @@ class Queen {
         }
         this.facing = towards;
         const close = Math.abs(dx) < 70;
-        b.setVelocityX(close ? towards * speed * 0.4 : towards * speed);
-        // she can't keep still: hop, hop, hop as she comes at you
+        if (ground) b.setVelocityX(close ? towards * speed * 0.5 : towards * speed);
+        // she can't keep still: hop, hop, hop as she comes at you (and now and then a big lunge)
         this.hopIn -= dt;
-        if (ground && this.hopIn <= 0) {
-          b.setVelocityY(-300 - Math.random() * 120);
-          this.hopIn = 0.55 + Math.random() * 0.75;
+        // you jumping on her? she jumps up to meet you
+        const above = p.alive && p.body.velocity.y > 60 && p.bottom < this.top + 6 && Math.abs(dx) < 90 && !s.heroDiving();
+        if (ground && above && this.cdBlock <= 0) {
+          b.setVelocity(towards * speed * 0.6, -560);
+          this.cdBlock = 1.6 + Math.random();
+          this.hopIn = 0.5;
+        } else if (ground && this.hopIn <= 0) {
+          const lunge = Math.abs(dx) < 240 && Math.random() < 0.35;
+          b.setVelocityY(lunge ? -500 - Math.random() * 60 : -340 - Math.random() * 140);
+          if (lunge) b.setVelocityX(towards * speed * 1.9);
+          this.hopIn = 0.35 + Math.random() * 0.5;
         }
-        if (ground && this.cdSlam <= 0 && Math.abs(dx) > 120 && Math.random() < 0.02) {
+        if (ground && this.cdSlam <= 0 && Math.abs(dx) > 100 && Math.random() < 0.045) {
           this.slam(p.x);
           break;
         }
         if (ground && this.cdCharge <= 0 && Math.abs(dx) < 330 && Math.abs(p.bottom - this.bottom) < 40) {
-          this.setMode('windup', 0.5 / this.rage);
+          this.setMode('windup', 0.4 / this.rage);
           this.dir = towards;
           s.fx.popText(this.x, this.top - 14, '!', '#ffd23f', 26);
           sfx.roar();
@@ -229,7 +247,7 @@ class Queen {
         this.spr.setX(this.spr.x + Math.sin(s.time.now / 14) * 0.8);
         if (this.t <= 0) {
           this.setMode('charge', 1.1);
-          this.chargeV = 300 * this.rage;
+          this.chargeV = Math.min(520, 380 * this.rage);
           sfx.poopa(0.8);
         }
         break;
@@ -239,8 +257,8 @@ class Queen {
         frame = Math.floor(s.time.now / 80) % 2 ? 'run0' : 'run1';
         if (ground && Math.random() < 0.3) s.fx.dust(this.x - this.dir * 20, this.bottom, 1);
         if (this.t <= 0) {
-          this.cdCharge = 2.2 + Math.random() * 1.8;
-          this.setMode('idle', 0.35);
+          this.cdCharge = 1.3 + Math.random() * 1.2;
+          this.setMode('idle', 0.2);
         }
         break;
       case 'slam':
@@ -249,8 +267,8 @@ class Queen {
           this.airborne = false;
           b.setVelocityX(0);
           s.slamLanded(this);
-          this.cdSlam = 3.5 + Math.random() * 2;
-          this.setMode('idle', 0.5);
+          this.cdSlam = 2.4 + Math.random() * 1.4;
+          this.setMode('idle', 0.3);
         }
         if (!ground) this.airborne = true;
         break;
@@ -260,11 +278,11 @@ class Queen {
         this.facing = (-away) as Side;
         frame = 'look';
         const room = away > 0 ? ROPE_R - 50 - this.x : this.x - (ROPE_L + 50);
-        b.setVelocityX(room > 4 ? away * 78 * this.rage : 0);
+        b.setVelocityX(room > 4 ? away * 100 * this.rage : 0);
         if (s.heroPerched() && this.cdLob <= 0) {
           // stay up there too long and she'll throw poo at you
           s.lobAt(this, p.x, p.bottom - 20);
-          this.cdLob = 1.6;
+          this.cdLob = 1.0;
         }
         if (!s.heroOnRopes() && !s.heroDiving()) this.setMode('idle', 0.2);
         break;
@@ -345,11 +363,12 @@ class Queen {
     const now = this.s.time.now;
     if (now < this.invulnUntil || this.hp <= 0 || this.mode === 'intro' || this.mode === 'down') return false;
     this.hp = Math.max(0, this.hp - n);
-    this.invulnUntil = now + 750;
+    this.invulnUntil = now + 1100;
     if (this.hp > 0) {
       const away = Math.sign(this.x - fromX) || 1;
       this.body.setVelocity(away * 210, -260);
-      this.setMode('hurt', 0.5);
+      this.setMode('hurt', 0.38);
+      this.counterNext = Math.random() < 0.6;
     }
     return true;
   }
@@ -405,6 +424,11 @@ export class WrestleScene extends Phaser.Scene {
   private camX = WORLD_W / 2;
   private camY = MAT_Y;
   private camZ = 1;
+  /** Cutscene shots: the camera goes exactly where camX/camY/camZ/camRot say (tweened by the intro). */
+  private camManual = false;
+  private camRot = 0;
+  private camTok = 0;
+  private sweeps: Phaser.GameObjects.Image[] = [];
   private dom!: HTMLElement;
   private skipping = false;
   private inIntro = false;
@@ -434,6 +458,9 @@ export class WrestleScene extends Phaser.Scene {
     this.climb = null;
     this.dive = null;
     this.camFocus = null;
+    this.camManual = false;
+    this.camRot = 0;
+    this.sweeps = [];
     this.skipping = false;
     this.lastHud = '';
     this.clock = 0;
@@ -576,6 +603,7 @@ export class WrestleScene extends Phaser.Scene {
     };
     sheetOf('wr-queen', (ctx, f) => drawQueen(ctx, Q_PAD, Q_TOP, f));
     sheetOf('wr-king', (ctx, f) => drawPlop(ctx, Q_PAD, Q_TOP, f, STYLES.polished, 'king'));
+    if (!T.exists('camflash')) addCanvas(this, 'camflash', hires(48, 48, 1, (ctx) => drawCameraFlash(ctx, 24)));
     if (!T.exists('spot')) addCanvas(this, 'spot', hires(300, 700, 1, (ctx) => drawSpotlight(ctx, 300, 700)));
     if (!T.exists('softshadow'))
       addCanvas(this, 'softshadow', hires(128, 40, 1, (ctx) => {
@@ -1054,7 +1082,7 @@ export class WrestleScene extends Phaser.Scene {
             this.shakeRopes(8);
             for (let i = 3; i < 6; i++) this.sagV[(-toward) as Side][i] -= 90;
             sfx.whoosh();
-            this.callout('FROM THE TOP ROPE!', 'go', 1300);
+            this.fx.popText(p.x, p.body.top - 18, 'FROM THE TOP ROPE!', '#ffd23f', 18);
             this.flashJumbo({ kind: 'big', text: 'FROM THE TOP ROPE!', sub: 'OH YEAH!', color: '#ffd23f', bg: '#c8102e' }, 1600);
             this.excitedUntil = this.clock + 2000;
           }
@@ -1114,7 +1142,9 @@ export class WrestleScene extends Phaser.Scene {
     // (a dive off the top rope is generous: coming down near her counts)
     const reach = this.dive ? 22 : 0;
     if (a.right < b.left - reach || a.left > b.right + reach || a.bottom < b.top - (this.dive ? 10 : 0) || a.top > b.bottom) return;
-    if (a.velocity.y > 40 && a.bottom < b.top + b.height * 0.4) {
+    // (she's leaping up to meet you: that's a headbutt, not a stomp — except off the top rope)
+    const rising = b.velocity.y < -250 && !this.dive;
+    if (!rising && a.velocity.y > 40 && a.bottom < b.top + b.height * 0.4) {
       const dive = !!this.dive;
       this.dive = null;
       this.hitQueen(dive ? 2 : 1, dive ? 'dive' : 'stomp', p.x);
@@ -1162,34 +1192,36 @@ export class WrestleScene extends Phaser.Scene {
   private updateCamera(dt: number, snap = false) {
     const cam = this.cameras.main;
     const base = Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W);
-    let tx: number;
-    let ty: number;
-    let tz: number;
-    if (this.camFocus) {
-      tx = this.camFocus.x;
-      ty = this.camFocus.y;
-      tz = this.camFocus.zoom;
-    } else {
-      const p = this.player;
-      const q = this.queen;
-      tx = p.x * 0.62 + q.x * 0.38;
-      ty = FIGHT_CAM_Y;
-      // (a touch wider than a level, so the whole jumbotron — her hits to go — and the floor round
-      // the ring both fit)
-      tz = 0.92;
+    if (!this.camManual) {
+      let tx: number;
+      let ty: number;
+      let tz: number;
+      if (this.camFocus) {
+        tx = this.camFocus.x;
+        ty = this.camFocus.y;
+        tz = this.camFocus.zoom;
+      } else {
+        const p = this.player;
+        const q = this.queen;
+        tx = p.x * 0.62 + q.x * 0.38;
+        // (a touch wider than a level, so the whole jumbotron — her hits to go — and the floor round
+        // the ring both fit: the view's top sits just above the jumbotron)
+        tz = 0.92;
+        ty = WY(JUMBO.y) - 8 + this.scale.height / (base * tz) / 2;
+      }
+      const k = snap ? 1 : 1 - Math.exp(-dt * 3.2);
+      this.camX += (tx - this.camX) * k;
+      this.camY += (ty - this.camY) * k;
+      this.camZ += (tz - this.camZ) * (snap ? 1 : 1 - Math.exp(-dt * 2.4));
+      this.camRot *= snap ? 0 : Math.exp(-dt * 4);
     }
-    const k = snap ? 1 : 1 - Math.exp(-dt * 3.2);
-    this.camX += (tx - this.camX) * k;
-    this.camY += (ty - this.camY) * k;
-    this.camZ += (tz - this.camZ) * (snap ? 1 : 1 - Math.exp(-dt * 2.4));
     const zoom = base * this.camZ;
     cam.setZoom(zoom);
+    cam.setRotation(this.camRot);
     const vw = this.scale.width / zoom;
     const vh = this.scale.height / zoom;
     const x = Phaser.Math.Clamp(this.camX, Math.min(vw / 2, WORLD_W / 2), Math.max(WORLD_W - vw / 2, WORLD_W / 2));
-    // (in the fight the view's top is just above the jumbotron; cutscenes centre on what they show)
-    const cy = this.camFocus ? this.camY : WY(JUMBO.y) - 8 + vh / 2;
-    const y = Phaser.Math.Clamp(cy, Math.min(vh / 2, WORLD_H / 2), Math.max(WORLD_H - vh / 2, WORLD_H / 2));
+    const y = Phaser.Math.Clamp(this.camY, Math.min(vh / 2, WORLD_H / 2), Math.max(WORLD_H - vh / 2, WORLD_H / 2));
     cam.centerOn(x, y);
   }
 
@@ -1261,7 +1293,8 @@ export class WrestleScene extends Phaser.Scene {
       const sy = (wy - cam.worldView.y) * cam.zoom * k;
       const x = Phaser.Math.Clamp(sx, 150, css.width - 150);
       el.style.left = `${x}px`;
-      el.style.top = `${Math.max(70, sy)}px`;
+      // (never off the top of the screen)
+      el.style.top = `${Math.max(el.offsetHeight + 10, sy)}px`;
       el.style.setProperty('--tail', `${sx - x}px`);
     };
     place();
@@ -1291,44 +1324,276 @@ export class WrestleScene extends Phaser.Scene {
 
   // ───────────────────────────────────────────── the show ──
 
-  /** Her entrance: lights down, a spotlight on the top turnbuckle, "Welcome to MY Poo Palace!", and she leaps in. */
+  /** A cutscene move: `fn(u)` for u 0→1 over `ms` (finishes at once if the intro is skipped). */
+  private glide(ms: number, fn: (u: number) => void, ease = 'Sine.easeInOut') {
+    return new Promise<void>((res) => {
+      if (this.skipping) return res();
+      let done = false;
+      this.tweens.addCounter({
+        from: 0,
+        to: 1,
+        duration: ms,
+        ease,
+        onUpdate: (tw) => {
+          if (done) return;
+          if (this.skipping) {
+            done = true;
+            res();
+            return;
+          }
+          fn(tw.getValue() ?? 0);
+        },
+        onComplete: () => {
+          if (!done) fn(1);
+          done = true;
+          res();
+        },
+      });
+    });
+  }
+
+  /** A camera move from where it is now to (x, y) at zoom z, tilted by rot. */
+  private camTo(x: number, y: number, z: number, ms: number, rot = 0, ease = 'Sine.easeInOut') {
+    const a = { x: this.camX, y: this.camY, z: this.camZ, r: this.camRot };
+    // (a new move takes over from one still going)
+    const tok = ++this.camTok;
+    return this.glide(ms, (u) => {
+      if (tok !== this.camTok) return;
+      this.camX = a.x + (x - a.x) * u;
+      this.camY = a.y + (y - a.y) * u;
+      this.camZ = a.z + (z - a.z) * u;
+      this.camRot = a.r + (rot - a.r) * u;
+    }, ease);
+  }
+  private cut(x: number, y: number, z: number, rot = 0) {
+    this.camX = x;
+    this.camY = y;
+    this.camZ = z;
+    this.camRot = rot;
+  }
+
+  /** Flashbulbs going off all over the crowd. */
+  private flashbulbs(n: number, over: number) {
+    for (let i = 0; i < n; i++)
+      this.time.delayedCall(Math.random() * over, () => {
+        if (!this.inIntro) return;
+        const x = WX(-120 + Math.random() * 1520);
+        const y = WY(30 + Math.random() * 250);
+        const img = this.add.image(x, y, 'camflash').setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH_W.spot).setScale(0.4 + Math.random() * 0.5).setAlpha(0.95);
+        this.tweens.add({ targets: img, alpha: 0, scale: img.scale * 1.4, duration: 220 + Math.random() * 160, onComplete: () => img.destroy() });
+      });
+  }
+
+  /** Pyro: sparks bursting up from a point. */
+  private pyro(x: number, y: number) {
+    for (let i = 0; i < 3; i++) this.time.delayedCall(i * 110, () => this.fx.sparkle(x + (Math.random() - 0.5) * 20, y - i * 18, 12));
+    this.fx.stars(x, y - 10, 4);
+  }
+
+  /** Point a sweeping rafters beam at a world point. */
+  private aimSweep(img: Phaser.GameObjects.Image, x: number, y: number) {
+    return -Math.atan2(x - img.x, y - img.y);
+  }
+
+  /**
+   * Her entrance, filmed like a big TV show: the jumbotron, the crowd going wild, lights down,
+   * a spotlight finds her in the ring, she struts and works the crowd, climbs the corner ropes to
+   * the top turnbuckle, "Welcome to MY Poo Palace!", and leaps in. Skip jumps straight to the leap.
+   */
   private async intro() {
     const q = this.queen;
     const p = this.player;
     this.inIntro = true;
     // (coming from the level, the TV bars are covering the screen: a title on them, then away they go)
     stingerTitle('<small>Plop Invasion · Part 1</small>THE POO PALACE');
+    // she's the star tonight: lit, and in front of the dark
+    q.spr.setDepth(DEPTH_W.spot + 0.3);
+    q.shadow.setDepth(DEPTH_W.spot + 0.2);
+    const startX = WX(700);
+    q.spr.setPosition(startX, MAT_Y).setAlpha(0);
+    q.shadow.setPosition(startX, MAT_Y + 2).setAlpha(0);
+    q.facing = -1;
+    q.spr.setFlipX(false).setFrame('idle');
+    this.dark.fillAlpha = 0.72;
+    this.camManual = true;
+    const jx = WX(JUMBO.x + (JUMBO.w * JUMBO.s) / 2);
+    const jy = WY(JUMBO.y + (JUMBO.h * JUMBO.s) / 2);
+    this.cut(jx, jy + 10, 2.3);
+    this.updateCamera(0, true);
+    this.flashJumbo({ kind: 'big', text: 'TONIGHT!', sub: 'TITLE MATCH · LIVE FROM THE POO PALACE', color: '#ffd23f', bg: '#c8102e' }, 2600);
+    // two beams sweeping the crowd from the rafters
+    for (const sx of [WX(160), WX(1120)]) {
+      const img = this.add.image(sx, WY(-80), 'spot').setOrigin(0.5, 0).setScale(0.42, 0.92).setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH_W.spot).setAlpha(0.75);
+      img.rotation = sx < WORLD_W / 2 ? -0.7 : 0.7;
+      this.tweens.add({ targets: img, rotation: sx < WORLD_W / 2 ? 0.5 : -0.5, duration: 1700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      this.sweeps.push(img);
+    }
+    const skip = this.dom.querySelector<HTMLElement>('.wr-skip')!;
     await this.wait(this.wd.checkpoint === -1 && !this.wd.result?.seconds ? 300 : 1100);
     void stingerReveal();
-    const skip = this.dom.querySelector<HTMLElement>('.wr-skip')!;
     skip.hidden = false;
     playHoops();
-    this.jumbo = { kind: 'title' };
-    this.dark.fillAlpha = 0.62;
-    q.spr.setPosition(POST_R, POST_TOP);
-    q.facing = -1;
-    q.spr.setFlipX(false).setFrame('yell1');
-    this.aimSpot(POST_R, POST_TOP, 0.9, 10);
-    this.camFocus = { x: POST_R - 60, y: POST_TOP - 10, zoom: 1.9 };
-    this.updateCamera(0, true);
-    p.view.setAlpha(1);
     sfx.drum();
-    sfx.cheer();
-    this.excitedUntil = this.clock + 3000;
-    // pyro going off behind her
-    for (let i = 0; i < 4; i++) this.time.delayedCall(i * 250, () => !this.skipping && this.fx.sparkle(POST_R + (Math.random() - 0.5) * 60, POST_TOP - 40 - Math.random() * 40, 10));
-    const yell = this.time.addEvent({ delay: 140, loop: true, callback: () => q.spr.setFrame(q.spr.frame.name === 'yell0' ? 'yell1' : 'yell0') });
-    if (!this.skipping) await Promise.race([this.say('“Welcome to MY <b>Poo Palace</b>!”', POST_R, POST_TOP - 105, 2400), this.iwait(2400)]);
-    yell.remove();
+
+    // ── 1. the jumbotron, pushing in ──
+    this.excitedUntil = this.clock + 9000;
+    await this.camTo(jx, jy + 4, 2.6, 2200, -0.012);
+    // ── 2. across the crowd, flashbulbs going off ──
+    if (!this.skipping) {
+      this.jumbo = { kind: 'title' };
+      sfx.cheer();
+      this.flashbulbs(26, 2600);
+      this.ribbonMsg = { text: 'QUEEN PLOP ♛ QUEEN PLOP', color: '#ff9ccf', bg: '#5a1030', t0: this.clock / 1000 };
+      this.cut(WX(40), WY(150), 1.7, 0.03);
+    }
+    await this.camTo(WX(1240), WY(165), 1.55, 2600, -0.025);
+
+    // ── 3. lights down… a spotlight finds her in the ring ──
+    if (!this.skipping) {
+      this.cut(WORLD_W / 2, MAT_Y - 90, 0.95);
+      this.setDark(0.8, 200);
+      for (const img of this.sweeps) this.tweens.add({ targets: img, alpha: 0.25, duration: 300 });
+      await this.iwait(450);
+    }
+    if (!this.skipping) {
+      sfx.thud();
+      sfx.cheer();
+      q.spr.setAlpha(1);
+      q.shadow.setAlpha(0.45);
+      q.spr.setFrame('yell1');
+      this.aimSpot(startX, MAT_Y, 0.9, 80);
+      this.cameras.main.flash(160, 255, 230, 240);
+      this.pyro(startX - 40, MAT_Y);
+      this.pyro(startX + 40, MAT_Y);
+      this.flashbulbs(14, 900);
+      await this.iwait(250);
+      q.spr.setFrame('grin');
+      await this.camTo(startX, MAT_Y - 55, 1.5, 900, 0, 'Quad.easeOut');
+    }
+
+    // ── 4. she struts across the ring, working the crowd ──
+    const strut = async (toX: number, ms: number) => {
+      const fromX = q.spr.x;
+      q.facing = toX > fromX ? 1 : -1;
+      q.spr.setFlipX(q.facing > 0);
+      await this.glide(ms, (u) => {
+        const x = fromX + (toX - fromX) * u;
+        // a strut: a little bounce in every step
+        const ph = u * (ms / 1000) * 7;
+        q.spr.setPosition(x, MAT_Y - Math.abs(Math.sin(ph * Math.PI)) * 4);
+        q.spr.setFrame((['walk0', 'walk1', 'walk2', 'walk3'] as const)[Math.floor(ph * 2) % 4]);
+        q.shadow.setPosition(x, MAT_Y + 2);
+        this.spot.setX(x);
+        this.camX += (x + q.facing * 30 - this.camX) * 0.08;
+      }, 'Linear');
+    };
+    await strut(WX(560), 1300);
+    if (!this.skipping) {
+      // at you: "POOPA!"
+      q.facing = -1;
+      q.spr.setFlipX(false).setFrame('yell1');
+      this.fx.popText(q.x, q.spr.y - 120, 'POOPA!', '#ff9ccf', 22);
+      sfx.poopa(1);
+      this.flashbulbs(10, 600);
+      this.excitedUntil = this.clock + 2000;
+      await this.camTo(q.spr.x + 10, MAT_Y - 60, 1.85, 500, 0.015, 'Quad.easeOut');
+      await this.iwait(550);
+      q.spr.setFrame('grin');
+      await this.iwait(400);
+    }
+    const climbX = ROPE_R - 26;
+    if (!this.skipping) void this.camTo(climbX - 80, MAT_Y - 70, 1.45, 1800, 0);
+    await strut(climbX, 1800);
+
+    // ── 5. up the corner ropes to the top turnbuckle ──
+    if (!this.skipping) {
+      q.facing = 1;
+      q.spr.setFlipX(true).setFrame('look');
+      sfx.drum();
+      void this.camTo(POST_R - 40, POST_TOP - 30, 1.9, 2000, -0.02);
+      for (const img of this.sweeps) this.tweens.add({ targets: img, alpha: 0.8, duration: 400 });
+    }
+    const steps: [number, number][] = [
+      [POST_R - 18, MAT_Y - RING.ropes[0] * K],
+      [POST_R - 13, MAT_Y - RING.ropes[1] * K],
+      [POST_R - 8, MAT_Y - RING.ropes[2] * K],
+      [POST_R, POST_TOP],
+    ];
+    for (let i = 0; i < steps.length && !this.skipping; i++) {
+      const fx = q.spr.x;
+      const fy = q.spr.y;
+      const [tx, ty] = steps[i];
+      await this.glide(380, (u) => {
+        q.spr.setPosition(fx + (tx - fx) * u, fy + (ty - fy) * u - Math.sin(Math.PI * u) * 10);
+        q.spr.setFrame(u < 0.5 ? 'run1' : 'run0');
+        q.shadow.setAlpha(0.45 * (1 - (MAT_Y - q.spr.y) / 120));
+        this.spot.setPosition(q.spr.x, q.spr.y + 10).setScale(0.55, (q.spr.y + 60) / 700);
+        for (const img of this.sweeps) img.rotation += (this.aimSweep(img, q.spr.x, q.spr.y - 40) - img.rotation) * 0.2;
+      }, 'Quad.easeOut');
+      if (this.skipping) break;
+      // her weight on the rope: it dips, and springs back
+      if (i < 3) {
+        this.sagV[1][3 + i] += 110;
+        this.sagV[1][i] += 55;
+        this.ropeHit(1, 3);
+      }
+      sfx.bump();
+      q.spr.setScale((QS / Q_RES) * 1.08, (QS / Q_RES) * 0.92);
+      this.tweens.add({ targets: q.spr, scaleX: QS / Q_RES, scaleY: QS / Q_RES, duration: 160 });
+      await this.iwait(120);
+    }
+    for (const img of this.sweeps) this.tweens.killTweensOf(img);
+
+    // ── 6. on top: pyro, everyone up, and a word from Her Majesty ──
+    if (!this.skipping) {
+      q.facing = -1;
+      q.spr.setFlipX(false).setFrame('yell1');
+      this.shakeRopes(4);
+      this.pyro(POST_R - 30, POST_TOP);
+      this.pyro(POST_R + 30, POST_TOP);
+      this.cameras.main.flash(180, 255, 235, 245);
+      sfx.cheer();
+      sfx.roar();
+      this.flashbulbs(30, 2600);
+      this.excitedUntil = this.clock + 4000;
+      this.flashJumbo({ kind: 'big', text: 'QUEEN PLOP!', sub: 'THE QUEEN OF THE POO PALACE', color: '#ff9ccf', bg: '#5a1030' }, 1e9);
+      for (const img of this.sweeps) this.tweens.add({ targets: img, rotation: this.aimSweep(img, POST_R, POST_TOP - 40), duration: 300 });
+      void this.camTo(POST_R - 50, POST_TOP - 88, 1.95, 650, 0.01, 'Quad.easeOut').then(() => this.camTo(POST_R - 50, POST_TOP - 92, 2.05, 2100, 0.004, 'Sine.easeInOut'));
+      const yell = this.time.addEvent({ delay: 140, loop: true, callback: () => q.spr.setFrame(q.spr.frame.name === 'yell0' ? 'yell1' : 'yell0') });
+      await Promise.race([this.say('“Welcome to MY <b>Poo Palace</b>!”', POST_R, POST_TOP - 132, 2700), this.iwait(2700)]);
+      yell.remove();
+    }
     this.dom.querySelector<HTMLElement>('.wr-speech')!.hidden = true;
-    // she leaps into the ring
+
+    // ── 7. she leaps into the ring ──
     this.inIntro = false;
     skip.hidden = true;
-    const landX = WX(820);
+    this.tweens.killTweensOf(this.spot);
+    for (const img of this.sweeps) {
+      this.tweens.killTweensOf(img);
+      this.tweens.add({ targets: img, alpha: 0, duration: 400, onComplete: () => img.destroy() });
+    }
+    this.sweeps = [];
+    q.spr.setAlpha(1).setScale(QS / Q_RES).setFlipX(false);
+    q.shadow.setAlpha(0.45);
+    q.facing = -1;
+    if (this.skipping) {
+      q.spr.setPosition(POST_R, POST_TOP);
+      this.spot.setAlpha(0);
+    }
     q.spr.setFrame('run1');
     this.tweens.add({ targets: this.spot, alpha: 0, duration: 300 });
     this.setDark(0, 500);
-    this.camFocus = null;
+    this.jumbo = this.countJumbo();
+    this.jumboUntil = 0;
+    this.camManual = false;
+    p.view.setAlpha(1);
+    const landX = WX(820);
+    // (the camera rides the leap down, then eases out to the fight)
+    this.camFocus = { x: landX + 40, y: MAT_Y - 80, zoom: 1.3 };
+    const fromX = q.spr.x;
+    const fromY = q.spr.y;
+    sfx.whoosh();
     await new Promise<void>((res) =>
       this.tweens.addCounter({
         from: 0,
@@ -1336,13 +1601,17 @@ export class WrestleScene extends Phaser.Scene {
         duration: this.skipping ? 1 : 650,
         onUpdate: (tw) => {
           const u = tw.getValue() ?? 0;
-          q.spr.setPosition(POST_R + (landX - POST_R) * u, POST_TOP + (MAT_Y - POST_TOP) * u - Math.sin(Math.PI * u) * 70);
+          q.spr.setPosition(fromX + (landX - fromX) * u, fromY + (MAT_Y - fromY) * u - Math.sin(Math.PI * u) * 70);
+          q.shadow.setPosition(q.spr.x, MAT_Y + 2);
         },
         onComplete: () => res(),
       }),
     );
+    q.spr.setDepth(DEPTH_W.queen);
+    q.shadow.setDepth(DEPTH_W.shadows);
     q.body.setAllowGravity(true);
     q.body.reset(landX, MAT_Y - q.body.halfHeight - 2);
+    this.camFocus = null;
     this.cameras.main.shake(240, 0.01);
     sfx.thud();
     this.shakeRopes(6);
@@ -1350,14 +1619,13 @@ export class WrestleScene extends Phaser.Scene {
     this.callout('FIGHT!', 'go', 1000);
     sfx.whistle();
     sfx.cheer();
-    this.jumbo = this.countJumbo();
-    q.setMode('idle', 0.8);
+    q.setMode('idle', 0.6);
     this.fighting = true;
     this.emitHud(true);
     this.game.events.emit('wrestle-fight');
   }
 
-  /** Her 8th hit: down she goes… "you'll never out-wrestle THE KING!"… and there he is, and he runs. */
+  /** Her last hit: down she goes… "you'll never out-wrestle THE KING!"… and there he is, and he runs. */
   private async win() {
     if (this.ended) return;
     this.ended = true;

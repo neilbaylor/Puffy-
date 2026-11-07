@@ -228,10 +228,14 @@ export function drawPlop(ctx: Ctx, ox: number, oy: number, f: PlopFrame, st: Sty
 const PINK: Fill = { base: '#e8579a', shade: '#b23272', light: '#ff9cc8' };
 const PEARL: Fill = { base: '#fbf4ea', shade: '#dccfbf', light: '#ffffff' };
 const SILVER: Fill = { base: '#f1d36a', shade: '#c79a2c', light: '#fff6c4' };
+const PINK_LINING: Fill = { base: '#ffb3d4', shade: '#e07fae', light: '#ffe0ee' };
+const LEATHER: Fill = { base: '#4a2412', shade: '#2e1408', light: '#7a4224' };
+const RUBY: Fill = { base: '#e8463f', shade: '#b52c27', light: '#ff8a80' };
 
 /**
- * Queen Plop (concept): a Plop with a pink royal cape, a tiara, a bow on her swirl, short
- * lashes, a touch of blush and a pearl necklace. Same frame layout as drawPlop.
+ * Queen Plop, Part 3's boss: a Plop with a royal cape (pink, with a pale lining and a gold
+ * trim), a jewelled tiara, a bow on her swirl, short lashes, a touch of blush, a string of
+ * pearls, and her gold championship belt. Same frame layout as drawPlop.
  */
 export function drawQueen(ctx: Ctx, ox: number, oy: number, f: PlopFrame, st: Style = STYLES.polished) {
   const ST = st;
@@ -243,19 +247,44 @@ export function drawQueen(ctx: Ctx, ox: number, oy: number, f: PlopFrame, st: St
   const sqY = f === 'idle1' ? 1.05 : hurt ? 0.9 : 1;
   const botY = ground - 30 + bob;
   const topY = botY - 27 * sqY;
-  // the pink cape, flowing out behind her (a frill along its hem)
-  ST.shape(ctx, [[cx - 26, botY - 28], [cx + 26, botY - 28], [cx + 44, ground - 4], [cx + 22, ground], [cx, ground - 4], [cx - 22, ground], [cx - 44, ground - 4]], PINK, 3005, { lw: 1.1, light: [cx - 14, botY - 10] });
+  // the royal cape, flowing out behind her: a pale lining showing at the hem, the cape over it
+  // with a couple of folds, and a gold trim along the bottom
+  const flare = walk ? walk[0] * 0.25 : 0;
+  ST.shape(ctx, [[cx - 24, botY - 26], [cx + 24, botY - 26], [cx + 48 + flare, ground - 2], [cx - 48 + flare, ground - 2]], PINK_LINING, 3004, { lw: 1, light: [cx, botY] });
+  const hem: Pt[] = [[cx + 44 + flare, ground - 5], [cx + 22, ground - 1], [cx, ground - 5], [cx - 22, ground - 1], [cx - 44 + flare, ground - 5]];
+  ST.shape(ctx, [[cx - 26, botY - 28], [cx + 26, botY - 28], ...hem], PINK, 3005, { lw: 1.1, light: [cx - 14, botY - 10] });
+  for (let k = -40; k <= 40; k += 10) ST.shape(ctx, ellipsePts(cx + k + flare * (Math.abs(k) / 44), ground - 4 + (Math.abs(k) % 20 === 0 ? -1 : 2), 2.1, 2.1, 0, 10), SILVER, 3006 + k, { lw: 0.5, plain: true });
+  for (const fx of [-20, 18]) st.line(ctx, [[cx + fx * 0.45, botY - 18], [cx + fx * 0.8 + flare, ground - 12]], 3007 + fx, 0.8, '#b23272');
   drawPlop(ctx, ox, oy, f, st, 'medium');
-  // a bow on the swirl's tip
+  // her championship belt: leather round her middle, a big gold plate with a crown on it
+  const beltY = botY + 11 + (hurt ? 1 : 0);
+  ST.shape(ctx, [[cx - 33, beltY - 4], [cx - 16, beltY - 1], [cx + 16, beltY - 1], [cx + 33, beltY - 4], [cx + 31, beltY + 3], [cx + 15, beltY + 6], [cx - 15, beltY + 6], [cx - 31, beltY + 3]], LEATHER, 3050, { lw: 0.9, light: [cx - 10, beltY - 2] });
+  for (const sx of [-26, -20, 20, 26]) ST.shape(ctx, ellipsePts(cx + sx, beltY + 1 + Math.abs(sx) * -0.06, 1.6, 1.6, 0, 8), SILVER, 3051 + sx, { lw: 0.4, plain: true });
+  ST.shape(ctx, ellipsePts(cx, beltY + 2, 12, 8, 0, 24), SILVER, 3060, { lw: 1, light: [cx - 4, beltY - 2] });
+  ST.shape(ctx, ellipsePts(cx, beltY + 2, 8.5, 5.4, 0, 20), { base: '#ffe27a', shade: '#d9a316', light: '#fff6c4' }, 3061, { lw: 0.6, plain: true });
+  ST.shape(ctx, [[cx - 5, beltY + 4], [cx - 6, beltY - 1], [cx - 2.5, beltY + 1.5], [cx, beltY - 2], [cx + 2.5, beltY + 1.5], [cx + 6, beltY - 1], [cx + 5, beltY + 4]], RUBY, 3062, { lw: 0.5, plain: true });
+  // a bow on the swirl's tip, with ribbon tails
   const tx = cx + 10;
   const ty = topY - 12 - 26;
-  ST.shape(ctx, [[tx, ty], [tx - 11, ty - 7], [tx - 11, ty + 6]], PINK, 3010, { lw: 0.8 });
-  ST.shape(ctx, [[tx, ty], [tx + 11, ty - 7], [tx + 11, ty + 6]], PINK, 3011, { lw: 0.8 });
-  ST.shape(ctx, ellipsePts(tx, ty, 3, 3, 0, 10), PINK, 3012, { lw: 0.7 });
-  // a tiara on her brow
+  st.line(ctx, [[tx - 1, ty + 2], [tx - 4, ty + 9], [tx - 2, ty + 13]], 3013, 1.6, '#b23272');
+  st.line(ctx, [[tx + 1, ty + 2], [tx + 5, ty + 8], [tx + 4, ty + 13]], 3014, 1.6, '#b23272');
+  ST.shape(ctx, [[tx, ty], [tx - 12, ty - 8], [tx - 13, ty + 1], [tx - 11, ty + 7]], PINK, 3010, { lw: 0.8, light: [tx - 8, ty - 5] });
+  ST.shape(ctx, [[tx, ty], [tx + 12, ty - 8], [tx + 13, ty + 1], [tx + 11, ty + 7]], PINK, 3011, { lw: 0.8, light: [tx + 6, ty - 5] });
+  ST.shape(ctx, ellipsePts(tx, ty, 3.4, 3.4, 0, 12), PINK, 3012, { lw: 0.7 });
+  // a jewelled tiara on her brow (five points; a ruby in the middle, pink gems either side)
   const by = topY - 14;
-  ST.shape(ctx, [[cx - 16, by + 4], [cx - 12, by - 3], [cx - 6, by + 1], [cx, by - 9], [cx + 6, by + 1], [cx + 12, by - 3], [cx + 16, by + 4], [cx, by + 2]], SILVER, 3020, { lw: 0.9, light: [cx - 4, by - 4] });
-  ST.shape(ctx, ellipsePts(cx, by - 3, 2.6, 3, 0, 12), PINK, 3021, { lw: 0.5, plain: true });
+  ST.shape(ctx, [[cx - 18, by + 4], [cx - 15, by - 4], [cx - 10, by + 1], [cx - 6, by - 7], [cx - 2, by], [cx, by - 12], [cx + 2, by], [cx + 6, by - 7], [cx + 10, by + 1], [cx + 15, by - 4], [cx + 18, by + 4], [cx, by + 2.5]], SILVER, 3020, { lw: 0.9, light: [cx - 4, by - 6] });
+  ST.shape(ctx, ellipsePts(cx, by - 3, 2.8, 3.4, 0, 12), RUBY, 3021, { lw: 0.5, plain: true });
+  for (const gx of [-8, 8]) ST.shape(ctx, ellipsePts(cx + gx, by - 0.5, 1.7, 1.9, 0, 10), PINK, 3022 + gx, { lw: 0.4, plain: true });
+  // (a glint on it)
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 0.9;
+  ctx.beginPath();
+  ctx.moveTo(cx - 13, by - 7);
+  ctx.lineTo(cx - 13, by - 2);
+  ctx.moveTo(cx - 15.5, by - 4.5);
+  ctx.lineTo(cx - 10.5, by - 4.5);
+  ctx.stroke();
   // long lashes (curling out), even with her eyes shut
   ctx.strokeStyle = ST.ink;
   ctx.lineWidth = 1.4;
