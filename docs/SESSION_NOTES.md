@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.125)
+## Where things stand (v0.126)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -187,6 +187,10 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   deferred art + MenuScene's quiet jobs (`takeQuietJobs`) + 24 warm-up frames under the loading bar
   (two-phase bar); the boot screen is the manifest blue with the rainbow PUFFY logo. Results after the last
   level: Play again + Home screen. Account card: Sign out bottom-left.
+- v0.126: hearts every 2.5–4 s (first at 4 s) below 6. Chairs: `CHAIRS` 4 a match (`chairsLeft`),
+  first 8 s in, then every 11–15 s after the last one's gone, or at the latest when she's down to
+  `CHAIR_AT_HP` [–, 11, 7, 4] hits, so all 4 come. `chairHurts`: you keep the chair through one hit,
+  the second drops it (and fainting drops it). Test: t109.
 - v0.125 music: the Queen fight plays the basketball song (`playHoops`) as a placeholder (to be
   replaced). `preloadHoopsMusic()` decodes it once the hero is two-thirds through a boss level
   (GameScene `bossSongReady`) and on the Wrestle test button, so it starts with her entrance instead
