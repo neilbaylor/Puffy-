@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.92)
+## Where things stand (v0.93)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -60,24 +60,31 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   tries to start without a tap (works where the browser allows it, e.g. Chrome with the game installed;
   iPhones always need a first tap).
 
-### Plop Invasion · Part 1 (level 3, v0.91–v0.92)
+### Plop Invasion · Part 1 (level 3, v0.91–v0.93)
 - World 2. `src/level/level3.ts` (downhill, 290 × 52), terrain palette `poo` and looks `p-muck` / `p-dusk` /
   `p-stink` (`gfx/plopLooks.ts`); poo touches in `gfx/world.ts` for palettes with `poo: true`
-  (drips, poo caps on trees, swirls, soft-serve hills, sludge sea), helpers in `gfx/plopworld.ts`.
+  (drips, poo caps on trees, swirls, soft-serve hills, sludge sea); the volleyball court is pro-tour style, helpers in `gfx/plopworld.ts`.
 - Plops in `entities/enemies/Plops.ts`: `plop` / `bigplop` / `giantplop` reuse the Puffball / BigPuff / Giant
   behaviour with Plop frames (`plopFrame`); unarmed ones throw poo (`Glob`), Giant Plops send poo waves
   (`GameScene.spawnPooWave`) and lob poo lumps. Bad guys are created with `createBadGuy`.
 - Builder: `L.puddle(x0, x1, h)` (quicksand: `Player.goo`, sink 22 px/s scaled by hero height so every hero
-  goes under in ~1.75 s, same hop for all) and `L.chase(x0, x1, speed)` (boulder chase in
-  `GameScene.updateChase`: rock speed = that hero's walk × speed (≤ run × 0.92); it rolls in half on screen and,
-  while more than 150 px behind, closes at up to run × 1.3, so it ends ~130 px behind a running hero;
-  `Player.freeRun` = no stamina drain). Tested: all 3 heroes escape both runs and clear both chasms by running.
+  goes under in ~1.75 s; hop `GOO_HOP` 440, weaker the deeper you are) and `L.chase(x0, x1, speed)` (boulder
+  chase in `GameScene.updateChase`: rock radius 115, too tall to clear with a double jump; speed = that hero's
+  walk × speed (≤ run × 0.92); while more than 110 px behind it closes at up to run × 1.35, so it ends ~60-75 px
+  behind a running hero; at the end it drops straight down the middle of the hole (`updateRockFall`) or, if a
+  puddle fills it, sinks in the poo. The end holes must be ≥ 8 tiles wide. The camera looks back up the hill
+  during a run. `Player.freeRun` = no stamina drain). Tested: all 3 heroes escape both runs.
   Put the far side of a puddle at the poo's height.
 - `L.spawn('volley', cx, h, { w })`: beach volleyball (`entities/Volley.ts`, `VolleyMatch` + `VolleyPlop`). 4 Plops
   rally; within 250 px of one (or one gets hurt) they whistle and spike the ball at you (fetch → hold → spike
   again); shooting the ball pops it, then they charge. Reach is checked across the frame (`prevY`) for slow devices.
 - `poogoat` (poo-covered goat, spits poo: `PooGoat` in Plops.ts, sheet `goat-poo`). Drips: `GameScene.updateDrips`.
 - Music: `src/assets/plop-invasion.m4a` (`levelTrack(3) = 'plop'`). Sudden-death basketball plays at 1.3×.
+- Enemies walk down 1–2 tile steps (`Enemy.pitAt`: only a real drop counts as a gap); Big Puffs / Big Plops
+  rumble the ground on heavy landings. Waves stop at a step up and are lifted out of the ground at spawn.
+- Loading: the start screen pre-draws the Parts next to the one shown (all built Parts are pickable once you've
+  beaten one) and decodes its song in quiet time. The game's `LevelView` is lazy too (`lazyNear` = where the
+  fly-over starts; `free: true` still frees other levels' terrain); lazily drawn chunks join the colour grade.
 - Plop textures have `PLOP_TOP = 22` px headroom (Giant Plop's tip); `Enemy.handAt` / `weaponK` place weapons in
   Plop hands; portraits have an `EDGE` margin (Big Muscles' bazooka tip).
 - `LevelInfo.speech` (the hero's line after the fly-over), `hoops` (basketball finale or not), `button`.

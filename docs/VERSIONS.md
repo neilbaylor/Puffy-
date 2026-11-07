@@ -95,3 +95,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.90: automatic resolution drop for slow devices is back
 - v0.91: Plop Invasion · Part 1
 - v0.92: Plop Invasion round 2 — beach volleyball, poo goats, drips, level 3 music
+- v0.93: bigger, meaner boulder; pro beach volleyball; faster level start
