@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.107)
+## Where things stand (v0.108)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -125,7 +125,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   kills; per browser). Signing in merges browser + account (the bigger of each; level = latestLevel, i.e. beaten+1).
   Saved to the account when a level's results modal comes up (`account.save()`: background, errors ignored).
 - v0.107: the signed-in account modal is a results-style card (selected hero on the left, stat list on the
-  right). The mute and account buttons sit in `.start-tl` (10px gap, the same as full screen/Battle).
+  right; "Current level" = the Part picked on the start screen, v0.108). The mute and account buttons sit in `.start-tl` (10px gap, the same as full screen/Battle).
   server.mjs hides Node's "SQLite is an experimental feature" warning. The Railway volume (/data) holds only
   puffy.db (+ its -wal/-shm files); the owner asked why not Railway Postgres: SQLite is free, needs no extra
   service, and is plenty for one small table. Move to Postgres if there are ever several app instances.
