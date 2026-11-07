@@ -1326,6 +1326,7 @@ export class GameScene extends Phaser.Scene {
 
   onEnemyDefeated(e: Enemy, by: Player | null) {
     if (!by) return;
+    bank.addKill();
     const giant = e.kind === 'giant' || e.kind === 'giantplop';
     if (giant) run.giants++;
     else run.popped++;

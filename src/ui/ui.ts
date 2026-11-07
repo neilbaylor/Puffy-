@@ -656,6 +656,7 @@ export class UI {
         <div class="acct-stats">
           <span><i class="rb-ico"></i><b>${u.rootbeer}</b> root beer</span>
           <span><i class="aura-ico"></i><b>${u.nuggies}</b> ${u.nuggies === 1 ? 'nuggie' : 'nuggies'}</span>
+          <span><b>${u.kills}</b> bad guys beaten</span>
           <span><b>${esc(levelName(Math.min(u.level, latestLevel())))}</b></span>
         </div>
         <p class="acct-note">Saved to your player, so it follows you to any phone or tablet.</p>
@@ -1042,6 +1043,8 @@ export class UI {
     this.touch.hide();
     // beating a level unlocks picking where to start
     progress.markBeaten(r.level ?? 1);
+    // signed in: the account gets this level's progress, quietly in the background
+    account.save();
     playLevelClear();
     const nextInfo = LEVELS.find((l) => l.id === (r.level ?? 1) + 1);
     const next = nextInfo && nextInfo.build ? nextInfo : null;

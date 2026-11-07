@@ -1,17 +1,18 @@
 import { latestLevel, progress } from '../level/levels';
-import { bank, onProgress } from './bank';
+import { bank } from './bank';
 
 /**
  * An optional account (you can always play without one): sign in with a name and a
  * password, and your root beer, nuggies and the level you're on are kept on the server
- * too, so they follow you to another phone or tablet. Signing in merges what this
- * browser has with what the account has (the bigger of each), then keeps saving as you
- * play (a moment after each change).
+ * too, so they follow you to another phone or tablet (and how many bad guys you've
+ * defeated). Signing in merges what this browser has with what the account has (the
+ * bigger of each); after that it's saved at the end of each level, in the background.
  */
 export interface AccountUser {
   name: string;
   rootbeer: number;
   nuggies: number;
+  kills: number;
   level: number;
 }
 
@@ -52,17 +53,16 @@ async function api(method: string, path: string, body?: unknown): Promise<{ ok: 
 }
 
 /** This browser's progress, as the account keeps it. */
-const local = () => ({ rootbeer: bank.rootbeer, nuggies: bank.nuggies, level: latestLevel() });
+const local = () => ({ rootbeer: bank.rootbeer, nuggies: bank.nuggies, kills: bank.kills, level: latestLevel() });
 
 /** Take the bigger of each (this browser vs. the account), then save that to the account. */
 async function merge(u: AccountUser) {
-  bank.setAtLeast(u.rootbeer, u.nuggies);
+  bank.setAtLeast(u.rootbeer, u.nuggies, u.kills);
   if (u.level - 1 > progress.beaten) progress.markBeaten(u.level - 1);
   user = u;
   await push();
 }
 
-let pushing: Promise<void> | null = null;
 async function push() {
   if (!token) return;
   const r = await api('PUT', '/api/progress', local());
@@ -76,16 +76,6 @@ function signedOut() {
   user = null;
   emit();
 }
-
-// save a moment after anything changes (a level beaten, root beer, nuggies)
-let timer = 0;
-onProgress(() => {
-  if (!token) return;
-  clearTimeout(timer);
-  timer = window.setTimeout(() => {
-    pushing = (pushing ?? Promise.resolve()).then(push);
-  }, 1500);
-});
 
 export const account = {
   get user() {
@@ -113,6 +103,14 @@ export const account = {
     saveToken(String(r.data.token));
     await merge(r.data.user as AccountUser);
     return null;
+  },
+  /**
+   * Save this browser's progress to the account (at the end of a level, while the results
+   * are up): in the background, never holding anything up, and any error is ignored.
+   */
+  save() {
+    if (!token) return;
+    push().catch(() => {});
   },
   async signOut() {
     if (token) await api('POST', '/api/logout');
