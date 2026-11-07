@@ -38,6 +38,7 @@ export function buildLevel3(): LevelData {
   L.spawn('tree', 1.5, 40, { h: 62 });
   L.spawn('tree', 10, 40, { h: 54 });
   L.auraArc(12, 2, 43, 0);
+  L.auraArc(22, 2, 45, 1);
   L.spawn('plop', 17, 40);
   L.ground(20, 24, 41); // a little rise
   L.spawn('plop', 22, 41);
@@ -57,9 +58,11 @@ export function buildLevel3(): LevelData {
   L.spawn('bigplop', 50, 41);
   // the island hangs over the lower ground, 3 tiles above the ledge: a running jump off the
   // ledge lands on it with any hero (Big Muscles too), and there's room to walk under it
-  L.island(53, 58, 44, 1, false);
-  L.rootbeer(55.5, 47);
-  L.aura(55.5, 46);
+  // (it starts four tiles past the ledge (a Giant Plop is three wide), high enough for a Giant Plop to walk under once he's stepped
+  // down; one row thick, so still in reach of a running jump + double jump off the ledge)
+  L.island(57, 62, 45, 1, false);
+  L.rootbeer(59.5, 48);
+  L.aura(59.5, 47);
   L.ground(53, 58, 39);
   L.spawn('plop', 56, 39);
   L.spawn('tree', 47.5, 41, { h: 56 });
@@ -69,21 +72,25 @@ export function buildLevel3(): LevelData {
   L.spawn('tree', 60, 38, { h: 66 });
   L.spawn('plop', 63, 38);
   L.spawn('giantplop', 70, 38);
+  L.aura(64, 42);
   L.aura(74, 41);
   L.spawn('checkpoint', 78, 38);
 
   // ── BOULDER RUN #1 (easier): steep steps down, 1 tile every 3 ──
   for (let i = 0; i < 14; i++) L.ground(81 + i * 3, 83 + i * 3, 38 - i);
-  L.chase(84, 123, 1.65);
+  L.chase(84, 123, 1.53);
   L.spawn('plop', 93, 34);
   L.spawn('plop', 104, 31);
   L.spawn('plop', 115, 27);
+  L.aura(89, 39);
   L.aura(99, 36);
+  L.aura(106, 35);
   L.aura(111, 32);
   // the chasm at the bottom (run and jump!), cut wide enough for the rock to drop in
   L.pit(123, 130);
   L.ground(131, 139, 24);
   L.auraArc(132, 3, 27, 1);
+  L.spawn('bigplop', 137, 24, { weapon: 'saw' }); // a chainsaw, waiting at the bottom
 
   // ── Poo puddle #2 (wide: hop, hop, hop) ─────────────────────
   L.puddle(140, 147, 24);
@@ -114,6 +121,7 @@ export function buildLevel3(): LevelData {
   L.rootbeer(185, 28); // right over the net
   L.ground(194, 197, 24);
   L.spawn('tree', 195.5, 24, { h: 54 });
+  L.auraArc(194, 3, 28, 1);
   L.ground(198, 213, 23);
   L.spawn('volley', 205, 23, { w: 13 });
   L.auraArc(203, 3, 27, 1);
@@ -124,18 +132,21 @@ export function buildLevel3(): LevelData {
   L.ground(221, 234, 23);
   L.spawn('giantplop', 226, 23);
   L.spawn('tree', 223, 23, { h: 60 });
+  L.aura(217, 27);
   L.aura(230, 26);
   L.spawn('checkpoint', 233, 23);
 
   // ── BOULDER RUN #2 (harder): faster rock, more in the way ───
   for (let i = 0; i < 13; i++) L.ground(235 + i * 3, 237 + i * 3, 23 - i);
-  L.chase(238, 274, 1.9);
+  L.chase(238, 274, 1.76);
   L.spawn('bigplop', 245, 20);
   L.spawn('plop', 252, 18);
   L.spawn('para', 258, 16, { kind: 'plop' });
   L.spawn('plop', 263, 14);
   L.spawn('plop', 269, 12);
+  L.aura(242, 24);
   L.aura(249, 22);
+  L.aura(266, 17);
   L.aura(260, 19);
   // at the bottom, a big poo puddle: jump it (or hop through it), and the rock sinks in it
   L.puddle(274, 281, 10);
@@ -145,6 +156,7 @@ export function buildLevel3(): LevelData {
   // ── Poo puddle #3, checkpoint 3 ─────────────────────────────
   L.puddle(292, 298, 10);
   L.rootbeer(295, 14); // over the puddle: a jump from the edge
+  L.auraArc(286, 3, 13, 1);
   L.ground(299, 304, 10);
   L.spawn('checkpoint', 301, 10);
 
@@ -169,12 +181,13 @@ export function buildLevel3(): LevelData {
 
   // ── A last rise, the last Plops, a GIANT PLOP guarding the gate ──
   L.ground(346, 353, 9);
-  L.spawn('plop', 349, 9);
+  L.spawn('bigplop', 349, 9, { weapon: 'saw' }); // another chainsaw
   L.ground(354, 359, 10);
   L.spawn('poogoat', 357, 10);
   L.ground(360, 377, 9);
   L.spawn('tree', 362, 9, { h: 58 });
   L.spawn('giantplop', 365, 9);
+  L.auraArc(355, 2, 13, 1);
   L.auraArc(367, 3, 12, 1);
   L.spawn('plop', 369, 9);
   L.spawn('tree', 371, 9, { h: 64 });

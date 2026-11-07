@@ -5,6 +5,7 @@ import { PLOP_PAD, PLOP_RES, PLOP_TOP } from '../../gfx/textures';
 import { PLOP_H } from '../../gfx/plops';
 import type { EnemyKind } from '../../level/builder';
 import type { GameScene } from '../../scenes/GameScene';
+import type { WeaponKind } from './Weapons';
 import { BigPuff, Giant, Glob, Goat, Puffball, colHash, createEnemy, type DeathKind, type Enemy } from './Enemy';
 
 /**
@@ -225,7 +226,8 @@ export class BigPlop extends BigPuff {
 export class GiantPlop extends Giant {
   readonly kind: EnemyKind = 'giantplop';
   private st = { t: Math.random() };
-  private lobCd = 2.5;
+  /** (now and then, not all the time: he hops, charges and slams just like a Giant Puff Ball) */
+  private lobCd = 6 + Math.random() * 2;
   private lobWind = 0;
   private lobDir = -1;
   private flies: Phaser.GameObjects.Image[] = [];
@@ -264,7 +266,7 @@ export class GiantPlop extends Giant {
       if (Math.abs(dx) > 170 && Math.abs(dx) < 460 && Math.abs(tgt.bottom - b.bottom) < 160) {
         this.lobDir = Math.sign(dx) || -1;
         this.dir = this.lobDir;
-        this.lobWind = 0.6;
+        this.lobWind = 0.45;
         this.gs.fx.popText(this.x, b.top - 26, 'HNNG!', '#c99064', 22);
         sfx.roar();
         return;
@@ -274,7 +276,7 @@ export class GiantPlop extends Giant {
   }
 
   private lob() {
-    this.lobCd = 3.2 + Math.random() * 1.6;
+    this.lobCd = 7 + Math.random() * 3;
     const b = this.body;
     const tgt = this.gs.nearestPlayer(this.x, this.y);
     const sx = this.x + this.lobDir * 40;
@@ -336,8 +338,15 @@ export class PooGoat extends Goat {
 }
 
 /** Any bad guy by kind: the Plops here, the Puff Balls and the rest in Enemy.ts. */
-export function createBadGuy(gs: GameScene, kind: EnemyKind, x: number, y: number): Enemy {
+export function createBadGuy(gs: GameScene, kind: EnemyKind, x: number, y: number, weapon?: WeaponKind): Enemy {
   const h = colHash(x);
+  if (weapon && (kind === 'plop' || kind === 'bigplop')) {
+    // (the level asks for this one to carry a particular weapon)
+    const e = kind === 'plop' ? new Plop(gs, x, y) : new BigPlop(gs, x, y);
+    e.arm(weapon, kind === 'plop' ? 'small' : 'big');
+    if (kind === 'bigplop') e.hp = 3;
+    return e;
+  }
   if (kind === 'plop') {
     // 1 in 3 small Plops carry a blaster; the rest throw poo
     const e = new Plop(gs, x, y);
