@@ -1,4 +1,5 @@
 import { T } from './tiles';
+import { TILE } from '../config';
 
 /**
  * A tiny level-authoring DSL. Coordinates are in tiles; heights are counted
@@ -22,6 +23,8 @@ export interface LevelData {
   world: string;
   /** Terrain looks by column range (Part 2: snowy rock, green valley, frozen pond). */
   zones?: { x0: number; x1: number; pal: string }[];
+  /** Stretches where the camera pulls back (tricky jumps: see where you'll land), in pixels. */
+  wide?: { x0: number; x1: number; zoom: number }[];
   /** The terrain palette everywhere else (default: Puff Ball Planet; Plop Invasion: 'poo'). */
   pal?: string;
   width: number;
@@ -35,6 +38,7 @@ export class LevelBuilder {
   readonly cells: Cell[][];
   readonly spawns: Spawn[] = [];
   readonly zones: { x0: number; x1: number; pal: string }[] = [];
+  readonly wides: { x0: number; x1: number; zoom: number }[] = [];
   /** The level's terrain palette (where no zone says otherwise). */
   pal?: string;
 
@@ -157,6 +161,12 @@ export class LevelBuilder {
     return this;
   }
 
+  /** Columns x0..x1: the camera pulls back to `zoom` (a tricky jumping section: see where you'll land). */
+  wide(x0: number, x1: number, zoom = 0.8) {
+    this.wides.push({ x0: x0 * TILE, x1: x1 * TILE, zoom });
+    return this;
+  }
+
   build(): LevelData {
     const idx: Record<Exclude<Cell, null>, number> = {
       ground: T.GROUND,
@@ -169,6 +179,7 @@ export class LevelBuilder {
       name: this.name,
       world: this.world,
       zones: this.zones.length ? this.zones : undefined,
+      wide: this.wides.length ? this.wides : undefined,
       pal: this.pal,
       width: this.width,
       height: this.height,

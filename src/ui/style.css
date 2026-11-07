@@ -2473,6 +2473,13 @@ kbd {
 /* signed in: the battle name is your player's (not editable) */
 .bl-namebox.locked input { cursor: default; }
 
-/* the signed-in account card: Sign out / Done on the right, a little space above them */
+/* the signed-in account card: Sign out in the top-right corner, Done on the right under the table
+   (a little space above it), and the hero lined up with the table (not the whole card) */
+.acct-card { position: relative; align-items: flex-start; }
+.acct-card .acct-out { position: absolute; top: 14px; right: 16px; }
+.acct-card .results-hero { margin-top: clamp(46px, 10vmin, 70px); }
 .acct-card .row { justify-content: flex-end; margin-top: 26px; }
-@media (max-height: 500px) { .acct-card .row { margin-top: 18px; } }
+@media (max-height: 500px) {
+  .acct-card .row { margin-top: 18px; }
+  .acct-card .results-hero { margin-top: 44px; }
+}

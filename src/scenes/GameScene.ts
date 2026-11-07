@@ -240,6 +240,7 @@ export class GameScene extends Phaser.Scene {
   create() {
     this.levelId = this.data0.level ?? 1;
     const data = (levelInfo(this.levelId).build ?? buildLevel1)();
+    this.wideZones = data.wide ?? [];
     this.physics.world.gravity.y = GRAVITY;
     this.physics.world.TILE_BIAS = 24;
     // only the terrain where the camera starts is drawn now (the end of the level, where the
@@ -670,7 +671,10 @@ export class GameScene extends Phaser.Scene {
     // (so 4:3 iPads and 16:10 Android tablets see enough of the level ahead).
     // a boulder run: the camera eases out so you can see the rock behind you AND the jump
     // at the bottom coming; it eases back in once the rock has gone into the hole
-    const chaseTarget = this.rock ? 0.78 : 1;
+    // (and over the tricky jumping sections, so you can see where you'll land)
+    const hx = this.players[0]?.x ?? 0;
+    const wide = this.wideZones.find((w) => hx > w.x0 && hx < w.x1);
+    const chaseTarget = this.rock ? 0.78 : wide ? wide.zoom : 1;
     this.chaseZoom = snap ? chaseTarget : this.chaseZoom + (chaseTarget - this.chaseZoom) * (1 - Math.exp(-dt * 1.6));
     const zoom = Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W) * this.cineZoom * this.chaseZoom;
     cam.setZoom(zoom);
@@ -985,6 +989,12 @@ export class GameScene extends Phaser.Scene {
       }
       b.setVelocity(0, 14 + b.height * 0.08); // (about 2 s for a small Plop, 5–6 s for a Giant)
       e.setAngle(Math.sin(this.time.now / 70 + e.x) * 7);
+      // only what's still above the surface shows (a Giant's arms reach past the puddle's
+      // edges, and would otherwise show through the ground either side of it)
+      const surf = pd.y + 3;
+      const top = e.y - e.displayOriginY * e.scaleY;
+      e.setCrop(0, 0, e.frame.realWidth, Phaser.Math.Clamp((surf - top) / e.scaleY, 0, e.frame.realHeight));
+      e.weapon?.hideBelow(surf);
       if (Math.random() < 0.08) this.fx.pooSplat(e.x + (Math.random() - 0.5) * b.width, pd.y, 3);
       if (b.top > pd.y + 4) {
         this.fx.pooSplat(e.x, pd.y, 10 + b.width / 4);
@@ -1570,6 +1580,8 @@ export class GameScene extends Phaser.Scene {
   cineZoom = 1;
   /** Eased out during a boulder run (see updateCamera). */
   private chaseZoom = 1;
+  /** Where the camera pulls back (from the level). */
+  private wideZones: { x0: number; x1: number; zoom: number }[] = [];
 
   private emitHud(force = false) {
     const p = this.players[0];

@@ -63,17 +63,20 @@ export class MenuScene extends Phaser.Scene {
    * opening scenery), so switching to them is instant.
    */
   private quiet: (() => void)[] = [];
+  /** Ground pictures drawn ahead in quiet moments (a whole level's, for its fly-over). */
+  private painted: string[] = [];
   private lastInput = 0;
   private lastQuiet = 0;
 
   /**
-   * The levels near this one in the Part picker (it shows every built level once you've beaten
-   * one): up to two either side, nearest first. Their opening scenery is small (only the fly-over's
-   * first view, ~6 MB) and their looks ~6 MB each, so memory stays bounded however many levels.
+   * The levels next to this one in the Part picker (it shows every built level once you've beaten
+   * one): one either side. Their opening scenery is small (only the fly-over's first view, ~6 MB)
+   * and their looks ~6 MB each; this Part's whole ground is drawn too (for its own fly-over after
+   * Play), so only the nearest are kept, to stay within what phones can hold.
    */
   private neighbours(id: number) {
     if (progress.beaten < 1) return [];
-    return LEVELS.filter((l) => l.build && l.id !== id && Math.abs(l.id - id) <= 2)
+    return LEVELS.filter((l) => l.build && l.id !== id && Math.abs(l.id - id) <= 1)
       .sort((a, b) => Math.abs(a.id - id) - Math.abs(b.id - id))
       .map((l) => l.id);
   }
@@ -148,22 +151,34 @@ export class MenuScene extends Phaser.Scene {
     // (kept drawn: the Parts next to this one in the picker, and the one you just came from)
     const near = [...new Set([...this.neighbours(id), this.prevId])].filter((n) => n && n !== id && levelInfo(n).build);
     const data = (levelInfo(id).build ?? buildLevel1)();
+    // a whole level's ground drawn ahead (for its fly-over) is only kept for the Part showing
+    // (memory: two whole levels at once is too much for phones)
+    const stale = this.painted.filter((k) => !k.startsWith(`terrain-${data.name}-`));
+    for (const k of stale) if (this.textures.exists(k)) this.textures.remove(k);
+    this.painted = this.painted.filter((k) => !stale.includes(k));
     if (!this.scene.isActive('Battle') && !this.scene.isActive('Game')) {
       freeLooksExcept(this, [...looks, ...near.flatMap((n) => themesFor(n))]);
       const keep = [data.name, ...near.map((n) => levelName(n))];
       for (const k of this.textures.getTextureKeys())
         if ((k.startsWith('terrain-') || k.startsWith('tree-')) && !keep.some((name) => k.startsWith(`terrain-${name}-`) || k.startsWith(`tree-${name}-`))) this.textures.remove(k);
     }
+    this.level = new LevelView(this, data, { lazyNear: this.x0, lazySpan: this.firstSpan() });
     this.quiet = [
       // first, what a click on a neighbouring Part needs: the look it'd show right now and
-      // its opening scenery; then this Part's song (so Play doesn't wait for it), then the
-      // other looks, which only show up later as the colours drift
+      // its opening scenery; then this Part's song (so Play doesn't wait for it), then the rest
+      // of this Part's ground (the level's fly-over sweeps all of it in a few seconds: drawn
+      // here, it only has to be put up), then the other looks, which only show up later as
+      // the colours drift
       ...near.flatMap((n) => [() => this.warmLook(themeMix(themeClock.t, themesFor(n)).a), () => this.prewarm(n)]),
       () => preloadLevelMusic(id),
+      ...this.level.paintJobs().map((job) => () => {
+        const key = job();
+        if (key) this.painted.push(key);
+        if (key) this.warmOnGpu([this.add.image(0, 0, key).setOrigin(0).setScrollFactor(0).setScale(0.05)]);
+      }),
       ...looks.map((l) => () => this.warmLook(l)),
       ...near.flatMap((n) => themesFor(n).map((l) => () => this.warmLook(l))),
     ];
-    this.level = new LevelView(this, data, { lazyNear: this.x0, lazySpan: this.firstSpan() });
     // loop over about a fifth of the level (at least a good stretch); nothing past it is drawn
     const vw = this.scale.width / Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W);
     this.loopEnd = this.x0 + Math.max(this.level.widthPx * 0.2, 1800);

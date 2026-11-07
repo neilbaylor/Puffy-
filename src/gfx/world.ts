@@ -321,6 +321,12 @@ export interface TerrainPieceOpts {
   seed: number;
   /** World y below which edges are "the bottom of the world" (no roots/outline there). */
   floorY: number;
+  /**
+   * Only the part of the piece inside this box will be kept (a chunk of a long piece): the
+   * little details outside it are skipped. (The dice are still rolled for them, so every
+   * chunk of the piece is laid out exactly the same and they join seamlessly.)
+   */
+  clip?: { x0: number; x1: number; y0: number; y1: number };
 }
 
 /**
@@ -344,6 +350,10 @@ export function drawTerrainPiece(ctx: Ctx, o: TerrainPieceOpts) {
   }
   const tops = facingRuns(pts, -1);
   const bottoms = facingRuns(pts, 1).filter((run) => run.some(([, y]) => y < o.floorY - 4));
+  // (is a detail at x, y anywhere near the part being kept?)
+  const C = o.clip;
+  const M = 40;
+  const vis = (x: number, y?: number) => !C || (x > C.x0 - M && x < C.x1 + M && (y === undefined || (y > C.y0 - M && y < C.y1 + M)));
 
   ctx.save();
   trace(ctx, pts);
@@ -367,10 +377,13 @@ export function drawTerrainPiece(ctx: Ctx, o: TerrainPieceOpts) {
     // soft wavy marshmallow bands
     for (let y = y0 + 30, k = 0; y < y1 + 40; y += 26 + r() * 12, k++) {
       ctx.fillStyle = k % 2 ? '#ffffff1f' : pal.strata + '26';
+      const bx0 = C ? Math.max(x0 - 10, Math.floor((C.x0 - M) / 10) * 10) : x0 - 10;
+      const bx1 = C ? Math.min(x1 + 10, C.x1 + M) : x1 + 10;
+      if (bx1 <= bx0) continue;
       ctx.beginPath();
-      ctx.moveTo(x0 - 10, y1 + 50);
-      for (let x = x0 - 10; x <= x1 + 10; x += 10) ctx.lineTo(x, y + Math.sin(x * 0.028 + k * 1.7) * 5);
-      ctx.lineTo(x1 + 10, y1 + 50);
+      ctx.moveTo(bx0, y1 + 50);
+      for (let x = bx0; x <= bx1; x += 10) ctx.lineTo(x, y + Math.sin(x * 0.028 + k * 1.7) * 5);
+      ctx.lineTo(bx1, y1 + 50);
       ctx.fill();
     }
     // puff fossils: little curled spirals and sleeping puff seeds in the earth
@@ -381,11 +394,14 @@ export function drawTerrainPiece(ctx: Ctx, o: TerrainPieceOpts) {
       if (r() < 0.55) {
         const sp: Pt[] = [];
         const rr = 3 + r() * 3;
+        if (!vis(px, py)) continue;
         for (let t = 0; t < 1; t += 0.06) sp.push([px + Math.cos(t * 11) * rr * t, py + Math.sin(t * 11) * rr * t]);
         ST.line(ctx, sp, seed + i, 0.55, pal.strata);
       } else {
         const rr = 2.6 + r() * 2.4;
-        ST.shape(ctx, fluffPts(px, py, rr, rr, 6, 0.12, r() * 3), { base: '#fff4ea', shade: '#efd2d6', light: '#ffffff' }, seed + i, { lw: 0.45, plain: true });
+        const rot = r() * 3;
+        if (!vis(px, py)) continue;
+        ST.shape(ctx, fluffPts(px, py, rr, rr, 6, 0.12, rot), { base: '#fff4ea', shade: '#efd2d6', light: '#ffffff' }, seed + i, { lw: 0.45, plain: true });
       }
     }
     // fine crayon grain
@@ -393,7 +409,9 @@ export function drawTerrainPiece(ctx: Ctx, o: TerrainPieceOpts) {
     for (let i = 0; i < area / 260; i++) {
       const gx = x0 + r() * (x1 - x0);
       const gy = y0 + r() * (y1 - y0);
-      ctx.strokeStyle = r() > 0.5 ? '#00000012' : '#ffffff18';
+      const dark = r() > 0.5;
+      if (!vis(gx, gy)) continue;
+      ctx.strokeStyle = dark ? '#00000012' : '#ffffff18';
       ctx.lineWidth = 0.8;
       ctx.beginPath();
       ctx.moveTo(gx - 1.2, gy + 3);
@@ -410,6 +428,7 @@ export function drawTerrainPiece(ctx: Ctx, o: TerrainPieceOpts) {
         const rr = 5 + r() * 2.5;
         const ox = p[0] - dy * (9 + r() * 3);
         const oy = p[1] + dx * (9 + r() * 3);
+        if (!vis(ox)) continue;
         ctx.fillStyle = pal.grass.shade;
         ctx.beginPath();
         ctx.arc(ox, oy + 1.2, rr + 0.8, 0, Math.PI * 2);
@@ -432,7 +451,10 @@ export function drawTerrainPiece(ctx: Ctx, o: TerrainPieceOpts) {
         for (const { p, dx, dy } of along(run, 9 + r() * 5, r() * 8)) {
           if (Math.abs(dy) > 0.6 || r() < 0.45) continue; // (drips only hang from fairly flat tops)
           const len = 7 + r() * 16;
-          drawDrip(ctx, p[0] - dy * 14, p[1] + dx * 14 - 2, len, 3 + r() * 3, r() < 0.3 ? POO_DARK : pal.grass);
+          const w = 3 + r() * 3;
+          const dark = r() < 0.3;
+          if (!vis(p[0])) continue;
+          drawDrip(ctx, p[0] - dy * 14, p[1] + dx * 14 - 2, len, w, dark ? POO_DARK : pal.grass);
         }
       }
     }
@@ -441,7 +463,10 @@ export function drawTerrainPiece(ctx: Ctx, o: TerrainPieceOpts) {
     for (let i = 0; i < Math.max(2, area / 1800); i++) {
       const cx = x0 + 8 + r() * (x1 - x0 - 16);
       const cy = y0 + 10 + r() * (y1 - y0 - 16);
-      ST.line(ctx, [[cx, cy], [cx + 4 - r() * 8, cy + 6], [cx + 2 - r() * 4, cy + 11]], seed + 50 + i, 0.6, pal.rock.shade);
+      const ax = 4 - r() * 8;
+      const bx = 2 - r() * 4;
+      if (!vis(cx, cy)) continue;
+      ST.line(ctx, [[cx, cy], [cx + ax, cy + 6], [cx + bx, cy + 11]], seed + 50 + i, 0.6, pal.rock.shade);
     }
     ctx.globalAlpha = 0.5;
     strokeRun(ctx, pts.slice(0, Math.max(2, Math.floor(pts.length / 3))), 7, pal.rock.light);
@@ -469,8 +494,10 @@ export function drawTerrainPiece(ctx: Ctx, o: TerrainPieceOpts) {
         if (r() < 0.35) continue;
         const len = 6 + r() * 14;
         const sway = (r() - 0.5) * 6;
+        const tuft = r() < 0.3;
+        if (!vis(p[0])) continue;
         ST.line(ctx, [p, [p[0] + sway * 0.4, p[1] + len * 0.5], [p[0] + sway, p[1] + len]], seed + p[0], 0.7, pal.strata);
-        if (r() < 0.3) ST.shape(ctx, ellipsePts(p[0] + sway, p[1] + len + 2, 2.4, 2.4, 0, 10), pal.grass, seed + p[0] + 1, { lw: 0.5, plain: true });
+        if (tuft) ST.shape(ctx, ellipsePts(p[0] + sway, p[1] + len + 2, 2.4, 2.4, 0, 10), pal.grass, seed + p[0] + 1, { lw: 0.5, plain: true });
       }
     }
     // fluffy bumps cresting the top edge, and the odd dandelion-puff stalk
@@ -479,13 +506,18 @@ export function drawTerrainPiece(ctx: Ctx, o: TerrainPieceOpts) {
         const roll = r();
         if (roll < 0.5) {
           const rr = 3.2 + r() * 2.6;
+          if (!vis(p[0])) continue;
           ST.shape(ctx, ellipsePts(p[0], p[1] - rr * 0.35, rr * 1.2, rr, 0, 16), pal.grass, seed + p[0], { lw: 0.6, plain: true });
         } else if (roll < 0.62 && pal.poo) {
           // a little poo swirl sitting on top
-          drawPooSwirl(ctx, p[0], p[1] + 1, 9 + r() * 6, r() < 0.3 ? POO_DARK : pal.grass, seed + p[0]);
+          const w = 9 + r() * 6;
+          const dark = r() < 0.3;
+          if (!vis(p[0])) continue;
+          drawPooSwirl(ctx, p[0], p[1] + 1, w, dark ? POO_DARK : pal.grass, seed + p[0]);
         } else if (roll < 0.58) {
           const h = 9 + r() * 7;
           const lean = (r() - 0.5) * 5;
+          if (!vis(p[0])) continue;
           ST.line(ctx, [[p[0], p[1]], [p[0] + lean * 0.4, p[1] - h * 0.5], [p[0] + lean, p[1] - h]], seed + p[0] + 2, 0.55, pal.grass.shade);
           const hx = p[0] + lean;
           const hy = p[1] - h - 3;

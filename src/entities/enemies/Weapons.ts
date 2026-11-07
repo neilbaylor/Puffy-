@@ -67,6 +67,13 @@ export class Weapon {
     return { x: this.owner.x + h.x * -this.facing, y: this.owner.y + h.y };
   }
 
+  /** Sinking into poo: the parts under the surface go out of sight. */
+  hideBelow(y: number) {
+    if (this.kind !== 'flail') this.img.setVisible(this.img.y < y);
+    if (this.ball) this.ball.setVisible(this.ball.y < y);
+    if (this.chain) this.chain.setVisible(!!this.ball && this.ball.y < y);
+  }
+
   update(dt: number, active: boolean) {
     this.t += dt;
     // hurt twice, the chainsaw guy loses his temper and THROWS it at you

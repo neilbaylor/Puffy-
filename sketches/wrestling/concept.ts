@@ -9,6 +9,7 @@ import { drawCharacter, rng, type Ctx, type Pose } from '../../src/gfx/draw';
 import { CHARACTERS } from '../../src/data/characters';
 import { STYLES, ellipsePts, roundRectPts, type Fill, type Pt } from '../../src/gfx/handdrawn';
 import { POO, POO_DARK, drawDrip, drawPooSwirl } from '../../src/gfx/plopworld';
+import { drawNuggie } from '../../src/gfx/collectibles';
 
 const ST = STYLES.polished;
 const FONT = '"Lilita One", "Arial Black", sans-serif';
@@ -30,13 +31,13 @@ const PLOP_DOME: ArenaStyle = {
   ads: [
     { text: 'POOPA COLA', bg: '#7a3f1a', fg: '#ffe2b0' },
     { text: 'MADE BY HENRY & NEIL', bg: '#ffc629', fg: '#4a1f05' },
-    { text: 'PLOP-A-MANIA', bg: '#3a1d0c', fg: '#ffd23f' },
+    { text: 'POO PALACE', bg: '#3a1d0c', fg: '#ffd23f' },
     { text: 'ROOT BEER · ICE COLD', bg: '#5a2a10', fg: '#ffe2b0' },
     { text: 'STINK STEEL CHAIRS', bg: '#9bb84a', fg: '#2a1a08' },
   ],
-  jumboTitle: 'KING PLOP',
-  jumboSub: 'P L O P - A - M A N I A   ·   T I T L E   M A T C H',
-  banners: [['PLOP', 'CHAMP'], ['STINK', 'CUP'], ['KING OF', 'THE RING']],
+  jumboTitle: 'QUEEN PLOP',
+  jumboSub: 'P O O   P A L A C E   ·   T I T L E   M A T C H',
+  banners: [['PLOP', 'CHAMP'], ['STINK', 'CUP'], ['QUEEN OF', 'THE RING']],
   bannerTop: '#3a1d0c',
   bannerBottom: '#5c3118',
   frame: '#ffd23f',
@@ -69,6 +70,25 @@ function arenaBackdrop(jumbo: JumboContent, excited: boolean) {
   const j = mk(JUMBO.w * 2, JUMBO.h * 2);
   j.ctx.scale(2, 2);
   drawJumboScreen(j.ctx, jumbo, 1.3);
+  // (the crawl along the bottom: this show's own, not the basketball one)
+  {
+    const c2 = j.ctx;
+    const y0 = JUMBO.h - 18 + 1.5;
+    const bar = c2.createLinearGradient(0, y0, 0, JUMBO.h);
+    bar.addColorStop(0, '#1c1430');
+    bar.addColorStop(1, '#0a0714');
+    c2.fillStyle = bar;
+    c2.fillRect(50, y0, JUMBO.w - 50, JUMBO.h - y0);
+    c2.font = `400 12px ${FONT}`;
+    c2.textAlign = 'left';
+    c2.textBaseline = 'middle';
+    let x = 56;
+    for (const [t, col] of [['POO PALACE', '#ffd23f'], ['  ★  ', '#ffd23f'], ['QUEEN PLOP vs PUFFY', '#ffffff'], ['  ★  ', '#ffd23f'], ['TITLE MATCH', '#7fe7ff'], ['  ★  ', '#ffd23f'], ['POOPA COLA', '#ffffff']]) {
+      c2.fillStyle = col;
+      c2.fillText(t, x, y0 + (JUMBO.h - y0) / 2 + 0.5);
+      x += c2.measureText(t).width;
+    }
+  }
   ctx.drawImage(j.c, JUMBO.x + STAGE_OX, JUMBO.y + STAGE_OY, JUMBO.w * JUMBO.s, JUMBO.h * JUMBO.s);
   const rb = mk(RIBBON.w * 2, RIBBON.h * 2);
   rb.ctx.scale(2, 2);
@@ -92,9 +112,10 @@ function arenaBackdrop(jumbo: JumboContent, excited: boolean) {
   ctx.fillStyle = haze;
   ctx.fillRect(-160, -90, 1600, 420);
   // fans' signs
-  const signs = ['POOPA!', 'GO PUFFY', 'STINKY!', 'KING ♛ PLOP', 'PLOP-A-MANIA', 'P.U.!'];
+  const signs = ['POOPA!', 'GO PUFFY', 'STINKY!', 'QUEEN ♛ PLOP', 'POO PALACE', 'P.U.!'];
   for (let i = 0; i < 9; i++) {
     const x = -60 + i * 160 + r() * 50;
+    if (i === 3) continue; // (clear of the tunnel out of the stands)
     const y = 175 + r() * 90;
     sign(ctx, x, y, signs[i % signs.length], i % 3 === 1 ? '#ffd23f' : '#f6efe2', i % 3 === 1 ? '#3a1d0c' : '#5c3118', (r() - 0.5) * 0.18);
   }
@@ -197,7 +218,7 @@ function ringBack(ctx: Ctx) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = '#8a5232';
-  ctx.fillText('♛ KING PLOP ♛', 0, 0);
+  ctx.fillText('♛ QUEEN PLOP ♛', 0, 0);
   ctx.restore();
   for (let i = 0; i < 9; i++) {
     const x = 230 + r() * 820;
@@ -208,18 +229,14 @@ function ringBack(ctx: Ctx) {
     ctx.fill();
   }
   // a poo puddle in the far-right corner of the mat (a hazard: slows you, like the level's puddles)
-  ST.shape(ctx, ellipsePts(960, R.floorY + 2, 46, 8, 0, 30), POO, 21, { lw: 0.9 });
-  ctx.fillStyle = '#ffffff55';
-  ctx.beginPath();
-  ctx.ellipse(948, R.floorY - 1, 14, 2.4, 0, 0, Math.PI * 2);
-  ctx.fill();
+  pooPuddle(ctx, 975, R.floorY + 3);
   // the skirt (the front face of the ring) with the show's name
   flat(ctx, [[R.x0 - 12, R.frontY], [R.x1 + 12, R.frontY], [R.x1 + 12, R.skirtY], [R.x0 - 12, R.skirtY]], '#3a1f0e', '#22110a', R.frontY, R.skirtY);
   ctx.fillStyle = '#ffd23f';
   ctx.font = `400 46px ${FONT}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('PLOP-A-MANIA', 640, (R.frontY + R.skirtY) / 2 + 2);
+  ctx.fillText('POO PALACE', 640, (R.frontY + R.skirtY) / 2 + 2);
   ctx.font = `400 22px ${FONT}`;
   ctx.fillStyle = '#c99064';
   ctx.fillText('♛', 640 - 205, (R.frontY + R.skirtY) / 2);
@@ -262,6 +279,86 @@ function ringside(ctx: Ctx) {
   // poo piles on the ringside floor
   drawPooSwirl(ctx, 300, 700, 34, POO, 51);
   drawPooSwirl(ctx, 1000, 712, 26, POO_DARK, 52);
+}
+
+/** The poo puddle on the mat: big, glossy, bubbling and stinking (you can't miss it). */
+function pooPuddle(ctx: Ctx, x: number, y: number) {
+  const r = rng(31);
+  // splats flung out round it across the mat
+  for (let i = 0; i < 9; i++) {
+    const a = r() * Math.PI * 2;
+    const d = 112 + r() * 40;
+    splat(ctx, x + Math.cos(a) * d, y + Math.sin(a) * d * 0.16, 5 + r() * 6, r);
+  }
+  // a dark wet stain soaked into the mat, then a big glossy heap of poo, bulging up
+  ctx.fillStyle = 'rgba(70,35,12,0.5)';
+  ctx.beginPath();
+  ctx.ellipse(x, y + 2, 112, 18, 0, 0, Math.PI * 2);
+  ctx.fill();
+  const heap: Pt[] = [];
+  for (let i = 0; i <= 40; i++) {
+    const t = (i / 40) * Math.PI;
+    // the top edge lumpy, the bottom edge flat on the mat
+    heap.push([x - Math.cos(t) * 100, y + 4 - Math.sin(t) * (16 + Math.sin(i * 1.7) * 3)]);
+  }
+  for (let i = 40; i >= 0; i--) heap.push([x - Math.cos((i / 40) * Math.PI) * 100, y + 6 + Math.sin((i / 40) * Math.PI) * 9]);
+  ST.shape(ctx, heap, POO_DARK, 21, { lw: 1.4, light: [x - 40, y - 20] });
+  ST.shape(ctx, ellipsePts(x - 6, y - 4, 82, 10, 0, 40), POO, 22, { lw: 0.6, plain: true });
+  // ripples and a big wet shine
+  ctx.strokeStyle = 'rgba(255,230,200,0.55)';
+  ctx.lineWidth = 1.8;
+  for (const [rx, ry] of [[24, 3.5], [44, 6.5]]) {
+    ctx.beginPath();
+    ctx.ellipse(x + 20, y - 4, rx, ry, 0, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.stroke();
+  }
+  ctx.fillStyle = '#ffffffcc';
+  ctx.beginPath();
+  ctx.ellipse(x - 40, y - 9, 22, 3, -0.05, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(x + 52, y - 7, 8, 2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // bubbles (one popping)
+  for (const [bx, by, br] of [[x + 34, y - 7, 7], [x - 6, y - 5, 4.5], [x + 64, y - 3, 4], [x - 66, y - 3, 3.5]])
+    ST.shape(ctx, ellipsePts(bx, by - br, br, br, 0, 16), POO, Math.round(bx), { lw: 0.8, light: [bx - br / 2, by - br * 1.5] });
+  ctx.strokeStyle = 'rgba(255,230,200,0.8)';
+  ctx.lineWidth = 1.6;
+  for (let k = 0; k < 6; k++) {
+    const a = (k / 6) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(x + 10 + Math.cos(a) * 7, y - 16 + Math.sin(a) * 5);
+    ctx.lineTo(x + 10 + Math.cos(a) * 11, y - 16 + Math.sin(a) * 8);
+    ctx.stroke();
+  }
+  // swirls poking up out of it, and a big cloud of stink (with flies)
+  drawPooSwirl(ctx, x - 58, y - 4, 26, POO, 23);
+  drawPooSwirl(ctx, x + 76, y - 2, 18, POO_DARK, 24);
+  ctx.strokeStyle = 'rgba(150,200,70,0.85)';
+  ctx.lineWidth = 3.2;
+  ctx.lineCap = 'round';
+  for (const sx of [x - 34, x - 6, x + 22, x + 50]) {
+    ctx.beginPath();
+    for (let k = 0; k <= 16; k++) {
+      const yy = y - 18 - k * 4.5;
+      const xx = sx + Math.sin(k * 0.8 + sx) * 5;
+      if (k) ctx.lineTo(xx, yy);
+      else ctx.moveTo(xx, yy);
+    }
+    ctx.stroke();
+  }
+  ctx.fillStyle = '#1a120c';
+  for (const [fx, fy] of [[x - 20, y - 70], [x + 40, y - 84], [x + 8, y - 98]]) {
+    ctx.beginPath();
+    ctx.ellipse(fx, fy, 2.6, 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.beginPath();
+    ctx.ellipse(fx - 2, fy - 3, 2.4, 1.4, -0.5, 0, Math.PI * 2);
+    ctx.ellipse(fx + 2, fy - 3, 2.4, 1.4, 0.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#1a120c';
+  }
 }
 
 /** A big flat panel (mat, skirt): a top-to-bottom shade and an ink outline (no round sheen). */
@@ -338,8 +435,72 @@ function king(ctx: Ctx, x: number, footY: number, f: PlopFrame, s = 2.2, flip = 
   ctx.save();
   ctx.translate(x, footY);
   ctx.scale(flip ? -s : s, s);
-  drawPlop(ctx, -50, -100, f, ST, 'king');
+  drawQueen(ctx, -50, -100, f);
   ctx.restore();
+}
+
+const PINK: Fill = { base: '#e8579a', shade: '#b23272', light: '#ff9cc8' };
+const PEARL: Fill = { base: '#fbf4ea', shade: '#dccfbf', light: '#ffffff' };
+const SILVER: Fill = { base: '#f1d36a', shade: '#c79a2c', light: '#fff6c4' };
+
+/**
+ * Queen Plop (concept): a Plop with a pink royal cape, a tiara, long lashes, pink lips,
+ * rosy cheeks, a pearl necklace and a bow on her swirl. Same frame layout as drawPlop.
+ */
+function drawQueen(ctx: Ctx, ox: number, oy: number, f: PlopFrame) {
+  const ground = oy + 100;
+  const cx = ox + 50;
+  const yell = f === 'yell0' || f === 'yell1';
+  const hurt = f === 'hurt';
+  const bob = f === 'run1' || f === 'yell1' ? -3 : f === 'idle1' ? -1.5 : hurt ? 2.5 : 0;
+  const sqY = f === 'idle1' ? 1.05 : hurt ? 0.9 : 1;
+  const botY = ground - 30 + bob;
+  const topY = botY - 27 * sqY;
+  // the pink cape, flowing out behind her (a frill along its hem)
+  ST.shape(ctx, [[cx - 26, botY - 28], [cx + 26, botY - 28], [cx + 44, ground - 4], [cx + 22, ground], [cx, ground - 4], [cx - 22, ground], [cx - 44, ground - 4]], PINK, 3005, { lw: 1.1, light: [cx - 14, botY - 10] });
+  for (let k = -40; k <= 40; k += 8) ST.shape(ctx, ellipsePts(cx + k, ground - 3, 4.4, 3.2, 0, 12), PEARL, 3006 + k, { lw: 0.6, plain: true });
+  drawPlop(ctx, ox, oy, f, ST, 'medium');
+  // a bow on the swirl's tip
+  const tx = cx + 10;
+  const ty = topY - 12 - 26;
+  ST.shape(ctx, [[tx, ty], [tx - 11, ty - 7], [tx - 11, ty + 6]], PINK, 3010, { lw: 0.8 });
+  ST.shape(ctx, [[tx, ty], [tx + 11, ty - 7], [tx + 11, ty + 6]], PINK, 3011, { lw: 0.8 });
+  ST.shape(ctx, ellipsePts(tx, ty, 3, 3, 0, 10), PINK, 3012, { lw: 0.7 });
+  // a tiara on her brow
+  const by = topY - 14;
+  ST.shape(ctx, [[cx - 16, by + 4], [cx - 12, by - 3], [cx - 6, by + 1], [cx, by - 9], [cx + 6, by + 1], [cx + 12, by - 3], [cx + 16, by + 4], [cx, by + 2]], SILVER, 3020, { lw: 0.9, light: [cx - 4, by - 4] });
+  ST.shape(ctx, ellipsePts(cx, by - 3, 2.6, 3, 0, 12), PINK, 3021, { lw: 0.5, plain: true });
+  // long lashes (curling out), even with her eyes shut
+  ctx.strokeStyle = ST.ink;
+  ctx.lineWidth = 1.4;
+  ctx.lineCap = 'round';
+  for (const [ex, er] of [[cx - 10, 9], [cx + 11, 8.4]] as const) {
+    for (const k of [-0.9, -0.45, 0]) {
+      const a = -Math.PI / 2 + k + (ex < cx ? -0.25 : 0.25);
+      const x0 = ex + Math.cos(a) * er * 0.82 - (ex < cx ? 2 : -2);
+      const y0 = topY - 3 + Math.sin(a) * er;
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.quadraticCurveTo(x0 + Math.cos(a) * 3, y0 + Math.sin(a) * 5, x0 + Math.cos(a - 0.5) * 6, y0 + Math.sin(a - 0.5) * 6 - 1);
+      ctx.stroke();
+    }
+  }
+  // rosy cheeks
+  ctx.fillStyle = 'rgba(255,110,150,0.5)';
+  for (const bx of [cx - 23, cx + 23]) {
+    ctx.beginPath();
+    ctx.ellipse(bx, topY + 9, 5, 2.8, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // pink lips (over the little mouth line), unless she's shouting or hurt
+  if (!yell && !hurt) {
+    ST.shape(ctx, [[cx - 12, botY + 4], [cx - 7, botY + 1], [cx - 4, botY + 2.5], [cx - 1, botY + 1], [cx + 4, botY + 4], [cx - 4, botY + 8]], { base: '#ff6fae', shade: '#d4407f', light: '#ffc0dc' }, 3030, { lw: 0.8, plain: true });
+  }
+  // a string of pearls where her two tiers meet
+  for (let k = -24; k <= 24; k += 5.5) {
+    const py = botY - 17 + (k * k) / 120;
+    ST.shape(ctx, ellipsePts(cx + k, py, 2.6, 2.6, 0, 10), PEARL, 3040 + k, { lw: 0.5, plain: true });
+  }
 }
 
 function plop(ctx: Ctx, x: number, footY: number, f: PlopFrame, s: number, flip = false) {
@@ -400,7 +561,7 @@ function vignette(ctx: Ctx, k = 0.55) {
   ctx.fillRect(0, 0, 1280, 720);
 }
 
-function healthBars(ctx: Ctx, you: number, boss: number) {
+function healthBars(ctx: Ctx, you: number, boss: number, nugs = 2) {
   const bar = (x: number, w: number, name: string, v: number, col: string, right: boolean) => {
     ctx.fillStyle = 'rgba(20,10,4,0.85)';
     ctx.beginPath();
@@ -423,17 +584,38 @@ function healthBars(ctx: Ctx, you: number, boss: number) {
     ctx.textBaseline = 'alphabetic';
     ctx.fillText(name, right ? x + w : x, 43);
   };
-  bar(30, 380, 'PUFFY', you, '#8fd14f', false);
-  bar(870, 380, 'KING PLOP', boss, '#e0812e', true);
-  // the round clock between them, styled like the arena's LED
+  // you: 3 hearts (like Battle mode) and your nuggies (a hit with a nuggie costs the nuggie;
+  // with none, it costs a heart)
   ctx.fillStyle = 'rgba(20,10,4,0.85)';
   ctx.beginPath();
-  ctx.roundRect(590, 22, 100, 50, 12);
+  ctx.roundRect(24, 22, 300, 50, 12);
   ctx.fill();
-  ctx.font = `400 30px ${FONT}`;
+  ctx.font = `400 20px ${FONT}`;
+  ctx.fillStyle = '#fff6e4';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('PUFFY', 38, 48);
+  for (let i = 0; i < 3; i++) heart(ctx, 128 + i * 32, 47, 12, i < you);
+  drawNuggie(ctx, 246, 47, 13);
+  ctx.font = `400 24px ${FONT}`;
   ctx.fillStyle = '#ffd23f';
-  ctx.textAlign = 'center';
-  ctx.fillText('1:24', 640, 58);
+  ctx.fillText('× ' + nugs, 266, 49);
+  bar(870, 380, 'QUEEN PLOP', boss, '#e8579a', true);
+  // 8 hits to beat her: the bar is in 8 pieces
+  ctx.fillStyle = 'rgba(20,10,4,0.85)';
+  for (let k = 1; k < 8; k++) ctx.fillRect(870 + (380 * k) / 8 - 1.5, 48, 3, 16);
+}
+
+function heart(ctx: Ctx, x: number, y: number, r: number, full: boolean) {
+  ctx.beginPath();
+  ctx.moveTo(x, y + r * 0.9);
+  ctx.bezierCurveTo(x - r * 1.4, y - r * 0.1, x - r * 0.7, y - r * 1.2, x, y - r * 0.45);
+  ctx.bezierCurveTo(x + r * 0.7, y - r * 1.2, x + r * 1.4, y - r * 0.1, x, y + r * 0.9);
+  ctx.fillStyle = full ? '#ff4d6d' : 'rgba(255,255,255,0.18)';
+  ctx.fill();
+  ctx.strokeStyle = '#1a0e06';
+  ctx.lineWidth = 2;
+  ctx.stroke();
 }
 
 function tag(ctx: Ctx, x: number, y: number, n: string, text: string, tx: number, ty: number) {
@@ -475,6 +657,29 @@ function tag(ctx: Ctx, x: number, y: number, n: string, text: string, tx: number
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
   lines.forEach((l, i) => ctx.fillText(l, bx0 + 36, ty - h / 2 + 24 + i * 21));
+}
+
+function bubble2(ctx: Ctx, x: number, y: number, lines: string[]) {
+  ctx.font = `400 30px ${FONT}`;
+  const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 50;
+  const h = lines.length * 38 + 26;
+  ctx.fillStyle = '#e8579a';
+  ctx.strokeStyle = '#fff3d6';
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.roundRect(x - w / 2, y - h / 2, w, h, 20);
+  ctx.moveTo(x - 30, y + h / 2);
+  ctx.lineTo(x - 50, y + h / 2 + 34);
+  ctx.lineTo(x - 2, y + h / 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#fff6e4';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  lines.forEach((l, i) => {
+    ctx.fillStyle = i === lines.length - 1 ? '#ffd23f' : '#fff6e4';
+    ctx.fillText(l, x, y - h / 2 + 32 + i * 38);
+  });
 }
 
 function caption(ctx: Ctx, t: string) {
@@ -530,8 +735,8 @@ export async function render() {
   await document.fonts.ready;
   const out: Record<string, HTMLCanvasElement> = {};
   const title = arenaBackdrop({ kind: 'title' }, false);
-  const loud = arenaBackdrop({ kind: 'big', text: 'OH NO HE DIDN’T!', sub: 'PUFFY OFF THE TOP ROPE', color: '#ffd23f', bg: '#5c3118' }, true);
-  const count = arenaBackdrop({ kind: 'big', text: '1 · 2 · 3 !', sub: 'NEW CHAMPION', color: '#ffd23f', bg: '#2a6a1a' }, true);
+  const loud = arenaBackdrop({ kind: 'big', text: '3 HITS TO GO', sub: 'OFF THE TOP ROPE: THAT ONE COUNTS DOUBLE', color: '#ffd23f', bg: '#5c3118' }, true);
+  const count = arenaBackdrop({ kind: 'big', text: 'K.O.!', sub: 'NEW CHAMPION', color: '#ffd23f', bg: '#2a6a1a' }, true);
   const R = RING;
 
   // 1. The whole arena, as the fight's camera sees it
@@ -539,14 +744,14 @@ export async function render() {
     ringBack(ctx);
     spot(ctx, 640, -90, R.frontY, 700, 0.08);
     hero(ctx, 'puffy', 300, R.floorY, 'idle0');
-    king(ctx, 930, R.floorY, 'grin');
+    king(ctx, 680, R.floorY, 'grin');
     ringFront(ctx);
     ringside(ctx);
     vignette(ctx, 0.35);
   });
 
   // 2. A moment mid-fight (the camera a little closer, following the action)
-  out.fight = frame(loud, 1.12, 640, 400, (ctx) => {
+  out.fight = frame(loud, 0.98, 640, 318, (ctx) => {
     ringBack(ctx);
     spot(ctx, 470, -90, R.frontY, 380, 0.1);
     spot(ctx, 860, -90, R.frontY, 420, 0.09);
@@ -560,17 +765,27 @@ export async function render() {
     ctx.quadraticCurveTo(330, 250, 490, 330);
     ctx.stroke();
     ctx.setLineDash([]);
-    // the King, stunned, with a bump; a poo drip falling from the jumbotron
+    // the Queen, caught by the dive: it counts double
     king(ctx, 760, R.floorY, 'hurt', 2.2, true);
     ctx.fillStyle = '#ffd23f';
     ctx.font = `400 26px ${FONT}`;
     ctx.fillText('✶', 720, 268);
     ctx.fillText('✶', 790, 258);
+    ctx.save();
+    ctx.translate(840, 250);
+    ctx.rotate(-0.12);
+    ctx.font = `400 40px ${FONT}`;
+    ctx.lineWidth = 7;
+    ctx.strokeStyle = '#3a1d0c';
+    ctx.strokeText('TOP ROPE! ×2', 0, 0);
+    ctx.fillStyle = '#ffd23f';
+    ctx.fillText('TOP ROPE! ×2', 0, 0);
+    ctx.restore();
     drawDrip(ctx, 960, 200, 26, 12);
     ringFront(ctx);
     ringside(ctx);
     vignette(ctx, 0.3);
-  }, (ctx) => healthBars(ctx, 0.72, 0.38));
+  }, (ctx) => healthBars(ctx, 2, 3 / 8, 2));
 
   // 3. The ring as a level: what each part does
   out.plan = frame(title, 0.93, 640, 352, (ctx) => {
@@ -591,11 +806,14 @@ export async function render() {
     ctx.stroke();
     ctx.setLineDash([]);
   }, (ctx) => {
+    healthBars(ctx, 3, 1, 1);
+    tag(ctx, 300, 66, '9', '3 hearts + your nuggies: a hit costs a nuggie,\nonly with none left does it cost a heart', 330, 128);
     tag(ctx, 640, R.floorY, '1', 'The mat = the floor. The whole fight\nis normal 2D along this one line.', 640, 610);
-    tag(ctx, R.x1, R.frontY - R.post, '2', 'Turnbuckles: stand on top,\ndive off for a big stomp', 1050, 160);
+    tag(ctx, R.x1, R.frontY - R.post, '2', 'Climb the ropes to the top turnbuckle;\ndive off and hit her: counts double', 1010, 150);
     tag(ctx, 500, R.frontY - 60, '3', 'Ropes: run into them and\nbounce back fast (springboard)', 360, 250);
+    tag(ctx, 800, R.floorY - 150, '8', 'Queen Plop: 8 hits to win (the scoreboard\ncounts them down); jumps a lot, aggressive;\nbacks off when you climb the ropes', 830, 245);
     tag(ctx, 960, R.floorY, '4', 'Poo puddle: sinks you\nlike the level', 1060, 420);
-    tag(ctx, 1190, 690, '5', 'Fall off = ringside floor;\nsteps back up, or get counted out', 1000, 560);
+    tag(ctx, 1190, 690, '5', 'Fall off = ringside floor;\nclimb the steps back in', 1000, 560);
     tag(ctx, 80, 650, '6', 'Announce table + steel steps:\nringside props to jump on', 240, 470);
     tag(ctx, 640, 180, '7', 'Poo drips off the jumbotron:\nfalling hazards', 640, 90);
   });
@@ -618,33 +836,113 @@ export async function render() {
       ctx.fillRect(R.x1 - 4 + Math.cos(a) * d, 420 + Math.sin(a) * d * 1.3, 2.2, 2.2);
     }
   }, (ctx) => {
-    bubble(ctx, 560, 120, '“This is MY ring!”');
+    bubble(ctx, 520, 120, '“Welcome to MY Poo Palace!”');
   });
 
-  // 5. The finish: 1-2-3 with a Plop referee, the crowd going wild
-  out.finish = frame(count, 1.12, 640, 400, (ctx) => {
+  // 5. The end of the fight: the Queen on the mat, dazed, and her warning
+  out.finish = frame(count, 1.3, 700, 420, (ctx) => {
     ringBack(ctx);
-    spot(ctx, 640, -90, R.frontY, 520, 0.14);
-    // the King flat on his back (rotated), Puffy on top, the ref slapping the mat
-    shadow(ctx, 720, R.floorY, 90);
+    spot(ctx, 700, -90, R.frontY, 460, 0.16);
+    // lying on her back (squashed flat), stars and little birds circling her head
+    shadow(ctx, 760, R.floorY, 92);
     ctx.save();
-    ctx.translate(720, R.floorY);
-    ctx.scale(-2.3, 2.3 * 0.42);
-    drawPlop(ctx, -50, -100, 'hurt', ST, 'king');
+    ctx.translate(760, R.floorY + 4);
+    ctx.rotate(-0.08);
+    ctx.scale(-2.2, 2.2 * 0.5);
+    drawQueen(ctx, -50, -100, 'hurt');
+    ctx.restore();
+    ctx.save();
+    ctx.translate(745, R.floorY - 132);
+    ctx.scale(1, 0.32);
+    ctx.strokeStyle = 'rgba(255,210,63,0.6)';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 70, 70, 0, 0, Math.PI * 2);
+    ctx.stroke();
     ctx.restore();
     ctx.fillStyle = '#ffd23f';
-    ctx.font = `400 24px ${FONT}`;
-    ctx.fillText('✶  ✶  ✶', 780, R.floorY - 100);
-    hero(ctx, 'puffy', 700, R.floorY - 62, 'idle1', 1.6);
-    plop(ctx, 470, R.floorY, 'yell1', 0.9);
-    refStripes(ctx, 470, R.floorY, 0.9);
-    ctx.fillStyle = '#ffd23f';
-    ctx.font = `400 60px ${FONT}`;
+    ctx.font = `400 26px ${FONT}`;
     ctx.textAlign = 'center';
-    ctx.fillText('3!', 470, 360);
+    for (const [dx, dy] of [[-70, 0], [20, 18], [62, -10]]) ctx.fillText('✶', 745 + dx, R.floorY - 124 + dy);
+    // Puffy, arms up (the crowd going wild)
+    hero(ctx, 'puffy', 520, R.floorY, 'jump', 1.7);
+    ringFront(ctx);
+    vignette(ctx, 0.35);
+  }, (ctx) => {
+    healthBars(ctx, 2, 0, 0);
+    bubble2(ctx, 800, 170, ['“Nice work…', 'but you’ll never out-wrestle', 'THE KING!”']);
+  });
+
+  // 6. …then the camera pulls right out, finds the King, and zooms in on him: he's down on the
+  // arena floor by the exit tunnel (he was watching the whole time), and he RUNS
+  const king2 = arenaBackdrop({ kind: 'big', text: 'THE KING?!', sub: 'HE WAS HERE ALL ALONG', color: '#ffd23f', bg: '#3d1478' }, true);
+  // (he's in the front row of the stands, behind the LED boards, heading for the tunnel out)
+  const KX = 548;
+  const kingScene = (ctx: Ctx) => {
+    ringBack(ctx);
+    shadow(ctx, 760, R.floorY, 92);
+    ctx.save();
+    ctx.translate(760, R.floorY + 4);
+    ctx.rotate(-0.08);
+    ctx.scale(-2.2, 2.2 * 0.5);
+    drawQueen(ctx, -50, -100, 'hurt');
+    ctx.restore();
+    hero(ctx, 'puffy', 520, R.floorY, 'idle0', 1.7, true);
     ringFront(ctx);
     ringside(ctx);
-    vignette(ctx, 0.3);
+    // the tunnel out of the lower bowl at the top of an aisle (a dark opening, an EXIT sign)
+    const tx = 470;
+    ctx.fillStyle = '#050302';
+    ctx.beginPath();
+    ctx.moveTo(tx - 24, 297);
+    ctx.lineTo(tx - 24, 236);
+    ctx.quadraticCurveTo(tx, 222, tx + 24, 236);
+    ctx.lineTo(tx + 24, 297);
+    ctx.fill();
+    ctx.strokeStyle = '#3b3530';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.fillStyle = '#1d6b2a';
+    ctx.fillRect(tx - 15, 208, 30, 11);
+    ctx.fillStyle = '#eafff0';
+    ctx.font = `400 9px ${FONT}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('EXIT', tx, 214);
+    // the King, running along the front row for it (the boards hide his feet, like everyone's)
+    ctx.save();
+    ctx.translate(KX, 300);
+    ctx.scale(0.62, 0.62);
+    drawPlop(ctx, -50, -100, 'run1', ST, 'king');
+    ctx.restore();
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    for (let i = 0; i < 3; i++) ctx.fillRect(KX + 26 + i * 6, 262 + i * 9, 22, 2.2);
+  };
+  /** The LED boards along the front of the stands, drawn again over the King's feet. */
+  const boards = (ctx: Ctx, back: HTMLCanvasElement) => {
+    const y0 = 296;
+    const y1 = 332;
+    ctx.drawImage(back, 0, (y0 + STAGE_OY) * 2, back.width, (y1 - y0) * 2, -STAGE_OX, y0, ARENA_W, y1 - y0);
+  };
+  out.kingWide = frame(king2, 0.8, 640, 330, (ctx) => {
+    kingScene(ctx);
+    boards(ctx, king2);
+    ctx.fillStyle = 'rgba(5,2,0,0.4)';
+    ctx.fillRect(-260, -190, 1800, 1100);
+    spot(ctx, KX, -150, 330, 120, 0.3);
+    ctx.strokeStyle = '#ffd23f';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.ellipse(KX, 288, 48, 48, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }, (ctx) => caption(ctx, '1 · The camera pulls out… who’s that in the front row?'));
+  out.king = frame(king2, 2.6, 520, 268, (ctx) => {
+    kingScene(ctx);
+    boards(ctx, king2);
+    spot(ctx, KX, -150, 330, 130, 0.22);
+  }, (ctx) => {
+    bubble(ctx, 470, 120, '“THE KING?!”');
+    caption(ctx, '2 · …zooms in: the King! He runs for the exit. End of the fight.');
   });
   return out;
 }

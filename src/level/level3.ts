@@ -162,6 +162,8 @@ export function buildLevel3(): LevelData {
 
   // ── THE PITS: pillars and an island over bottomless pits (difficult) ──
   // 4–5 tiles between them, some a step up: run, and keep your double jump for when you need it
+  // (the camera pulls back here, so you can see the next pillar and where you'll land)
+  L.wide(303, 331, 0.8);
   L.ground(309, 310, 12);
   L.ground(315, 316, 13);
   L.island(322, 324, 12, 1, false);

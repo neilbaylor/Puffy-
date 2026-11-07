@@ -85,6 +85,18 @@ export class LevelView {
   /** Trees, flowers and grass that sway in the breeze. */
   private sway: { img: Phaser.GameObjects.Image; amp: number; speed: number; ph: number }[] = [];
 
+  /** Every terrain chunk's picture, drawn or not (see `paintJobs`). */
+  private paints: { key: string; paint: () => boolean }[] = [];
+
+  /**
+   * One job per terrain picture of this level not drawn yet: the start screen runs them in
+   * quiet moments, so the level's fly-over (which sweeps the whole level in seconds) only
+   * has to put the pictures up, not draw them. Each job returns its texture key if it drew one.
+   */
+  paintJobs(): (() => string | null)[] {
+    return this.paints.filter((p) => !this.scene.textures.exists(p.key)).map((p) => () => (p.paint() ? p.key : null));
+  }
+
   /** Lazy views: never draw the terrain past `maxX` (the start-screen fly-over only loops over part of the level). */
   trimPending(maxX: number) {
     this.pending = this.pending.filter((p) => p.x0 < maxX);
@@ -221,18 +233,18 @@ export class LevelView {
           const cut = Math.min(y1 + PAD, Math.max(top + 200, deep + 300));
           const ch = cut - top + PAD;
           const key = `terrain-${d.name}-${kind}-${pieceId}-${ci}`;
-          const make = () => {
-          let fillCol = DEEP_FILL.get(key);
+          /** Just the picture (the start screen draws a level's in quiet moments, ahead of Play). */
+          const paint = () => {
           if (!this.scene.textures.exists(key)) {
             const c = hires(cw + PAD * 2, ch, PROP_RES, (ctx) => {
               ctx.translate(PAD - cx0, PAD - top);
-              drawTerrainPiece(ctx, { kind, outline, pal, seed: Math.round(x0 + y0), floorY: this.heightPx });
+              drawTerrainPiece(ctx, { kind, outline, pal, seed: Math.round(x0 + y0), floorY: this.heightPx, clip: { x0: cx0 - PAD, x1: cx0 + cw + PAD, y0: top - PAD, y1: cut + PAD } });
             });
             if (cut < y1 + PAD) {
               // the deep rock is the palette's deep soil colour (no pixel read-back: that stalls the GPU);
               // fade the bottom of the chunk into it so the plain block below is seamless
               const hex = kind === 'ground' ? pal.soilDeep : pal.rock.shade;
-              fillCol = Phaser.Display.Color.HexStringToColor(hex).color;
+              const fillCol = Phaser.Display.Color.HexStringToColor(hex).color;
               DEEP_FILL.set(key, fillCol);
               const cctx = c.getContext('2d')!;
               const fadeH = Math.round(90 * PROP_RES);
@@ -248,7 +260,14 @@ export class LevelView {
               cctx.restore();
             }
             addCanvas(this.scene, key, c, undefined, { release: true });
+            return true;
           }
+          return false;
+          };
+          this.paints.push({ key, paint });
+          const make = () => {
+          paint();
+          const fillCol = DEEP_FILL.get(key);
           const chunk = this.scene.add
             .image(cx0 - PAD, top - PAD, key)
             .setOrigin(0, 0)
