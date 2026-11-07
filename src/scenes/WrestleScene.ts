@@ -26,11 +26,11 @@ import type { GameOverState, HudState, ResultState } from './GameScene';
 /**
  * Part 3's boss: Queen Plop, in a wrestling ring in the Poo Palace (see sketches/wrestling/DESIGN.md).
  *
- * The fight is the platformer's own: the same hero, controls and jumps (no bazooka in the ring),
+ * The fight is the platformer's own: the same hero, controls, jumps and bazooka (a rocket = a hit),
  * side-on across the mat. The ropes at either end are springy (run into them and you're flung
  * back), and you can climb them to the top turnbuckle and dive off (land on her: two hits); there's
  * no leaving the ring. You have 5 hearts (shown over your head; more turn up in the ring, up to 6), there's
- * a folding chair now and then (hit her with it: two hits), and she takes 20 hits, counted down on
+ * a folding chair now and then (FIRE swings it while you hold it: two hits), and she takes 15 hits, counted down on
  * the jumbotron.
  */
 export interface WrestleData {
@@ -68,7 +68,7 @@ const QS = 1.3;
 const Q_RES = 4;
 const Q_PAD = 18;
 const Q_TOP = 24;
-const HITS = 20;
+const HITS = 15;
 /** Your hearts in the ring: you start with 5, and pick-ups can take you up to 6. */
 const HEARTS_START = 5;
 const HEARTS_MAX = 6;
@@ -185,7 +185,7 @@ class Queen {
     const dx = p.x - this.x;
     const towards: Side = dx < 0 ? -1 : 1;
     const ground = this.onGround;
-    const speed = 118 * this.rage;
+    const speed = 108 * this.rage;
     let frame: PlopFrame | null = null;
 
     switch (this.mode) {
@@ -230,14 +230,14 @@ class Queen {
         const above = p.alive && p.body.velocity.y > 60 && p.bottom < this.top + 6 && Math.abs(dx) < 90 && !s.heroDiving();
         if (ground && above && this.cdBlock <= 0) {
           b.setVelocity(towards * speed * 0.6, -640);
-          this.cdBlock = 1.4 + Math.random();
+          this.cdBlock = 1.9 + Math.random();
           this.hopIn = 0.45;
         } else if (ground && this.hopIn <= 0) {
-          const lunge = Math.abs(dx) < 260 && Math.random() < 0.4;
+          const lunge = Math.abs(dx) < 260 && Math.random() < 0.3;
           const big = !lunge && Math.random() < 0.3;
           b.setVelocityY(lunge ? -600 - Math.random() * 80 : big ? -700 - Math.random() * 60 : -430 - Math.random() * 170);
           if (lunge) b.setVelocityX(towards * speed * 2);
-          this.hopIn = 0.25 + Math.random() * 0.45;
+          this.hopIn = 0.35 + Math.random() * 0.5;
         }
         // from further off: a big lump of poo, hurled at you (where it lands, it rolls on at you)
         if (ground && this.cdHeave <= 0 && Math.abs(dx) > 150 && Math.abs(dx) < 520 && p.alive && Math.abs(p.bottom - MAT_Y) < 50) {
@@ -248,7 +248,7 @@ class Queen {
           sfx.roar();
           break;
         }
-        if (ground && this.cdSlam <= 0 && Math.abs(dx) > 100 && Math.random() < 0.045) {
+        if (ground && this.cdSlam <= 0 && Math.abs(dx) > 100 && Math.random() < 0.035) {
           this.slam(p.x);
           break;
         }
@@ -277,7 +277,7 @@ class Queen {
         frame = Math.floor(s.time.now / 80) % 2 ? 'run0' : 'run1';
         if (ground && Math.random() < 0.3) s.fx.dust(this.x - this.dir * 20, this.bottom, 1);
         if (this.t <= 0) {
-          this.cdCharge = 1.3 + Math.random() * 1.2;
+          this.cdCharge = 1.7 + Math.random() * 1.3;
           this.setMode('idle', 0.2);
         }
         break;
@@ -288,7 +288,7 @@ class Queen {
         this.spr.setX(this.spr.x + Math.sin(s.time.now / 12) * 0.7);
         if (this.t <= 0) {
           s.heaveAt(this, p.x);
-          this.cdHeave = 3.2 + Math.random() * 2;
+          this.cdHeave = 3.8 + Math.random() * 2;
           this.setMode('idle', 0.25);
         }
         break;
@@ -473,6 +473,9 @@ export class WrestleScene extends Phaser.Scene {
   /** Just up on the turnbuckle: you stay put until you let go of the direction you climbed with. */
   private perchLock: Side | 0 = 0;
   private prevJump = false;
+  private prevFire = false;
+  private firePressed = false;
+  private rawInput!: { poll(): { fire: boolean } };
   private prevHeroBottom = 0;
   private dark!: Phaser.GameObjects.Rectangle;
   private spot!: Phaser.GameObjects.Image;
@@ -576,11 +579,15 @@ export class WrestleScene extends Phaser.Scene {
     // ── the hero ──
     this.fx = new Fx(this);
     const spec = this.wd.session.players[0] ?? { slot: 0, characterId: this.wd.charId ?? 'puffy', inputId: 'solo' };
-    // (no bazooka in the ring: it's a wrestling match — the fire button's hidden too)
+    // (the bazooka works in the ring; holding the chair, FIRE swings it instead)
     const src = sourceById(spec.inputId) ?? soloSource;
-    const noFire = Object.create(src) as typeof src;
-    noFire.poll = () => ({ ...src.poll(), fire: false });
-    this.player = new Player(this, characterById(spec.characterId), noFire, WX(330), MAT_Y - 30);
+    this.rawInput = src;
+    const input = Object.create(src) as typeof src;
+    input.poll = () => {
+      const i = src.poll();
+      return this.chair?.state === 'held' ? { ...i, fire: false } : i;
+    };
+    this.player = new Player(this, characterById(spec.characterId), input, WX(330), MAT_Y - 30);
     this.player.facing = 1;
     // (their chair-carrying frames, ready for when a chair comes in)
     makeCarrySheet(this, this.player.char);
@@ -592,6 +599,11 @@ export class WrestleScene extends Phaser.Scene {
     this.queen = new Queen(this, POST_R, POST_TOP);
     this.queen.body.setAllowGravity(false);
     this.physics.add.collider(this.queen.spr, this.qStatics);
+    // (rockets go off on her: a hit, and it knocks her back)
+    this.physics.add.overlap(this.gRockets, this.queen.spr, (a, b) => {
+      const r = (a instanceof Rocket ? a : b) as Rocket;
+      if (r.active && this.queen.dangerous) r.explode();
+    });
 
     this.heartsG = this.add.graphics().setDepth(DEPTH.text);
     this.confetti = new SimpleConfetti(this, DEPTH.fx);
@@ -1129,6 +1141,9 @@ export class WrestleScene extends Phaser.Scene {
     const input = p.input.poll();
     const jumpPressed = input.jump && !this.prevJump;
     this.prevJump = input.jump;
+    const fireNow = this.rawInput.poll().fire;
+    this.firePressed = fireNow && !this.prevFire;
+    this.prevFire = fireNow;
 
     if (this.fighting && p.alive) {
       if (this.climb) this.updateClimb(dt);
@@ -1381,6 +1396,7 @@ export class WrestleScene extends Phaser.Scene {
         c.img.setAlpha(1).setDepth(DEPTH.players - 0.1).setOrigin(0.5, (CHAIR_H - 2) / (CHAIR_H + 4));
         c.shadow.setVisible(false);
         p.sheet = makeCarrySheet(this, p.char);
+        this.game.events.emit('wrestle-chair', true);
         sfx.clank();
         this.fx.popText(p.x, p.body.top - 20, 'CHAIR!', '#e2e7ec', 18);
         c.swing = -2; // (-2: lifting)
@@ -1399,10 +1415,11 @@ export class WrestleScene extends Phaser.Scene {
       c.a = CARRY_SWING.lift + (-1.75 - CARRY_SWING.lift) * (u * u * (3 - 2 * u));
       p.frameOverride = u < 1 ? WrestleScene.carryFrame(c.a) : null;
       if (u >= 1) c.swing = -1;
-    } else if (c.swing < 0 && c.cd <= 0 && inReach && (toward === p.facing || gap < 20) && !this.climb) {
+    } else if (c.swing < 0 && c.cd <= 0 && this.firePressed && !this.climb) {
+      // the CHAIR button: swing it (if she's right there, turn to her)
       c.swing = 0;
       c.hit = false;
-      p.facing = toward;
+      if (inReach && gap < 20) p.facing = toward;
       sfx.whoosh();
     }
     if (c.swing >= 0) {
@@ -1416,7 +1433,7 @@ export class WrestleScene extends Phaser.Scene {
       p.frameOverride = WrestleScene.carryFrame(c.a);
       if (!c.hit && c.a > -0.75) {
         c.hit = true;
-        if (inReach && this.chairHit()) return;
+        if (inReach && toward === p.facing && this.chairHit()) return;
       }
       if (t > UP + DOWN + 0.12) {
         c.swing = -1;
@@ -1438,6 +1455,7 @@ export class WrestleScene extends Phaser.Scene {
     const p = this.player;
     p.sheet = null;
     p.frameOverride = null;
+    this.game.events.emit('wrestle-chair', false);
     c.state = 'fall';
     c.vy = -200;
     c.bounced = true;
@@ -1458,6 +1476,7 @@ export class WrestleScene extends Phaser.Scene {
     this.chair = null;
     p.sheet = null;
     p.frameOverride = null;
+    this.game.events.emit('wrestle-chair', false);
     c.shadow.destroy();
     const [x, y] = [c.img.x, c.img.y];
     c.img.setTexture('wr-chair-bent').setOrigin(0.5).setPosition(x + p.facing * 30, Math.min(y, q.top + 10));
@@ -1975,6 +1994,7 @@ export class WrestleScene extends Phaser.Scene {
     }
     p.sheet = null;
     p.frameOverride = null;
+    this.game.events.emit('wrestle-chair', false);
     this.heartPick?.img.destroy();
     this.heartPick = null;
     await this.wait(500);

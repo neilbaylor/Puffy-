@@ -158,10 +158,18 @@ export class TouchControls {
     this.root.hidden = false;
   }
 
-  /** The FIRE button shown or not (there's no bazooka in Queen Plop's wrestling ring). */
+  /** The FIRE button shown or not. */
   setFire(on: boolean) {
     this.fireBtn.hidden = !on;
     if (!on) touchState.fire = false;
+    if (on) this.setChair(false);
+  }
+
+  /** In Queen Plop's ring, holding the folding chair: the FIRE button swings it instead. */
+  setChair(on: boolean) {
+    this.fireBtn.classList.toggle('chair', on);
+    this.fireBtn.setAttribute('aria-label', on ? 'Swing the chair' : 'Fire');
+    this.fireBtn.querySelector('span')!.textContent = on ? 'CHAIR' : 'FIRE';
   }
 
   /** Online battles: the BOMB button shows (with how many) once you've picked some up. */

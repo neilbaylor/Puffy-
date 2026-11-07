@@ -841,6 +841,11 @@ html:has(body.booting) body { background: #5fc4ff; }
   font-size: calc(var(--jump) * 0.2);
   background: radial-gradient(circle at 35% 30%, #a6f27a, #46b33a 70%);
 }
+.tbtn-fire.chair {
+  font-size: calc(var(--fire) * 0.18);
+  background: radial-gradient(circle at 35% 30%, #eef2f5, #8f9aa6 70%);
+  color: #1a0e06;
+}
 .tbtn-fire {
   right: calc(18px + var(--safe-r) + var(--jump) + 10px);
   bottom: calc(18px + var(--safe-b) + var(--jump) * 0.35);
