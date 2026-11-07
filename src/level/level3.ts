@@ -5,25 +5,31 @@ import { LevelBuilder, type LevelData } from './builder';
  * and covered in poo. It runs very slightly downhill (with the odd little rise),
  * except the two boulder runs, which are STEEP: a giant rock comes rolling down
  * after you, so keep running, dodge the Plops, and jump the chasm at the
- * bottom — the rock tumbles in (on the second run it sinks in a poo puddle). Puddles of poo are like quicksand: you sink
- * slowly, so keep hopping to get across. Mid-level the Plops are playing
- * beach volleyball, and they spike the ball at you.
+ * bottom — the rock tumbles in (on the second run it sinks in a poo puddle).
+ * Puddles of poo are like quicksand: you sink slowly, so keep hopping to get
+ * across. Mid-level the Plops are playing beach volleyball, and they spike the
+ * ball at you. Two jumping sections: pillars standing in poo (miss and you can
+ * still hop back out), and later pillars over bottomless pits.
  * Heights are tiles from the bottom (the level is 52 tall).
  *
  *   0-28    Poo-covered meadow (a little rise), first Plops
- *   29-37   Poo puddle #1 (small: learn to hop out)
- *   38-58   A poo goat, a Big Plop, a floating island with root beer
+ *   29-33   Poo puddle #1 (small: learn to hop out)
+ *   34-46   GIANT PLOP on the meadow, a poo goat
+ *   47-58   A Big Plop, a floating island with root beer (off the ledge)
  *   59-80   GIANT PLOP #1 · checkpoint 1
  *   81-130  BOULDER RUN #1 (easier): a long steep slope, three Plops, an 8-wide chasm
  *   131-151 Poo puddle #2 (wide)
- *   152-169 BEACH VOLLEYBALL: they spike the ball at you
- *   170-190 A rise with a poo goat, GIANT PLOP #2 · checkpoint 2
- *   191-237 BOULDER RUN #2 (harder: faster rock, a Big Plop, a Plop parachuting in, the rock sinks in a poo puddle)
- *   238-258 Poo puddle #3, checkpoint 3
- *   259-289 A last rise with a poo goat, the last Plops, the gate
+ *   152-177 POO PITS: 3-wide pillars standing in poo, 4-tile gaps (semi-difficult)
+ *   178-195 BEACH VOLLEYBALL: they spike the ball at you
+ *   196-216 A rise with a poo goat, GIANT PLOP #2 · checkpoint 2
+ *   217-263 BOULDER RUN #2 (harder: faster rock, a Big Plop, a Plop parachuting in, the rock sinks in a poo puddle)
+ *   264-284 Poo puddle #3, checkpoint 3
+ *   285-313 THE PITS: pillars and an island over bottomless pits, 4–5 tile gaps (difficult)
+ *   314-327 GIANT PLOP #3 · checkpoint 4
+ *   328-358 A last rise with a poo goat, the last Plops, a GIANT PLOP guarding the gate
  */
 export function buildLevel3(): LevelData {
-  const L = new LevelBuilder('Plop Invasion · Part 1', 'World 2', 290, 52);
+  const L = new LevelBuilder('Plop Invasion · Part 1', 'World 2', 360, 52);
   L.pal = 'poo';
 
   // ── Poo-covered meadow ───────────────────────────────────────
@@ -43,8 +49,8 @@ export function buildLevel3(): LevelData {
   L.aura(31, 43);
   // (the far side as high as the poo, so you have to get out of it)
   L.ground(34, 46, 40);
-  L.spawn('plop', 38, 40);
-  L.spawn('poogoat', 44, 40);
+  L.spawn('giantplop', 40, 40);
+  L.spawn('poogoat', 45, 40);
 
   // ── A Big Plop, and a floating island off the ledge ──────────
   L.ground(47, 52, 41);
@@ -82,55 +88,91 @@ export function buildLevel3(): LevelData {
   // ── Poo puddle #2 (wide: hop, hop, hop) ─────────────────────
   L.puddle(140, 147, 24);
   L.aura(143.5, 27);
-  L.ground(148, 151, 24);
+  L.ground(148, 153, 24);
   L.spawn('tree', 149.5, 24, { h: 52 });
 
+  // ── POO PITS: 3-wide pillars standing in poo, 4 tiles apart (semi-difficult) ──
+  // a running jump (or a jump and a double jump) gets you from one to the next; fall
+  // short and you're in the poo: hop, double jump, and you're back on a pillar (every puddle has a
+  // side no more than 2 tiles above the poo, so you can always climb out)
+  L.puddle(154, 157, 22);
+  L.ground(158, 160, 24);
+  L.puddle(161, 164, 22);
+  L.ground(165, 167, 25);
+  L.puddle(168, 171, 22);
+  L.ground(172, 174, 24);
+  L.puddle(175, 176, 22);
+  L.ground(177, 177, 23);
+  L.auraArc(155.5, 2, 28, 1);
+  L.aura(166, 29);
+  L.auraArc(169, 2, 29, 1);
+  L.spawn('para', 169, 31, { kind: 'plop' });
+
   // ── BEACH VOLLEYBALL ─────────────────────────────────────────
-  L.ground(152, 169, 23);
-  L.spawn('volley', 161, 23, { w: 15 });
-  L.rootbeer(161, 28); // right over the net
+  L.ground(178, 195, 23);
+  L.spawn('volley', 187, 23, { w: 15 });
+  L.rootbeer(187, 28); // right over the net
 
   // ── A rise with a poo goat, GIANT PLOP #2 · checkpoint 2 ────
-  L.ground(170, 176, 24);
-  L.spawn('poogoat', 174, 24);
-  L.ground(177, 190, 23);
-  L.spawn('giantplop', 182, 23);
-  L.spawn('tree', 179, 23, { h: 60 });
-  L.aura(186, 26);
-  L.spawn('checkpoint', 189, 23);
+  L.ground(196, 202, 24);
+  L.spawn('poogoat', 200, 24);
+  L.ground(203, 216, 23);
+  L.spawn('giantplop', 208, 23);
+  L.spawn('tree', 205, 23, { h: 60 });
+  L.aura(212, 26);
+  L.spawn('checkpoint', 215, 23);
 
-  // ── BOULDER RUN #2 (harder): faster rock, more in the way, a wider chasm ──
-  for (let i = 0; i < 13; i++) L.ground(191 + i * 3, 193 + i * 3, 23 - i);
-  L.chase(194, 230, 1.7);
-  L.spawn('bigplop', 201, 20);
-  L.spawn('plop', 208, 18);
-  L.spawn('para', 214, 16, { kind: 'plop' });
-  L.spawn('plop', 219, 14);
-  L.spawn('plop', 225, 12);
-  L.aura(205, 22);
-  L.aura(216, 19);
+  // ── BOULDER RUN #2 (harder): faster rock, more in the way ───
+  for (let i = 0; i < 13; i++) L.ground(217 + i * 3, 219 + i * 3, 23 - i);
+  L.chase(220, 256, 1.7);
+  L.spawn('bigplop', 227, 20);
+  L.spawn('plop', 234, 18);
+  L.spawn('para', 240, 16, { kind: 'plop' });
+  L.spawn('plop', 245, 14);
+  L.spawn('plop', 251, 12);
+  L.aura(231, 22);
+  L.aura(242, 19);
   // at the bottom, a big poo puddle: jump it (or hop through it), and the rock sinks in it
-  L.puddle(230, 237, 10);
-  L.ground(238, 247, 10);
-  L.auraArc(239, 3, 13, 1);
+  L.puddle(256, 263, 10);
+  L.ground(264, 273, 10);
+  L.auraArc(265, 3, 13, 1);
 
   // ── Poo puddle #3, checkpoint 3 ─────────────────────────────
-  L.puddle(248, 254, 10);
-  L.rootbeer(251, 14); // over the puddle: a jump from the edge
-  L.ground(255, 258, 10);
-  L.spawn('checkpoint', 257, 10);
+  L.puddle(274, 280, 10);
+  L.rootbeer(277, 14); // over the puddle: a jump from the edge
+  L.ground(281, 286, 10);
+  L.spawn('checkpoint', 283, 10);
 
-  // ── A last rise, the last Plops, the gate ──────────────────
-  L.ground(259, 266, 9);
-  L.spawn('plop', 262, 9);
-  L.ground(267, 272, 10);
-  L.spawn('poogoat', 270, 10);
-  L.ground(273, 289, 9);
-  L.spawn('bigplop', 277, 9);
-  L.spawn('tree', 275, 9, { h: 58 });
-  L.auraArc(279, 3, 12, 1);
-  L.spawn('plop', 281, 9);
-  L.spawn('tree', 283, 9, { h: 64 });
-  L.spawn('goal', 286, 9);
+  // ── THE PITS: pillars and an island over bottomless pits (difficult) ──
+  // 4–5 tiles between them, some a step up: run, and keep your double jump for when you need it
+  L.ground(291, 292, 12);
+  L.ground(297, 298, 13);
+  L.island(304, 306, 12, 1, false);
+  L.ground(309, 311, 10);
+  L.auraArc(289, 2, 15, 1);
+  L.aura(297.5, 16);
+  L.auraArc(301, 2, 17, 2);
+  L.aura(310, 13);
+  L.spawn('para', 300, 18, { kind: 'plop' });
+
+  // ── GIANT PLOP #3 · checkpoint 4 ────────────────────────────
+  L.ground(314, 327, 11);
+  L.spawn('tree', 316, 11, { h: 58 });
+  L.spawn('giantplop', 320, 11);
+  L.aura(323, 14);
+  L.spawn('checkpoint', 325, 11);
+
+  // ── A last rise, the last Plops, a GIANT PLOP guarding the gate ──
+  L.ground(328, 335, 9);
+  L.spawn('plop', 331, 9);
+  L.ground(336, 341, 10);
+  L.spawn('poogoat', 339, 10);
+  L.ground(342, 359, 9);
+  L.spawn('tree', 344, 9, { h: 58 });
+  L.spawn('giantplop', 347, 9);
+  L.auraArc(349, 3, 12, 1);
+  L.spawn('plop', 351, 9);
+  L.spawn('tree', 353, 9, { h: 64 });
+  L.spawn('goal', 356, 9);
   return L.build();
 }

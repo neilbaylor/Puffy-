@@ -10,7 +10,7 @@ import { ONE_WAY_TILES, SOLID_TILES } from '../level/tiles';
 
 const PAD = 34; // room around each terrain piece for grass blades / roots
 /** Terrain pieces are cut into chunks no wider than this (world px), to stay under mobile texture limits. */
-const CHUNK = 1600;
+const CHUNK = 800;
 /** Colour of the deep rock under each terrain chunk (sampled once, when the chunk is drawn). */
 const DEEP_FILL = new Map<string, number>();
 
