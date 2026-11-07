@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.85)
+## Where things stand (v0.86)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -33,7 +33,13 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   level is beaten, mute (top-left), full screen + **Battle** buttons (top-right, same height, side by side).
 - v0.84: a loading screen with a progress bar; behind it everything the start screen needs is prepared, so it's
   smooth from the first moment (on a 4× slowed CPU the first hero tap went from 3.7 s to under 0.6 s).
-  It draws the looks for both levels (so switching Part 1 / Part 2 on the start screen is instant).
+  Since v0.86 it draws only the starting level's looks: one level at a time keeps its looks and scenery
+  in memory (`ensureLevelLooks` / `freeLooksExcept` in `gfx/textures.ts`), so memory doesn't grow with more
+  levels; picking another level draws its looks behind the fade. The start-screen fly-over loops over the first
+  fifth of the level (`MenuScene.loopEnd`) instead of crossing and keeping the whole level. Measured: 86 MB
+  with Part 2 / 62 MB with Part 1 at the start screen (was ~123 MB and growing).
+- The loading screen hides the start screen underneath (`body.booting`) until it fades: on iPhones parts of
+  the page underneath showed through / overflowed on the left.
 - v0.85: the start screen opens on the furthest level you've unlocked (`latestLevel()` in `levels.ts`); no
   automatic full screen (the owner only wants the button, or installing the game); the start screen's song
   tries to start without a tap (works where the browser allows it, e.g. Chrome with the game installed;
