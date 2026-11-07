@@ -21,6 +21,7 @@ import { VolleyMatch } from '../entities/Volley';
 import { soloSource, sourceById } from '../input/devices';
 import type { EnemyKind } from '../level/builder';
 import { levelInfo } from '../level/levels';
+import { preloadHoopsMusic } from '../core/music';
 import { buildLevel1 } from '../level/level1';
 import { T } from '../level/tiles';
 import { Background, type View } from '../world/Background';
@@ -238,6 +239,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   create() {
+    this.bossSongReady = false;
     this.levelId = this.data0.level ?? 1;
     const data = (levelInfo(this.levelId).build ?? buildLevel1)();
     this.wideZones = data.wide ?? [];
@@ -493,12 +495,19 @@ export class GameScene extends Phaser.Scene {
 
   // ───────────────────────────────────────────── frame loop ──
 
+  private bossSongReady = false;
+
   update(_time: number, deltaMs: number) {
     const dt = Math.min(deltaMs / 1000, 1 / 30);
     if (this.intro) return this.updateIntro(dt);
 
     this.updatePuddles(dt);
     this.updateDrips(dt);
+    // two-thirds of the way through a level with a boss: get the boss's song ready
+    if (!this.bossSongReady && (levelInfo(this.levelId).wrestle || levelInfo(this.levelId).hoops) && (this.players[0]?.x ?? 0) > this.level.widthPx * 0.66) {
+      this.bossSongReady = true;
+      preloadHoopsMusic();
+    }
     for (const p of this.players) {
       p.update(dt);
       if (p.alive && p.body.top > this.level.heightPx + 40) p.faint(true);
