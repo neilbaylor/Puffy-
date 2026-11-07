@@ -108,3 +108,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.103: signs you back in by itself; battles use your player's name ("v1.03")
 - v0.104: bad guys sink in the poo too ("v1.04")
 - v0.105: livelier Plops, a root beer badge (versions back on v0.x)
+- v0.106: sign-in question on two lines, root beer badge breathing room
