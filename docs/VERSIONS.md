@@ -124,3 +124,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.119: wrestling: ring wider (posts at stage x 40/1240), no steps, ropes keep you in at any height; the mat has a hole under the puddle (quicksand via p.goo + view crop; under → BLUB, hurt, spat out); queen uses her own full-mat static group; "FROM THE TOP ROPE!" callout + jumbotron on the dive; 10 hits; no bazooka (input wrapped with fire=false; TouchControls.setFire(false))
 - v0.120: Queen Plop: long cinematic entrance, tougher/jumpier AI, sharper art (Q_RES 4), top-rope pop text
 - v0.121: Queen Plop 20 hits, higher jumps + rumble, rolling poo throw, folding chair, hearts over head (no HUD/nuggies), shorter intro, nicer bubble
+- v0.122: folded grey chair held overhead + swung (hero carry frames), Queen name card, shorter intro

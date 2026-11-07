@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.121)
+## Where things stand (v0.122)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -187,6 +187,17 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   deferred art + MenuScene's quiet jobs (`takeQuietJobs`) + 24 warm-up frames under the loading bar
   (two-phase bar); the boot screen is the manifest blue with the rainbow PUFFY logo. Results after the last
   level: Play again + Home screen. Account card: Sign out bottom-left.
+- v0.122 chair + card: `drawFoldingChair` is now a folded chair stood on end (CHAIR_W 30 × CHAIR_H 74,
+  grip = the feet at the bottom; `bent` folds it in a V). Heroes have a carry mode (`carry`,
+  `carryArms`, `carryHand`, `CARRY_SWING` in gfx/draw.ts; used by puffy/scruffy/muscles.ts: no bazooka,
+  both arms to the hands). `makeCarrySheet()` (gfx/textures.ts) builds `char-<id>-carry` = every POSE
+  + sw0–sw3 + lift; built at fight start. Player has `sheet` (alternate sheet) and `frameOverride`.
+  WrestleScene: pick up → lift tween → held overhead (chair sprite at `heroHand(a)`, rotated along the
+  arms, depth just behind the hero); auto swing when she's within ~0.85 chair lengths and in front
+  (wind-up then down; the hit at a > −0.75). Hit → `chairHit()` (2 hits, bent, flies off). Queen's
+  name card = Hoops' lower third (`.hoops-l3.wr-l3`, pink) from the spotlight reveal to the
+  turnbuckle. Speech bubble `width: max-content`, clamped by its real width. Test: t106 <hero>.
+  (The start screen remembers the last hero played: `puffy.hero` in localStorage.)
 - v0.121 Queen Plop round 2 (`WrestleScene.ts`): HITS 20 (rage = 1 + lost/HITS·0.8). Bigger,
   more frequent hops/lunges (−430…−760); `queenLanded()` rumbles camera + ropes on landings over
   300 px/s (like the Giant Plops). New 'heave' mode: `heaveAt()` throws a big lump of poo (`Lob.big`)
