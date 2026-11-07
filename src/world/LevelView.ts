@@ -85,6 +85,9 @@ export class LevelView {
   /** Trees, flowers and grass that sway in the breeze. */
   private sway: { img: Phaser.GameObjects.Image; amp: number; speed: number; ph: number }[] = [];
 
+  /** The plain deep rock under every terrain chunk (one shape for the whole level). */
+  private deepG: Phaser.GameObjects.Graphics | null = null;
+
   /** Every terrain chunk's picture, drawn or not (see `paintJobs`). */
   private paints: { key: string; paint: () => boolean }[] = [];
 
@@ -281,7 +284,9 @@ export class LevelView {
           if (cut < y1 + PAD && fillCol !== undefined) {
             // the deep rock: from just above the cut down to the bottom of the level, with
             // the piece's outline continuing down its sides
-            const g = this.scene.add.graphics().setDepth(DEPTH.tiles - 0.01);
+            // (all of them in one shape: dozens of separate ones cost more to draw every frame)
+            this.deepG ??= this.scene.add.graphics().setDepth(DEPTH.tiles - 0.01);
+            const g = this.deepG;
             const gx0 = Math.max(cx0, x0 + 3);
             const gx1 = Math.min(cx0 + cw, x1 - 3);
             g.fillStyle(fillCol, 1).fillRect(gx0, cut - 6, gx1 - gx0, this.heightPx + 200 - cut);

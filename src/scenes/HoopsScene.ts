@@ -44,6 +44,7 @@ import {
 import { stingerReveal, stingerTitle } from '../ui/stinger';
 import { addCanvas, hires } from '../gfx/textures';
 import { BOOM_FRAMES, BOOM_SIZE, drawBoomFrame } from '../gfx/boom';
+import { drawEmber, drawFireball, drawFluffChunk, drawSmoke } from '../gfx/blast';
 import { gamepadSources } from '../input/gamepad';
 import { isKeyDown } from '../input/keyboard';
 import { usingTouch } from '../input/touch';
@@ -908,14 +909,15 @@ export class HoopsScene extends Phaser.Scene {
       });
       addCanvas(this, 'kingboom', c, (t) => BOOM_FRAMES.forEach((f, i) => t.add(f, 0, (i % COLS) * fw, Math.floor(i / COLS) * fw, fw, fw)));
     }
-    const FT = 95; // ms per frame (a beat longer than a quick pop)
-    const boom = this.add.image(cx, cy, 'kingboom', 'b0').setDepth(12.25).setScale(1.5 / 1.5);
-    BOOM_FRAMES.forEach((f, i) => this.time.delayedCall(i * FT, () => boom.setFrame(f)));
-    this.tweens.add({ targets: boom, scale: 2 / 1.5, duration: BOOM_FRAMES.length * FT, ease: 'Sine.easeOut' });
-    this.tweens.add({ targets: boom, alpha: 0, delay: BOOM_FRAMES.length * FT - 100, duration: 380, onComplete: () => boom.destroy() });
-    // fireball glow
-    const glow = this.add.image(cx, cy, 'spot').setBlendMode(Phaser.BlendModes.ADD).setTint(0xffd27a).setDepth(12.2).setScale(0.2).setAlpha(1);
-    this.tweens.add({ targets: glow, scale: 3.2, alpha: 0, duration: 900, ease: 'Cubic.easeOut', onComplete: () => glow.destroy() });
+    // the flash and the spiky starburst (the first frames of the hand-drawn BOOM); after that it's
+    // a real fireball, rolling smoke, embers and bits of the King flying off
+    const FT = 70;
+    const BURST = 5;
+    const boom = this.add.image(cx, cy, 'kingboom', 'b0').setDepth(12.25).setScale(1.25);
+    for (let i = 1; i < BURST; i++) this.time.delayedCall(i * FT, () => boom.setFrame(BOOM_FRAMES[i]));
+    this.tweens.add({ targets: boom, scale: 1.6, duration: BURST * FT + 160, ease: 'Sine.easeOut' });
+    this.tweens.add({ targets: boom, alpha: 0, delay: BURST * FT - 40, duration: 200, onComplete: () => boom.destroy() });
+    this.blastFx(cx, cy, k.y);
     // shockwave rings
     for (const [delay, col, w] of [[0, 0xffffff, 14], [90, 0xffd23f, 8], [180, 0xff8fb3, 5]] as const) {
       const ring = this.add.graphics().setDepth(12.3).setBlendMode(Phaser.BlendModes.ADD);
@@ -933,12 +935,6 @@ export class HoopsScene extends Phaser.Scene {
         },
         onComplete: () => ring.destroy(),
       });
-    }
-    // smoke puffs rolling out
-    for (let i = 0; i < 16; i++) {
-      const a = (i / 16) * Math.PI * 2;
-      const p = this.add.image(cx, cy, 'softshadow').setTint(0xffffff).setAlpha(0.5).setDepth(11.9).setDisplaySize(90, 70);
-      this.tweens.add({ targets: p, x: cx + Math.cos(a) * 260, y: cy + Math.sin(a) * 170, displayWidth: 260, displayHeight: 200, alpha: 0, duration: 1400 + Math.random() * 500, ease: 'Cubic.easeOut', onComplete: () => p.destroy() });
     }
     // THE blast
     // the biggest confetti blast in the game, by a lot
@@ -984,6 +980,95 @@ export class HoopsScene extends Phaser.Scene {
         },
       });
     });
+  }
+
+  /**
+   * The explosion itself: a lumpy fireball that swells and cools (white → yellow → orange), smoke
+   * rolling out and up (dark first, then pale, spreading along the floor too), embers raining down,
+   * and chunks of the King's fluff flying off, bouncing on the court and fading. `floor`: his feet.
+   */
+  private blastFx(cx: number, cy: number, floor: number) {
+    const R = 2;
+    if (!this.textures.exists('fx-fire')) addCanvas(this, 'fx-fire', hires(160, 160, R, (ctx) => drawFireball(ctx, 160)));
+    for (let i = 0; i < 3; i++) if (!this.textures.exists(`fx-smoke${i}`)) addCanvas(this, `fx-smoke${i}`, hires(140, 140, R, (ctx) => drawSmoke(ctx, 140, 11 + i * 7)));
+    if (!this.textures.exists('fx-ember')) addCanvas(this, 'fx-ember', hires(24, 24, R, (ctx) => drawEmber(ctx, 24)));
+    for (let i = 0; i < 4; i++) if (!this.textures.exists(`fx-chunk${i}`)) addCanvas(this, `fx-chunk${i}`, hires(40, 40, R, (ctx) => drawFluffChunk(ctx, 40, 31 + i * 13)));
+    const rnd = (a: number, b: number) => a + Math.random() * (b - a);
+    // the fireball: a few lumps of fire, swelling and cooling
+    for (const [delay, tint, s1, dur] of [[0, 0xffffff, 2.4, 700], [40, 0xffe7a0, 3.0, 850], [90, 0xffb050, 3.4, 950], [150, 0xff7a3a, 3.6, 1050]] as const) {
+      const f = this.add.image(cx + rnd(-20, 20), cy + rnd(-16, 16), 'fx-fire').setBlendMode(Phaser.BlendModes.ADD).setTint(tint).setDepth(12.2).setScale(0.2 / R).setAngle(rnd(0, 360)).setAlpha(0);
+      this.tweens.add({ targets: f, alpha: 1, delay, duration: 60 });
+      this.tweens.add({ targets: f, scale: s1 / R, angle: f.angle + rnd(-40, 40), delay, duration: dur, ease: 'Cubic.easeOut' });
+      this.tweens.add({ targets: f, alpha: 0, delay: delay + dur * 0.35, duration: dur * 0.65, ease: 'Sine.easeIn', onComplete: () => f.destroy() });
+    }
+    // smoke: dark and close first, paler as it rolls out; it rises, spreads, and fades
+    for (let i = 0; i < 26; i++) {
+      const a = (i / 26) * Math.PI * 2 + rnd(-0.2, 0.2);
+      const d = rnd(150, 300);
+      const early = i % 3 !== 0;
+      const sm = this.add
+        .image(cx + Math.cos(a) * 12, cy + Math.sin(a) * 10, `fx-smoke${i % 3}`)
+        .setDepth(early ? 12.15 : 12.1)
+        .setTint(early ? 0x8a7f86 : 0xd6cfd8)
+        .setScale(0.35 / R)
+        .setAngle(rnd(0, 360))
+        .setAlpha(0);
+      const delay = 80 + rnd(0, 200);
+      const dur = rnd(1700, 2600);
+      // (it can't sink through the court: the lower half rolls out flat along the floor)
+      const ty = Math.min(cy + Math.sin(a) * d * 0.55 - rnd(40, 110), floor - 30);
+      this.tweens.add({ targets: sm, alpha: early ? 0.95 : 0.8, delay, duration: 140 });
+      this.tweens.add({ targets: sm, x: cx + Math.cos(a) * d, y: ty, scale: rnd(1.5, 2.3) / R, angle: sm.angle + rnd(-60, 60), delay, duration: dur, ease: 'Cubic.easeOut' });
+      this.tweens.add({ targets: sm, alpha: 0, delay: delay + dur * 0.45, duration: dur * 0.55, ease: 'Sine.easeIn', onComplete: () => sm.destroy() });
+    }
+    // a ring of dust kicked along the court
+    for (const dir of [-1, 1])
+      for (let i = 0; i < 4; i++) {
+        const du = this.add.image(cx, floor - 10, `fx-smoke${i % 3}`).setDepth(12.05).setTint(0xcfc2b2).setScale(0.3 / R, 0.18 / R).setAlpha(0.85);
+        this.tweens.add({ targets: du, x: cx + dir * rnd(180, 420), scaleX: rnd(1.6, 2.2) / R, scaleY: rnd(0.6, 0.9) / R, alpha: 0, delay: 60 + i * 50, duration: rnd(1100, 1600), ease: 'Cubic.easeOut', onComplete: () => du.destroy() });
+      }
+    // embers: thrown out hot, falling back down, fading
+    const embers = this.add.particles(cx, cy, 'fx-ember', {
+      emitting: false,
+      speed: { min: 260, max: 900 },
+      angle: { min: 0, max: 360 },
+      gravityY: 900,
+      lifespan: { min: 700, max: 1500 },
+      scale: { start: 0.9 / R, end: 0 },
+      alpha: { start: 1, end: 0.2 },
+      blendMode: Phaser.BlendModes.ADD,
+    }).setDepth(12.3);
+    embers.explode(110);
+    this.time.delayedCall(1800, () => embers.destroy());
+    // chunks of the King's fluff: flung out, spinning, bouncing on the court, then fading away
+    for (let i = 0; i < 16; i++) {
+      const ch = this.add.image(cx + rnd(-20, 20), cy + rnd(-20, 20), `fx-chunk${i % 4}`).setDepth(12.18).setScale(rnd(0.55, 1.1) / R);
+      const st = { vx: rnd(-650, 650), vy: rnd(-900, -250), spin: rnd(-720, 720), t: 0, bounces: 0 };
+      const ev = this.time.addEvent({
+        delay: 16,
+        loop: true,
+        callback: () => {
+          const dt = 0.016;
+          st.t += dt;
+          st.vy += 1500 * dt;
+          ch.x += st.vx * dt;
+          ch.y += st.vy * dt;
+          ch.angle += st.spin * dt;
+          if (ch.y > floor - 6 && st.vy > 0) {
+            ch.y = floor - 6;
+            st.vy *= -0.38;
+            st.vx *= 0.6;
+            st.spin *= 0.5;
+            st.bounces++;
+          }
+          if (st.t > 1.6) ch.setAlpha(Math.max(0, 1 - (st.t - 1.6) / 0.6));
+          if (st.t > 2.2) {
+            ev.remove();
+            ch.destroy();
+          }
+        },
+      });
+    }
   }
 
   /** A celebration: cannons from both sides, then confetti raining down for a while. */

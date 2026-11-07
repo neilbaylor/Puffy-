@@ -317,7 +317,9 @@ export class GameScene extends Phaser.Scene {
           const x0 = s.x * TILE;
           const x1 = (s.x + Number(s.opts?.w ?? 4)) * TILE;
           const g = this.add.graphics().setDepth(DEPTH.players + 0.6);
-          this.puddles.push({ x0, x1, y: s.y * TILE + 10, g, t: Math.random() * 10 });
+          const y = s.y * TILE + 10;
+          this.puddles.push({ x0, x1, y, g, t: Math.random() * 10 });
+          this.puddleBody(x0, x1, y);
           break;
         }
         case 'volley':
@@ -953,6 +955,36 @@ export class GameScene extends Phaser.Scene {
    * picture covers you as you go down), every jump pops you up and on, and if
    * you go right under, that's a life gone.
    */
+  /**
+   * The still part of a puddle, drawn once: the poo under the surface getting darker in soft
+   * bands, then plain dark all the way down (only the surface moves, so only that is drawn
+   * each frame — redrawing the whole puddle every frame was most of what made Part 3 heavier).
+   */
+  private puddleBody(x0: number, x1: number, y: number) {
+    const w = x1 - x0 + 4;
+    const R = 2;
+    const key = `puddle-body-${Math.round(w)}`;
+    if (!this.textures.exists(key)) {
+      const c = document.createElement('canvas');
+      c.width = Math.ceil(w * R);
+      c.height = 100 * R;
+      const ctx = c.getContext('2d')!;
+      ctx.scale(R, R);
+      ctx.fillStyle = POO.base;
+      ctx.fillRect(0, 0, w, 89);
+      ctx.fillStyle = POO_DARK.base;
+      ctx.fillRect(0, 89, w, 11);
+      // (the same bands as before: from 19 below the top, 14 of them, 5 tall, darker each time)
+      for (let k = 0; k < 14; k++) {
+        ctx.globalAlpha = 0.07 + k * 0.066;
+        ctx.fillRect(0, 19 + k * 5, w, 5);
+      }
+      this.textures.addCanvas(key, c);
+    }
+    this.add.image(x0 - 2, y + 3, key).setOrigin(0, 0).setScale(1 / R).setDepth(DEPTH.players + 0.59);
+    this.add.rectangle(x0 - 2, y + 102, w, this.level.heightPx + 40 - (y + 100), hexOf(POO_DARK.base)).setOrigin(0, 0).setDepth(DEPTH.players + 0.59);
+  }
+
   private updatePuddles(dt: number) {
     for (const p of this.players) {
       let goo = 0;
@@ -1011,21 +1043,19 @@ export class GameScene extends Phaser.Scene {
       g.clear();
       if (pd.x1 < left || pd.x0 > right) continue;
       const y = pd.y;
-      const bottom = this.level.heightPx + 40;
       // the body of the puddle, all the way down (whatever sinks in it, disappears)
       const pts: Phaser.Types.Math.Vector2Like[] = [];
       for (let x = pd.x0 - 2; x <= pd.x1 + 2; x += 6) pts.push({ x, y: y + Math.sin(x * 0.07 + pd.t * 2.2) * 1.8 + Math.sin(x * 0.19 - pd.t * 3.1) * 0.9 });
       const w = pd.x1 - pd.x0 + 4;
-      // deeper = darker, in soft bands (it's thick and glossy, not a slab)
-      g.fillStyle(hexOf(POO_DARK.base), 1).fillRect(pd.x0 - 2, y + 8, w, bottom - y);
+      // (deeper = darker, in soft bands: that part is drawn once, in puddleBody; here just the
+      // wavy surface down to where it starts)
       g.fillStyle(hexOf(POO.base), 1);
       g.beginPath();
-      g.moveTo(pd.x0 - 2, y + 92);
+      g.moveTo(pd.x0 - 2, y + 5);
       for (const q of pts) g.lineTo(q.x, q.y);
-      g.lineTo(pd.x1 + 2, y + 92);
+      g.lineTo(pd.x1 + 2, y + 5);
       g.closePath();
       g.fillPath();
-      for (let k = 0; k < 14; k++) g.fillStyle(hexOf(POO_DARK.base), 0.07 + k * 0.066).fillRect(pd.x0 - 2, y + 22 + k * 5, w, 5);
       // slow swirls stirring in it
       for (let i = 0; i < Math.max(2, Math.round(w / 60)); i++) {
         const sx = pd.x0 + ((i + 0.5) / Math.max(2, Math.round(w / 60))) * w + Math.sin(pd.t * 0.5 + i * 2) * 8;
@@ -1033,7 +1063,8 @@ export class GameScene extends Phaser.Scene {
         const a = pd.t * (i % 2 ? 0.9 : -0.9) + i;
         g.lineStyle(2, hexOf(POO.light), 0.32);
         g.beginPath();
-        for (let k = 0; k <= 18; k++) {
+        // (every other point: it reads the same, and costs half)
+        for (let k = 0; k <= 18; k += 2) {
           const ang = a + k * 0.55;
           const rr = 1.5 + k * 0.45;
           const px = sx + Math.cos(ang) * rr * 1.5;
