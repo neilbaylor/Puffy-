@@ -71,7 +71,8 @@ body {
   padding: 80px calc(96px + var(--safe-r)) 80px calc(96px + var(--safe-l));
   font: 400 clamp(20px, 6vmin, 28px) var(--display);
   color: #fff;
-  background: linear-gradient(#6ec3ff, #fff3dc);
+  /* the same blue as the app's splash on Android (manifest background_color), so one runs into the other */
+  background: radial-gradient(ellipse at 50% 40%, #8fd6ff, #5fc4ff 70%);
   /* (its own layer, so nothing being prepared underneath can show through on iPhones) */
   transform: translateZ(0);
   transition: opacity 0.3s ease;
@@ -83,7 +84,9 @@ body {
 body.booting #ui { visibility: hidden; }
 /* (and whatever still peeks out matches the bottom of the loading screen) */
 html:has(body.booting),
-html:has(body.booting) body { background: #fff3dc; }
+html:has(body.booting) body { background: #5fc4ff; }
+/* the rainbow PUFFY over the loading bar */
+#boot .boot-logo { margin-bottom: clamp(10px, 3vmin, 22px); font-size: clamp(64px, 18vmin, 150px); }
 /* the loading bar: the game's art being drawn, then everything warmed up. One element, the gold
    part is its background sized by --p (nothing to clip, so it can't poke out of the rounded ends) */
 .boot-bar {
@@ -357,6 +360,8 @@ html:has(body.booting) body { background: #fff3dc; }
   align-items: center;
   gap: 4px;
 }
+/* first play (no Part picker yet): a bit more room between the heroes and Play */
+.start.no-levels .start-foot { margin-top: clamp(16px, 4vh, 40px); }
 /* a small, even margin under Play (it used to be nudged past the padding and
    could hang off the bottom of tablets) */
 .start { padding-bottom: calc(clamp(10px, 2vmin, 18px) + var(--safe-b)); }
@@ -2491,13 +2496,84 @@ kbd {
 /* signed in: the battle name is your player's (not editable) */
 .bl-namebox.locked input { cursor: default; }
 
-/* the signed-in account card: Sign out in the top-right corner, Done on the right under the table
+/* the signed-in account card: Sign out in the bottom-left corner, Done on the right under the table
    (a little space above it), and the hero lined up with the table (not the whole card) */
 .acct-card { position: relative; align-items: flex-start; }
-.acct-card .acct-out { position: absolute; top: 14px; right: 16px; }
+.acct-card .acct-out { position: absolute; left: 22px; bottom: 28px; }
 .acct-card .results-hero { margin-top: clamp(22px, 5vmin, 40px); }
 .acct-card .row { justify-content: flex-end; margin-top: 26px; }
 @media (max-height: 500px) {
   .acct-card .row { margin-top: 18px; }
   .acct-card .results-hero { margin-top: 22px; }
+}
+
+/* ── Queen Plop's ring (WrestleScene) ── */
+.wrestle {
+  position: absolute;
+  inset: 0;
+  pointer-events: none !important;
+  font-family: var(--display);
+  color: #fff;
+}
+/* big words: FIGHT! K.O.! */
+.wr-callout {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  transform: translate(-50%, -50%) scale(0.5);
+  opacity: 0;
+  font-size: clamp(44px, 12vmin, 96px);
+  color: #ffd23f;
+  -webkit-text-stroke: 0.14em #3a1d0c;
+  paint-order: stroke fill;
+  text-shadow: 0 0.08em 0 #3a1d0c;
+  transition: transform 0.28s cubic-bezier(0.2, 1.6, 0.4, 1), opacity 0.2s;
+  white-space: nowrap;
+}
+.wr-callout.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+.wr-callout.bad { color: #ff8a80; }
+/* a speech bubble over someone's head (placed by the scene; --tail points it at them) */
+.wr-speech {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  max-width: min(80vw, 520px);
+  padding: 12px 22px 11px;
+  border-radius: 20px;
+  background: #5c3118;
+  border: 4px solid #fff3d6;
+  box-shadow: 0 10px 24px #0008;
+  color: #ffd23f;
+  font-size: clamp(18px, 4.4vmin, 32px);
+  line-height: 1.1;
+  text-align: center;
+}
+.wr-speech[hidden] { display: none; }
+.wr-speech b { font-weight: 400; color: #fff; }
+.wr-speech::after {
+  content: '';
+  position: absolute;
+  left: calc(50% + var(--tail, 0px) - 14px);
+  bottom: -22px;
+  border: 14px solid transparent;
+  border-top: 18px solid #fff3d6;
+}
+.wr-skip {
+  position: absolute;
+  right: calc(14px + var(--safe-r));
+  bottom: calc(14px + var(--safe-b));
+  pointer-events: auto;
+  padding: 8px 16px;
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  font: 400 18px/1 var(--display);
+  color: var(--ink);
+}
+.wr-skip[hidden] { display: none; }
+/* (temporary) the start screen's straight-to-the-wrestling button */
+.wr-test-btn {
+  position: absolute;
+  right: calc(12px + var(--safe-r));
+  top: calc(66px + var(--safe-t));
+  z-index: 2;
 }

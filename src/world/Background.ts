@@ -25,12 +25,21 @@ interface Cloud {
   drift: number;
   bob: number;
   lumps: { x: number; y: number; r: number; ph: number; w: number }[];
+  /** Its picture (redrawn a few times a second as it changes shape), and the copies of it on screen. */
+  tex: Phaser.Textures.CanvasTexture;
+  imgs: Phaser.GameObjects.Image[];
+  next: number;
 }
+
+/** A cloud's picture: this box (in cloud units, × its size) and resolution; how often it's redrawn (s). */
+const CB = { x0: -92, y0: -62, w: 184, h: 80 };
+const CLOUD_RES = 1.5;
+const CLOUD_EVERY = 0.3;
 
 /** A band of living clouds at one parallax depth. */
 interface CloudBand {
-  g: Phaser.GameObjects.Graphics;
   clouds: Cloud[];
+  depth: number;
   fx: number;
   fy: number;
   anchor: number;
@@ -181,9 +190,14 @@ export class Background {
     for (let i = 0; i < n; i++) {
       const lumps = base.map(([x, y, rr]) => ({ x: x + (r() - 0.5) * 12, y: y + (r() - 0.5) * 8, r: rr * (0.8 + r() * 0.35), ph: r() * 6.28, w: 0.18 + r() * 0.3 }));
       for (let k = 0; k < 2; k++) if (r() < 0.6) lumps.push({ x: (r() - 0.5) * 56, y: -8 - r() * 8, r: 11 + r() * 9, ph: r() * 6.28, w: 0.15 + r() * 0.3 });
-      clouds.push({ x: (i / n) * width + r() * 90, y: ys[0] + r() * (ys[1] - ys[0]), s: size[0] + r() * (size[1] - size[0]), drift: (r() - 0.5) * 18, bob: r() * 6.28, lumps });
+      const cs = size[0] + r() * (size[1] - size[0]);
+      // (each cloud's own picture, shared by every scene that shows this sky)
+      const key = `bgcloud-${seed}-${i}`;
+      const T = this.scene.textures;
+      const tex = (T.exists(key) ? T.get(key) : T.createCanvas(key, Math.ceil(CB.w * cs * CLOUD_RES), Math.ceil(CB.h * cs * CLOUD_RES))) as Phaser.Textures.CanvasTexture;
+      clouds.push({ x: (i / n) * width + r() * 90, y: ys[0] + r() * (ys[1] - ys[0]), s: cs, drift: (r() - 0.5) * 18, bob: r() * 6.28, lumps, tex, imgs: [], next: -1 - r() * CLOUD_EVERY });
     }
-    return { g: this.scene.add.graphics().setDepth(depth).setAlpha(alpha), clouds, fx, fy, anchor, width, alpha };
+    return { clouds, depth, fx, fy, anchor, width, alpha };
   }
 
   /** The puffs of a cloud right now: each one slowly swells, shrinks and wanders, so the cloud keeps changing shape. */
@@ -208,35 +222,81 @@ export class Background {
     return pts;
   }
 
+  /**
+   * Draw a cloud's current shape into its picture: the shaded underside, the lit top (a touch
+   * smaller and lifted), soft highlights on the upper puffs, and the ink outline. (Done a few
+   * times a second, not every frame: they change shape slowly, and as pictures they're cheap
+   * to show — drawn as shapes every frame they were most of the game's drawing work.)
+   */
+  private paintCloud(c: Cloud, hi: number) {
+    const { fill, shade, ink } = this.cloudCol;
+    const ctx = c.tex.getContext();
+    const col = (n: number, a = 1) => `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, c.tex.width, c.tex.height);
+    const k = CLOUD_RES;
+    ctx.setTransform(k, 0, 0, k, -CB.x0 * c.s * k, -CB.y0 * c.s * k);
+    const lumps = this.lumpsNow(c);
+    const pts = this.silhouette(c, lumps);
+    const path = (f: (p: Phaser.Math.Vector2) => [number, number]) => {
+      ctx.beginPath();
+      pts.forEach((p, i) => {
+        const [x, y] = f(p);
+        if (i) ctx.lineTo(x, y);
+        else ctx.moveTo(x, y);
+      });
+      ctx.closePath();
+    };
+    path((p) => [p.x, p.y]);
+    ctx.fillStyle = col(shade);
+    ctx.fill();
+    path((p) => [p.x * 0.93, p.y * 0.9 - 3 * c.s]);
+    ctx.fillStyle = col(fill);
+    ctx.fill();
+    ctx.fillStyle = col(hi, 0.7);
+    for (const [lx, ly, lr] of lumps)
+      if (ly < 2) {
+        ctx.beginPath();
+        ctx.arc((lx - lr * 0.22) * c.s, (ly - lr * 0.3) * c.s, lr * 0.45 * c.s, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    path((p) => [p.x, p.y]);
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = col(ink);
+    ctx.stroke();
+    c.tex.refresh();
+  }
+
   private drawClouds(view: View, camUp: number, dt: number) {
     this.t += dt;
     this.cloudScroll += 5 * dt;
-    const { fill, shade, ink } = this.cloudCol;
-    const hi = lerpRgb(fill, 0xffffff, 0.65);
+    const hi = lerpRgb(this.cloudCol.fill, 0xffffff, 0.65);
     for (const band of this.bands) {
-      const g = band.g;
-      g.clear();
-      g.setPosition(view.left - 2, view.top + view.height * band.anchor + camUp * band.fy);
+      const ox = view.left - 2;
+      const oy = view.top + view.height * band.anchor + camUp * band.fy;
       const scroll = view.left * band.fx + this.cloudScroll * (band.fx / 0.16);
       for (const c of band.clouds) {
+        // a new shape now and then (each cloud on its own beat, so they don't all redraw at once)
+        if (this.t >= c.next) {
+          this.paintCloud(c, hi);
+          c.next = this.t + CLOUD_EVERY;
+        }
         const base = c.x + this.t * c.drift - scroll;
         let x = (((base % band.width) + band.width) % band.width) - 120;
         const y = c.y + Math.sin(this.t * 0.35 + c.bob) * 5;
-        const lumps = this.lumpsNow(c);
-        const pts = this.silhouette(c, lumps);
-        for (; x < view.width + 120; x += band.width) {
-          const at = pts.map((p) => new Phaser.Math.Vector2(x + p.x, y + p.y));
-          g.fillStyle(shade, 1);
-          g.fillPoints(at, true);
-          // lit top: same shape a touch smaller and lifted, leaving a shaded rim underneath
-          g.fillStyle(fill, 1);
-          g.fillPoints(pts.map((p) => new Phaser.Math.Vector2(x + p.x * 0.93, y + p.y * 0.9 - 3 * c.s)), true);
-          // soft highlights on the upper puffs give them volume
-          g.fillStyle(hi, 0.7);
-          for (const [lx, ly, lr] of lumps) if (ly < 2) g.fillCircle(x + (lx - lr * 0.22) * c.s, y + (ly - lr * 0.3) * c.s, lr * 0.45 * c.s);
-          g.lineStyle(1.6, ink, 1);
-          g.strokePoints(at, true, true);
+        let n = 0;
+        for (; x < view.width + 120; x += band.width, n++) {
+          if (!c.imgs[n])
+            c.imgs[n] = this.scene.add
+              .image(0, 0, c.tex.key)
+              .setOrigin(-CB.x0 / CB.w, -CB.y0 / CB.h)
+              .setScale(1 / CLOUD_RES)
+              .setDepth(band.depth)
+              .setAlpha(band.alpha);
+          c.imgs[n].setVisible(true).setPosition(ox + x, oy + y);
         }
+        for (; n < c.imgs.length; n++) c.imgs[n].setVisible(false);
       }
     }
   }

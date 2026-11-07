@@ -5,7 +5,14 @@ import { sfx } from '../core/sfx';
 import { ART_RES, WALK_FRAMES } from '../gfx/draw';
 import { FaceClock } from '../gfx/face';
 import { emptyInput, type InputSource, type InputState } from '../input/types';
-import type { GameScene } from '../scenes/GameScene';
+import type { Fx } from '../world/Fx';
+
+/** What a hero needs from the scene it's in (a level, or Queen Plop's ring). */
+export interface PlayerHost extends Phaser.Scene {
+  fx: Fx;
+  fireRocket(p: Player): void;
+  onPlayerFainted(p: Player): void;
+}
 
 const COYOTE = 0.1;
 const JUMP_BUFFER = 0.12;
@@ -81,7 +88,7 @@ export class Player {
   private eating = 0;
 
   constructor(
-    private scene: GameScene,
+    private scene: PlayerHost,
     readonly char: CharacterDef,
     readonly input: InputSource,
     x: number,

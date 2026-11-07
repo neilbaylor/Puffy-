@@ -1570,11 +1570,12 @@ export class GameScene extends Phaser.Scene {
       seconds: Math.round((Date.now() - run.startedAt) / 1000),
     };
     // no basketball at the end of this one (yet): the level's done at the gate
-    if (!levelInfo(this.levelId).hoops) {
+    const boss = levelInfo(this.levelId).wrestle ? 'Wrestle' : levelInfo(this.levelId).hoops ? 'Hoops' : null;
+    if (!boss) {
       this.time.delayedCall(2200, () => this.game.events.emit('level-complete', { ...res, level: this.levelId } satisfies ResultState));
       return;
     }
-    // ── transition to King Puff Ball's Basketball Palace ──
+    // ── transition to the boss: King Puff Ball's Basketball Palace, or Queen Plop's Poo Palace ──
     // the world rumbles, the camera pushes in on the hero, a flash, then the palace
     this.tweens.add({
       targets: this,
@@ -1591,7 +1592,7 @@ export class GameScene extends Phaser.Scene {
         this.cameras.main.flash(200, 255, 240, 200);
         sfx.whoosh();
         void stingerCover().then(() =>
-          this.scene.start('Hoops', { session: this.session, charId: p.char.id, checkpoint: this.lastCheckpoint, level: this.levelId, result: res } satisfies HoopsData),
+          this.scene.start(boss, { session: this.session, charId: p.char.id, checkpoint: this.lastCheckpoint, level: this.levelId, result: res } satisfies HoopsData),
         );
       },
     });

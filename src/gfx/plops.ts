@@ -7,7 +7,7 @@
  * Frame 96 × 104, feet on y = 100.
  */
 import type { Ctx } from './draw';
-import { ellipsePts, type Fill, type Pt, type Style } from './handdrawn';
+import { STYLES, ellipsePts, type Fill, type Pt, type Style } from './handdrawn';
 
 export type PlopFrame = 'idle' | 'run0' | 'run1' | 'yell0' | 'yell1' | 'walk0' | 'walk1' | 'walk2' | 'walk3' | 'idle1' | 'blink' | 'look' | 'grin' | 'hurt';
 /**
@@ -221,5 +221,66 @@ export function drawPlop(ctx: Ctx, ox: number, oy: number, f: PlopFrame, st: Sty
     st.shape(ctx, [[cx - 17, by + 3], [cx - 19, by - 15], [cx - 9, by - 5], [cx, by - 19], [cx + 9, by - 5], [cx + 19, by - 15], [cx + 17, by + 3]], GOLD, 2060, { lw: 1.1, light: [cx - 4, by - 8] });
     for (const [gx, gy] of [[-11, -2], [0, -5], [11, -2]] as const)
       st.shape(ctx, ellipsePts(cx + gx, by + gy, 2.4, 2.6, 0, 12), { base: '#e8463f', shade: '#b52c27', light: '#ff8a80' }, 2061 + gx, { lw: 0.5, plain: true });
+  }
+}
+
+/** Queen Plop (Part 3's boss): pink cape, tiara, a bow on her swirl, short lashes, a touch of blush, pearls. */
+const PINK: Fill = { base: '#e8579a', shade: '#b23272', light: '#ff9cc8' };
+const PEARL: Fill = { base: '#fbf4ea', shade: '#dccfbf', light: '#ffffff' };
+const SILVER: Fill = { base: '#f1d36a', shade: '#c79a2c', light: '#fff6c4' };
+
+/**
+ * Queen Plop (concept): a Plop with a pink royal cape, a tiara, a bow on her swirl, short
+ * lashes, a touch of blush and a pearl necklace. Same frame layout as drawPlop.
+ */
+export function drawQueen(ctx: Ctx, ox: number, oy: number, f: PlopFrame, st: Style = STYLES.polished) {
+  const ST = st;
+  const ground = oy + 100;
+  const cx = ox + 50;
+  const hurt = f === 'hurt';
+  const walk = f in WALK ? WALK[f as keyof typeof WALK] : null;
+  const bob = walk ? walk[3] : f === 'run1' || f === 'yell1' ? -3 : f === 'idle1' ? -1.5 : hurt ? 2.5 : 0;
+  const sqY = f === 'idle1' ? 1.05 : hurt ? 0.9 : 1;
+  const botY = ground - 30 + bob;
+  const topY = botY - 27 * sqY;
+  // the pink cape, flowing out behind her (a frill along its hem)
+  ST.shape(ctx, [[cx - 26, botY - 28], [cx + 26, botY - 28], [cx + 44, ground - 4], [cx + 22, ground], [cx, ground - 4], [cx - 22, ground], [cx - 44, ground - 4]], PINK, 3005, { lw: 1.1, light: [cx - 14, botY - 10] });
+  drawPlop(ctx, ox, oy, f, st, 'medium');
+  // a bow on the swirl's tip
+  const tx = cx + 10;
+  const ty = topY - 12 - 26;
+  ST.shape(ctx, [[tx, ty], [tx - 11, ty - 7], [tx - 11, ty + 6]], PINK, 3010, { lw: 0.8 });
+  ST.shape(ctx, [[tx, ty], [tx + 11, ty - 7], [tx + 11, ty + 6]], PINK, 3011, { lw: 0.8 });
+  ST.shape(ctx, ellipsePts(tx, ty, 3, 3, 0, 10), PINK, 3012, { lw: 0.7 });
+  // a tiara on her brow
+  const by = topY - 14;
+  ST.shape(ctx, [[cx - 16, by + 4], [cx - 12, by - 3], [cx - 6, by + 1], [cx, by - 9], [cx + 6, by + 1], [cx + 12, by - 3], [cx + 16, by + 4], [cx, by + 2]], SILVER, 3020, { lw: 0.9, light: [cx - 4, by - 4] });
+  ST.shape(ctx, ellipsePts(cx, by - 3, 2.6, 3, 0, 12), PINK, 3021, { lw: 0.5, plain: true });
+  // long lashes (curling out), even with her eyes shut
+  ctx.strokeStyle = ST.ink;
+  ctx.lineWidth = 1.4;
+  ctx.lineCap = 'round';
+  for (const [ex, er] of [[cx - 10, 9], [cx + 11, 8.4]] as const) {
+    for (const k of [-0.7, -0.2]) {
+      const a = -Math.PI / 2 + k + (ex < cx ? -0.25 : 0.25);
+      const x0 = ex + Math.cos(a) * er * 0.82 - (ex < cx ? 2 : -2);
+      const y0 = topY - 3 + Math.sin(a) * er;
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.quadraticCurveTo(x0 + Math.cos(a) * 2, y0 + Math.sin(a) * 3, x0 + Math.cos(a - 0.4) * 4, y0 + Math.sin(a - 0.4) * 4 - 0.5);
+      ctx.stroke();
+    }
+  }
+  // a touch of blush
+  ctx.fillStyle = 'rgba(255,110,150,0.3)';
+  for (const bx of [cx - 23, cx + 23]) {
+    ctx.beginPath();
+    ctx.ellipse(bx, topY + 9, 5, 2.8, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // a string of pearls where her two tiers meet
+  for (let k = -24; k <= 24; k += 5.5) {
+    const py = botY - 17 + (k * k) / 120;
+    ST.shape(ctx, ellipsePts(cx + k, py, 2.6, 2.6, 0, 10), PEARL, 3040 + k, { lw: 0.5, plain: true });
   }
 }

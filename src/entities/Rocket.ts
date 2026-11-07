@@ -1,8 +1,14 @@
 import Phaser from 'phaser';
 import { DEPTH } from '../config';
 import { ART_RES } from '../gfx/draw';
-import type { GameScene } from '../scenes/GameScene';
+import type { Fx } from '../world/Fx';
 import type { Player } from './Player';
+
+/** What a rocket needs from its scene. */
+export interface RocketHost extends Phaser.Scene {
+  fx: Fx;
+  explode(x: number, y: number, owner: Player): void;
+}
 
 const LIFETIME = 1.4;
 
@@ -14,7 +20,7 @@ export class Rocket extends Phaser.Physics.Arcade.Image {
   exploded = false;
 
   constructor(
-    private gs: GameScene,
+    private gs: RocketHost,
     readonly owner: Player,
     x: number,
     y: number,

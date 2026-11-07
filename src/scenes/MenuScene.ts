@@ -66,6 +66,13 @@ export class MenuScene extends Phaser.Scene {
    * opening scenery), so switching to them is instant.
    */
   private quiet: (() => void)[] = [];
+
+  /** The quiet-moment jobs still to do, taken off the list (the loading screen does them up front). */
+  takeQuietJobs() {
+    const jobs = this.quiet;
+    this.quiet = [];
+    return jobs;
+  }
   /** Ground pictures drawn ahead in quiet moments (a whole level's, for its fly-over). */
   private painted: string[] = [];
   private lastInput = 0;

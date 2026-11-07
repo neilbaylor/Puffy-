@@ -14,6 +14,8 @@ export interface LevelInfo {
   build: (() => LevelData) | null;
   /** Ends with a basketball game against King Puff Ball (otherwise the gate ends the level). */
   hoops?: boolean;
+  /** Ends with a wrestling match against Queen Plop in the Poo Palace. */
+  wrestle?: boolean;
   /** What the hero says when the level starts (after the fly-over). */
   speech?: string;
   /** The label on its Part button on the start screen (default: `part`). */
@@ -31,6 +33,7 @@ export const LEVELS: LevelInfo[] = [
     button: 'Part 3',
     build: buildLevel3,
     speech: 'Oh no, the Plops have taken over Puff Ball Planet!',
+    wrestle: true,
   },
 ];
 
