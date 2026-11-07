@@ -1,2 +1,2 @@
 
-- v0.94: instant Part switching on the start screen
+- v0.95: the camera zooms out during boulder runs

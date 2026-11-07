@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.94)
+## Where things stand (v0.95)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -72,8 +72,8 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   chase in `GameScene.updateChase`: rock radius 115, too tall to clear with a double jump; speed = that hero's
   walk × speed (≤ run × 0.92); while more than 110 px behind it closes at up to run × 1.35, so it ends ~60-75 px
   behind a running hero; at the end it drops straight down the middle of the hole (`updateRockFall`) or, if a
-  puddle fills it, sinks in the poo. The end holes must be ≥ 8 tiles wide. The camera looks back up the hill
-  during a run. `Player.freeRun` = no stamina drain). Tested: all 3 heroes escape both runs.
+  puddle fills it, sinks in the poo. The end holes must be ≥ 8 tiles wide. The camera eases out to 78% zoom
+  (`chaseZoom`) and looks back up the hill a little during a run, so the rock and the end jump are both in view. `Player.freeRun` = no stamina drain). Tested: all 3 heroes escape both runs.
   Put the far side of a puddle at the poo's height.
 - `L.spawn('volley', cx, h, { w })`: beach volleyball (`entities/Volley.ts`, `VolleyMatch` + `VolleyPlop`). 4 Plops
   rally; within 250 px of one (or one gets hurt) they whistle and spike the ball at you (fetch → hold → spike
