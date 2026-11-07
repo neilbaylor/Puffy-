@@ -72,6 +72,9 @@ const HITS = 15;
 /** Your hearts in the ring: you start with 5, and pick-ups can take you up to 6. */
 const HEARTS_START = 5;
 const HEARTS_MAX = 6;
+/** Folding chairs in a match, and (for each one after the first) how few hits she has left when it comes, at the latest. */
+const CHAIRS = 4;
+const CHAIR_AT_HP = [-1, 11, 7, 4];
 /** The poo puddle on the mat (world x): you sink into it, like the level's. */
 const PUD_X0 = WX(PUDDLE.x - PUDDLE.w * 0.78);
 const PUD_X1 = WX(PUDDLE.x + PUDDLE.w * 0.78);
@@ -426,7 +429,7 @@ export class WrestleScene extends Phaser.Scene {
   private lobs: Lob[] = [];
   /** A heart to pick up in the ring (instead of nuggies), and when the next one comes. */
   private heartPick: { img: Phaser.GameObjects.Image; t: number; y: number } | null = null;
-  private heartIn = 5;
+  private heartIn = 4;
   private heartsG!: Phaser.GameObjects.Graphics;
   /** The folding chair: falls into the ring now and then; pick it up and hit her with it (two hits). */
   private chair: {
@@ -443,7 +446,11 @@ export class WrestleScene extends Phaser.Scene {
     cd: number;
     hit: boolean;
   } | null = null;
-  private chairIn = 12;
+  private chairIn = 8;
+  /** Chairs still to come this match (4 in all), and the hits-left mark that brings each one early. */
+  private chairsLeft = CHAIRS;
+  /** Hits she's landed on you while you hold the chair (two and you drop it). */
+  private chairHurts = 0;
   private hearts = HEARTS_START;
   private ended = false;
   private fighting = false;
@@ -506,9 +513,11 @@ export class WrestleScene extends Phaser.Scene {
     this.waves = [];
     this.lobs = [];
     this.heartPick = null;
-    this.heartIn = 5;
+    this.heartIn = 4;
     this.chair = null;
-    this.chairIn = 12;
+    this.chairIn = 8;
+    this.chairsLeft = CHAIRS;
+    this.chairHurts = 0;
     this.hearts = HEARTS_START;
     this.ended = false;
     this.fighting = false;
@@ -769,17 +778,19 @@ export class WrestleScene extends Phaser.Scene {
     });
   }
 
-  /** You got hit: a heart gone (and the chair, if you had it). */
+  /** You got hit: a heart gone (and on the second hit while you hold the chair, the chair). */
   private hurtPlayer(fromX: number) {
     const p = this.player;
     if (!p.alive || p.invulnerable || this.ended || !this.fighting) return;
     if (this.climb) this.endClimb();
     this.dive = null;
-    this.dropChair();
+    // (holding the chair, you hang on through one hit; the second knocks it out of your hands)
+    if (this.chair?.state === 'held' && ++this.chairHurts >= 2) this.dropChair();
     {
       this.hearts--;
       if (this.hearts <= 0) {
         this.hearts = 0;
+        this.dropChair();
         this.emitHud(true);
         p.faint(false);
         return;
@@ -1272,7 +1283,7 @@ export class WrestleScene extends Phaser.Scene {
       this.heartIn = 2;
       return;
     }
-    this.heartIn = 4 + Math.random() * 3;
+    this.heartIn = 2.5 + Math.random() * 1.5;
     const x = this.ringSpot();
     const y = MAT_Y - 30 - Math.random() * 60;
     const img = this.add.image(x, y, 'prize-heart').setScale(0.9 / ART_RES).setDepth(DEPTH.pickups);
@@ -1342,10 +1353,13 @@ export class WrestleScene extends Phaser.Scene {
     const SC = WrestleScene.CHAIR_S / ART_RES;
     const LEN = CHAIR_H * WrestleScene.CHAIR_S;
     if (!c) {
-      if (!this.fighting) return;
+      if (!this.fighting || this.chairsLeft <= 0) return;
       this.chairIn -= dt;
-      if (this.chairIn > 0) return;
-      this.chairIn = 18 + Math.random() * 8;
+      // (one every 11–15 s, or sooner as she weakens: all 4 come before she's done)
+      const n = CHAIRS - this.chairsLeft;
+      if (this.chairIn > 0 && q.hp > CHAIR_AT_HP[n]) return;
+      this.chairsLeft--;
+      this.chairIn = 11 + Math.random() * 4;
       // one comes flying in from the crowd: CHAIR!
       const x = this.ringSpot();
       const img = this.add.image(x, this.cameras.main.worldView.top - 50, 'wr-chair').setScale(SC).setDepth(DEPTH.pickups);
@@ -1400,6 +1414,7 @@ export class WrestleScene extends Phaser.Scene {
         sfx.clank();
         this.fx.popText(p.x, p.body.top - 20, 'CHAIR!', '#e2e7ec', 18);
         c.swing = -2; // (-2: lifting)
+        this.chairHurts = 0;
         c.t = 0;
       }
     }
