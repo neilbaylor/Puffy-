@@ -159,8 +159,8 @@ export async function openStore(file = dbPath()): Promise<Store> {
 
 // ───────────────────────────────────────────── the API ──
 
-/** New names: 2–10 letters, numbers, spaces, - or _ (signing in accepts any name that exists). */
-const NAME_RE = /^[A-Za-z0-9 _-]{2,10}$/;
+/** Names: 2–16 letters, numbers, spaces, - or _ (the game itself caps them at 10). */
+const NAME_RE = /^[A-Za-z0-9 _-]{2,16}$/;
 const sha = (s: string) => createHash('sha256').update(s).digest('hex');
 const pub = (u: UserRow): PublicUser => ({ name: u.name, rootbeer: u.rootbeer, nuggies: u.nuggies, kills: u.kills, level: u.level });
 const int = (v: unknown, lo: number, hi: number) => Math.max(lo, Math.min(hi, Math.floor(Number(v) || 0)));
@@ -238,8 +238,7 @@ export async function createUserApi() {
         const body = await readBody(req);
         const name = String(body.name ?? '').trim();
         const password = String(body.password ?? '');
-        if (route === 'POST /api/register' && !NAME_RE.test(name)) return void send(res, 400, { error: 'Names are 2–10 letters, numbers, spaces, - or _.' }), true;
-        if (name.length < 2 || name.length > 16) return void send(res, 400, { error: 'Type your name.' }), true;
+        if (!NAME_RE.test(name)) return void send(res, 400, { error: 'Names are letters, numbers, spaces, - or _.' }), true;
         if (password.length < 4 || password.length > 64) return void send(res, 400, { error: 'Passwords are 4–64 characters.' }), true;
         if (route === 'POST /api/register') {
           if (store.byName(name)) return void send(res, 409, { error: 'That name is taken.' }), true;

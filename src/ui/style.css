@@ -2450,3 +2450,5 @@ kbd {
 .acct-err.ask { color: #7a5a44; }
 .acct-rb { display: inline-flex; align-items: center; gap: 2px; margin-left: 2px; font: 400 12px/1 var(--display); color: #8a5a2a; }
 .acct-rb .rb-ico { display: inline-block; width: 12px; height: 16px; background: var(--rootbeer-img) center / contain no-repeat; }
+/* signed in: the battle name is your player's (not editable) */
+.bl-namebox.locked input { cursor: default; }
