@@ -1,2 +1,2 @@
 
-- v1.03: signs you back in by itself; battles use your player's name
+- v1.04: bad guys sink in the poo too
