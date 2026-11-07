@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.111)
+## Where things stand (v0.112)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -130,6 +130,16 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   puffy.db (+ its -wal/-shm files); the owner asked why not Railway Postgres: SQLite is free, needs no extra
   service, and is plenty for one small table. Move to Postgres if there are ever several app instances.
 
+### Next: the Part 3 boss fight (Queen Plop in the Poo Palace) — designed, not built yet
+- Read `sketches/wrestling/DESIGN.md` (agreed with the owner) and look at the concept screens beside
+  it. `sketches/wrestling/concept.ts` draws them with the game's own art (the basketball arena restyled,
+  the ring, Queen Plop as a `drawQueen` overlay on a medium Plop).
+- Key rules: side-on 2D fight on the mat; 3 hearts + nuggies (hit costs a nuggie first); 8 hits to win,
+  the jumbotron counts down; top-rope dive hit = 2; she jumps a lot, is aggressive, backs off when
+  you're on the ropes; ropes: bounce off, climb, rope physics (spring + wobble) — the owner said
+  "don't rush" the rope feel; no referee; ending: Queen dazed "Nice work… but you'll never
+  out-wrestle THE KING!", camera pulls out and zooms in on the King in the front row, he runs out.
+
 ### Battle mode (v0.60 onwards)
 - Room codes (default `birchcliff`), 4 players + watchers, 25 s countdown with 2+ players, 150 s battles,
   curtain reveal, shake in the last 10 s, results modal (ties explained), last battle's KOs shown in the lobby
@@ -142,6 +152,12 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Camera 20% closer than the whole arena, following you gently; off-screen players get edge pointers.
 - Rocks fall slowly (max 340 px/s) and shake the ground a little when they land (as do big
   bad guys landing from jumps). Anvils were removed in v0.107 (rocks only).
+- v0.112: Giant Plops sinking in poo are cropped at the surface (`setCrop`, weapon `hideBelow`);
+  `L.wide(x0, x1, zoom)` camera pull-back zones (The Pits: 0.8); terrain chunks only draw their own
+  details (`clip` in drawTerrainPiece, dice still rolled so chunks join); the start screen pre-draws the
+  selected Part's whole ground in quiet time (`LevelView.paintJobs`, freed when you switch Part) so the
+  level fly-over only puts pictures up; neighbours kept warm reduced to ±1 (memory). Account card:
+  Sign out top-right, hero lined up with the table.
 - v0.107 pacing (`src/shared/battle/sim.ts`): bad guys every 9–18 s (first at 10 s), at most 2 at once;
   prizes every 11–18 s (first at 5 s). Measured over 10 sim-minutes: enemies 99 → 67, prizes 125 → 82.
 - Plops: a four-step walk per size (small hop, medium waddle, big stomp), weapons held at the grip. Since
