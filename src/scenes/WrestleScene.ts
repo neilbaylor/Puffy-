@@ -1506,8 +1506,13 @@ export class WrestleScene extends Phaser.Scene {
     const c = this.chair!;
     const q = this.queen;
     const p = this.player;
-    if (!this.hitQueen(2, 'chair', p.x)) return false;
+    // (out of your hands before the hit counts: if it's the knock-out, the ending tidies away any
+    // chair still lying about, and this one's busy flying off her head)
     this.chair = null;
+    if (!this.hitQueen(2, 'chair', p.x)) {
+      this.chair = c;
+      return false;
+    }
     p.sheet = null;
     p.frameOverride = null;
     this.game.events.emit('wrestle-chair', false);
