@@ -1,6 +1,7 @@
 import type { LevelData } from './builder';
 import { buildLevel1 } from './level1';
 import { buildLevel2 } from './level2';
+import { buildLevel3 } from './level3';
 
 export interface LevelInfo {
   /** 1-based level number. */
@@ -11,11 +12,26 @@ export interface LevelInfo {
   part: string;
   /** null = not built yet ("coming soon"). */
   build: (() => LevelData) | null;
+  /** Ends with a basketball game against King Puff Ball (otherwise the gate ends the level). */
+  hoops?: boolean;
+  /** What the hero says when the level starts (after the fly-over). */
+  speech?: string;
+  /** The label on its Part button on the start screen (default: `part`). */
+  button?: string;
 }
 
 export const LEVELS: LevelInfo[] = [
-  { id: 1, world: 'World 1', title: 'Puff Ball Planet', part: 'Part 1', build: buildLevel1 },
-  { id: 2, world: 'World 1', title: 'Puff Ball Planet', part: 'Part 2', build: buildLevel2 },
+  { id: 1, world: 'World 1', title: 'Puff Ball Planet', part: 'Part 1', build: buildLevel1, hoops: true },
+  { id: 2, world: 'World 1', title: 'Puff Ball Planet', part: 'Part 2', build: buildLevel2, hoops: true },
+  {
+    id: 3,
+    world: 'World 2',
+    title: 'Plop Invasion',
+    part: 'Part 1',
+    button: 'Plop Invasion',
+    build: buildLevel3,
+    speech: 'Oh no, the Plops have taken over Puff Ball Planet!',
+  },
 ];
 
 export const levelInfo = (id: number) => LEVELS.find((l) => l.id === id) ?? LEVELS[0];

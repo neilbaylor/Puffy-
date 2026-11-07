@@ -1045,8 +1045,8 @@ export class BattleScene extends Phaser.Scene {
         const base = PLOP_ART[kind].scale / PLOP_RES;
         v.spr.setScale(base * sx, base * sy).setRotation(rot);
       } else frame = kind === 'big' && !onGround && !chute ? 'air' : Math.floor(v.anim) % 2 ? 'w1' : 'w0';
-      // (Plops are drawn facing right; the Puff Balls' art faces left)
-      v.spr.setFrame(frame).setPosition(x + ox, y + 2 + oy).setFlipX(v.plop ? dir < 0 : dir > 0);
+      // (the Plops' art faces left, like the Puff Balls')
+      v.spr.setFrame(frame).setPosition(x + ox, y + 2 + oy).setFlipX(dir > 0);
       if (flags & 8) v.spr.setTintFill(0xffffff);
       else v.spr.clearTint();
       v.chute.setVisible(chute).setPosition(x, y - h + 4).setRotation(Math.sin(this.time.now / 400 + id) * 0.12);

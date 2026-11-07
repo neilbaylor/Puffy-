@@ -148,6 +148,7 @@ export const playLevelClear = () => play('levelClear', true);
 
 /** Each level's own song (Part 1: Level Clear, Part 2: Mountain Climb). */
 const levelTrack = (level: number): Track => (level === 2 ? 'mountain' : 'levelClear');
+// (Plop Invasion plays Part 1's song for now: Puff Ball Planet, taken over)
 
 /** Start a level's song from the top. */
 export const playLevelSong = (level = 1) => play(levelTrack(level), true);

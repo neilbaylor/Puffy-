@@ -276,6 +276,8 @@ export class Ambience {
   private vignette: Phaser.GameObjects.Image;
   private t = 0;
   private readonly arctic: boolean;
+  /** Plop Invasion: flies buzzing about instead of butterflies, drab birds. */
+  private readonly stinky: boolean;
 
   constructor(
     private scene: Phaser.Scene,
@@ -285,6 +287,7 @@ export class Ambience {
   ) {
     makeTextures(scene);
     this.arctic = levelId === 2;
+    this.stinky = levelId === 3;
     this.glow = scene.add.image(0, 0, 'amb-glow').setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.clouds - 1).setAlpha(0.55);
     for (let i = 0; i < 3; i++)
       this.shafts.push(scene.add.image(0, 0, 'amb-shaft').setOrigin(0.5, 0).setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.near + 1).setAlpha(0));
@@ -344,7 +347,10 @@ export class Ambience {
       const y0 = view.top + view.height * (0.1 + Math.random() * 0.25);
       const depthK = 0.45 + Math.random() * 0.35; // farther birds are smaller and slower
       for (let i = 0; i < n; i++) {
-        const img = this.scene.add.image(0, 0, 'amb-bird', 'up').setDepth(DEPTH.clouds + 2).setTint(this.arctic ? (i % 2 ? 0xffffff : 0xeef3fb) : [0x8fc8ff, 0xffb3c6, 0xffe17a, 0xb9f0d0][(i + Math.floor(y0)) % 4]);
+        const img = this.scene.add
+          .image(0, 0, 'amb-bird', 'up')
+          .setDepth(DEPTH.clouds + 2)
+          .setTint(this.arctic ? (i % 2 ? 0xffffff : 0xeef3fb) : this.stinky ? [0x8a7a6a, 0x6e6458, 0x9a8a72][i % 3] : [0x8fc8ff, 0xffb3c6, 0xffe17a, 0xb9f0d0][(i + Math.floor(y0)) % 4]);
         this.birds.push({
           img,
           x: dir > 0 ? -60 - i * 26 : view.width + 60 + i * 26,
@@ -373,14 +379,16 @@ export class Ambience {
     });
 
     // ── butterflies flitting over the ground near you ──
-    if (this.flies.length < 4 && Math.random() < dt * 0.5) {
+    if (this.flies.length < (this.stinky ? 7 : 4) && Math.random() < dt * (this.stinky ? 1.5 : 0.5)) {
       const x = view.left + view.width * (0.1 + Math.random() * 0.8);
       const gy = this.groundBelow(x, view.top + 10, view.height);
       if (gy !== null && gy < view.top + view.height - 20) {
         // soft, gentle colours (cabbage whites, pale lemons, faded lilac and peach)
-        const cols = this.arctic ? [0xffffff, 0xeef5ff, 0xdcecff, 0xf4f8ff] : [0xffffff, 0xfff4c8, 0xf0e6ff, 0xffe8da, 0xe8f4ff, 0xfffbe8];
-        const img = this.scene.add.image(x, gy - 40, 'amb-fly', 'open').setDepth(DEPTH.decor + 1).setScale(0.24).setTint(cols[Math.floor(Math.random() * cols.length)]).setAlpha(0);
-        this.flies.push({ img, x, y: gy - 30 - Math.random() * 50, home: gy, vx: (Math.random() < 0.5 ? -1 : 1) * (14 + Math.random() * 18), ph: Math.random() * 6, t: 0, life: 10 + Math.random() * 10 });
+        const cols = this.arctic ? [0xffffff, 0xeef5ff, 0xdcecff, 0xf4f8ff] : this.stinky ? [0x3a3440, 0x2e3a2e, 0x443a30] : [0xffffff, 0xfff4c8, 0xf0e6ff, 0xffe8da, 0xe8f4ff, 0xfffbe8];
+        // (Plop Invasion: little dark flies, low over the ground, zipping about)
+        const img = this.scene.add.image(x, gy - 40, 'amb-fly', 'open').setDepth(DEPTH.decor + 1).setScale(this.stinky ? 0.13 : 0.24).setTint(cols[Math.floor(Math.random() * cols.length)]).setAlpha(0);
+        const fast = this.stinky ? 2.6 : 1;
+        this.flies.push({ img, x, y: gy - 30 - Math.random() * 50, home: gy + (this.stinky ? 18 : 0), vx: (Math.random() < 0.5 ? -1 : 1) * (14 + Math.random() * 18) * fast, ph: Math.random() * 6, t: 0, life: 10 + Math.random() * 10 });
       }
     }
     this.flies = this.flies.filter((f) => {
