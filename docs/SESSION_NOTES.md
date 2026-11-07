@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.99)
+## Where things stand (v1.01)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -100,6 +100,21 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   Plop hands; portraits have an `EDGE` margin (Big Muscles' bazooka tip).
 - `LevelInfo.speech` (the hero's line after the fly-over), `hoops` (basketball finale or not), `button`.
 - No finale yet (ends at the gate). The owner wants a boss battle at the end later.
+
+### Player accounts (v1.00–v1.01)
+- Optional (playing never needs one). Start screen: account button by the sound toggle → sign in / "New player"
+  (`ui.showAccount`), or, signed in, the player's stats and Sign out.
+- Server: `server/users.ts` (bundled to `dist-server/users.mjs`, loaded by `server.mjs`). SQLite via Node's built-in
+  `node:sqlite` (Node ≥ 22.13; `engines` says so), JSON-file fallback otherwise. The file and tables are created on
+  start-up if missing; new columns are added with ALTER TABLE (see `kills`). File: `DB_PATH`, else
+  `$RAILWAY_VOLUME_MOUNT_PATH/puffy.db`, else `./data/puffy.db`. **On Railway attach a volume**, or each deploy
+  starts with an empty database.
+- Table `users`: name (unique, case-insensitive), scrypt hash + salt, rootbeer, nuggies, kills, level, timestamps;
+  `sessions`: sha256 of each sign-in token. API: POST /api/register, POST /api/login, GET /api/me,
+  PUT /api/progress, POST /api/logout (Bearer token). ~12 sign-in tries a minute per address.
+- Client: `src/core/account.ts` (token in localStorage `puffy.token`), `src/core/bank.ts` (root beer, nuggies eaten,
+  kills; per browser). Signing in merges browser + account (the bigger of each; level = latestLevel, i.e. beaten+1).
+  Saved to the account when a level's results modal comes up (`account.save()`: background, errors ignored).
 
 ### Battle mode (v0.60 onwards)
 - Room codes (default `birchcliff`), 4 players + watchers, 25 s countdown with 2+ players, 150 s battles,
