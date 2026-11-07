@@ -124,6 +124,11 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Client: `src/core/account.ts` (token in localStorage `puffy.token`), `src/core/bank.ts` (root beer, nuggies eaten,
   kills; per browser). Signing in merges browser + account (the bigger of each; level = latestLevel, i.e. beaten+1).
   Saved to the account when a level's results modal comes up (`account.save()`: background, errors ignored).
+- v0.107: the signed-in account modal is a results-style card (selected hero on the left, stat list on the
+  right). The mute and account buttons sit in `.start-tl` (10px gap, the same as full screen/Battle).
+  server.mjs hides Node's "SQLite is an experimental feature" warning. The Railway volume (/data) holds only
+  puffy.db (+ its -wal/-shm files); the owner asked why not Railway Postgres: SQLite is free, needs no extra
+  service, and is plenty for one small table. Move to Postgres if there are ever several app instances.
 
 ### Battle mode (v0.60 onwards)
 - Room codes (default `birchcliff`), 4 players + watchers, 25 s countdown with 2+ players, 150 s battles,
@@ -135,9 +140,13 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   whoever grabs them; the grabber does a celebration hop (Scruffy backflips).
 - Your hero has a soft halo; no "(you)" and no bomb count over your head. Hearts sit above names.
 - Camera 20% closer than the whole arena, following you gently; off-screen players get edge pointers.
-- Rocks and anvils fall slowly (max 340 px/s) and shake the ground a little when they land (as do big
-  bad guys landing from jumps).
-- Plops: a four-step walk per size (small hop, medium waddle, big stomp), weapons held at the grip.
+- Rocks fall slowly (max 340 px/s) and shake the ground a little when they land (as do big
+  bad guys landing from jumps). Anvils were removed in v0.107 (rocks only).
+- v0.107 pacing (`src/shared/battle/sim.ts`): bad guys every 9–18 s (first at 10 s), at most 2 at once;
+  prizes every 11–18 s (first at 5 s). Measured over 10 sim-minutes: enemies 99 → 67, prizes 125 → 82.
+- Plops: a four-step walk per size (small hop, medium waddle, big stomp), weapons held at the grip. Since
+  v0.107 standing Plops breathe, blink, glance, grin and now and then yell (`plopStanding` in BattleScene),
+  and flinch with the 'hurt' frame for 0.32 s when hit (flag 8) — the same frames as level 3.
 
 ## Things to know before changing the battle
 
