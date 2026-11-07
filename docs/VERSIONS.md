@@ -92,3 +92,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.87: shorter loading screen, renderer on the label, lower resolution on slow devices
 - v0.88: loading screen fills the whole iPhone screen
 - v0.89: 2-wide pillars, instant Part switching, no resolution drop
+- v0.90: automatic resolution drop for slow devices is back

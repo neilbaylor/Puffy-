@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.89)
+## Where things stand (v0.90)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -44,7 +44,9 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   pressed early emit `need-assets` to finish it first. Timings per step: `window.__boot` in the console.
   Loading went 4.3 → 4.0 s (normal) and 9.5 → 6.4 s (CPU ×4); first hero tap on a slow CPU 3.7 s → 0.27 s.
 - The version label shows the renderer (WebGL / Canvas). v0.87 tried an automatic resolution drop on slow
-  devices; the owner didn't want it, v0.89 removed it (and clears the saved `puffy.res`).
+  devices; v0.89 removed it, then the owner asked for it back to try on the old iPad (v0.90). It watches the
+  start screen ~4 s after loading: under ~47 fps (and not a steady 30 fps cap) → 1.25×, then 1×, remembered in
+  `localStorage puffy.res`, 'lower res' on the label (`watchSpeed` in `main.ts`).
 - v0.89: the start screen keeps the current level and its neighbours in the Part picker in memory; their
   looks and opening scenery are drawn in quiet moments (`MenuScene.quiet`), so switching Parts is instant.
 - Open question: an old iPad plays slowly (not smooth in the levels). Not solved yet. Likely causes: the canvas
