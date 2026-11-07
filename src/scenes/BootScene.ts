@@ -2,7 +2,6 @@ import Phaser from 'phaser';
 import { preloadMenuMusic, primeMusic } from '../core/music';
 import { textureSteps } from '../gfx/textures';
 import { latestLevel } from '../level/levels';
-import type { MenuScene } from './MenuScene';
 
 /** Resolves on the next animation frame (or soon after, if frames are paused). */
 const nextFrame = () => new Promise<void>((r) => {
@@ -42,7 +41,8 @@ export class BootScene extends Phaser.Scene {
     const song = preloadMenuMusic();
     setProgress(0.04);
     await nextFrame();
-    const steps = textureSteps(this);
+    const level = latestLevel();
+    const steps = textureSteps(this, level);
     const total = steps.length + 4;
     let done = 0;
     for (const step of steps) {
@@ -50,10 +50,9 @@ export class BootScene extends Phaser.Scene {
       setProgress(++done / total);
       await nextFrame();
     }
-    // the fly-over behind the start screen, and the other level's opening scenery
-    this.scene.launch('Menu', { silent: true, level: latestLevel() });
+    // the fly-over behind the start screen
+    this.scene.launch('Menu', { silent: true, level });
     await nextFrame();
-    (this.scene.get('Menu') as MenuScene).prewarmOther();
     setProgress(++done / total);
     await nextFrame();
     this.registry.set('ready', true);
@@ -73,6 +72,7 @@ export class BootScene extends Phaser.Scene {
     // others start it on the first tap
     primeMusic();
     const boot = document.getElementById('boot');
+    document.body.classList.remove('booting');
     if (boot) {
       boot.classList.add('out');
       setTimeout(() => boot.remove(), 350);

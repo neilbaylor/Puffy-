@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { DEPTH, GRAVITY, MAX_FALL_SPEED, MIN_VIEW_W, TILE, VIEW_H } from '../config';
-import { PROP_RES } from '../gfx/textures';
+import { PROP_RES, ensureLevelLooks, freeLooksExcept } from '../gfx/textures';
 import { characterById } from '../data/characters';
 import type { Session } from '../core/session';
 import { lives, loseLife, resetLives } from '../core/lives';
@@ -218,6 +218,10 @@ export class GameScene extends Phaser.Scene {
     this.level = new LevelView(this, data);
     const { widthPx, heightPx } = this.level;
     this.physics.world.setBounds(0, -400, widthPx, heightPx + 800, true, true, false, false);
+    // this level's looks (drawn now if the start screen didn't already); the others are freed
+    // when nothing else is showing them
+    ensureLevelLooks(this, this.levelId);
+    if (!this.scene.isActive('Menu') && !this.scene.isActive('Battle')) freeLooksExcept(this, themesFor(this.levelId));
     this.bg = new Background(this, heightPx - VIEW_H);
     this.amb = new Ambience(this, this.levelId, (x, y, max) => {
       for (let d = 0; d <= max; d += 6) if (this.level.isSolidAt(x, y + d)) return Math.floor((y + d) / TILE) * TILE;
