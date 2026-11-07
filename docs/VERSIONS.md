@@ -109,3 +109,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.104: bad guys sink in the poo too ("v1.04")
 - v0.105: livelier Plops, a root beer badge (versions back on v0.x)
 - v0.106: sign-in question on two lines, root beer badge breathing room
+- v0.107: Battle: no anvils, half as many bad guys (max 2), fewer prizes, battle Plops with moods + flinch; results-style account card; bigger account button; 10px gap by the sound button; SQLite warning hidden
