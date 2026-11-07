@@ -402,8 +402,9 @@ export class UI {
       this.showHud();
       // (no HUD in the ring, just the pause button: your hearts are over your head)
       this.hud.classList.add('bare');
-      this.touch.setFire(false);
     });
+    // holding the chair: the FIRE button swings it
+    game.events.on('wrestle-chair', (on: boolean) => this.touch.setChair(on));
     game.events.on('level-complete', (r: ResultState) => this.showResults(r));
     game.events.on('game-over', (g: GameOverState) => this.showGameOver(g));
 

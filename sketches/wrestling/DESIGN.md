@@ -26,7 +26,7 @@ The concept screens are in this folder (`wide`, `plan`, `entrance`, `fight`, `fi
   hearts costs a life from the full game.
 - **The folding chair** (folded flat, grey steel) drops into the ring a few times a fight ("CHAIR!" on
   the jumbotron). Walk over it to pick it up: the hero bends down and holds it up over their head in
-  both hands (no bazooka). When she's in reach they swing it down onto her: **2 hits**, it bends
+  both hands (no bazooka). The FIRE button becomes the CHAIR button: press it to swing the chair down onto her (when she's in reach): **2 hits**, it bends
   and it's gone. Leave it and it fades away; get hit and you drop it.
 - **The ropes:**
   - **Run into them and bounce off** fast, like a springboard.
@@ -36,7 +36,8 @@ The concept screens are in this folder (`wide`, `plan`, `entrance`, `fight`, `fi
   - **Rope physics:** each rope is a springy line. It stretches where you hit it, sags under you as you
     climb, and wobbles back when you let go. Launching off the top shakes all three ropes.
     Each rope is a damped spring that bends at the contact point, so this is not too complex.
-- **No leaving the ring**: the ropes keep you in at any height (above the top rope, only as far as the corner posts). No bazooka in the ring either (the fire button is hidden).
+- **No leaving the ring**: the ropes keep you in at any height (above the top rope, only as far as the corner posts).
+- **The bazooka works**: a rocket that hits her is one hit (and knocks her back).
 
 ## Queen Plop
 - A Plop queen: a pink royal cape, a tiara, a bow on her swirl, short lashes, a touch of blush
@@ -46,7 +47,7 @@ The concept screens are in this folder (`wide`, `plan`, `entrance`, `fight`, `fi
 - **Aggressive, jumping more and higher**: big hops and lunges (her landings rumble the camera
   and the ring, like the Giant Plops), charges, slams, and the Giant Plops' **big lump of poo**
   that lands short of you and rolls on at you.
-- **20 hits to beat her.** **The jumbotron counts down** the hits
+- **15 hits to beat her.** **The jumbotron counts down** the hits
   left ("3 HITS TO GO") and flashes "FROM THE TOP ROPE!" for a dive.
 - No referee: enough hits and she's done.
 
