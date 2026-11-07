@@ -11,7 +11,7 @@ import { drawParachute } from './parachute';
 import { drawHockeyNet, drawPuck, drawRinkLines, drawStick } from './hockey';
 import { MOUNTAIN_LOOKS, drawMountainFar, drawMountainMid, drawMountainNear, type MountainLook } from './mountain';
 import './plopLooks'; // (registers Plop Invasion's palettes)
-import { POOWAVE_H, POOWAVE_W, drawPooOnGoat, drawPooPile, drawPooWave, drawStink, drawVolleyNet, drawVolleyball } from './plopworld';
+import { POOWAVE_H, POOWAVE_W, drawPooOnGoat, drawPooPile, drawPooWave, drawStink, drawVolleyNetSide, drawVolleyball } from './plopworld';
 import { PLOP_FRAMES, PLOP_H, PLOP_W, drawPlop, type PlopKind } from './plops';
 import { drawPoo } from './hazards';
 import { FLAME_FRAMES, FLAME_H, FLAME_W, drawDyingFlame, drawFlame, drawScorch } from './flame';
@@ -201,7 +201,7 @@ function makePlops(scene: Phaser.Scene, kind: PlopKind) {
     addCanvas(scene, 'stink', hires(12, 26, 2, (ctx2) => drawStink(ctx2)));
     // beach volleyball (Plop Invasion's mid-level match)
     addCanvas(scene, 'volleyball', hires(26, 26, ART_RES, (ctx2) => drawVolleyball(ctx2, 13, 13, 11)));
-    addCanvas(scene, 'volleynet', hires(64, 100, 3, (ctx2) => drawVolleyNet(ctx2, 64, 96, 66)));
+    addCanvas(scene, 'volleynet', hires(20, 112, 3, (ctx2) => drawVolleyNetSide(ctx2, 20, 108, 66)));
   }
 }
 

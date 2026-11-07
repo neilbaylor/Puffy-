@@ -20,16 +20,16 @@ import { LevelBuilder, type LevelData } from './builder';
  *   81-130  BOULDER RUN #1 (easier): a long steep slope, three Plops, an 8-wide chasm
  *   131-151 Poo puddle #2 (wide)
  *   152-177 POO PITS: 3-wide pillars standing in poo, 4-tile gaps (semi-difficult)
- *   178-195 BEACH VOLLEYBALL: they spike the ball at you
- *   196-216 A rise with a poo goat, GIANT PLOP #2 · checkpoint 2
- *   217-263 BOULDER RUN #2 (harder: faster rock, a Big Plop, a Plop parachuting in, the rock sinks in a poo puddle)
- *   264-284 Poo puddle #3, checkpoint 3
- *   285-313 THE PITS: pillars and an island over bottomless pits, 4–5 tile gaps (difficult)
- *   314-327 GIANT PLOP #3 · checkpoint 4
- *   328-358 A last rise with a poo goat, the last Plops, a GIANT PLOP guarding the gate
+ *   178-213 BEACH VOLLEYBALL: two games in a row; they spike the ball at you
+ *   214-234 A rise with a poo goat, GIANT PLOP #2 · checkpoint 2
+ *   235-281 BOULDER RUN #2 (harder: faster rock, a Big Plop, a Plop parachuting in, the rock sinks in a poo puddle)
+ *   282-302 Poo puddle #3, checkpoint 3
+ *   303-331 THE PITS: pillars and an island over bottomless pits, 4–5 tile gaps (difficult)
+ *   332-345 GIANT PLOP #3 · checkpoint 4
+ *   346-376 A last rise with a poo goat, the last Plops, a GIANT PLOP guarding the gate
  */
 export function buildLevel3(): LevelData {
-  const L = new LevelBuilder('Plop Invasion · Part 1', 'World 2', 360, 52);
+  const L = new LevelBuilder('Plop Invasion · Part 1', 'World 2', 378, 52);
   L.pal = 'poo';
 
   // ── Poo-covered meadow ───────────────────────────────────────
@@ -74,7 +74,7 @@ export function buildLevel3(): LevelData {
 
   // ── BOULDER RUN #1 (easier): steep steps down, 1 tile every 3 ──
   for (let i = 0; i < 14; i++) L.ground(81 + i * 3, 83 + i * 3, 38 - i);
-  L.chase(84, 123, 1.45);
+  L.chase(84, 123, 1.65);
   L.spawn('plop', 93, 34);
   L.spawn('plop', 104, 31);
   L.spawn('plop', 115, 27);
@@ -108,71 +108,76 @@ export function buildLevel3(): LevelData {
   L.auraArc(169, 2, 29, 1);
   L.spawn('para', 169, 31, { kind: 'plop' });
 
-  // ── BEACH VOLLEYBALL ─────────────────────────────────────────
-  L.ground(178, 195, 23);
-  L.spawn('volley', 187, 23, { w: 15 });
-  L.rootbeer(187, 28); // right over the net
+  // ── BEACH VOLLEYBALL: two games, one after the other ────────
+  L.ground(178, 193, 23);
+  L.spawn('volley', 185, 23, { w: 13 });
+  L.rootbeer(185, 28); // right over the net
+  L.ground(194, 197, 24);
+  L.spawn('tree', 195.5, 24, { h: 54 });
+  L.ground(198, 213, 23);
+  L.spawn('volley', 205, 23, { w: 13 });
+  L.auraArc(203, 3, 27, 1);
 
   // ── A rise with a poo goat, GIANT PLOP #2 · checkpoint 2 ────
-  L.ground(196, 202, 24);
-  L.spawn('poogoat', 200, 24);
-  L.ground(203, 216, 23);
-  L.spawn('giantplop', 208, 23);
-  L.spawn('tree', 205, 23, { h: 60 });
-  L.aura(212, 26);
-  L.spawn('checkpoint', 215, 23);
+  L.ground(214, 220, 24);
+  L.spawn('poogoat', 218, 24);
+  L.ground(221, 234, 23);
+  L.spawn('giantplop', 226, 23);
+  L.spawn('tree', 223, 23, { h: 60 });
+  L.aura(230, 26);
+  L.spawn('checkpoint', 233, 23);
 
   // ── BOULDER RUN #2 (harder): faster rock, more in the way ───
-  for (let i = 0; i < 13; i++) L.ground(217 + i * 3, 219 + i * 3, 23 - i);
-  L.chase(220, 256, 1.7);
-  L.spawn('bigplop', 227, 20);
-  L.spawn('plop', 234, 18);
-  L.spawn('para', 240, 16, { kind: 'plop' });
-  L.spawn('plop', 245, 14);
-  L.spawn('plop', 251, 12);
-  L.aura(231, 22);
-  L.aura(242, 19);
+  for (let i = 0; i < 13; i++) L.ground(235 + i * 3, 237 + i * 3, 23 - i);
+  L.chase(238, 274, 1.9);
+  L.spawn('bigplop', 245, 20);
+  L.spawn('plop', 252, 18);
+  L.spawn('para', 258, 16, { kind: 'plop' });
+  L.spawn('plop', 263, 14);
+  L.spawn('plop', 269, 12);
+  L.aura(249, 22);
+  L.aura(260, 19);
   // at the bottom, a big poo puddle: jump it (or hop through it), and the rock sinks in it
-  L.puddle(256, 263, 10);
-  L.ground(264, 273, 10);
-  L.auraArc(265, 3, 13, 1);
+  L.puddle(274, 281, 10);
+  L.ground(282, 291, 10);
+  L.auraArc(283, 3, 13, 1);
 
   // ── Poo puddle #3, checkpoint 3 ─────────────────────────────
-  L.puddle(274, 280, 10);
-  L.rootbeer(277, 14); // over the puddle: a jump from the edge
-  L.ground(281, 286, 10);
-  L.spawn('checkpoint', 283, 10);
+  L.puddle(292, 298, 10);
+  L.rootbeer(295, 14); // over the puddle: a jump from the edge
+  L.ground(299, 304, 10);
+  L.spawn('checkpoint', 301, 10);
 
   // ── THE PITS: pillars and an island over bottomless pits (difficult) ──
   // 4–5 tiles between them, some a step up: run, and keep your double jump for when you need it
-  L.ground(291, 292, 12);
-  L.ground(297, 298, 13);
-  L.island(304, 306, 12, 1, false);
-  L.ground(309, 311, 10);
-  L.auraArc(289, 2, 15, 1);
-  L.aura(297.5, 16);
-  L.auraArc(301, 2, 17, 2);
-  L.aura(310, 13);
-  L.spawn('para', 300, 18, { kind: 'plop' });
+  L.ground(309, 310, 12);
+  L.ground(315, 316, 13);
+  L.island(322, 324, 12, 1, false);
+  L.ground(327, 329, 10);
+  L.auraArc(307, 2, 15, 1);
+  L.aura(315.5, 16);
+  L.auraArc(319, 2, 17, 2);
+  L.aura(328, 13);
+  L.spawn('para', 318, 18, { kind: 'plop' });
 
   // ── GIANT PLOP #3 · checkpoint 4 ────────────────────────────
-  L.ground(314, 327, 11);
-  L.spawn('tree', 316, 11, { h: 58 });
-  L.spawn('giantplop', 320, 11);
-  L.aura(323, 14);
-  L.spawn('checkpoint', 325, 11);
+  L.ground(332, 345, 11);
+  L.spawn('tree', 334, 11, { h: 58 });
+  L.spawn('giantplop', 338, 11);
+  L.aura(341, 14);
+  L.spawn('checkpoint', 343, 11);
 
   // ── A last rise, the last Plops, a GIANT PLOP guarding the gate ──
-  L.ground(328, 335, 9);
-  L.spawn('plop', 331, 9);
-  L.ground(336, 341, 10);
-  L.spawn('poogoat', 339, 10);
-  L.ground(342, 359, 9);
-  L.spawn('tree', 344, 9, { h: 58 });
-  L.spawn('giantplop', 347, 9);
-  L.auraArc(349, 3, 12, 1);
-  L.spawn('plop', 351, 9);
-  L.spawn('tree', 353, 9, { h: 64 });
-  L.spawn('goal', 356, 9);
+  L.ground(346, 353, 9);
+  L.spawn('plop', 349, 9);
+  L.ground(354, 359, 10);
+  L.spawn('poogoat', 357, 10);
+  L.ground(360, 377, 9);
+  L.spawn('tree', 362, 9, { h: 58 });
+  L.spawn('giantplop', 365, 9);
+  L.auraArc(367, 3, 12, 1);
+  L.spawn('plop', 369, 9);
+  L.spawn('tree', 371, 9, { h: 64 });
+  L.spawn('goal', 374, 9);
   return L.build();
 }

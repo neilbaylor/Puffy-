@@ -3,7 +3,7 @@ import { DEPTH, TILE } from '../config';
 import { sfx } from '../core/sfx';
 import { ART_RES } from '../gfx/draw';
 import { PLOP_H, PLOP_W } from '../gfx/plops';
-import { drawBeachCourt, drawCourtBoard, drawRefChair } from '../gfx/plopworld';
+import { SAND, drawCourtBoard, drawRefChair, drawVolleySand } from '../gfx/plopworld';
 import { PLOP_PAD, PLOP_RES, PLOP_TOP, addCanvas, hires } from '../gfx/textures';
 import type { GameScene } from '../scenes/GameScene';
 import { Plop } from './enemies/Plops';
@@ -54,34 +54,31 @@ export class VolleyMatch {
     this.netX = cx;
     this.left = cx - half;
     this.right = cx + half;
-    // the court, like the pro tour: a raked sand court seen a little from the front (its far
-    // edge up and to the left), blue tape, the net across the middle, sponsor banners behind,
-    // the referee up in his chair at the far end of the net
-    const D = { x: -28, y: -18 };
-    const cw = half * 2 + 20;
-    const ckey = `volleycourt-${Math.round(cw)}`;
-    if (!gs.textures.exists(ckey))
-      addCanvas(gs, ckey, hires(cw - D.x + 8, -D.y + 14, 3, (ctx) => drawBeachCourt(ctx, 4 - D.x, -D.y + 4, cw, D.x, D.y)), undefined, { release: true });
-    gs.add.image(this.left - 10 - (4 - D.x), ground + 1 - (-D.y + 4), ckey).setOrigin(0, 0).setScale(1 / 3).setDepth(DEPTH.tiles + 0.5);
-    const bw = Math.round(half - 34);
+    // the court, side on like the soccer pitch: a band of raked sand over the ground with
+    // the tape along the top; banners and the referee's high chair stand behind; the net
+    // (side on: a padded post, the net band and its antenna) in front of everyone
+    const sw = Math.round(half * 2);
+    const skey = `volleysand-${sw}`;
+    if (!gs.textures.exists(skey)) addCanvas(gs, skey, hires(sw + SAND.END * 2, SAND.UP + SAND.DOWN, 3, (ctx) => drawVolleySand(ctx, sw)), undefined, { release: true });
+    gs.add.image(this.left - SAND.END, ground, skey).setOrigin(0, SAND.UP / (SAND.UP + SAND.DOWN)).setScale(1 / 3).setDepth(DEPTH.tiles + 0.5);
+    const bw = Math.round(half - 46);
     const bkey = `volleyboard-${bw}`;
     if (!gs.textures.exists(bkey)) addCanvas(gs, bkey, hires(bw, 22, 3, (ctx) => drawCourtBoard(ctx, bw, 16, 'PLOP BEACH TOUR')), undefined, { release: true });
-    const by = ground + D.y - 2;
-    for (const x0 of [this.left + D.x - 2, cx + 18]) gs.add.image(x0, by, bkey).setOrigin(0, 1).setScale(1 / 3).setDepth(DEPTH.tiles + 0.45);
+    for (const x0 of [this.left + 10, cx + 36]) gs.add.image(x0, ground - 2, bkey).setOrigin(0, 1).setScale(1 / 3).setDepth(DEPTH.decor - 1);
     if (!gs.textures.exists('refchair')) addCanvas(gs, 'refchair', hires(24, 52, 3, (ctx) => drawRefChair(ctx, 12, 50)));
-    const chairX = cx - 14 - 12;
-    const chairY = ground + D.y + 2;
-    gs.add.image(chairX, chairY, 'refchair').setOrigin(0.5, 50 / 52).setScale(1 / 3).setDepth(DEPTH.decor + 0.4);
+    const chairX = cx + 20;
+    const chairY = ground;
+    gs.add.image(chairX, chairY, 'refchair').setOrigin(0.5, 50 / 52).setScale(1 / 3).setDepth(DEPTH.decor - 1);
+    gs.add.image(cx, ground + 2, 'volleynet').setOrigin(0.5, 108 / 112).setScale(1 / 3).setDepth(DEPTH.enemies + 2);
     // the referee: a little Plop up on the chair, facing the court
     this.ref = gs.add
       .sprite(chairX - 1, chairY - 33, 'gplop-small', 'idle')
       .setOrigin((50 + PLOP_PAD) / (PLOP_W + PLOP_PAD * 2), (100 + PLOP_TOP) / (PLOP_H + PLOP_TOP))
       .setScale(0.36 / PLOP_RES)
-      .setDepth(DEPTH.decor + 0.45);
+      .setDepth(DEPTH.decor - 0.9);
     this.refY = this.ref.y;
     // the ball's shadow on the sand (so you can see where it's coming down)
-    this.shadow = gs.add.ellipse(cx, ground - 1, 18, 5, 0x5a3a1c, 0.3).setDepth(DEPTH.tiles + 0.55);
-    gs.add.image(cx, ground + 2, 'volleynet').setOrigin(0.5, 96 / 100).setScale(1 / 3).setDepth(DEPTH.decor + 0.5);
+    this.shadow = gs.add.ellipse(cx, ground - 2, 18, 5, 0x5a3a1c, 0.3).setDepth(DEPTH.tiles + 0.55);
 
     // two a side
     for (const [side, f] of [[-1, 0.72], [-1, 0.32], [1, 0.32], [1, 0.72]] as const) {

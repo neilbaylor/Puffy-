@@ -1111,7 +1111,7 @@ export class GameScene extends Phaser.Scene {
       if (!this.rock) return;
     } else {
       const lead = hero ? hero.x - (R.x + R.r) : 0;
-      const want = hero && lead > 110 ? Math.max(R.target, Math.min(Math.abs(hero.body.velocity.x) + 150, hero.char.runSpeed * 1.35)) : R.target;
+      const want = hero && lead > 70 ? Math.max(R.target, Math.min(Math.abs(hero.body.velocity.x) + 170, hero.char.runSpeed * 1.4)) : R.target;
       R.v += (want - R.v) * (1 - Math.exp(-dt * 1.5));
       R.x += R.v * dt;
       R.img.rotation += (R.v * dt) / R.r;
@@ -1219,7 +1219,7 @@ export class GameScene extends Phaser.Scene {
     // (it bursts in from the edge of the screen, half in view)
     const x = this.view.left - r * 0.5;
     const gy = this.groundUnder(x, this.view.top) ?? hero.bottom;
-    const target = Math.min(hero.char.walkSpeed * c.speed, hero.char.runSpeed * 0.92);
+    const target = Math.min(hero.char.walkSpeed * c.speed, hero.char.runSpeed * 0.95);
     const img = this.add.image(x, gy - r, 'bigrock').setScale((2 * r) / 42 / 12).setDepth(DEPTH.enemies + 2);
     this.rock = { img, x, y: gy - r, v: hero.char.runSpeed, target, vy: 0, r, x1: c.x1, falling: false, rumble: 0 };
     sfx.roar();
