@@ -2472,3 +2472,7 @@ kbd {
 .acct-rb .rb-ico { display: inline-block; width: 0.8em; height: 1em; margin: 0.07em 0 0.2em; background: var(--rootbeer-img) center / contain no-repeat; }
 /* signed in: the battle name is your player's (not editable) */
 .bl-namebox.locked input { cursor: default; }
+
+/* the signed-in account card: Sign out / Done on the right, a little space above them */
+.acct-card .row { justify-content: flex-end; margin-top: 18px; }
+@media (max-height: 500px) { .acct-card .row { margin-top: 12px; } }
