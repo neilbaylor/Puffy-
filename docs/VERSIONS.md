@@ -133,3 +133,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.128: Queen fight: a heart every 3-6 s
 - v0.129: Queen fight: hearts every 2-4 s, fewer poo throws
 - v0.130: Queen fight: a heart every 3-5 s
+- v0.131: Queen fight: 5 chairs, quick repeat chair swings
