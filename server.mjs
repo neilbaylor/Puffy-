@@ -33,8 +33,18 @@ async function load(path) {
   return entry;
 }
 
+// the user accounts API (/api/...), built from server/users.ts; its database is created on start-up if needed
+let userApi = null;
+try {
+  const { createUserApi } = await import('./dist-server/users.mjs');
+  userApi = await createUserApi();
+} catch (e) {
+  console.warn('User accounts not available:', e.message);
+}
+
 const server = createServer(async (req, res) => {
   try {
+    if (userApi && (await userApi(req, res))) return;
     const url = new URL(req.url ?? '/', 'http://x');
     let path = normalize(join(ROOT, decodeURIComponent(url.pathname)));
     if (!path.startsWith(ROOT)) return void res.writeHead(403).end();
