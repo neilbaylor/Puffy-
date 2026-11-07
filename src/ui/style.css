@@ -227,7 +227,7 @@ html:has(body.booting) body { background: #fff3dc; }
   -webkit-text-stroke: 5px var(--ink);
   paint-order: stroke fill;
 }
-.world-name .w { white-space: nowrap; }
+.world-name .w { display: inline-block; white-space: nowrap; }
 /* a gentle wave rolling through the letters, like the logo's hop but softer */
 .world-name i {
   display: inline-block;
@@ -236,6 +236,7 @@ html:has(body.booting) body { background: #fff3dc; }
   animation-delay: calc(var(--i) * 0.06s);
 }
 .world-name .sep {
+  display: inline-block;
   font-weight: 400;
   color: var(--gold);
   margin: 0 0.15em;
