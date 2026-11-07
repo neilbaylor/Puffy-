@@ -650,7 +650,7 @@ export class UI {
     const u = account.user;
     const el = h(`<div class="screen modal acct">
       <div class="panel acct-panel">
-        <p class="eyebrow">Your player</p>
+        ${u ? '<p class="eyebrow">Your player</p>' : ''}
         ${
           u
             ? `<h2>Hi ${esc(u.name)}!</h2>
@@ -666,7 +666,6 @@ export class UI {
           <button class="btn btn-go" data-act="back">Done</button>
         </div>`
             : `<h2>Sign in</h2>
-        <p class="acct-note">No need to sign in to play! With a name and password, your root beer, nuggies and level are saved, on any phone or tablet. A new name makes a new player.</p>
         <label class="bl-namebox acct-box"><input name="name" maxlength="10" placeholder="Name" autocomplete="username" autocapitalize="off" spellcheck="false" aria-label="Name"></label>
         <label class="bl-namebox acct-box"><input name="pw" type="password" maxlength="64" placeholder="Password" autocomplete="current-password" aria-label="Password"></label>
         <p class="acct-err" hidden></p>

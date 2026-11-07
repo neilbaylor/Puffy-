@@ -7,6 +7,7 @@ import { bank } from './bank';
  * too, so they follow you to another phone or tablet (and how many bad guys you've
  * defeated). Signing in merges what this browser has with what the account has (the
  * bigger of each); after that it's saved at the end of each level, in the background.
+ * The name and password are kept on this device, so it signs you back in by itself.
  */
 export interface AccountUser {
   name: string;
@@ -17,6 +18,24 @@ export interface AccountUser {
 }
 
 const TOKEN_KEY = 'puffy.token';
+/** The name and password last signed in with (kept on this device, to sign straight back in). */
+const CREDS_KEY = 'puffy.account';
+function savedCreds(): { name: string; password: string } | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(CREDS_KEY) ?? 'null');
+    return v && typeof v.name === 'string' && typeof v.password === 'string' ? v : null;
+  } catch {
+    return null;
+  }
+}
+function saveCreds(c: { name: string; password: string } | null) {
+  try {
+    if (c) localStorage.setItem(CREDS_KEY, JSON.stringify(c));
+    else localStorage.removeItem(CREDS_KEY);
+  } catch {
+    /* private mode */
+  }
+}
 let token: string | null = (() => {
   try {
     return localStorage.getItem(TOKEN_KEY);
@@ -89,12 +108,29 @@ export const account = {
     listeners.add(fn);
     return () => listeners.delete(fn);
   },
-  /** On start-up: still signed in from last time? Pick the account back up. */
+  /**
+   * On start-up: signed in before? Sign straight back in — with the session from last time,
+   * or else with the name and password kept on this device (and if that player isn't on
+   * the server any more, it's made again with them).
+   */
   async restore() {
-    if (!token) return;
-    const r = await api('GET', '/api/me');
-    if (r.ok) await merge(r.data.user as AccountUser);
-    else if (r.status === 401) signedOut();
+    if (token) {
+      const r = await api('GET', '/api/me');
+      if (r.ok) return merge(r.data.user as AccountUser);
+      if (r.status !== 401) return; // (offline: try again next time)
+      saveToken(null);
+    }
+    const c = savedCreds();
+    if (!c) return;
+    let r = await api('POST', '/api/login', c);
+    if (!r.ok && r.data.unknown) r = await api('POST', '/api/register', c);
+    if (!r.ok) {
+      if (r.status === 401) saveCreds(null); // (the password changed somewhere else)
+      emit();
+      return;
+    }
+    saveToken(String(r.data.token));
+    await merge(r.data.user as AccountUser);
   },
   /**
    * Sign in (or, with `create`, make a new player). `unknown`: there's no player by that
@@ -104,6 +140,7 @@ export const account = {
     const r = await api('POST', create ? '/api/register' : '/api/login', { name: name.trim(), password });
     if (!r.ok) return { error: String(r.data.error ?? 'Something went wrong.'), unknown: !!r.data.unknown };
     saveToken(String(r.data.token));
+    saveCreds({ name: name.trim(), password });
     await merge(r.data.user as AccountUser);
     return { error: null };
   },
@@ -117,6 +154,7 @@ export const account = {
   },
   async signOut() {
     if (token) await api('POST', '/api/logout');
+    saveCreds(null);
     signedOut();
   },
 };
