@@ -14,7 +14,7 @@ import { FLAME_FRAMES, FLAME_H, FLAME_W, drawDyingFlame, drawFlame, drawScorch }
 import { ART_RES, ART_STYLE, CHAR_H, CHAR_W, POSES, canvas, drawCharacter, ellipse, type Ctx } from './draw';
 import { FACE_FRAMES, faceFromKey } from './face';
 import { STYLES } from './handdrawn';
-import { themesFor } from '../world/theme';
+import { themeClock, themeMix, themesFor } from '../world/theme';
 import {
   DEFAULT_PALETTE,
   PALETTES,
@@ -119,27 +119,49 @@ function makeCollisionTiles(scene: Phaser.Scene) {
   addCanvas(scene, 'tiles', c);
 }
 
+/** A little extra room either side of a hero (the bazooka tip pokes out of the 56-unit cell). */
+const HERO_M = 8;
+/** One hero's animation frames (`face`: the standing pose with each little face they pull now and then). */
+function makeCharacter(scene: Phaser.Scene, ch: (typeof CHARACTERS)[number], face: boolean) {
+  const M = HERO_M;
+  if (!face) sheet(scene, `char-${ch.id}`, CHAR_W + M * 2, CHAR_H, POSES, (ctx, p) => drawCharacter(ctx, M, 0, ch, p));
+  else sheet(scene, `char-${ch.id}-face`, CHAR_W + M * 2, CHAR_H, FACE_FRAMES, (ctx, f) => drawCharacter(ctx, M, 0, ch, 'idle0', faceFromKey(f)));
+}
+
 function makeCharacters(scene: Phaser.Scene) {
-  // a little extra room either side (the bazooka tip pokes out of the 56-unit cell)
-  const M = 8;
-  for (const ch of CHARACTERS) sheet(scene, `char-${ch.id}`, CHAR_W + M * 2, CHAR_H, POSES, (ctx, p) => drawCharacter(ctx, M, 0, ch, p));
-  // the standing pose with each of the little faces they pull now and then in the game
-  for (const ch of CHARACTERS)
-    sheet(scene, `char-${ch.id}-face`, CHAR_W + M * 2, CHAR_H, FACE_FRAMES, (ctx, f) => drawCharacter(ctx, M, 0, ch, 'idle0', faceFromKey(f)));
+  for (const ch of CHARACTERS) makeCharacter(scene, ch, false);
+  for (const ch of CHARACTERS) makeCharacter(scene, ch, true);
+}
+
+/** The bad guys, as separate pieces (so they can be drawn a bit at a time). */
+function baddiePieces(scene: Phaser.Scene): { name: string; run: () => void }[] {
+  const st = STYLES[ART_STYLE];
+  return [
+    { name: 'puffball', run: () => sheet(scene, 'puffball', PUFFBALL_W, PUFFBALL_H, ['w0', 'w1', 'flat'] as const, (ctx, f) => drawPuffball(ctx, 0, 0, f, st)) },
+    { name: 'bigpuff', run: () => sheet(scene, 'bigpuff', BIGPUFF_W, BIGPUFF_H, BIGPUFF_FRAMES, (ctx, f) => drawBigPuff(ctx, 0, 0, f, st)) },
+    { name: 'giant', run: () => sheet(scene, 'giant', GIANT_W, GIANT_H, GIANT_FRAMES, (ctx, f) => drawGiant(ctx, 0, 0, f, st), 2.5) },
+    {
+      name: 'goat',
+      run: () => {
+        sheet(scene, 'goat', GOAT_W, GOAT_H, GOAT_FRAMES, (ctx, f) => drawGoat(ctx, 0, 0, f, st));
+        addCanvas(scene, 'spit', hires(36, 14, ART_RES, (ctx) => drawSpit(ctx, 24, 7, st)));
+      },
+    },
+    {
+      // the armed bad guys' weapons
+      name: 'weapons',
+      run: () => {
+        addCanvas(scene, 'w-blaster', hires(BLASTER.w, BLASTER.h, W_RES, (ctx) => drawBlaster(ctx, st)));
+        sheet(scene, 'w-saw', SAW.w, SAW.h, ['s0', 's1'] as const, (ctx, f) => drawChainsaw(ctx, st, f === 's0' ? 0 : 1), W_RES);
+        sheet(scene, 'w-ball', 30, 30, ['open', 'shut'] as const, (ctx, f) => drawFlailBall(ctx, st, f === 'open'), W_RES);
+        addCanvas(scene, 'w-bullet', hires(18, 18, W_RES, (ctx) => drawBullet(ctx, st)));
+      },
+    },
+  ];
 }
 
 function makeBaddies(scene: Phaser.Scene) {
-  const st = STYLES[ART_STYLE];
-  sheet(scene, 'puffball', PUFFBALL_W, PUFFBALL_H, ['w0', 'w1', 'flat'] as const, (ctx, f) => drawPuffball(ctx, 0, 0, f, st));
-  sheet(scene, 'bigpuff', BIGPUFF_W, BIGPUFF_H, BIGPUFF_FRAMES, (ctx, f) => drawBigPuff(ctx, 0, 0, f, st));
-  sheet(scene, 'giant', GIANT_W, GIANT_H, GIANT_FRAMES, (ctx, f) => drawGiant(ctx, 0, 0, f, st), 2.5);
-  sheet(scene, 'goat', GOAT_W, GOAT_H, GOAT_FRAMES, (ctx, f) => drawGoat(ctx, 0, 0, f, st));
-  addCanvas(scene, 'spit', hires(36, 14, ART_RES, (ctx) => drawSpit(ctx, 24, 7, st)));
-  // the armed bad guys' weapons
-  addCanvas(scene, 'w-blaster', hires(BLASTER.w, BLASTER.h, W_RES, (ctx) => drawBlaster(ctx, st)));
-  sheet(scene, 'w-saw', SAW.w, SAW.h, ['s0', 's1'] as const, (ctx, f) => drawChainsaw(ctx, st, f === 's0' ? 0 : 1), W_RES);
-  sheet(scene, 'w-ball', 30, 30, ['open', 'shut'] as const, (ctx, f) => drawFlailBall(ctx, st, f === 'open'), W_RES);
-  addCanvas(scene, 'w-bullet', hires(18, 18, W_RES, (ctx) => drawBullet(ctx, st)));
+  for (const p of baddiePieces(scene)) p.run();
 }
 
 function makeItems(scene: Phaser.Scene, pal: WorldPalette) {
@@ -340,19 +362,33 @@ export function freeLooksExcept(scene: Phaser.Scene, keep: readonly string[]) {
   }
 }
 
+type Step = { name: string; run: () => void };
+
 /**
- * The same work as generateTextures, split into steps so the boot can draw one
- * per frame behind the loading screen. Only the starting level's looks are drawn
- * (another level's are drawn when you pick it).
+ * The game's art in small steps. `now`: what the start screen needs (drawn behind the
+ * loading screen): the ground's tiles, the props (flowers, tufts, boulders, the gate…)
+ * and the starting level's current look. `later`: everything else (the heroes' game
+ * frames, the bad guys, the level's other looks), drawn piece by piece once the start
+ * screen is up, in quiet moments. Another level's looks are drawn when it's picked.
  */
-export function textureSteps(scene: Phaser.Scene, level = 1, pal: WorldPalette = DEFAULT_PALETTE): { name: string; run: () => void }[] {
-  return [
-    { name: 'tiles', run: () => makeCollisionTiles(scene) },
-    { name: 'heroes', run: () => makeCharacters(scene) },
-    { name: 'baddies', run: () => makeBaddies(scene) },
-    { name: 'items', run: () => makeItems(scene, pal) },
-    ...themesFor(level).map((id) => ({ name: `bg-${id}`, run: () => ensureLook(scene, id) })),
-  ];
+export function textureSteps(scene: Phaser.Scene, level = 1, pal: WorldPalette = DEFAULT_PALETTE): { now: Step[]; later: Step[] } {
+  const looks = themesFor(level);
+  const first = themeMix(themeClock.t, looks).a;
+  return {
+    now: [
+      { name: 'tiles', run: () => makeCollisionTiles(scene) },
+      { name: 'items', run: () => makeItems(scene, pal) },
+      { name: `bg-${first}`, run: () => ensureLook(scene, first) },
+    ],
+    later: [
+      ...CHARACTERS.flatMap((ch) => [
+        { name: `hero ${ch.id}`, run: () => makeCharacter(scene, ch, false) },
+        { name: `hero ${ch.id} faces`, run: () => makeCharacter(scene, ch, true) },
+      ]),
+      ...baddiePieces(scene),
+      ...looks.filter((id) => id !== first).map((id) => ({ name: `bg-${id}`, run: () => ensureLook(scene, id) })),
+    ],
+  };
 }
 
 export function generateTextures(scene: Phaser.Scene, pal: WorldPalette = DEFAULT_PALETTE) {

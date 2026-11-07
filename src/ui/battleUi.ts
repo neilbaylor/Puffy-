@@ -89,6 +89,12 @@ export class BattleUI {
   /** Battle: first the room code (in a little window), then into that room's lobby. */
   open(code?: string) {
     if (!code) return this.askCode();
+    // (the game's art may still be being drawn in the background: finish it first)
+    if (!this.host.game.registry.get('ready')) {
+      this.host.game.events.once('assets-ready', () => this.open(code));
+      this.host.game.events.emit('need-assets');
+      return;
+    }
     this.code = code;
     const base = battleUrl();
     const url = base ? `${base}${base.includes('?') ? '&' : '?'}room=${encodeURIComponent(code)}` : null;
@@ -180,6 +186,8 @@ export class BattleUI {
    * code you use is remembered for next time.
    */
   private askCode() {
+    // (typing a code takes a moment: finish drawing the game's art meanwhile)
+    if (!this.host.game.registry.get('ready')) this.host.game.events.emit('need-assets');
     const el = h(`<div class="screen modal battle-code">
       <div class="panel bc-panel">
         <p class="eyebrow">Battle with friends</p>

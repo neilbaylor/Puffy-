@@ -297,7 +297,8 @@ export class UI {
 
     game.events.on('menu', () => this.showStart());
     // (during the loading screen: each hero's card poses drawn now, so the first pick is instant)
-    game.events.on('warm-start', () => this.warmCards());
+    game.events.on('warm-start', () => this.warmCards(true));
+    game.events.on('warm-cards', () => this.warmCards(false));
     game.events.on('game-start', (s: GameScene, info: { fresh: boolean; atStart: boolean; level: string; world: string }) => {
       this.gameScene = s;
       this.setScreen(null);
@@ -446,7 +447,7 @@ export class UI {
         <button class="icon-btn fs-btn" data-act="fs" aria-label="Full screen" hidden>⛶</button>
         <button class="icon-btn battle-btn" data-act="battle" aria-label="Online battle with friends">Battle</button>
       </div>
-      <p class="version">v${VERSION}</p>
+      <p class="version">v${VERSION} · ${this.game.renderer.type === Phaser.WEBGL ? 'WebGL' : 'Canvas'}${this.lowRes()}</p>
       <div class="start-foot">
         <button class="btn btn-big btn-go" data-act="play">Play</button>
         ${usingTouch() ? '' : controlsHtml(true)}
@@ -652,11 +653,11 @@ export class UI {
     return poses;
   }
 
-  /** Every card's hop poses, drawn ahead of time. */
-  private warmCards() {
+  /** The cards' hop poses, drawn ahead of time (the picked hero's during loading, the others just after). */
+  private warmCards(pickedOnly: boolean) {
     this.screen?.querySelectorAll<HTMLElement>('.card').forEach((card, i) => {
       const cv = card.querySelector('canvas');
-      if (cv) this.posesFor(i, cv);
+      if (cv && (!pickedOnly || i === this.selected)) this.posesFor(i, cv);
     });
   }
 
@@ -740,12 +741,22 @@ export class UI {
     }
   }
 
+  /** ' · lower res' on the version label when this device was found slow and draws at a lower resolution. */
+  private lowRes() {
+    try {
+      return Number(localStorage.getItem('puffy.res')) ? ' · lower res' : '';
+    } catch {
+      return '';
+    }
+  }
+
   private play() {
     if (!this.game.registry.get('ready')) {
       // the art is still being drawn (a second at most): start as soon as it's done
       const btn = this.screen?.querySelector<HTMLButtonElement>('[data-act=play]');
       if (btn) btn.textContent = 'Loading…';
       this.game.events.once('assets-ready', () => this.play());
+      this.game.events.emit('need-assets');
       return;
     }
     unlockAudio();

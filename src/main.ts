@@ -17,9 +17,19 @@ installInput();
  * vertically; the visible width follows the screen's aspect ratio.
  */
 // Cap the render resolution: full 2x on phones, 1.75x on big tablet screens (keeps Android tablets smooth).
+// A device found to be slow (see watchSpeed) is capped lower still, and remembers it.
+const RES_KEY = 'puffy.res';
+let resCap = (() => {
+  try {
+    return Number(localStorage.getItem(RES_KEY)) || 0;
+  } catch {
+    return 0;
+  }
+})();
 const dpr = () => {
   const big = Math.min(window.innerWidth, window.innerHeight) >= 700;
-  return Math.min(window.devicePixelRatio || 1, big ? 1.75 : 2);
+  const r = Math.min(window.devicePixelRatio || 1, big ? 1.75 : 2);
+  return resCap ? Math.min(r, resCap) : r;
 };
 const size = () => ({ w: Math.max(1, Math.round(window.innerWidth * dpr())), h: Math.max(1, Math.round(window.innerHeight * dpr())) });
 
@@ -82,6 +92,48 @@ function start(refreshMs: number) {
   };
   window.addEventListener('resize', resize);
   window.addEventListener('orientationchange', () => setTimeout(resize, 200));
+
+  /**
+   * Older tablets (an old iPad, say) can't keep up drawing this many pixels. Once
+   * everything is loaded, watch the start screen for a few seconds: if it's running
+   * under ~47 fps, draw at a lower resolution (a little softer, much smoother), and
+   * check again (at most twice). The device remembers it for next time.
+   */
+  const watchSpeed = (rounds: number) => {
+    const deltas: number[] = [];
+    let since = 0;
+    let last = 0;
+    const onStep = () => {
+      // (real time between frames: the frame time Phaser reports is smoothed and capped)
+      const t = performance.now();
+      const delta = last ? t - last : 0;
+      last = t;
+      if (!delta || delta > 1000 || document.hidden || !game.scene.isActive('Menu')) return;
+      deltas.push(delta);
+      since += delta;
+      // (about 4 seconds' worth, however fast or slow the frames are)
+      if (since < 4000 || deltas.length < 20) return;
+      game.events.off('step', onStep);
+      deltas.sort((a, b) => a - b);
+      const median = deltas[deltas.length >> 1];
+      // (a steady 30 fps is a cap, e.g. an iPhone in Low Power Mode, not a struggling device)
+      const capped30 = deltas.filter((d) => d > 30.5 && d < 36.5).length > deltas.length * 0.8;
+      const now = dpr();
+      if (median > 21 && !capped30 && now > 1.05 && rounds > 0) {
+        resCap = now > 1.4 ? 1.25 : 1;
+        try {
+          localStorage.setItem(RES_KEY, String(resCap));
+        } catch {
+          /* private mode */
+        }
+        resize();
+        setTimeout(() => watchSpeed(rounds - 1), 1500);
+      }
+    };
+    game.events.on('step', onStep);
+  };
+  game.events.once('assets-ready', () => setTimeout(() => watchSpeed(2), 1000));
+  (window as unknown as { __res: () => unknown }).__res = () => ({ dpr: dpr(), cap: resCap, renderer: game.renderer.type === Phaser.WEBGL ? 'WebGL' : 'Canvas' });
 
   new UI(game);
 

@@ -59,7 +59,8 @@ export class MenuScene extends Phaser.Scene {
     // only this level's looks (backgrounds) and scenery stay in memory; the others are freed
     // (picking another level draws its looks behind the fade)
     // (not while a battle is showing too: it uses Part 1's looks and its own arena)
-    ensureLevelLooks(this, id);
+    // (while the game is still loading, the boot draws the level's other looks in quiet moments)
+    if (this.registry.get('ready')) ensureLevelLooks(this, id);
     const data = (levelInfo(id).build ?? buildLevel1)();
     if (!this.scene.isActive('Battle') && !this.scene.isActive('Game')) {
       freeLooksExcept(this, themesFor(id));
