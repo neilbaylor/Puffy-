@@ -15,14 +15,15 @@ import { LevelBuilder, type LevelData } from './builder';
  *   0-28    Poo-covered meadow (a little rise), first Plops
  *   29-33   Poo puddle #1 (small: learn to hop out)
  *   34-46   GIANT PLOP on the meadow, a poo goat
- *   47-58   A Big Plop, a floating island with root beer (off the ledge)
+ *   47-58   A Big Plop, a floating island with root beer (off the ledge), a Plop parachuting in
  *   59-80   GIANT PLOP #1 · checkpoint 1
  *   81-130  BOULDER RUN #1 (easier): a long steep slope, three Plops, an 8-wide chasm
  *   131-151 Poo puddle #2 (wide)
  *   152-177 POO PITS: 3-wide pillars standing in poo, 4-tile gaps (semi-difficult)
  *   178-213 BEACH VOLLEYBALL: two games in a row; they spike the ball at you
  *   214-234 A rise with a poo goat, GIANT PLOP #2 · checkpoint 2
- *   235-281 BOULDER RUN #2 (harder: faster rock, a Big Plop, a Plop parachuting in, the rock sinks in a poo puddle)
+ *   235-281 BOULDER RUN #2 (harder: faster rock, a Big Plop, two Plops parachuting in, the rock sinks in a poo puddle)
+ *   (Plops parachute in at 56, 63, 104, 169, 258, 263 and 318: the same number of Plops, more of them from the sky)
  *   282-302 Poo puddle #3, checkpoint 3
  *   303-331 THE PITS: pillars and an island over bottomless pits, 4–5 tile gaps (difficult)
  *   332-345 GIANT PLOP #3 · checkpoint 4
@@ -64,13 +65,13 @@ export function buildLevel3(): LevelData {
   L.rootbeer(59.5, 48);
   L.aura(59.5, 47);
   L.ground(53, 58, 39);
-  L.spawn('plop', 56, 39);
+  L.spawn('para', 56, 39, { kind: 'plop' }); // (the first one to drop in by parachute)
   L.spawn('tree', 47.5, 41, { h: 56 });
 
   // ── GIANT PLOP #1 · checkpoint 1 ────────────────────────────
   L.ground(59, 80, 38);
   L.spawn('tree', 60, 38, { h: 66 });
-  L.spawn('plop', 63, 38);
+  L.spawn('para', 63, 38, { kind: 'plop' });
   L.spawn('giantplop', 70, 38);
   L.aura(64, 42);
   L.aura(74, 41);
@@ -80,7 +81,7 @@ export function buildLevel3(): LevelData {
   for (let i = 0; i < 14; i++) L.ground(81 + i * 3, 83 + i * 3, 38 - i);
   L.chase(84, 123, 1.53);
   L.spawn('plop', 93, 34);
-  L.spawn('plop', 104, 31);
+  L.spawn('para', 104, 31, { kind: 'plop' });
   L.spawn('plop', 115, 27);
   L.aura(89, 39);
   L.aura(99, 36);
@@ -142,7 +143,7 @@ export function buildLevel3(): LevelData {
   L.spawn('bigplop', 245, 20);
   L.spawn('plop', 252, 18);
   L.spawn('para', 258, 16, { kind: 'plop' });
-  L.spawn('plop', 263, 14);
+  L.spawn('para', 263, 14, { kind: 'plop' });
   L.spawn('plop', 269, 12);
   L.aura(242, 24);
   L.aura(249, 22);
