@@ -130,3 +130,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.125: Queen fight uses the basketball song (placeholder), preloaded so it starts on time
 - v0.126: Queen fight: more hearts (2.5-4 s), 4 chairs a match, chair dropped on the 2nd hit
 - v0.127: Queen fight: two rockets per hit; CHAIR button stays red
+- v0.128: Queen fight: a heart every 3-6 s
