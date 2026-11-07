@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.119)
+## Where things stand (v0.120)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -187,6 +187,18 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   deferred art + MenuScene's quiet jobs (`takeQuietJobs`) + 24 warm-up frames under the loading bar
   (two-phase bar); the boot screen is the manifest blue with the rainbow PUFFY logo. Results after the last
   level: Play again + Home screen. Account card: Sign out bottom-left.
+- v0.120 Queen Plop round (`src/scenes/WrestleScene.ts`): a long, skippable entrance in `intro()`
+  (jumbotron push-in, crowd pan with flashbulbs and sweeping rafter beams, lights down, spotlight
+  strut with "POOPA!", she climbs the right corner ropes with rope sag, "Welcome to MY Poo Palace!",
+  leap in). Cutscene camera = `camManual` + `camTo()`/`cut()`/`glide()` (a newer `camTo` cancels an
+  older one via `camTok`); `updateCamera` now always eases `camY`, so hand-offs don't jump. She is
+  drawn above the dark/spot during the intro, back at `DEPTH_W.queen` after the leap. Tougher Queen:
+  rage step 0.08, speed 118, hops every 0.35–0.85 s with lunges, jumps up to meet a falling hero
+  (rising faster than −250 = a headbutt, not a stomp; top-rope dives still count), faster/more
+  charges and slams, 1.1 s invulnerability, 60% counter-charge after a hit. `Q_RES` 4 (sharper
+  close-ups). "FROM THE TOP ROPE!" is now an `fx.popText` (the jumbotron still flashes). Rockets:
+  none in the ring since v0.119 (fire is always false). Test t93 now runs at the LEFT ropes (the
+  quicksand puddle is on the right); t104 = intro frames.
 - v0.107 pacing (`src/shared/battle/sim.ts`): bad guys every 9–18 s (first at 10 s), at most 2 at once;
   prizes every 11–18 s (first at 5 s). Measured over 10 sim-minutes: enemies 99 → 67, prizes 125 → 82.
 - Plops: a four-step walk per size (small hop, medium waddle, big stomp), weapons held at the grip. Since
