@@ -1,2 +1,2 @@
 
-- v0.95: the camera zooms out during boulder runs
+- v0.96: first click on another Part is instant too

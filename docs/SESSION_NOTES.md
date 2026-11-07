@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.95)
+## Where things stand (v0.96)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -85,7 +85,9 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Loading: the start screen keeps every Part within two of the one shown (and the one you just left) ready —
   only the fly-over's first view of each (`MenuScene.firstSpan`, ~6 MB) plus its looks (~6 MB each) — drawn
   first in quiet moments (600 ms without a tap; not waiting for the boot's own art), then this Part's song.
-  Switching Parts measured 8–52 ms. The fade-out (320 ms) lets the new title swap in before the scenery is drawn. The game's `LevelView` is lazy too (`lazyNear` = where the
+  Switching Parts measured 8–52 ms. The fade-out (320 ms) lets the new title swap in before the scenery is drawn.
+  Pre-drawn pictures are shown once invisibly (`MenuScene.warmOnGpu` / `warmLook`): phones only finish the GPU
+  upload on first draw, which made the first click on a Part stall. The game's `LevelView` is lazy too (`lazyNear` = where the
   fly-over starts; `free: true` still frees other levels' terrain); lazily drawn chunks join the colour grade.
 - Plop textures have `PLOP_TOP = 22` px headroom (Giant Plop's tip); `Enemy.handAt` / `weaponK` place weapons in
   Plop hands; portraits have an `EDGE` margin (Big Muscles' bazooka tip).
