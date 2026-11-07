@@ -460,8 +460,10 @@ export class UI {
             ).join('')}</div>`
           : ''
       }
-      <button class="icon-btn mute-btn" data-act="mute" aria-label="Sound on or off"></button>
-      <button class="icon-btn acct-btn" data-act="account" aria-label="Your player account">${this.accountLabel()}</button>
+      <div class="start-tl">
+        <button class="icon-btn mute-btn" data-act="mute" aria-label="Sound on or off"></button>
+        <button class="icon-btn acct-btn" data-act="account" aria-label="Your player account">${this.accountLabel()}</button>
+      </div>
       <div class="start-tr">
         <button class="icon-btn fs-btn" data-act="fs" aria-label="Full screen" hidden>⛶</button>
         <button class="icon-btn battle-btn" data-act="battle" aria-label="Online battle with friends">Battle</button>
@@ -648,24 +650,30 @@ export class UI {
    */
   private showAccount() {
     const u = account.user;
-    const el = h(`<div class="screen modal acct">
-      <div class="panel acct-panel">
-        ${u ? '<p class="eyebrow">Your player</p>' : ''}
-        ${
-          u
-            ? `<h2>Hi ${esc(u.name)}!</h2>
-        <div class="acct-stats">
-          <span><i class="rb-ico"></i><b>${u.rootbeer}</b> root beer</span>
-          <span><i class="aura-ico"></i><b>${u.nuggies}</b> ${u.nuggies === 1 ? 'nuggie' : 'nuggies'}</span>
-          <span><b>${u.kills}</b> bad guys beaten</span>
-          <span><b>${esc(levelName(Math.min(u.level, latestLevel())))}</b></span>
+    // signed in: like the end-of-level card — your hero on the left, your player's stats on the right
+    const el = u
+      ? h(`<div class="screen modal acct">
+      <div class="panel results acct-card">
+        <div class="results-hero"><canvas width="160" height="160"></canvas></div>
+        <div class="results-body">
+          <p class="eyebrow">Your player</p>
+          <h2>Hi ${esc(u.name)}!</h2>
+          <dl class="stat-list">
+            <dt>Root beer <i class="rb-ico"></i></dt><dd>${Math.max(u.rootbeer, bank.rootbeer)}</dd>
+            <dt>Nuggies eaten <i class="aura-ico"></i></dt><dd>${Math.max(u.nuggies, bank.nuggies)}</dd>
+            <dt>Bad guys beaten</dt><dd>${Math.max(u.kills, bank.kills)}</dd>
+            <dt>Up to</dt><dd>${esc(levelName(latestLevel()))}</dd>
+          </dl>
+          <div class="row">
+            <button class="btn btn-alt" data-act="out">Sign out</button>
+            <button class="btn btn-go" data-act="back">Done</button>
+          </div>
         </div>
-        <p class="acct-note">Saved to your player, so it follows you to any phone or tablet.</p>
-        <div class="row">
-          <button class="btn btn-alt" data-act="out">Sign out</button>
-          <button class="btn btn-go" data-act="back">Done</button>
-        </div>`
-            : `<h2>Sign in</h2>
+      </div>
+    </div>`)
+      : h(`<div class="screen modal acct">
+      <div class="panel acct-panel">
+        <h2>Sign in</h2>
         <label class="bl-namebox acct-box"><input name="name" maxlength="10" placeholder="Name" autocomplete="username" autocapitalize="off" spellcheck="false" aria-label="Name"></label>
         <label class="bl-namebox acct-box"><input name="pw" type="password" maxlength="64" placeholder="Password" autocomplete="current-password" aria-label="Password"></label>
         <p class="acct-err" hidden></p>
@@ -676,10 +684,10 @@ export class UI {
         <div class="row acct-confirm" hidden>
           <button class="btn btn-alt" data-act="cancel">Cancel</button>
           <button class="btn btn-go" data-act="ok">OK</button>
-        </div>`
-        }
+        </div>
       </div>
     </div>`);
+    if (u) this.liveHero(el.querySelector('canvas')!, CHARACTERS[this.selected] ?? CHARACTERS[0], () => this.screen === el);
     const back = () => {
       sfx.back();
       this.showStart();

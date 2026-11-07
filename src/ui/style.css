@@ -2421,21 +2421,30 @@ kbd {
 .bl-fulldots i:nth-child(4) { animation-delay: 0.45s; }
 
 /* the (optional) account: a small button by the sound toggle, and its sign-in panel */
-.acct-btn {
+/* top left of the start screen: the sound toggle and the account button, side by side */
+.start-tl {
   position: absolute;
   top: calc(10px + var(--safe-t));
-  left: calc(12px + 52px + var(--safe-l));
+  left: calc(12px + var(--safe-l));
+  display: flex;
+  align-items: flex-start;
+  gap: 10px; /* (the same as the full screen / Battle pair on the right) */
+}
+.start-tl .mute-btn { position: static; }
+.acct-btn {
   width: auto;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 0 12px 0 10px;
-  font: 400 15px/1 var(--display);
+  padding: 0 14px 0 12px;
+  /* (a touch smaller than the Battle button's lettering) */
+  font: 900 clamp(19px, 3.7vmin, 26px) / 1 var(--display);
   color: var(--ink);
   white-space: nowrap;
   max-width: 40vw;
 }
 .acct-btn span { overflow: hidden; text-overflow: ellipsis; }
+.acct-btn > svg { width: 1em; height: 1em; flex: none; }
 .acct-panel { align-items: center; max-width: min(100%, 420px); }
 .acct-note { margin: 0; text-align: center; font-weight: 800; font-size: 13px; color: #7a5a44; max-width: 34ch; }
 .acct-box { width: min(100%, 300px); }
@@ -2446,7 +2455,7 @@ kbd {
 .acct-stats i { display: inline-block; width: 22px; height: 22px; background: center / contain no-repeat; }
 .acct-stats .rb-ico { background-image: var(--rootbeer-img); }
 .acct-stats .aura-ico { background-image: var(--nuggie-img); }
-.acct .row { flex-wrap: wrap; justify-content: center; }
+.acct-panel .row { flex-wrap: wrap; justify-content: center; }
 .acct-err.ask { color: #7a5a44; }
 .acct-rb {
   display: inline-flex;
@@ -2457,9 +2466,9 @@ kbd {
   border-radius: 999px;
   background: #fff1cf;
   box-shadow: inset 0 0 0 2px #e2b768;
-  font: 400 15px/1 var(--display);
+  font: 400 clamp(16px, 3.1vmin, 22px) / 1 var(--display);
   color: #8a5a2a;
 }
-.acct-rb .rb-ico { display: inline-block; width: 12px; height: 15px; margin: 1px 0 3px; background: var(--rootbeer-img) center / contain no-repeat; }
+.acct-rb .rb-ico { display: inline-block; width: 0.8em; height: 1em; margin: 0.07em 0 0.2em; background: var(--rootbeer-img) center / contain no-repeat; }
 /* signed in: the battle name is your player's (not editable) */
 .bl-namebox.locked input { cursor: default; }
