@@ -209,96 +209,171 @@ export function drawPooOnGoat(ctx: Ctx, frame: string) {
   drawPooSwirl(ctx, 40, 25, 11, POO, 5104);
 }
 
-/** A beach volleyball (yellow, blue and white panels), centre (cx, cy), radius r. */
+/**
+ * A pro beach volleyball: white, with curved yellow and blue panels sweeping round it
+ * in three bands, fine seams, a soft shine. Centre (cx, cy), radius r.
+ */
 export function drawVolleyball(ctx: Ctx, cx: number, cy: number, r: number) {
+  const YEL = '#ffcc1a';
+  const BLU = '#1d5fc4';
   ctx.save();
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = '#fbfaf5';
   ctx.fill();
   ctx.clip();
-  // three curved panels of colour sweeping round
-  for (const [a, col] of [[0, '#ffd23f'], [2.1, '#3f8fe8'], [4.2, '#ffd23f']] as const) {
-    ctx.fillStyle = col;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    for (let t = 0; t <= 1; t += 0.1) ctx.lineTo(cx + Math.cos(a + t * 1.2) * r * 1.2, cy + Math.sin(a + t * 1.2) * r * 1.2);
-    for (let t = 1; t >= 0; t -= 0.1) ctx.lineTo(cx + Math.cos(a + 0.5 + t * 1.2) * r * 0.45, cy + Math.sin(a + 0.5 + t * 1.2) * r * 0.45);
-    ctx.closePath();
-    ctx.fill();
-  }
-  // seams
-  ctx.strokeStyle = '#3a2418aa';
-  ctx.lineWidth = r * 0.07;
-  for (const a of [0, 2.1, 4.2]) {
-    ctx.beginPath();
-    ctx.arc(cx + Math.cos(a + 1.6) * r * 0.9, cy + Math.sin(a + 1.6) * r * 0.9, r * 0.95, a - 0.4, a + 1.4);
-    ctx.stroke();
-  }
+  // each band: the strip between two big circles curving across the ball, cut into three
+  // panels (yellow, white, blue) by two more circles in between
+  const band = (a: number, cols: string[]) => {
+    const ux = Math.cos(a);
+    const uy = Math.sin(a);
+    const R0 = r * 1.15;
+    const offs = [1.95, 1.78, 1.61, 1.44];
+    for (let i = 0; i < 3; i++) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx + ux * r * offs[i + 1], cy + uy * r * offs[i + 1], R0, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.beginPath();
+      ctx.rect(cx - r * 3, cy - r * 3, r * 6, r * 6);
+      ctx.arc(cx + ux * r * offs[i], cy + uy * r * offs[i], R0, 0, Math.PI * 2, true);
+      ctx.fillStyle = cols[i];
+      ctx.fill('evenodd');
+      ctx.restore();
+    }
+    ctx.strokeStyle = '#1b2440';
+    ctx.lineWidth = r * 0.045;
+    for (const o of offs) {
+      ctx.beginPath();
+      ctx.arc(cx + ux * r * o, cy + uy * r * o, R0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  };
+  band(-0.5, [YEL, '#fbfaf5', BLU]);
+  band(-0.5 + (Math.PI * 2) / 3, [BLU, '#fbfaf5', YEL]);
+  band(-0.5 + (Math.PI * 4) / 3, [YEL, '#fbfaf5', BLU]);
   // shading + shine
-  const g = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.1, cx, cy, r);
-  g.addColorStop(0, '#ffffff66');
-  g.addColorStop(0.6, '#ffffff00');
-  g.addColorStop(1, '#00000033');
+  const g = ctx.createRadialGradient(cx - r * 0.38, cy - r * 0.42, r * 0.05, cx, cy, r * 1.05);
+  g.addColorStop(0, '#ffffffaa');
+  g.addColorStop(0.35, '#ffffff22');
+  g.addColorStop(0.75, '#00000000');
+  g.addColorStop(1, '#0a1a3a55');
   ctx.fillStyle = g;
   ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
   ctx.restore();
   ctx.strokeStyle = INK;
-  ctx.lineWidth = r * 0.12;
+  ctx.lineWidth = r * 0.11;
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.stroke();
 }
 
-/** The volleyball court's net (wooden posts, a mesh, the white tape), standing on y = h, centred at x = w/2. */
+/**
+ * A pro beach volleyball net, seen from a little in front: the near post (bottom right,
+ * its foot at (w/2 + 14, h)) and the far post (up and to the left, a touch smaller), the
+ * net stretched between them (white top band, blue bottom band, black mesh), red-and-white
+ * antennas over each end, padded posts and guy ropes. The top of the near end is netH up.
+ */
 export function drawVolleyNet(ctx: Ctx, w: number, h: number, netH: number) {
   const cx = w / 2;
-  const top = h - netH;
-  // posts
-  for (const s of [-1, 1]) {
-    const px = cx + s * 9;
-    ST.shape(ctx, [[px - 2.2, h + 2], [px + 2.2, h + 2], [px + 1.8, top - 4], [px - 1.8, top - 4]], { base: '#b07a4a', shade: '#7a4e2c', light: '#d8a87a' }, 5201 + s, { lw: 0.9 });
-  }
-  // the mesh (between the posts, from the tape down to just above the sand)
-  const meshTop = top;
-  const meshBot = top + netH * 0.48;
-  ctx.fillStyle = '#ffffff22';
-  ctx.fillRect(cx - 9, meshTop, 18, meshBot - meshTop);
-  ctx.strokeStyle = '#3a2418aa';
-  ctx.lineWidth = 0.5;
-  for (let y = meshTop; y <= meshBot; y += 3) {
+  const near = { x: cx + 14, y: h };
+  const far = { x: cx - 14, y: h - 18 };
+  const kF = 0.9;
+  const topN = near.y - netH;
+  const topF = far.y - netH * kF;
+  const deep = 0.4; // the mesh covers the top 40% (the rest is open, down to the sand)
+  const botN = topN + netH * deep;
+  const botF = topF + netH * kF * deep;
+  const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+  const post = (x: number, foot: number, top: number, k: number, seed: number) => {
+    // a slim metal pole, a blue foam pad round its lower half, a little mound of sand
+    ctx.fillStyle = '#e8cf98';
     ctx.beginPath();
-    ctx.moveTo(cx - 9, y);
-    ctx.lineTo(cx + 9, y);
+    ctx.ellipse(x, foot, 4 * k, 1.4 * k, 0, 0, Math.PI * 2);
+    ctx.fill();
+    const box = (x0: number, y0: number, w: number, h: number, fill: string | CanvasGradient, lw: number) => {
+      ctx.fillStyle = fill;
+      ctx.fillRect(x0, y0, w, h);
+      ctx.strokeStyle = INK;
+      ctx.lineWidth = lw;
+      ctx.strokeRect(x0, y0, w, h);
+    };
+    const metal = ctx.createLinearGradient(x - 1.3 * k, 0, x + 1.3 * k, 0);
+    metal.addColorStop(0, '#9aa1ad');
+    metal.addColorStop(0.45, '#ffffff');
+    metal.addColorStop(1, '#8d94a0');
+    box(x - 1.2 * k, top - 3, 2.4 * k, foot - top + 3, metal, 0.5);
+    const padTop = foot - (foot - top) * 0.55;
+    const pad = ctx.createLinearGradient(x - 2.6 * k, 0, x + 2.6 * k, 0);
+    pad.addColorStop(0, '#1b4e9e');
+    pad.addColorStop(0.4, '#4a8af0');
+    pad.addColorStop(1, '#18458c');
+    box(x - 2.5 * k, padTop, 5 * k, foot - padTop - 0.3, pad, 0.6);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(x - 2.5 * k, lerp(padTop, foot, 0.3), 5 * k, 1.2 * k);
+    ctx.fillRect(x - 2.5 * k, lerp(padTop, foot, 0.36), 5 * k, 0.5 * k);
+    void seed;
+  };
+  const rope = (x0: number, y0: number, x1: number, y1: number) => {
+    ctx.strokeStyle = '#f3ead7';
+    ctx.lineWidth = 0.6;
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.quadraticCurveTo((x0 + x1) / 2, (y0 + y1) / 2 + 2, x1, y1);
+    ctx.stroke();
+    ctx.fillStyle = '#7a5a3a';
+    ctx.fillRect(x1 - 0.6, y1 - 2, 1.2, 2.4);
+  };
+  // behind: the far rope, the far post
+  rope(far.x, topF - 1, far.x - 11, far.y - 5);
+  post(far.x, far.y, topF, kF, 5211);
+  // the net: mesh panel between the posts
+  ctx.fillStyle = '#10121a22';
+  ctx.beginPath();
+  ctx.moveTo(far.x, topF);
+  ctx.lineTo(near.x, topN);
+  ctx.lineTo(near.x, botN);
+  ctx.lineTo(far.x, botF);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#15161dcc';
+  ctx.lineWidth = 0.35;
+  for (let i = 1; i < 12; i++) {
+    const t = i / 12;
+    ctx.beginPath();
+    ctx.moveTo(lerp(far.x, near.x, t), lerp(topF, topN, t));
+    ctx.lineTo(lerp(far.x, near.x, t), lerp(botF, botN, t));
     ctx.stroke();
   }
-  for (let x = cx - 9; x <= cx + 9; x += 3) {
+  for (let j = 1; j < 9; j++) {
+    const t = j / 9;
     ctx.beginPath();
-    ctx.moveTo(x, meshTop);
-    ctx.lineTo(x, meshBot);
+    ctx.moveTo(far.x, lerp(topF, botF, t));
+    ctx.lineTo(near.x, lerp(topN, botN, t));
     ctx.stroke();
   }
-  ST.shape(ctx, [[cx - 10.5, meshTop - 1.6], [cx + 10.5, meshTop - 1.6], [cx + 10.5, meshTop + 1.6], [cx - 10.5, meshTop + 1.6]], { base: '#ffffff', shade: '#e6dccb', light: '#ffffff' }, 5205, { lw: 0.6, plain: true });
-  ST.line(ctx, [[cx - 10, meshBot], [cx + 10, meshBot]], 5206, 0.7);
+  // the bands: white along the top, blue along the bottom, and the cable down each side
+  const bandQ = (y0f: number, y0n: number, th: number, base: string, seed: number) =>
+    ST.shape(ctx, [[far.x, y0f], [near.x, y0n], [near.x, y0n + th], [far.x, y0f + th * kF]], { base, shade: base, light: base }, seed, { lw: 0.55, plain: true });
+  bandQ(topF - 0.4, topN - 0.4, 2.6, '#ffffff', 5215);
+  bandQ(botF - 1, botN - 1, 1.8, '#2a6fd6', 5216);
+  // antennas (red and white) sticking up over each end of the net
+  for (const [x, y, k] of [[far.x + 1.5, topF, kF], [near.x - 1.5, topN, 1]] as const) {
+    const len = netH * 0.36 * k;
+    for (let i = 0; i < 6; i++) {
+      ctx.strokeStyle = i % 2 ? '#ffffff' : '#e8322a';
+      ctx.lineWidth = 1.1 * k;
+      ctx.beginPath();
+      ctx.moveTo(x, y + 1 - (len * i) / 6);
+      ctx.lineTo(x, y + 1 - (len * (i + 1)) / 6);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 0.35;
+    ctx.strokeRect(x - 0.55 * k, y + 1 - len, 1.1 * k, len);
+  }
+  // in front: the near post and its rope
+  post(near.x, near.y, topN, 1, 5221);
+  rope(near.x, topN - 1, near.x + 12, near.y + 1);
 }
 
-/** A striped beach umbrella stuck in the sand, foot at (x, groundY). */
-export function drawBeachUmbrella(ctx: Ctx, x: number, groundY: number) {
-  ST.line(ctx, [[x, groundY], [x + 2, groundY - 52]], 5301, 1.6, '#8a6a4a');
-  const cx = x + 2;
-  const cy = groundY - 52;
-  const R = 26;
-  for (let i = 0; i < 6; i++) {
-    const a0 = Math.PI + (i / 6) * Math.PI;
-    const a1 = Math.PI + ((i + 1) / 6) * Math.PI;
-    const pts: Pt[] = [[cx, cy - 2]];
-    for (let t = 0; t <= 1; t += 0.25) {
-      const a = a0 + (a1 - a0) * t;
-      pts.push([cx + Math.cos(a) * R, cy + Math.sin(a) * R * 0.55 + 6]);
-    }
-    ST.shape(ctx, pts, i % 2 ? { base: '#ffffff', shade: '#e8dcc8', light: '#ffffff' } : { base: '#ff6a5c', shade: '#d23a30', light: '#ffb0a8' }, 5310 + i, { lw: 0.7, plain: true });
-  }
-  ST.line(ctx, [[cx - R, cy + 6], [cx + R, cy + 6]], 5320, 0.4);
-  // a poo on top, of course
-  drawPooSwirl(ctx, cx, cy - 11, 8, POO, 5321);
-}

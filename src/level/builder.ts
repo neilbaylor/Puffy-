@@ -77,10 +77,10 @@ export class LevelBuilder {
   }
 
   /** Floating grassy island: top surface at height h, `thick` tiles deep. */
-  island(x0: number, x1: number, h: number, thick = 2) {
+  island(x0: number, x1: number, h: number, thick = 2, belly = true) {
     for (let x = x0; x <= x1; x++) for (let k = 0; k < thick; k++) this.set(x, this.top(h) + k, 'ground');
     // a rounder belly: one extra row under the middle
-    if (x1 - x0 >= 3) for (let x = x0 + 1; x <= x1 - 1; x++) this.set(x, this.top(h) + thick, 'ground');
+    if (belly && x1 - x0 >= 3) for (let x = x0 + 1; x <= x1 - 1; x++) this.set(x, this.top(h) + thick, 'ground');
     return this;
   }
 

@@ -58,9 +58,15 @@ function decode(t: Track): Promise<AudioBuffer | null> {
         out = off.createBuffer(1, buf.length, buf.sampleRate);
         const o = out.getChannelData(0);
         const n = buf.numberOfChannels;
+        // (in slices, letting the game breathe between them: a whole song in one go is a stutter)
+        const SLICE = 1 << 18;
         for (let c = 0; c < n; c++) {
           const d = buf.getChannelData(c);
-          for (let i = 0; i < d.length; i++) o[i] += d[i] / n;
+          for (let s0 = 0; s0 < d.length; s0 += SLICE) {
+            const s1 = Math.min(d.length, s0 + SLICE);
+            for (let i = s0; i < s1; i++) o[i] += d[i] / n;
+            await new Promise((r) => setTimeout(r, 0));
+          }
         }
       }
       decoded.set(t, out);
