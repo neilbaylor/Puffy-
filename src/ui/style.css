@@ -2578,3 +2578,4 @@ kbd {
   top: calc(66px + var(--safe-t));
   z-index: 2;
 }
+.tbtn[hidden] { display: none !important; }

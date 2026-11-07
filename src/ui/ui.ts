@@ -398,7 +398,10 @@ export class UI {
       this.banner.hidden = true;
       this.touch.hide();
     });
-    game.events.on('wrestle-fight', () => this.showHud());
+    game.events.on('wrestle-fight', () => {
+      this.showHud();
+      this.touch.setFire(false);
+    });
     game.events.on('level-complete', (r: ResultState) => this.showResults(r));
     game.events.on('game-over', (g: GameOverState) => this.showGameOver(g));
 
@@ -1021,6 +1024,7 @@ export class UI {
       pose = pose === 'idle0' ? 'idle1' : 'idle0';
       draw();
     }, 625);
+    this.touch.setFire(true);
     if (usingTouch()) this.touch.show();
     else this.touch.hide();
   }

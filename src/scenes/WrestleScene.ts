@@ -13,7 +13,7 @@ import { POOWAVE_H, POOWAVE_W, drawPooWave } from '../gfx/plopworld';
 import { drawPoo } from '../gfx/hazards';
 import { drawNuggie } from '../gfx/collectibles';
 import { STYLES } from '../gfx/handdrawn';
-import { KING_SEAT, POO_PALACE, POST_BOX, PUDDLE, RING, RING_BOX, ROPE_COL, STEPS, TABLE, TUNNEL, backX, drawArenaPoo, drawFrontPost, drawRing, drawRingFloor, drawRingside, drawTunnel, drawWrestleJumbo } from '../gfx/wrestle';
+import { KING_SEAT, POO_PALACE, POST_BOX, PUDDLE, RING, RING_BOX, ROPE_COL, TUNNEL, backX, drawArenaPoo, drawFrontPost, drawRing, drawRingFloor, drawRingside, drawTunnel, drawWrestleJumbo } from '../gfx/wrestle';
 import { addCanvas, hires } from '../gfx/textures';
 import { Player } from '../entities/Player';
 import { Rocket } from '../entities/Rocket';
@@ -67,7 +67,10 @@ const QS = 1.3;
 const Q_RES = 2.4;
 const Q_PAD = 18;
 const Q_TOP = 24;
-const HITS = 8;
+const HITS = 10;
+/** The poo puddle on the mat (world x): you sink into it, like the level's. */
+const PUD_X0 = WX(PUDDLE.x - PUDDLE.w * 0.78);
+const PUD_X1 = WX(PUDDLE.x + PUDDLE.w * 0.78);
 /** (the fight camera's own height is worked out in updateCamera) */
 const FIGHT_CAM_Y = MAT_Y;
 
@@ -358,6 +361,8 @@ export class WrestleScene extends Phaser.Scene {
   queen!: Queen;
   private wd!: WrestleData;
   private statics!: Phaser.Physics.Arcade.StaticGroup;
+  /** (Queen Plop stands on the whole mat: the puddle only swallows you) */
+  private qStatics!: Phaser.Physics.Arcade.StaticGroup;
   private rockets: Rocket[] = [];
   private gRockets!: Phaser.Physics.Arcade.Group;
   private waves: Wave[] = [];
@@ -462,9 +467,10 @@ export class WrestleScene extends Phaser.Scene {
 
     // ── what you stand on ──
     this.statics = this.physics.add.staticGroup();
-    const block = (x0: number, x1: number, top: number, bottom: number, oneWay = false) => {
+    this.qStatics = this.physics.add.staticGroup();
+    const block = (x0: number, x1: number, top: number, bottom: number, oneWay = false, group = this.statics) => {
       const r = this.add.rectangle((x0 + x1) / 2, (top + bottom) / 2, x1 - x0, bottom - top, 0xff00ff, 0).setVisible(false);
-      this.statics.add(r);
+      group.add(r);
       const b = r.body as Phaser.Physics.Arcade.StaticBody;
       if (oneWay) {
         b.checkCollision.down = false;
@@ -473,18 +479,24 @@ export class WrestleScene extends Phaser.Scene {
       }
       return r;
     };
-    // the ring (mat on top, the skirt down to the floor), the floor all round, the steps and the table
-    block(WX(RING.x0 - RING.apron), WX(RING.x1 + RING.apron), MAT_Y, GROUND_Y + 2);
+    // the ring (mat on top, the skirt down to the floor), with a hole under the poo puddle (it's
+    // quicksand: there's a floor deep down, so you can't fall through), and the floor all round
+    block(WX(RING.x0 - RING.apron), PUD_X0, MAT_Y, GROUND_Y + 2);
+    block(PUD_X1, WX(RING.x1 + RING.apron), MAT_Y, GROUND_Y + 2);
+    block(PUD_X0, PUD_X1, MAT_Y + 70, GROUND_Y + 2);
     block(-50, WORLD_W + 50, GROUND_Y, WORLD_H + 60);
-    for (const [x0, x1, top] of STEPS) block(WX(x0), WX(x1), WY(top), GROUND_Y + 2);
-    block(WX(TABLE[0]), WX(TABLE[1]), WY(TABLE[2]), GROUND_Y + 2);
+    block(WX(RING.x0 - RING.apron), WX(RING.x1 + RING.apron), MAT_Y, GROUND_Y + 2, false, this.qStatics);
     // the tops of the corner posts (you land on them from above)
     for (const x of [POST_L, POST_R]) block(x - 11, x + 11, POST_TOP, POST_TOP + 8, true);
 
     // ── the hero ──
     this.fx = new Fx(this);
     const spec = this.wd.session.players[0] ?? { slot: 0, characterId: this.wd.charId ?? 'puffy', inputId: 'solo' };
-    this.player = new Player(this, characterById(spec.characterId), sourceById(spec.inputId) ?? soloSource, WX(330), MAT_Y - 30);
+    // (no bazooka in the ring: it's a wrestling match — the fire button's hidden too)
+    const src = sourceById(spec.inputId) ?? soloSource;
+    const noFire = Object.create(src) as typeof src;
+    noFire.poll = () => ({ ...src.poll(), fire: false });
+    this.player = new Player(this, characterById(spec.characterId), noFire, WX(330), MAT_Y - 30);
     this.player.facing = 1;
     this.physics.add.collider(this.player.hitbox, this.statics);
     this.gRockets = this.physics.add.group({ allowGravity: false });
@@ -493,7 +505,7 @@ export class WrestleScene extends Phaser.Scene {
     // ── Queen Plop ──
     this.queen = new Queen(this, POST_R, POST_TOP);
     this.queen.body.setAllowGravity(false);
-    this.physics.add.collider(this.queen.spr, this.statics);
+    this.physics.add.collider(this.queen.spr, this.qStatics);
 
     this.confetti = new SimpleConfetti(this, DEPTH.fx);
     this.dark = this.add.rectangle(WORLD_W / 2, WORLD_H / 2, WORLD_W * 3, WORLD_H * 3, 0x070302, 0).setDepth(DEPTH_W.dark);
@@ -757,8 +769,8 @@ export class WrestleScene extends Phaser.Scene {
 
   /**
    * The hero and the ropes: inside the ring the ropes at each end stop you; run into them
-   * and they stretch and fling you back; go over the top one and you're out on the floor.
-   * Outside, they keep you out (jump over, or climb to a corner post).
+   * and they stretch and fling you back. There's no leaving the ring (above the top rope you can
+   * only go as far as the corner posts).
    */
   private ropePhysics(dt: number) {
     const p = this.player;
@@ -785,8 +797,13 @@ export class WrestleScene extends Phaser.Scene {
           continue;
         }
         if (!low) {
-          // over the top rope: out of the ring
-          this.inRing = false;
+          // above the top rope: still no way out (as far as the corner post, no further)
+          const post = side < 0 ? POST_L : POST_R;
+          const past = side * (b.center.x - post);
+          if (past > 0) {
+            b.x -= side * past;
+            if (side * b.velocity.x > 0) b.setVelocityX(0);
+          }
           continue;
         }
         const vOut = side * b.velocity.x;
@@ -816,15 +833,42 @@ export class WrestleScene extends Phaser.Scene {
           if (over > 6) b.x -= side * (over - 6);
           if (vOut > 0) b.setVelocityX(0);
         }
-      } else if (low && side * (b.center.x - rope) > -hw - 30 && side * (b.center.x - rope) < hw + 2 && b.bottom > MAT_Y - ROPE_TOP) {
-        // outside, below the top rope: the ropes keep you out
-        const out = side * (b.center.x - rope) - hw;
-        if (out < 0 && Math.abs(b.center.x - rope) < hw + 4) {
-          b.x += side * -out;
-          if (side * b.velocity.x < 0) b.setVelocityX(0);
-        }
       }
     }
+  }
+
+  /**
+   * The poo puddle on the mat is quicksand, like the level's: you sink slowly (jump to hop out);
+   * only what's above the surface shows; go right under and it costs you (BLUB!), and you're
+   * spat out at the edge.
+   */
+  private quicksand() {
+    const p = this.player;
+    const b = p.body;
+    const surf = MAT_Y + 3;
+    const inPud = b.center.x > PUD_X0 && b.center.x < PUD_X1 && b.bottom > MAT_Y + 1;
+    p.goo = inPud ? b.bottom - MAT_Y : 0;
+    if (inPud && Math.random() < 0.06) this.fx.pooSplat(p.x, MAT_Y, 2);
+    if (inPud && b.top > surf) {
+      this.fx.pooSplat(p.x, MAT_Y, 14);
+      this.fx.popText(p.x, MAT_Y - 30, 'BLUB!', '#c99064', 20);
+      sfx.dribble(1);
+      const x = b.center.x - PUD_X0 < PUD_X1 - b.center.x ? PUD_X0 - 16 : PUD_X1 + 16;
+      p.goo = 0;
+      b.reset(x, MAT_Y - b.halfHeight - 2);
+      b.setVelocity(0, -380);
+      this.hurtPlayer(PUDDLE.x);
+    }
+  }
+
+  /** Only what's above the poo shows (applied after the hero's picture is placed each frame). */
+  private cropInPoo() {
+    const p = this.player;
+    const v = p.view;
+    if (p.goo > 0) {
+      const top = v.y - v.displayHeight;
+      v.setCrop(0, 0, v.frame.realWidth, Phaser.Math.Clamp((MAT_Y + 3 - top) / Math.abs(v.scaleY), 0, v.frame.realHeight));
+    } else if (v.isCropped) v.setCrop();
   }
 
   /** A satisfying twang (two notes). */
@@ -1010,6 +1054,8 @@ export class WrestleScene extends Phaser.Scene {
             this.shakeRopes(8);
             for (let i = 3; i < 6; i++) this.sagV[(-toward) as Side][i] -= 90;
             sfx.whoosh();
+            this.callout('FROM THE TOP ROPE!', 'go', 1300);
+            this.flashJumbo({ kind: 'big', text: 'FROM THE TOP ROPE!', sub: 'OH YEAH!', color: '#ffd23f', bg: '#c8102e' }, 1600);
             this.excitedUntil = this.clock + 2000;
           }
           if (this.dive) {
@@ -1029,9 +1075,7 @@ export class WrestleScene extends Phaser.Scene {
         }
       }
       if (!this.climb) this.ropePhysics(dt);
-      // the poo puddle on the mat: you wade (and hop out of it)
-      p.goo = p.onGround && Math.abs(p.x - WX(PUDDLE.x)) < PUDDLE.w * K * 0.9 && Math.abs(p.bottom - MAT_Y) < 3 ? 2 : 0;
-      if (p.goo && Math.random() < 0.05) this.fx.pooSplat(p.x, MAT_Y, 2);
+      this.quicksand();
     } else if (!this.fighting && p.state === 'finished') p.update(dt);
 
     if (this.fighting || this.queen.mode === 'down' || this.queen.mode === 'hurt') this.queen.update(dt);
@@ -1046,6 +1090,7 @@ export class WrestleScene extends Phaser.Scene {
     this.updateRopes(dt);
     this.updateCamera(dt);
     p.sync(dt);
+    this.cropInPoo();
     if (this.climb) p.view.setFrame(Math.floor(this.clock / 90) % 2 ? 'jump' : 'fall');
     if (this.fighting) this.emitHud();
     // the crowd on its feet for the big moments
