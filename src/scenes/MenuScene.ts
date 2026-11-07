@@ -3,7 +3,7 @@ import { preloadLevelMusic } from '../core/music';
 import { MIN_VIEW_W, TILE, VIEW_H } from '../config';
 import { bgKey, ensureLook, freeLooksExcept } from '../gfx/textures';
 import { buildLevel1 } from '../level/level1';
-import { LEVELS, levelInfo, levelName, progress } from '../level/levels';
+import { LEVELS, latestLevel, levelInfo, levelName, progress } from '../level/levels';
 import { Background } from '../world/Background';
 import { Ambience } from '../world/Ambience';
 import { LevelView } from '../world/LevelView';
@@ -73,13 +73,15 @@ export class MenuScene extends Phaser.Scene {
 
   /**
    * The levels next to this one in the Part picker (it shows every built level once you've beaten
-   * one): one either side. Their opening scenery is small (only the fly-over's first view, ~6 MB)
+   * one): one either side, plus the furthest one unlocked. Their opening scenery is small (only the fly-over's first view, ~6 MB)
    * and their looks ~6 MB each; this Part's whole ground is drawn too (for its own fly-over after
    * Play), so only the nearest are kept, to stay within what phones can hold.
    */
   private neighbours(id: number) {
     if (progress.beaten < 1) return [];
-    return LEVELS.filter((l) => l.build && l.id !== id && Math.abs(l.id - id) <= 1)
+    // (…and the furthest Part you've unlocked: it's the one most often picked, even from far away)
+    const latest = latestLevel();
+    return LEVELS.filter((l) => l.build && l.id !== id && (Math.abs(l.id - id) <= 1 || l.id === latest))
       .sort((a, b) => Math.abs(a.id - id) - Math.abs(b.id - id))
       .map((l) => l.id);
   }
