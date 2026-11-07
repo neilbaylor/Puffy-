@@ -134,3 +134,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.129: Queen fight: hearts every 2-4 s, fewer poo throws
 - v0.130: Queen fight: a heart every 3-5 s
 - v0.131: Queen fight: 5 chairs, quick repeat chair swings
+- v0.132: Level 3: more of the Plops parachute in (7, same total)

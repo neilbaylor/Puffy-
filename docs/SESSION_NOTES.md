@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.131)
+## Where things stand (v0.132)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -187,6 +187,9 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   deferred art + MenuScene's quiet jobs (`takeQuietJobs`) + 24 warm-up frames under the loading bar
   (two-phase bar); the boot screen is the manifest blue with the rainbow PUFFY logo. Results after the last
   level: Play again + Home screen. Account card: Sign out bottom-left.
+- v0.132: Level 3 (`level3.ts`): the Plops at tiles 56, 63, 104 and 263 now parachute in (`L.spawn('para', x, y, { kind: 'plop' })`),
+  joining 169, 258 and 318: same number of Plops, 7 from the sky. (A para dropping in only triggers when
+  the screen's right edge nears it, so none sit in the opening screen.) Test: t112.
 - v0.131: `CHAIRS` 5, `CHAIR_AT_HP` [–, 12, 9, 6, 3], chair timer 10–13 s. Chair swing ~0.3 s with almost no
   cooldown (0.05 s); a press during a swing sets `again` and the next swing follows on. Test: t111.
 - v0.130: hearts every 3–5 s (first at 3 s).
