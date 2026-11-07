@@ -6,7 +6,7 @@
  */
 import { face } from './face';
 import type { Ctx, Pose } from './draw';
-import { gait } from './draw';
+import { carry, carryArms, gait } from './draw';
 import { ellipsePts, petalPts, roundRectPts, type Fill, type Pt, type Style } from './handdrawn';
 import { drawBazooka } from './bazooka';
 
@@ -88,7 +88,15 @@ function drawMusclesPose(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style
   const shoulder: Pt = [cx - rx + 1, cy + 2];
   const elbow: Pt = hurt ? [cx - rx - 3.5, cy + 8] : [cx - rx - 5.5, cy - 1 - flex * 3];
   const fist: Pt = hurt ? [cx - rx - 2.5, cy + 15] : [cx - rx - 5 + flex * 1.5, cy - 8.5 - flex * 4];
-  arm(ctx, st, [shoulder, elbow, fist], [4.2, 4.6, 3.6], MUSCLES.limb, seed + 1);
+  const ca = carry.on && !hurt ? carryArms('muscles', ox, oy) : null;
+  // (carrying: both arms up to the hands, elbows bent out a little)
+  const carryArm = (a: { x: number; y: number; len: number; rot: number }): [Pt, Pt, Pt] => {
+    const h: Pt = [a.x + Math.cos(a.rot) * a.len, a.y + Math.sin(a.rot) * a.len];
+    const m: Pt = [(a.x + h[0]) / 2 - Math.sin(a.rot) * 2.2, (a.y + h[1]) / 2 + Math.cos(a.rot) * 2.2];
+    return [[a.x, a.y], m, h];
+  };
+  if (ca) arm(ctx, st, carryArm(ca.back), [4.2, 4.6, 3.6], MUSCLES.limb, seed + 1);
+  else arm(ctx, st, [shoulder, elbow, fist], [4.2, 4.6, 3.6], MUSCLES.limb, seed + 1);
 
   // long thick legs with curled feet
   const leg = (hx: number, dx: number, lift: number, fill: Fill, s: number) => {
@@ -207,6 +215,10 @@ function drawMusclesPose(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style
     return;
   }
 
+  if (ca) {
+    arm(ctx, st, carryArm(ca.front), [3.8, 4.2, 3.3], MUSCLES.body, seed + 14);
+    return;
+  }
   // the big bazooka (heavy hitter)
   const by = cy + ry - 1;
   const kick = recoil ? 3.5 : 0;

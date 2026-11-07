@@ -92,6 +92,34 @@ export function gait(f: number, stride: number, lift: number, bobAmt = 1.6) {
 export const CHAR_W = 56;
 export const CHAR_H = 56;
 
+/**
+ * Carrying something over the head in both hands (the folding chair in the ring): no bazooka, both
+ * arms reach out along angle `a` (0 = forward, −π/2 = straight up, from the hero facing right). Set
+ * only while the carry sheets are drawn.
+ */
+export const carry = { on: false, a: -1.75 };
+/** The carry sheet's extra frames: winding up, the swing, the follow-through; and bending to pick it up. */
+export const CARRY_SWING = { sw0: -2.3, sw1: -1.25, sw2: -0.4, sw3: 0.2, lift: 0.95 } as const;
+export type CarryFrame = keyof typeof CARRY_SWING;
+/** Each hero's shoulders (front, back; units, hero drawn at ox = oy = 0) and arm length when carrying. */
+const CARRY_ARM: Record<string, { f: [number, number]; b: [number, number]; len: number }> = {
+  puffy: { f: [22, 24], b: [18, 26], len: 16 },
+  scruffy: { f: [22, 32], b: [18, 33], len: 12 },
+  muscles: { f: [24, 21], b: [19, 23], len: 15.5 },
+};
+/** Where the hands are (hero units) when carrying at angle a. */
+export function carryHand(id: string, a: number): [number, number] {
+  const c = CARRY_ARM[id] ?? CARRY_ARM.puffy;
+  return [c.f[0] + Math.cos(a) * c.len, c.f[1] + Math.sin(a) * c.len];
+}
+/** Both arms, as (shoulder, length, angle), meeting at the hands. */
+export function carryArms(id: string, ox: number, oy: number) {
+  const c = CARRY_ARM[id] ?? CARRY_ARM.puffy;
+  const [hx, hy] = carryHand(id, carry.a);
+  const arm = (s: [number, number]) => ({ x: ox + s[0], y: oy + s[1], len: Math.hypot(hx - s[0], hy - s[1]), rot: Math.atan2(hy - s[1], hx - s[0]) });
+  return { front: arm(c.f), back: arm(c.b), hand: [ox + hx, oy + hy] as [number, number] };
+}
+
 /** Draws a hero facing right, feet touching y = oy + CHAR_H - 2. */
 export function drawCharacter(ctx: Ctx, ox: number, oy: number, ch: CharacterDef, pose: Pose, f?: Face) {
   if (f) return withFace(f, () => drawCharacter(ctx, ox, oy, ch, pose));

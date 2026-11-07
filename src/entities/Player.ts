@@ -86,6 +86,10 @@ export class Player {
   private face = new FaceClock();
   /** Eating a nuggie: seconds left of the munch animation. */
   private eating = 0;
+  /** Drawn from another sheet of the same frames (e.g. holding the chair in the ring), or null. */
+  sheet: string | null = null;
+  /** A frame that overrides the animation (e.g. swinging the chair), or null. */
+  frameOverride: string | null = null;
 
   constructor(
     private scene: PlayerHost,
@@ -298,8 +302,14 @@ export class Player {
       }
       // standing about, they now and then blink, glance around, smile or chatter
       this.face.tick(dt);
-      const fk = frame.startsWith('idle') ? this.face.key : null;
-      if (fk) this.view.setTexture(`char-${this.char.id}-face`, fk);
+      // (another sheet of the same frames, e.g. holding the chair in the ring; and a frame that
+      // overrides the animation, e.g. a swing)
+      if (this.frameOverride && this.stun <= 0) frame = this.frameOverride;
+      const fk = frame.startsWith('idle') && !this.sheet ? this.face.key : null;
+      if (this.sheet) {
+        if (this.view.texture.key !== this.sheet) this.view.setTexture(this.sheet, frame);
+        else this.view.setFrame(frame);
+      } else if (fk) this.view.setTexture(`char-${this.char.id}-face`, fk);
       else if (this.view.texture.key !== `char-${this.char.id}`) this.view.setTexture(`char-${this.char.id}`, frame);
       else this.view.setFrame(frame);
       this.view.setAlpha(this.invulnerable ? (Math.floor(this.scene.time.now / 70) % 2 ? 0.4 : 1) : 1);
