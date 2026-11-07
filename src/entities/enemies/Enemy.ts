@@ -77,6 +77,12 @@ export abstract class Enemy extends Phaser.Physics.Arcade.Sprite {
     this.body.moves = true;
   }
 
+  /** A real drop ahead at x (no ground within two tiles below the feet), not just a step down. */
+  protected pitAt(x: number, bottom: number) {
+    for (let d = 6; d <= 72; d += 8) if (this.gs.level.isSolidAt(x, bottom + d)) return false;
+    return true;
+  }
+
   /** Per-frame behaviour, only called while awake and alive. */
   abstract tick(dt: number): void;
 
@@ -215,7 +221,8 @@ abstract class Walker extends Enemy {
     else if (b.blocked.right) this.dir = -1;
     if (this.careful && b.blocked.down) {
       const aheadX = this.dir > 0 ? b.right + 2 : b.left - 2;
-      if (!this.gs.level.isSolidAt(aheadX, b.bottom + 4)) this.dir *= -1;
+      // (turns at a real drop; a step down the hill is fine)
+      if (this.pitAt(aheadX, b.bottom)) this.dir *= -1;
     }
     b.setVelocityX(this.dir * this.speed);
     this.setFlipX(this.dir > 0);
@@ -330,7 +337,9 @@ export class BigPuff extends Walker {
     const sp = (this.mad ? 112 : 78) * (this.weapon?.kind === 'saw' ? 1.25 : 1);
     const wall = this.dir < 0 ? b.blocked.left : b.blocked.right;
     const aheadX = this.dir > 0 ? b.right + 4 : b.left - 4;
-    const gap = !this.gs.level.isSolidAt(aheadX, b.bottom + 6);
+    // (a step down the hill isn't a gap: he just walks off it, so he never stalls at one
+    // when you're further down)
+    const gap = this.pitAt(aheadX, b.bottom);
     if ((wall || (gap && dy <= 40)) && this.hopCd <= 0) {
       b.setVelocity(this.dir * sp * 1.6, wall ? -560 : -430);
       this.hopCd = 0.6;
@@ -338,6 +347,23 @@ export class BigPuff extends Walker {
       b.setVelocityX(0); // won't jump down into a pit after you
     } else b.setVelocityX(this.dir * sp);
     this.setFrame(Math.floor(this.t * (this.mad ? 9 : 7)) % 2 ? (this.mad ? 'm1' : 'w1') : this.mad ? 'm0' : 'w0');
+  }
+
+  /** How hard he was falling (a heavy landing rumbles the ground). */
+  private fallVy = 0;
+  update(dt: number) {
+    super.update(dt);
+    if (this.dead || !this.active) return;
+    const b = this.body;
+    if (!b.blocked.down) this.fallVy = Math.max(this.fallVy, b.velocity.y);
+    else {
+      if (this.fallVy > 340 && this.awake) {
+        this.gs.shakeFrom(this.x, b.bottom, 130, 0.0045);
+        this.gs.fx.dust(b.left + 4, b.bottom, 3);
+        this.gs.fx.dust(b.right - 4, b.bottom, 3);
+      }
+      this.fallVy = 0;
+    }
   }
 
   protected shutFrame(f: string) {
@@ -435,7 +461,7 @@ export class Giant extends Enemy {
         }
         if (target && Math.abs(target.x - this.x) > 20) this.dir = Math.sign(target.x - this.x);
         const aheadX = this.dir > 0 ? b.right + 4 : b.left - 4;
-        const groundAhead = this.gs.level.isSolidAt(aheadX, b.bottom + 6);
+        const groundAhead = !this.pitAt(aheadX, b.bottom); // (a step down the hill is fine to walk off)
         const wallAhead = this.dir < 0 ? b.blocked.left : b.blocked.right;
         b.setVelocityX(groundAhead && !wallAhead ? this.dir * 66 : 0);
         // you're up on a step / another block, or across a gap: don't just stand at the
@@ -470,7 +496,7 @@ export class Giant extends Enemy {
         break;
       case 'charge': {
         const aheadX = this.dir > 0 ? b.right + 6 : b.left - 6;
-        const stop = !this.gs.level.isSolidAt(aheadX, b.bottom + 6) || (this.dir < 0 ? b.blocked.left : b.blocked.right);
+        const stop = this.pitAt(aheadX, b.bottom) || (this.dir < 0 ? b.blocked.left : b.blocked.right);
         b.setVelocityX(stop ? 0 : this.dir * 290);
         this.setFrame(Math.floor(this.t * 12) % 2 ? 'w1' : 'w0');
         if (Math.random() < 0.5) this.gs.fx.dust(this.dir > 0 ? b.left + 8 : b.right - 8, b.bottom, 1);

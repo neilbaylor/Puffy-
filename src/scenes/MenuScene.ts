@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { preloadLevelMusic } from '../core/music';
 import { MIN_VIEW_W, TILE, VIEW_H } from '../config';
 import { ensureLook, freeLooksExcept } from '../gfx/textures';
 import { buildLevel1 } from '../level/level1';
@@ -27,13 +28,12 @@ export class MenuScene extends Phaser.Scene {
     const onLevel = (id: number) => {
       if (id === this.levelId || !levelInfo(id).build) return;
       const cam = this.cameras.main;
-      // (into or out of Plop Invasion, the fade goes through poo brown)
-      const c = id === 3 || this.levelId === 3 ? [92, 52, 28] : [255, 248, 236];
-      cam.fadeOut(id === 3 ? 320 : 180, c[0], c[1], c[2]);
+      const c = [255, 248, 236];
+      cam.fadeOut(180, c[0], c[1], c[2]);
       cam.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
         this.children.removeAll(true);
         this.build(id);
-        cam.fadeIn(id === 3 ? 600 : 380, c[0], c[1], c[2]);
+        cam.fadeIn(380, c[0], c[1], c[2]);
       });
     };
     this.game.events.on('menu-level', onLevel);
@@ -59,9 +59,10 @@ export class MenuScene extends Phaser.Scene {
   private lastInput = 0;
   private lastQuiet = 0;
 
-  /** The unlocked levels next to this one in the Part picker. */
+  /** The levels next to this one in the Part picker (it shows every built level once you've beaten one). */
   private neighbours(id: number) {
-    return LEVELS.filter((l) => l.build && l.id <= progress.beaten + 1 && Math.abs(l.id - id) === 1).map((l) => l.id);
+    if (progress.beaten < 1) return [];
+    return LEVELS.filter((l) => l.build && Math.abs(l.id - id) === 1).map((l) => l.id);
   }
 
   /** Draw a level's opening scenery for the fly-over now (then throw the objects away; the pictures stay). */
@@ -103,6 +104,8 @@ export class MenuScene extends Phaser.Scene {
         if ((k.startsWith('terrain-') || k.startsWith('tree-')) && !keep.some((name) => k.startsWith(`terrain-${name}-`) || k.startsWith(`tree-${name}-`))) this.textures.remove(k);
     }
     this.quiet = [
+      // (this Part's song, decoded ahead so pressing Play doesn't wait for it)
+      () => preloadLevelMusic(id),
       ...looks.map((l) => () => ensureLook(this, l)),
       ...near.flatMap((n) => [...themesFor(n).map((l) => () => ensureLook(this, l)), () => this.prewarm(n)]),
     ];

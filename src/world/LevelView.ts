@@ -49,13 +49,14 @@ export class LevelView {
     readonly data: LevelData,
     /** Lazy: only draw the terrain near `nearX` now, the rest bit by bit (the start screen). */
     /** keep: leave other levels' terrain alone (a battle watched while the start screen still shows). */
-    opts?: { lazyNear?: number; keep?: boolean },
+    /** free: free other levels' terrain (the game; default when not lazy). */
+    opts?: { lazyNear?: number; keep?: boolean; free?: boolean },
   ) {
     this.lazy = opts?.lazyNear !== undefined;
     this.lazyNear = opts?.lazyNear ?? 0;
     // only one level's terrain lives in memory at a time in the game (phones run out
     // otherwise); the start screen's lazy views keep theirs (they only draw a little)
-    if (opts?.lazyNear === undefined && !opts?.keep)
+    if ((opts?.free ?? opts?.lazyNear === undefined) && !opts?.keep)
       for (const k of scene.textures.getTextureKeys())
       if (k.startsWith('terrain-') && !k.startsWith(`terrain-${data.name}-`)) scene.textures.remove(k);
     this.map = scene.make.tilemap({ data: data.tiles.map((r) => [...r]), tileWidth: TILE, tileHeight: TILE });
@@ -94,8 +95,11 @@ export class LevelView {
       const near = this.pending.filter((p) => p.x1 > left - 400 && p.x0 < right + 400);
       for (const p of near) p.make();
       this.pending = this.pending.filter((p) => !near.includes(p));
-      const ahead = this.pending.filter((p) => p.x0 < right + 2200 && p.x1 > left);
-      ahead.sort((a, b) => a.x0 - b.x0);
+      // (the nearest to the view first, either way: the level's fly-over runs right to left)
+      const mid = (left + right) / 2;
+      const dist = (p: { x0: number; x1: number }) => Math.max(0, p.x0 - mid, mid - p.x1);
+      const ahead = this.pending.filter((p) => p.x0 < right + 2200 && p.x1 > left - 2200);
+      ahead.sort((a, b) => dist(a) - dist(b));
       if (ahead[0]) {
         ahead[0].make();
         this.pending = this.pending.filter((p) => p !== ahead[0]);
@@ -242,11 +246,16 @@ export class LevelView {
             }
             addCanvas(this.scene, key, c, undefined, { release: true });
           }
-          this.scene.add
+          const chunk = this.scene.add
             .image(cx0 - PAD, top - PAD, key)
             .setOrigin(0, 0)
             .setScale(1 / PROP_RES)
             .setDepth(DEPTH.tiles);
+          // (drawn later, in lazy mode: it joins the colour grade too)
+          if (this.scenery) {
+            this.scenery.push(chunk);
+            if (this.tint !== 0xffffff) chunk.setTint(this.tint);
+          }
           if (cut < y1 + PAD && fillCol !== undefined) {
             // the deep rock: from just above the cut down to the bottom of the level, with
             // the piece's outline continuing down its sides

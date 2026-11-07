@@ -5,7 +5,7 @@ import { LevelBuilder, type LevelData } from './builder';
  * and covered in poo. It runs very slightly downhill (with the odd little rise),
  * except the two boulder runs, which are STEEP: a giant rock comes rolling down
  * after you, so keep running, dodge the Plops, and jump the chasm at the
- * bottom — the rock tumbles in. Puddles of poo are like quicksand: you sink
+ * bottom — the rock tumbles in (on the second run it sinks in a poo puddle). Puddles of poo are like quicksand: you sink
  * slowly, so keep hopping to get across. Mid-level the Plops are playing
  * beach volleyball, and they spike the ball at you.
  * Heights are tiles from the bottom (the level is 52 tall).
@@ -14,12 +14,12 @@ import { LevelBuilder, type LevelData } from './builder';
  *   29-37   Poo puddle #1 (small: learn to hop out)
  *   38-58   A poo goat, a Big Plop, a floating island with root beer
  *   59-80   GIANT PLOP #1 · checkpoint 1
- *   81-128  BOULDER RUN #1 (easier): a long steep slope, three Plops, a 6-wide chasm
- *   129-151 Poo puddle #2 (wide)
+ *   81-130  BOULDER RUN #1 (easier): a long steep slope, three Plops, an 8-wide chasm
+ *   131-151 Poo puddle #2 (wide)
  *   152-169 BEACH VOLLEYBALL: they spike the ball at you
  *   170-190 A rise with a poo goat, GIANT PLOP #2 · checkpoint 2
- *   191-236 BOULDER RUN #2 (harder: faster rock, a Big Plop, a Plop parachuting in, a 7-wide chasm)
- *   237-258 Poo puddle #3, checkpoint 3
+ *   191-237 BOULDER RUN #2 (harder: faster rock, a Big Plop, a Plop parachuting in, the rock sinks in a poo puddle)
+ *   238-258 Poo puddle #3, checkpoint 3
  *   259-289 A last rise with a poo goat, the last Plops, the gate
  */
 export function buildLevel3(): LevelData {
@@ -46,12 +46,14 @@ export function buildLevel3(): LevelData {
   L.spawn('plop', 38, 40);
   L.spawn('poogoat', 44, 40);
 
-  // ── A Big Plop under a floating island ───────────────────────
+  // ── A Big Plop, and a floating island off the ledge ──────────
   L.ground(47, 52, 41);
   L.spawn('bigplop', 50, 41);
-  L.island(50, 55, 46);
-  L.rootbeer(52.5, 49);
-  L.aura(52, 48);
+  // the island hangs over the lower ground, 3 tiles above the ledge: a running jump off the
+  // ledge lands on it with any hero (Big Muscles too), and there's room to walk under it
+  L.island(53, 58, 44, 1, false);
+  L.rootbeer(55.5, 47);
+  L.aura(55.5, 46);
   L.ground(53, 58, 39);
   L.spawn('plop', 56, 39);
   L.spawn('tree', 47.5, 41, { h: 56 });
@@ -66,16 +68,16 @@ export function buildLevel3(): LevelData {
 
   // ── BOULDER RUN #1 (easier): steep steps down, 1 tile every 3 ──
   for (let i = 0; i < 14; i++) L.ground(81 + i * 3, 83 + i * 3, 38 - i);
-  L.chase(84, 123, 1.3);
+  L.chase(84, 123, 1.45);
   L.spawn('plop', 93, 34);
   L.spawn('plop', 104, 31);
   L.spawn('plop', 115, 27);
   L.aura(99, 36);
   L.aura(111, 32);
-  // the chasm at the bottom (run and jump!)
-  L.pit(123, 128);
-  L.ground(129, 139, 24);
-  L.auraArc(130, 3, 27, 1);
+  // the chasm at the bottom (run and jump!), cut wide enough for the rock to drop in
+  L.pit(123, 130);
+  L.ground(131, 139, 24);
+  L.auraArc(132, 3, 27, 1);
 
   // ── Poo puddle #2 (wide: hop, hop, hop) ─────────────────────
   L.puddle(140, 147, 24);
@@ -99,7 +101,7 @@ export function buildLevel3(): LevelData {
 
   // ── BOULDER RUN #2 (harder): faster rock, more in the way, a wider chasm ──
   for (let i = 0; i < 13; i++) L.ground(191 + i * 3, 193 + i * 3, 23 - i);
-  L.chase(194, 230, 1.55);
+  L.chase(194, 230, 1.7);
   L.spawn('bigplop', 201, 20);
   L.spawn('plop', 208, 18);
   L.spawn('para', 214, 16, { kind: 'plop' });
@@ -107,9 +109,10 @@ export function buildLevel3(): LevelData {
   L.spawn('plop', 225, 12);
   L.aura(205, 22);
   L.aura(216, 19);
-  L.pit(230, 236);
-  L.ground(237, 247, 10);
-  L.auraArc(238, 3, 13, 1);
+  // at the bottom, a big poo puddle: jump it (or hop through it), and the rock sinks in it
+  L.puddle(230, 237, 10);
+  L.ground(238, 247, 10);
+  L.auraArc(239, 3, 13, 1);
 
   // ── Poo puddle #3, checkpoint 3 ─────────────────────────────
   L.puddle(248, 254, 10);

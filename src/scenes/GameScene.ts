@@ -168,7 +168,22 @@ export class GameScene extends Phaser.Scene {
   private puddles: { x0: number; x1: number; y: number; g: Phaser.GameObjects.Graphics; t: number }[] = [];
   /** Boulder chases: where they start and end, how fast; and the rock while it's rolling. */
   private chases: { x0: number; x1: number; speed: number; started: boolean }[] = [];
-  private rock: null | { img: Phaser.GameObjects.Image; x: number; y: number; v: number; target: number; vy: number; r: number; x1: number; falling: boolean; rumble: number } = null;
+  private rock: null | {
+    img: Phaser.GameObjects.Image;
+    x: number;
+    y: number;
+    v: number;
+    target: number;
+    vy: number;
+    r: number;
+    x1: number;
+    falling: boolean;
+    rumble: number;
+    /** Once it's going over the edge: the middle of the hole it drops into, and the poo puddle there (if any). */
+    holeX?: number;
+    pool?: { x0: number; x1: number; y: number } | null;
+    sinking?: boolean;
+  } = null;
 
   private gPlayers!: Group;
   private gEnemies!: Group;
@@ -240,7 +255,14 @@ export class GameScene extends Phaser.Scene {
     const data = (levelInfo(this.levelId).build ?? buildLevel1)();
     this.physics.world.gravity.y = GRAVITY;
     this.physics.world.TILE_BIAS = 24;
-    this.level = new LevelView(this, data);
+    // only the terrain where the camera starts is drawn now (the end of the level, where the
+    // fly-over begins, or the checkpoint on a retry); the rest a chunk per frame as it plays,
+    // so the level starts without a long pause
+    const cpsAt = data.spawns.filter((sp) => sp.type === 'checkpoint').sort((a, b) => a.x - b.x);
+    const spawnAt = data.spawns.find((sp) => sp.type === 'player');
+    const startCol = this.startCheckpoint >= 0 && cpsAt[this.startCheckpoint] ? cpsAt[this.startCheckpoint].x : (spawnAt?.x ?? 0);
+    const firstX = this.retry ? startCol * TILE : data.width * TILE - 300;
+    this.level = new LevelView(this, data, { lazyNear: firstX - 500, free: true });
     const { widthPx, heightPx } = this.level;
     this.physics.world.setBounds(0, -400, widthPx, heightPx + 800, true, true, false, false);
     // this level's looks (drawn now if the start screen didn't already); the others are freed
@@ -678,12 +700,16 @@ export class GameScene extends Phaser.Scene {
         sumBottom += p.bottom;
         sumVx += p.body.velocity.x;
       }
-      // look ahead in the direction of travel, so you can see what's coming
-      const lookTarget = tracked.length === 1 ? Phaser.Math.Clamp(sumVx / 3, -90, 90) : 0;
+      // look ahead in the direction of travel, so you can see what's coming; with a boulder
+      // rolling after you, look back a bit instead and up the hill, so you can see it coming
+      const R = this.rock && !this.rock.falling ? this.rock : null;
+      const lookTarget = R ? -vw * 0.16 : tracked.length === 1 ? Phaser.Math.Clamp(sumVx / 3, -90, 90) : 0;
       this.lookAhead += (lookTarget - this.lookAhead) * (snap ? 1 : 1 - Math.exp(-dt * 2.5));
       const tx = (minX + maxX) / 2 + this.lookAhead;
       // keep the hero's feet ~62% down the screen: above the touch controls
-      const tTop = sumBottom / tracked.length - vh * 0.62;
+      const feet = sumBottom / tracked.length;
+      let tTop = feet - vh * 0.62;
+      if (R) tTop = Math.max(Math.min(tTop, R.y - R.r - 40), feet - vh * 0.8);
       this.camX += (tx - this.camX) * (snap ? 1 : 1 - Math.exp(-dt * 7));
       this.camTop += (tTop - this.camTop) * (snap ? 1 : 1 - Math.exp(-dt * 4));
     }
@@ -784,6 +810,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   spawnShockwave(x: number, groundY: number, dir: number, speed: number) {
+    groundY = this.surfaceAt(x, groundY);
     // a rolling wall of fire (flickering hand-drawn flames over an orange glow)
     const glow = this.add.image(x, groundY - 16, 'glow').setTint(0xff7a2a).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.75).setScale(1.6, 1.1).setDepth(DEPTH_WAVE - 0.1);
     const img = this.add.image(x, groundY + 3, 'flame', 'f0').setOrigin(0.5, 1).setScale(0.1 * FLAME_S, FLAME_S).setFlipX(dir < 0).setDepth(DEPTH_WAVE);
@@ -793,7 +820,15 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** A Big Plop's wave of poo: rolls along the ground like the Giants' fire (jump it!), then slumps into a splat. */
+  /** The top of the ground at x near groundY (if groundY is inside a hill, the surface above it). */
+  private surfaceAt(x: number, groundY: number) {
+    let y = groundY;
+    for (let i = 0; i < 6 && this.level.isSolidAt(x, y - 4); i++) y -= TILE;
+    return y;
+  }
+
   spawnPooWave(x: number, groundY: number, dir: number, speed: number) {
+    groundY = this.surfaceAt(x, groundY);
     const glow = this.add.image(x, groundY - 4, 'glow').setTint(0x3a1e0c).setAlpha(0.3).setScale(1.3, 0.35).setDepth(DEPTH_WAVE - 0.1);
     const img = this.add.image(x, groundY + 3, 'poowave', 'w0').setOrigin(0.5, 34 / 36).setScale(0.1 * POO_S, POO_S).setFlipX(dir < 0).setDepth(DEPTH_WAVE);
     this.tweens.add({ targets: img, scaleX: POO_S, duration: 160, ease: 'Back.easeOut' });
@@ -839,7 +874,10 @@ export class GameScene extends Phaser.Scene {
       const front = w.img.x + w.dir * 20;
       this.fx.flameTrail(w.img.x, w.y, w.dir, vigor);
       // ran into a wall: it burns out there
-      if (this.level.isSolidAt(front, w.y - 8) && w.life > FLAME_FADE) w.life = FLAME_FADE;
+      if (this.level.isSolidAt(front, w.y - 8)) {
+        w.speed = 0;
+        if (w.life > FLAME_FADE) w.life = FLAME_FADE;
+      }
       if (w.life <= 0) {
         // the last flicker sinks into a curl of smoke and a few embers, leaving a scorch mark
         this.fx.flameDie(w.img.x, w.y);
@@ -888,7 +926,11 @@ export class GameScene extends Phaser.Scene {
     w.glow.setPosition(w.img.x, w.y - 3).setAlpha(0.3 * vigor);
     if (Math.random() < 0.35 * vigor) this.fx.pooSplat(w.img.x - w.dir * 18, w.y - 8, 1);
     const front = w.img.x + w.dir * 22;
-    if (this.level.isSolidAt(front, w.y - 8) && w.life > FLAME_FADE) w.life = FLAME_FADE;
+    // (a step up stops it dead: it slumps there instead of sliding on into the hill)
+    if (this.level.isSolidAt(front, w.y - 8)) {
+      w.speed = 0;
+      if (w.life > FLAME_FADE) w.life = FLAME_FADE;
+    }
     if (w.life <= 0) {
       // it slumps into a flat splat that fades away
       this.fx.pooSplat(w.img.x, w.y - 4, 6);
@@ -1058,43 +1100,43 @@ export class GameScene extends Phaser.Scene {
     if (!R) return;
     // it hangs right behind you: if you've got well ahead it rolls faster (a bit faster than a run)
     // to stay close; at its own pace it's faster than walking, so keep running!
-    const lead = hero ? hero.x - (R.x + R.r) : 0;
-    const want = hero && lead > 150 && !R.falling ? Math.max(R.target, Math.min(Math.abs(hero.body.velocity.x) + 140, hero.char.runSpeed * 1.3)) : R.target;
-    R.v += (want - R.v) * (1 - Math.exp(-dt * 1.5));
-    R.x += R.v * dt;
-    R.img.rotation += (R.v * dt) / R.r;
-    const ground = this.groundUnder(R.x, R.y);
-    if (ground === null || ground > R.y + R.r + 2 || R.vy < 0) {
-      // in the air: off a step (it bounces down the hill) or into the chasm
-      R.vy = Math.min(1400, R.vy + 1600 * dt);
-      R.y += R.vy * dt;
-      if (ground !== null && R.y + R.r >= ground && R.vy > 0) {
-        R.y = ground - R.r;
-        if (R.vy > 260) {
-          this.shakeFrom(R.x, ground, 160, 0.006);
-          this.fx.dust(R.x - R.r * 0.5, ground, 6);
-          this.fx.dust(R.x + R.r * 0.5, ground, 6);
-          sfx.thud();
-          R.vy = -R.vy * 0.25; // a little bounce
-        } else R.vy = 0;
-      }
-      if (ground === null && R.x > R.x1 - R.r && !R.falling) {
-        R.falling = true;
-        sfx.whoosh();
-        this.fx.popText(R.x, R.y - R.r - 10, 'BYE ROCK!', '#ffffff', 18);
-      }
-      if (R.y > this.level.heightPx + 200) {
-        this.time.delayedCall(250, () => {
-          sfx.thud();
-          this.cameras.main.shake(260, 0.008);
-        });
-        R.img.destroy();
-        this.rock = null;
-        return;
-      }
+    if (R.falling) {
+      this.updateRockFall(R, dt);
+      if (!this.rock) return;
     } else {
-      R.y = ground - R.r;
-      if (Math.random() < 0.45) this.fx.dust(R.x - R.r * 0.7, ground, 1);
+      const lead = hero ? hero.x - (R.x + R.r) : 0;
+      const want = hero && lead > 110 ? Math.max(R.target, Math.min(Math.abs(hero.body.velocity.x) + 150, hero.char.runSpeed * 1.35)) : R.target;
+      R.v += (want - R.v) * (1 - Math.exp(-dt * 1.5));
+      R.x += R.v * dt;
+      R.img.rotation += (R.v * dt) / R.r;
+      const ground = this.groundUnder(R.x, R.y);
+      if (ground === null && R.x > R.x1 - R.r * 0.4) {
+        // over the edge: it drops straight down the middle of the hole (or into the poo)
+        R.falling = true;
+        let right = R.x1;
+        while (right < R.x1 + 30 * TILE && this.groundUnder(right, R.y - R.r) === null) right += 8;
+        R.holeX = (R.x1 + right) / 2;
+        R.pool = this.puddles.find((pd) => R.holeX! > pd.x0 && R.holeX! < pd.x1) ?? null;
+        sfx.whoosh();
+        this.fx.popText(R.x, R.y - R.r - 10, R.pool ? 'SPLOOSH!' : 'BYE ROCK!', '#ffffff', 20);
+      } else if (ground === null || ground > R.y + R.r + 2 || R.vy < 0) {
+        // in the air: off a step (it bounces down the hill)
+        R.vy = Math.min(1400, R.vy + 1600 * dt);
+        R.y += R.vy * dt;
+        if (ground !== null && R.y + R.r >= ground && R.vy > 0) {
+          R.y = ground - R.r;
+          if (R.vy > 260) {
+            this.shakeFrom(R.x, ground, 180, 0.008);
+            this.fx.dust(R.x - R.r * 0.5, ground, 8);
+            this.fx.dust(R.x + R.r * 0.5, ground, 8);
+            sfx.thud();
+            R.vy = -R.vy * 0.25; // a little bounce
+          } else R.vy = 0;
+        }
+      } else {
+        R.y = ground - R.r;
+        if (Math.random() < 0.5) this.fx.dust(R.x - R.r * 0.7, ground, 1);
+      }
     }
     R.img.setPosition(R.x, R.y);
     R.rumble -= dt;
@@ -1108,6 +1150,7 @@ export class GameScene extends Phaser.Scene {
       const cy = Phaser.Math.Clamp(R.y, b.top, b.bottom);
       return Math.hypot(cx - R.x, cy - R.y) < R.r * k;
     };
+    if (R.falling) return;
     for (const p of this.players) if (p.alive && !p.invulnerable && hits(p.body)) this.hitPlayer(p, R.x - R.r);
     for (const e of this.enemies)
       if (e.active && !e.dead && hits(e.body, 1)) {
@@ -1116,12 +1159,45 @@ export class GameScene extends Phaser.Scene {
       }
   }
 
+  /** The rock going into the hole at the bottom of the run: down the middle, or slowly under the poo. */
+  private updateRockFall(R: NonNullable<GameScene['rock']>, dt: number) {
+    R.x += (R.holeX! - R.x) * Math.min(1, dt * 7);
+    R.v *= Math.exp(-dt * 3);
+    R.img.rotation += (R.v * dt) / R.r;
+    const pool = R.pool;
+    if (pool && R.y + R.r * 0.15 > pool.y) {
+      if (!R.sinking) {
+        // SPLOOSH: into the poo (under the puddle's picture), sinking slowly out of sight
+        R.sinking = true;
+        R.img.setDepth(DEPTH.players + 0.5);
+        for (let i = -2; i <= 2; i++) this.fx.pooSplat(R.x + i * R.r * 0.4, pool.y, 14);
+        this.shakeFrom(R.x, pool.y, 300, 0.01);
+        sfx.thud();
+        sfx.dribble(1);
+      }
+      R.vy += (70 - R.vy) * Math.min(1, dt * 5);
+      if (Math.random() < 0.2) this.fx.pooSplat(R.x + (Math.random() - 0.5) * R.r * 1.6, pool.y, 4);
+    } else R.vy = Math.min(1400, R.vy + 1600 * dt);
+    R.y += R.vy * dt;
+    R.img.setPosition(R.x, R.y);
+    const gone = pool ? R.y - R.r > pool.y + 16 : R.y - R.r > this.level.heightPx + 40;
+    if (gone) {
+      if (!pool)
+        this.time.delayedCall(250, () => {
+          sfx.thud();
+          this.cameras.main.shake(260, 0.008);
+        });
+      R.img.destroy();
+      this.rock = null;
+    }
+  }
+
   private startChase(c: { x0: number; x1: number; speed: number }, hero: Player) {
     if (!this.textures.exists('bigrock'))
       addCanvas(
         this,
         'bigrock',
-        hires(42, 42, 7, (ctx) => {
+        hires(42, 42, 12, (ctx) => {
           drawRock(ctx);
           // smeared with poo, like everything else round here
           ctx.fillStyle = POO.base;
@@ -1132,12 +1208,13 @@ export class GameScene extends Phaser.Scene {
           }
         }),
       );
-    const r = 54;
+    // (too tall to jump over, even with a double jump; the holes at the bottom are cut to fit it)
+    const r = 115;
     // (it bursts in from the edge of the screen, half in view)
     const x = this.view.left - r * 0.5;
     const gy = this.groundUnder(x, this.view.top) ?? hero.bottom;
     const target = Math.min(hero.char.walkSpeed * c.speed, hero.char.runSpeed * 0.92);
-    const img = this.add.image(x, gy - r, 'bigrock').setScale((2 * r) / 42 / 7).setDepth(DEPTH.enemies + 2);
+    const img = this.add.image(x, gy - r, 'bigrock').setScale((2 * r) / 42 / 12).setDepth(DEPTH.enemies + 2);
     this.rock = { img, x, y: gy - r, v: hero.char.runSpeed, target, vy: 0, r, x1: c.x1, falling: false, rumble: 0 };
     sfx.roar();
     this.cameras.main.shake(400, 0.008);

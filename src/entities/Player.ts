@@ -20,9 +20,9 @@ const RECOIL_TIME = 0.16;
 /** How fast you sink in a puddle of poo (px/s, for a hero of the usual height). */
 const GOO_SINK = 22;
 /** Wading speed in poo, the hop out of it, and how fast you carry on through the air after the hop (the same for all heroes). */
-const GOO_WADE = 75;
-const GOO_HOP = 480;
-const GOO_AIR = 165;
+const GOO_WADE = 65;
+const GOO_HOP = 440;
+const GOO_AIR = 150;
 
 const HIT_W = 22;
 const HIT_H = 34;
@@ -197,7 +197,7 @@ export class Player {
       jumpedNow = true;
       // (the same hop for every hero, so the puddles are just as hard whoever you are)
       const depth = Phaser.Math.Clamp(this.goo / (c.hitH ?? HIT_H), 0, 1);
-      b.setVelocity(vx, -GOO_HOP * (1 - depth * 0.3));
+      b.setVelocity(vx, -GOO_HOP * (1 - depth * 0.45));
       this.launchSpeed = GOO_AIR;
       this.gooHop = true;
       this.jumpBuffer = 0;

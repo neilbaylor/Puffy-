@@ -48,14 +48,44 @@ export class VolleyMatch {
     this.netX = cx;
     this.left = cx - half;
     this.right = cx + half;
-    // the court: a strip of sand, the net, a beach umbrella at one end
+    // the court, like the pro tour: a raked sand court seen a little from the front (its far
+    // edge up and to the left), blue boundary tape, the net across the middle, sponsor boards
+    const D = { x: -28, y: -18 }; // from the front edge to the back edge
+    const L0 = this.left - 10;
+    const R0 = this.right + 10;
     const sand = gs.add.graphics().setDepth(DEPTH.tiles + 0.5);
-    sand.fillStyle(0xe9cf98, 1).fillRoundedRect(this.left - 10, ground - 4, half * 2 + 20, 10, 5);
-    sand.fillStyle(0xd2b276, 1).fillRect(this.left - 4, ground + 3, half * 2 + 8, 3);
-    for (let x = this.left; x < this.right; x += 7) sand.fillStyle(0xc9a466, 0.8).fillCircle(x + ((x * 37) % 5), ground - 1 + ((x * 13) % 4), 0.9);
-    sand.lineStyle(1.6, 0xffffff, 0.9).lineBetween(this.left + 4, ground - 3, this.right - 4, ground - 3);
-    gs.add.image(cx, ground + 2, 'volleynet').setOrigin(0.5, 1).setScale(1 / 3).setDepth(DEPTH.decor + 0.5);
-    gs.add.image(this.left - 26, ground + 2, 'umbrella').setOrigin(30 / 64, 68 / 70).setScale(1 / 3).setDepth(DEPTH.decor);
+    const quad = (g: Phaser.GameObjects.Graphics, x0: number, x1: number, y: number, dx: number, dy: number) =>
+      g.fillPoints([new Phaser.Math.Vector2(x0, y), new Phaser.Math.Vector2(x1, y), new Phaser.Math.Vector2(x1 + dx, y + dy), new Phaser.Math.Vector2(x0 + dx, y + dy)], true);
+    sand.fillStyle(0xd9b878, 1);
+    quad(sand, L0 - 4, R0 + 4, ground + 4, D.x, D.y - 4);
+    sand.fillStyle(0xedd6a2, 1);
+    quad(sand, L0, R0, ground + 1, D.x, D.y);
+    for (let i = 0; i < 70; i++) {
+      const t = (i * 0.618) % 1;
+      const u = (i * 0.414) % 1;
+      sand.fillStyle(i % 3 ? 0xd4b47a : 0xfff0c8, 0.8).fillCircle(L0 + 6 + t * (R0 - L0 - 12) + D.x * u, ground + D.y * u, 0.8);
+    }
+    // the tape: round the court and the centre line under the net
+    sand.lineStyle(1.8, 0x2a6fd6, 1);
+    const fx0 = this.left;
+    const fx1 = this.right;
+    const fy = ground - 1;
+    sand.strokePoints([new Phaser.Math.Vector2(fx0, fy), new Phaser.Math.Vector2(fx1, fy), new Phaser.Math.Vector2(fx1 + D.x * 0.85, fy + D.y * 0.85), new Phaser.Math.Vector2(fx0 + D.x * 0.85, fy + D.y * 0.85)], true);
+    sand.lineStyle(1.2, 0x2a6fd6, 0.8).lineBetween(cx, fy, cx + D.x * 0.85, fy + D.y * 0.85);
+    // sponsor boards along the back of the court
+    const boards = gs.add.graphics().setDepth(DEPTH.tiles + 0.45);
+    const by = ground + D.y - 4;
+    for (const [x0, x1] of [[L0 + D.x + 4, cx - 30], [cx + 2, R0 + D.x - 4]] as const) {
+      boards.fillStyle(0x1b4e9e, 1).fillRoundedRect(x0, by - 15, x1 - x0, 15, 2);
+      boards.fillStyle(0x2a6fd6, 1).fillRoundedRect(x0 + 1.5, by - 13.5, x1 - x0 - 3, 9, 1.5);
+      boards.lineStyle(1.2, 0x15233f, 1).strokeRoundedRect(x0, by - 15, x1 - x0, 15, 2);
+      gs.add
+        .text((x0 + x1) / 2, by - 8.5, 'PLOP BEACH TOUR', { fontFamily: '"Lilita One", sans-serif', fontSize: '22px', color: '#ffffff', stroke: '#15233f', strokeThickness: 5 })
+        .setOrigin(0.5)
+        .setScale(0.36)
+        .setDepth(DEPTH.tiles + 0.46);
+    }
+    gs.add.image(cx, ground + 2, 'volleynet').setOrigin(0.5, 96 / 100).setScale(1 / 3).setDepth(DEPTH.decor + 0.5);
 
     // two a side
     for (const [side, f] of [[-1, 0.72], [-1, 0.32], [1, 0.32], [1, 0.72]] as const) {
