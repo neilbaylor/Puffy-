@@ -8,7 +8,7 @@ The concept screens are in this folder (`wide`, `plan`, `entrance`, `fight`, `fi
   there are splats on the boards. Fans hold signs (POOPA!, GO PUFFY, QUEEN ♛ PLOP, P.U.!).
 - A wrestling ring in the middle, with **POO PALACE** on its skirt and QUEEN PLOP on the mat.
   The announce table (POOPA TV), steel steps and poo piles are on the floor around it.
-- A **poo puddle** in one corner of the mat. It sinks you like the puddles in the level.
+- A **poo puddle** in one corner of the mat: quicksand, like the level's (sink slowly, hop out; go right under and it costs you).
 
 ## The camera
 - The fight is filmed from the side, like a wrestling TV camera (`wide.jpg`). The crowd, boards
@@ -32,14 +32,14 @@ The concept screens are in this folder (`wide`, `plan`, `entrance`, `fight`, `fi
   - **Rope physics:** each rope is a springy line. It stretches where you hit it, sags under you as you
     climb, and wobbles back when you let go. Launching off the top shakes all three ropes.
     Each rope is a damped spring that bends at the contact point, so this is not too complex.
-- **Fall off the ring** to the floor beside it and climb the steel steps back in.
+- **No leaving the ring**: the ropes keep you in at any height (above the top rope, only as far as the corner posts). No bazooka in the ring either (the fire button is hidden).
 
 ## Queen Plop
 - A Plop queen: a pink royal cape, a tiara, a bow on her swirl, short lashes, a touch of blush
   and a string of pearls (feminine, but not too much).
 - **Aggressive, and she jumps a lot** (hops, charges, slams).
 - **She backs off when she sees you on the ropes**, so you have to climb and jump off quickly.
-- **8 hits to beat her.** Her health bar is in 8 pieces, and **the jumbotron counts down** the hits
+- **10 hits to beat her.** **The jumbotron counts down** the hits
   left ("3 HITS TO GO").
 - No referee: enough hits and she's done.
 

@@ -15,8 +15,8 @@ const FONT = '"Lilita One", "Arial Black", sans-serif';
 /** The ring, as the TV camera sees it from the side (stage units). */
 export const RING = {
   /** Front posts (x), and how much the back of the ring shrinks toward the middle. */
-  x0: 150,
-  x1: 1130,
+  x0: 40,
+  x1: 1240,
   back: 0.885,
   /** The mat: its back edge, front edge, and the line the fighters stand on. */
   backY: 440,
@@ -34,17 +34,10 @@ export const RING = {
 };
 /** A point on the back edge of the ring, from its front x (the back is further away: smaller). */
 export const backX = (x: number) => 640 + (x - 640) * RING.back;
-/** The steel steps beside each corner (stage units): [x0, x1, top]. */
-export const STEPS: [number, number, number][] = [
-  [18, 138, 594],
-  [58, 138, 538],
-  [1142, 1262, 594],
-  [1142, 1222, 538],
-];
 /** The announcers' table (left of the ring): [x0, x1, top]. */
 export const TABLE: [number, number, number] = [-150, -20, 600];
 /** The poo puddle on the mat (stage x of its middle, half-width). */
-export const PUDDLE = { x: 975, w: 100 };
+export const PUDDLE = { x: 1040, w: 100 };
 /** The tunnel out of the stands (top of an aisle), and where the King sits in the front row. */
 export const TUNNEL = { x: 470, top: 222, bottom: 297 };
 export const KING_SEAT = { x: 548, feet: 300 };
@@ -300,7 +293,7 @@ export function drawRingFloor(ctx: Ctx) {
 }
 
 /** The ring's box for its texture (stage units): what drawRing covers. */
-export const RING_BOX = { x: 100, y: 330, w: 1080, h: 270 };
+export const RING_BOX = { x: 10, y: 330, w: 1260, h: 270 };
 
 /**
  * The ring itself (no ropes: those move): the back posts, the mat with the Queen's name on it,
@@ -324,7 +317,7 @@ export function drawRing(ctx: Ctx) {
   ctx.restore();
   const r = rng(404);
   for (let i = 0; i < 9; i++) {
-    const x = 230 + r() * 820;
+    const x = 150 + r() * 980;
     const y = R.backY + 8 + r() * (R.frontY - R.backY - 14);
     ctx.fillStyle = `rgba(120,70,30,${0.18 + r() * 0.25})`;
     ctx.beginPath();
@@ -365,13 +358,8 @@ export function drawFrontPost(ctx: Ctx) {
   post(ctx, POST_BOX.w / 2, POST_BOX.h - 2, RING.post, 1);
 }
 
-/** The steel steps and the announcers' table (stage units, untranslated: drawn where they stand). */
+/** The announcers' table (stage units, untranslated: drawn where it stands). */
 export function drawRingside(ctx: Ctx) {
-  // the steel steps: one staircase at each corner (diamond-plate treads, bolted side panels)
-  for (const side of [-1, 1]) {
-    const steps = STEPS.filter(([x0]) => (side < 0 ? x0 < 640 : x0 > 640)).sort((a, b) => b[2] - a[2]);
-    steps.forEach(([x0, x1, top], i) => stepBlock(ctx, x0, x1, top, RING.groundY + 6, side, 30 + i * 3 + (side > 0 ? 10 : 0)));
-  }
   const [tx0, tx1, ttop] = TABLE;
   ST.shape(ctx, roundRectPts(tx0, ttop, tx1 - tx0, RING.groundY + 6 - ttop, 6), SKIRT, 40, { lw: 1.1 });
   ctx.fillStyle = '#ffd23f';
@@ -386,54 +374,6 @@ export function drawRingside(ctx: Ctx) {
   ctx.fillRect(tx0 + 74, ttop - 26, 38, 20);
   drawPooSwirl(ctx, 330, RING.groundY + 8, 30, POO, 51);
   drawPooSwirl(ctx, 960, RING.groundY + 14, 24, POO_DARK, 52);
-}
-
-/** One block of the steel steps: a riveted steel box with a diamond-plate tread on top. */
-function stepBlock(ctx: Ctx, x0: number, x1: number, top: number, bottom: number, side: number, seed: number) {
-  // its shadow on the floor
-  ctx.fillStyle = 'rgba(0,0,0,0.3)';
-  ctx.beginPath();
-  ctx.ellipse((x0 + x1) / 2, bottom - 2, (x1 - x0) / 2 + 8, 6, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ST.shape(ctx, roundRectPts(x0, top, x1 - x0, bottom - top, 5), STEEL, seed, { lw: 1.1, light: [side < 0 ? x1 - 8 : x0 + 8, top] });
-  // the tread: a bright steel lip with a diamond pattern
-  const g = ctx.createLinearGradient(0, top, 0, top + 12);
-  g.addColorStop(0, '#b9b2a8');
-  g.addColorStop(1, '#6d655c');
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  ctx.roundRect(x0 + 2, top + 2, x1 - x0 - 4, 11, 4);
-  ctx.fill();
-  ctx.save();
-  ctx.beginPath();
-  ctx.roundRect(x0 + 2, top + 2, x1 - x0 - 4, 11, 4);
-  ctx.clip();
-  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-  ctx.lineWidth = 1.2;
-  for (let x = x0 - 10; x < x1 + 10; x += 8) {
-    ctx.beginPath();
-    ctx.moveTo(x, top + 13);
-    ctx.lineTo(x + 6, top + 3);
-    ctx.moveTo(x + 6, top + 13);
-    ctx.lineTo(x, top + 3);
-    ctx.stroke();
-  }
-  ctx.restore();
-  // the side panel: a darker inset with rivets in each corner
-  const py0 = top + 18;
-  const py1 = bottom - 8;
-  if (py1 - py0 > 14) {
-    ctx.fillStyle = 'rgba(0,0,0,0.22)';
-    ctx.beginPath();
-    ctx.roundRect(x0 + 8, py0, x1 - x0 - 16, py1 - py0, 4);
-    ctx.fill();
-    ctx.fillStyle = '#c9c2b8';
-    for (const [rx, ry] of [[x0 + 13, py0 + 5], [x1 - 13, py0 + 5], [x0 + 13, py1 - 5], [x1 - 13, py1 - 5]]) {
-      ctx.beginPath();
-      ctx.arc(rx, ry, 2.2, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
 }
 
 /** The jumbotron: one of the scoreboard's screens, with this show's own crawl along the bottom. */

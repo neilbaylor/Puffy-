@@ -131,7 +131,7 @@ export class TouchControls {
       return { x: r.left + r.width / 2, y: r.top + r.height / 2, r: r.width / 2 };
     };
     const j = centre(this.jumpBtn);
-    const f = centre(this.fireBtn);
+    const f = this.fireBtn.hidden ? { x: -1e9, y: -1e9, r: 1 } : centre(this.fireBtn);
     const bb = this.bombBtn.hidden ? null : centre(this.bombBtn);
     let jump = false;
     let fire = false;
@@ -156,6 +156,12 @@ export class TouchControls {
 
   show() {
     this.root.hidden = false;
+  }
+
+  /** The FIRE button shown or not (there's no bazooka in Queen Plop's wrestling ring). */
+  setFire(on: boolean) {
+    this.fireBtn.hidden = !on;
+    if (!on) touchState.fire = false;
   }
 
   /** Online battles: the BOMB button shows (with how many) once you've picked some up. */
