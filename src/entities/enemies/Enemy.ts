@@ -85,6 +85,8 @@ export abstract class Enemy extends Phaser.Physics.Arcade.Sprite {
 
   /** Fallen into a puddle of poo (Plop Invasion): sinking, like quicksand. */
   inPoo = false;
+  /** When it was last hit (and lived): a moment of "ow!" on its face. */
+  hurtAt = -1e9;
 
   /** Per-frame behaviour, only called while awake and alive. */
   abstract tick(dt: number): void;
@@ -112,6 +114,7 @@ export abstract class Enemy extends Phaser.Physics.Arcade.Sprite {
     } else {
       this.setTintFill(0xffffff);
       this.flashUntil = this.gs.time.now + 90;
+      this.hurtAt = this.gs.time.now;
       sfx.bump();
     }
   }

@@ -9,8 +9,13 @@
 import type { Ctx } from './draw';
 import { ellipsePts, type Fill, type Pt, type Style } from './handdrawn';
 
-export type PlopFrame = 'idle' | 'run0' | 'run1' | 'yell0' | 'yell1' | 'walk0' | 'walk1' | 'walk2' | 'walk3';
-export const PLOP_FRAMES: PlopFrame[] = ['idle', 'run0', 'run1', 'yell0', 'yell1', 'walk0', 'walk1', 'walk2', 'walk3'];
+export type PlopFrame = 'idle' | 'run0' | 'run1' | 'yell0' | 'yell1' | 'walk0' | 'walk1' | 'walk2' | 'walk3' | 'idle1' | 'blink' | 'look' | 'grin' | 'hurt';
+/**
+ * The frames: walking, running and yelling, plus little moments while they stand about —
+ * idle1 (breathing in: a touch taller and narrower), blink, look (a glance back over the
+ * shoulder), grin (a sly toothy grin) — and hurt (squeezed-shut eyes, wobbly mouth).
+ */
+export const PLOP_FRAMES: PlopFrame[] = ['idle', 'run0', 'run1', 'yell0', 'yell1', 'walk0', 'walk1', 'walk2', 'walk3', 'idle1', 'blink', 'look', 'grin', 'hurt'];
 /**
  * A proper four-step walk: [stride, front foot lift, back foot lift, body bob, arm swing].
  * Contact (feet apart, body low) → passing (one foot up, body high) → the other contact → passing.
@@ -64,7 +69,12 @@ export function drawPlop(ctx: Ctx, ox: number, oy: number, f: PlopFrame, st: Sty
   const walk = f in WALK ? WALK[f as keyof typeof WALK] : null;
   const run = f === 'run0' || f === 'run1' || !!walk;
   const yell = f === 'yell0' || f === 'yell1';
-  const bob = walk ? walk[3] : f === 'run1' || f === 'yell1' ? -3 : 0;
+  // breathing in (idle1) stretches the body a little; a hit squashes it down
+  const breathe = f === 'idle1' ? 1 : 0;
+  const hurt = f === 'hurt';
+  const bob = walk ? walk[3] : f === 'run1' || f === 'yell1' ? -3 : breathe ? -1.5 : hurt ? 2.5 : 0;
+  const sqX = breathe ? 0.97 : hurt ? 1.07 : 1;
+  const sqY = breathe ? 1.05 : hurt ? 0.9 : 1;
   const stride = walk ? walk[0] : f === 'run0' ? 7 : f === 'run1' ? -7 : 0;
   const liftF = walk ? walk[1] : stride > 0 ? 4 : 0;
   const liftB = walk ? walk[2] : stride < 0 ? 4 : 0;
@@ -91,26 +101,49 @@ export function drawPlop(ctx: Ctx, ox: number, oy: number, f: PlopFrame, st: Sty
     st.shape(ctx, [[x, y], [x + Math.cos(ang) * len * 0.5 + nx, y + Math.sin(ang) * len * 0.5 + ny], tip, [x + Math.cos(ang) * len * 0.5 - nx, y + Math.sin(ang) * len * 0.5 - ny]], BODY, seed, { lw: 1 });
   };
   const wave = f === 'yell1' ? 0.35 : 0;
-  arm(cx - 30, botY - 4, Math.PI + (yell ? 0.95 + wave : run ? 0.45 - swing : 0.75), 2010);
-  arm(cx + 30, botY - 4, yell ? -0.95 - wave : run ? -0.3 - swing : -0.75, 2011);
+  // (arms: up when yelling, flung out when hit, lifting a touch as it breathes in)
+  const armL = yell ? 0.95 + wave : hurt ? 1.25 : run ? 0.45 - swing : 0.75 + breathe * 0.12;
+  const armR = yell ? -0.95 - wave : hurt ? -1.25 : run ? -0.3 - swing : -0.75 - breathe * 0.12;
+  arm(cx - 30 * sqX, botY - 4, Math.PI + armL, 2010);
+  arm(cx + 30 * sqX, botY - 4, armR, 2011);
 
   // top tier: a smaller dome (behind the bottom tier, like the sketch), with the swirl tip
-  const topY = botY - 27;
+  const topY = botY - 27 * sqY;
   const tipH = kind === 'large' ? 1.25 : kind === 'small' ? 0.75 : 1;
   st.shape(ctx, [[cx - 8, topY - 12], [cx + 2, topY - 12 - 22 * tipH], [cx + 12, topY - 12 - 32 * tipH], [cx + 10, topY - 12 - 18 * tipH], [cx + 14, topY - 12]], BODY, 2030, { lw: 1.2, light: [cx + 4, topY - 26] });
-  st.shape(ctx, ellipsePts(cx + 1, topY + 2, 26, 19, 0, 36), BODY, 2031, { lw: 1.3, light: [cx - 8, topY - 7] });
+  st.shape(ctx, ellipsePts(cx + 1, topY + 2, 26 * sqX, 19 * sqY, 0, 36), BODY, 2031, { lw: 1.3, light: [cx - 8, topY - 7] });
   // bottom tier: a wide squashy oval in front
-  st.shape(ctx, ellipsePts(cx, botY, 35, 21, 0, 40), BODY, 2020, { lw: 1.3, light: [cx - 12, botY - 8] });
+  st.shape(ctx, ellipsePts(cx, botY, 35 * sqX, 21 * sqY, 0, 40), BODY, 2020, { lw: 1.3, light: [cx - 12, botY - 8] });
 
   // big googly eyes with slit pupils (looking left, the way they face)
   const eyeK = kind === 'small' ? 1.22 : kind === 'large' ? 0.9 : 1;
+  const blink = f === 'blink';
+  const look = f === 'look';
+  const grin = f === 'grin';
   for (const [ex, er0, s] of [[cx - 10, 9, 1], [cx + 11, 8.4, 2]] as const) {
     const er = er0 * eyeK;
-    st.shape(ctx, ellipsePts(ex, topY - 3, er * 0.82, er, 0, 24), EYE, 2040 + s, { lw: 1 });
+    if (blink) {
+      // shut: a soft curved line where the eye was
+      st.line(ctx, [[ex - er * 0.8, topY - 3], [ex, topY - 1], [ex + er * 0.8, topY - 3]], 2040 + s, 1.3);
+      continue;
+    }
+    if (hurt) {
+      // squeezed shut: > <
+      const d = s === 1 ? 1 : -1;
+      st.line(ctx, [[ex - er * 0.6 * d, topY - 3 - er * 0.5], [ex + er * 0.5 * d, topY - 3], [ex - er * 0.6 * d, topY - 3 + er * 0.5]], 2040 + s, 1.4);
+      continue;
+    }
+    st.shape(ctx, ellipsePts(ex, topY - 3, er * 0.82, er * (grin ? 0.78 : 1), 0, 24), EYE, 2040 + s, { lw: 1 });
     ctx.fillStyle = st.ink;
     ctx.beginPath();
-    ctx.ellipse(ex - 2.4, topY - 3 + (yell ? -1 : 1), 1.5, er * 0.42, 0, 0, Math.PI * 2);
+    // (glancing back over its shoulder: the pupils swing round the other way)
+    const px = look ? ex + 2.6 : ex - 2.4;
+    ctx.ellipse(px, topY - 3 + (yell ? -1 : grin ? 0.5 : 1), 1.5, er * (grin ? 0.32 : 0.42), 0, 0, Math.PI * 2);
     ctx.fill();
+    if (grin) {
+      // half-closed, sly lids
+      st.line(ctx, [[ex - er * 0.85, topY - 3 - er * 0.2], [ex + er * 0.85, topY - 3 - er * 0.35]], 2048 + s, 1.2);
+    }
   }
   if (kind === 'small') {
     // rosy cheeks
@@ -121,7 +154,14 @@ export function drawPlop(ctx: Ctx, ox: number, oy: number, f: PlopFrame, st: Sty
       ctx.fill();
     }
   }
-  if (yell || kind === 'large' || kind === 'king') {
+  if (look) {
+    // one brow up: "huh?"
+    st.line(ctx, [[cx - 18, topY - 14], [cx - 4, topY - 15]], 2045, 1.2);
+    st.line(ctx, [[cx + 4, topY - 17], [cx + 17, topY - 20]], 2046, 1.2);
+  } else if (hurt) {
+    st.line(ctx, [[cx - 18, topY - 10], [cx - 5, topY - 15]], 2045, 1.3);
+    st.line(ctx, [[cx + 4, topY - 15], [cx + 18, topY - 10]], 2046, 1.3);
+  } else if (yell || grin || kind === 'large' || kind === 'king') {
     // angry brows
     st.line(ctx, [[cx - 19, topY - 15], [cx - 4, topY - 10]], 2045, 1.3);
     st.line(ctx, [[cx + 3, topY - 10], [cx + 19, topY - 15]], 2046, 1.3);
@@ -136,6 +176,16 @@ export function drawPlop(ctx: Ctx, ox: number, oy: number, f: PlopFrame, st: Sty
     const zig = (y: number, dir: number): Pt[] => Array.from({ length: 7 }, (_, i) => [cx - 14 + i * 3.4, y + (i % 2 ? dir * 3.6 : 0)] as Pt);
     st.line(ctx, zig(botY + 2 - open + 3, 1), 2051, 0.8);
     st.line(ctx, zig(botY + 2 + open - 3, -1), 2052, 0.8);
+  } else if (hurt) {
+    // OW: a wobbly little open mouth
+    st.shape(ctx, ellipsePts(cx - 4, botY + 4, 5, 3.6, 0, 16), { base: '#5a2a18', shade: '#3a1a0e', light: '#7a3a22' }, 2050, { lw: 1 });
+  } else if (grin) {
+    // a sly, toothy grin, wider on one side
+    const g: Pt[] = [[cx - 16, botY + 1], [cx - 8, botY + 7], [cx + 4, botY + 7.5], [cx + 12, botY]];
+    st.shape(ctx, [...g, [cx + 4, botY + 3], [cx - 8, botY + 3]], { base: '#fdf8ee', shade: '#e4d8c4', light: '#ffffff' }, 2050, { lw: 1.1 });
+    for (const tx of [cx - 9, cx - 3, cx + 3]) st.line(ctx, [[tx, botY + 3], [tx, botY + 7]], 2054 + tx, 0.6);
+  } else if (look) {
+    st.shape(ctx, ellipsePts(cx - 3, botY + 4, 2.6, 2.6, 0, 12), { base: '#5a2a18', shade: '#3a1a0e', light: '#7a3a22' }, 2050, { lw: 0.9 });
   } else if (kind === 'large' || kind === 'king') {
     // a grumpy underbite with two teeth poking up
     st.line(ctx, [[cx - 14, botY + 3], [cx - 4, botY + 6], [cx + 8, botY + 3]], 2050, 1.2);

@@ -50,15 +50,39 @@ function plopBody(e: Phaser.Physics.Arcade.Sprite, size: Size) {
  * mad, crouch, air, slam, flat): a Plop shows its own instead — the four-step
  * walk while it's moving, shouting when it stops, and so on.
  */
+/** Each Plop's little moments while it stands about (a blink, a glance, a grin), and when the next is due. */
+const moods = new WeakMap<object, { next: number; until: number; face: string }>();
+
+/**
+ * Standing about: it breathes (a slow in and out), blinks every few seconds, and now and
+ * then glances back over its shoulder or grins to itself.
+ */
+function idleFace(e: Phaser.Physics.Arcade.Sprite, t: number): string {
+  let m = moods.get(e);
+  if (!m) moods.set(e, (m = { next: t + 0.5 + Math.random() * 3, until: 0, face: 'idle' }));
+  if (t >= m.until && t >= m.next) {
+    const r = Math.random();
+    m.face = r < 0.6 ? 'blink' : r < 0.82 ? 'look' : 'grin';
+    m.until = t + (m.face === 'blink' ? 0.13 : 0.7 + Math.random() * 0.6);
+    m.next = m.until + 1.4 + Math.random() * 3;
+  }
+  if (t < m.until) return m.face;
+  // (each one breathes at its own moment)
+  return Math.floor(t * 1.5 + ((e.x * 0.37) % 1)) % 2 ? 'idle1' : 'idle';
+}
+
 function plopFrame(e: Phaser.Physics.Arcade.Sprite, f: string, rate: number): string {
   const b = e.body as Body | undefined;
   const moving = !!b && b.enable && Math.abs(b.velocity.x) > 8 && b.blocked.down;
   const t = e.scene ? e.scene.time.now / 1000 : 0;
   const walk = `walk${Math.floor(t * rate) % 4}`;
+  // just been hit: "ow!"
+  const hurtAt = (e as unknown as { hurtAt?: number }).hurtAt ?? -1e9;
+  if (e.scene && e.scene.time.now - hurtAt < 320) return 'hurt';
   switch (f) {
     case 'w0':
     case 'w1':
-      return moving ? walk : 'idle';
+      return moving ? walk : idleFace(e, t);
     case 'm0':
     case 'm1':
       return moving ? walk : f === 'm0' ? 'yell0' : 'yell1';
@@ -69,12 +93,18 @@ function plopFrame(e: Phaser.Physics.Arcade.Sprite, f: string, rate: number): st
     case 'slam':
       return 'yell0';
     case 'idle':
+      return idleFace(e, t);
     case 'yell0':
     case 'yell1':
     case 'walk0':
     case 'walk1':
     case 'walk2':
     case 'walk3':
+    case 'idle1':
+    case 'blink':
+    case 'look':
+    case 'grin':
+    case 'hurt':
       return f;
     default:
       return 'idle';
@@ -121,6 +151,29 @@ interface Thrower {
   windup: number;
   dir: number;
 }
+/**
+ * Now and then, while just patrolling, a Plop stops to stand about for a moment (and
+ * breathes, blinks, glances round or grins to itself: see idleFace). Not with you right
+ * next to it, and not in the middle of anything.
+ */
+function loiter(gs: GameScene, e: Enemy, st: { t: number; pause: number }, dt: number, keepAway: number): boolean {
+  const b = e.body;
+  if (st.pause > 0) {
+    st.pause -= dt;
+    b.setVelocityX(0);
+    e.setFrame('w0');
+    return true;
+  }
+  st.t -= dt;
+  const tgt = gs.nearestPlayer(e.x, e.y);
+  const near = !!tgt && tgt.alive && Math.abs(tgt.x - e.x) < keepAway;
+  if (st.t <= 0 && b.blocked.down && !near && !e.weapon?.busy) {
+    st.pause = 1 + Math.random() * 1.5;
+    st.t = 3 + Math.random() * 4;
+  }
+  return false;
+}
+
 function throwPoo(gs: GameScene, e: Enemy, th: Thrower, dt: number, o: { min: number; max: number; cd: [number, number]; size: number }): boolean {
   const b = e.body;
   th.cd -= dt;
@@ -175,8 +228,10 @@ export class Plop extends Puffball {
   setFrame(frame: string | number, updateSize?: boolean, updateOrigin?: boolean) {
     return super.setFrame(plopFrame(this, String(frame), 10), updateSize, updateOrigin);
   }
+  private lazy = { t: 1 + Math.random() * 4, pause: 0 };
   tick(dt = 1 / 60) {
     if (!this.weapon && throwPoo(this.gs, this, this.th, dt, { min: 50, max: 300, cd: [2.4, 3.6], size: 1.05 })) return;
+    if (loiter(this.gs, this, this.lazy, dt, 120)) return;
     super.tick(dt);
   }
   update(dt: number) {
@@ -205,9 +260,12 @@ export class BigPlop extends BigPuff {
   setFrame(frame: string | number, updateSize?: boolean, updateOrigin?: boolean) {
     return super.setFrame(plopFrame(this, String(frame), 8), updateSize, updateOrigin);
   }
+  private lazy = { t: 1 + Math.random() * 4, pause: 0 };
   tick(dt = 1 / 60) {
     // (up close he pounces, like the Big Puff Ball; from further off, unarmed, he throws poo)
     if (!this.weapon && throwPoo(this.gs, this, this.th, dt, { min: 150, max: 340, cd: [2, 3], size: 1.4 })) return;
+    // (only while he hasn't spotted you: then it's all business)
+    if (loiter(this.gs, this, this.lazy, dt, 360)) return;
     super.tick(dt);
   }
   update(dt: number) {
