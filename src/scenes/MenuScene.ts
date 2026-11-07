@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { preloadLevelMusic } from '../core/music';
 import { MIN_VIEW_W, TILE, VIEW_H } from '../config';
-import { ensureLook, freeLooksExcept } from '../gfx/textures';
+import { bgKey, ensureLook, freeLooksExcept } from '../gfx/textures';
 import { buildLevel1 } from '../level/level1';
 import { LEVELS, levelInfo, levelName, progress } from '../level/levels';
 import { Background } from '../world/Background';
@@ -10,6 +10,9 @@ import { LevelView } from '../world/LevelView';
 import { mixTint, themeClock, themeMix, themesFor } from '../world/theme';
 
 /** Animated backdrop behind the start screen: a slow fly-over of Puff Ball Planet. */
+/** Look textures already shown once (warmed on the graphics chip). */
+const shown = new WeakSet<Phaser.Textures.Texture>();
+
 export class MenuScene extends Phaser.Scene {
   private bg!: Background;
   private amb!: Ambience;
@@ -81,7 +84,35 @@ export class MenuScene extends Phaser.Scene {
     if (!info.build) return;
     const before = new Set(this.children.list);
     new LevelView(this, info.build(), { lazyNear: this.startX(id), lazySpan: this.firstSpan() });
-    for (const o of [...this.children.list]) if (!before.has(o)) o.destroy();
+    this.warmOnGpu(this.children.list.filter((o) => !before.has(o)));
+  }
+
+  /**
+   * Pictures drawn ahead of time aren't really on the graphics chip until they're first shown
+   * (phones and tablets finish the upload then, and that first frame stalls). So: show them
+   * once, invisibly (nearly transparent, behind everything), then throw the objects away.
+   */
+  private warmOnGpu(objs: Phaser.GameObjects.GameObject[]) {
+    for (const o of objs) {
+      const a = o as unknown as { setAlpha?: (v: number) => void; setDepth?: (v: number) => void };
+      a.setAlpha?.(0.003);
+      a.setDepth?.(-1000);
+    }
+    let frames = 0;
+    const done = () => {
+      if (++frames < 2) return;
+      this.events.off(Phaser.Scenes.Events.RENDER, done);
+      for (const o of objs) o.destroy();
+    };
+    this.events.on(Phaser.Scenes.Events.RENDER, done);
+  }
+
+  /** A look drawn now (if it isn't already) and shown once invisibly, so its first real showing is instant. */
+  private warmLook(id: string) {
+    ensureLook(this, id);
+    const keys = (['sky', 'far', 'clouds', 'hills', 'near'] as const).map((l) => bgKey(l, id)).filter((k) => this.textures.exists(k) && !shown.has(this.textures.get(k)));
+    for (const k of keys) shown.add(this.textures.get(k));
+    if (keys.length) this.warmOnGpu(keys.map((k) => this.add.image(0, 0, k).setOrigin(0).setScrollFactor(0).setScale(0.05)));
   }
   /** The fly-over loops over the first part of the level only (from x0 to here), so only that much is ever drawn. */
   private loopEnd = 0;
@@ -125,10 +156,10 @@ export class MenuScene extends Phaser.Scene {
       // first, what a click on a neighbouring Part needs: the look it'd show right now and
       // its opening scenery; then this Part's song (so Play doesn't wait for it), then the
       // other looks, which only show up later as the colours drift
-      ...near.flatMap((n) => [() => ensureLook(this, themeMix(themeClock.t, themesFor(n)).a), () => this.prewarm(n)]),
+      ...near.flatMap((n) => [() => this.warmLook(themeMix(themeClock.t, themesFor(n)).a), () => this.prewarm(n)]),
       () => preloadLevelMusic(id),
-      ...looks.map((l) => () => ensureLook(this, l)),
-      ...near.flatMap((n) => themesFor(n).map((l) => () => ensureLook(this, l))),
+      ...looks.map((l) => () => this.warmLook(l)),
+      ...near.flatMap((n) => themesFor(n).map((l) => () => this.warmLook(l))),
     ];
     this.level = new LevelView(this, data, { lazyNear: this.x0, lazySpan: this.firstSpan() });
     // loop over about a fifth of the level (at least a good stretch); nothing past it is drawn
