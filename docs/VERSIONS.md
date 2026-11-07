@@ -118,3 +118,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.113: clearer sign-in messages; King explosion redone (fireball, smoke, embers, flying fluff); King sceptre redrawn; Part 3 lighter (puddles drawn once, one shape for deep rock); Big Muscles more stamina; account hero by the greeting
 - v0.114: smooth start-screen title swap between Parts (letters pop in after the scenery is built; the rest of the line glides)
 - v0.115: start screen keeps the furthest unlocked Part ready (Part 1 → Part 3 fast again)
+- v0.116: Queen Plop wrestling fight (Poo Palace) at the end of Part 3 (+ temporary Wrestle test button); clouds as cached pictures (lighter every frame); loading screen draws everything up front, blue with rainbow PUFFY; Home screen after the last level; Sign out bottom-left; more room above Play

@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.115)
+## Where things stand (v0.116)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -130,7 +130,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   puffy.db (+ its -wal/-shm files); the owner asked why not Railway Postgres: SQLite is free, needs no extra
   service, and is plenty for one small table. Move to Postgres if there are ever several app instances.
 
-### Next: the Part 3 boss fight (Queen Plop in the Poo Palace) — designed, not built yet
+### The Part 3 boss fight (Queen Plop in the Poo Palace) — built in v0.116
 - Read `sketches/wrestling/DESIGN.md` (agreed with the owner) and look at the concept screens beside
   it. `sketches/wrestling/concept.ts` draws them with the game's own art (the basketball arena restyled,
   the ring, Queen Plop as a `drawQueen` overlay on a medium Plop).
@@ -169,6 +169,24 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   the words/separators that stay glide (FLIP with element.animate) when the line re-centres.
 - v0.115: MenuScene.neighbours = Parts ±1 plus the furthest unlocked (latestLevel), so Part 1 → Part 3
   is warm again (cold it was ~770 ms vs ~410 ms; the fade alone is 320 ms).
+- v0.116: **WrestleScene** (src/scenes/WrestleScene.ts, art in src/gfx/wrestle.ts, drawQueen in gfx/plops.ts).
+  The world is the arena's stage units × K=0.62 (heroes keep their size/physics). Player and Rocket take a
+  host interface (PlayerHost/RocketHost) so they run outside GameScene. Ropes: side ropes are springs
+  (run in fast → `loading` → `rebound` fling back; leaning just stops you; over the top rope → outside);
+  climb = toward a corner post + jump (3 rope steps, then the turnbuckle top; `perchLock` keeps you there
+  while still pushing); jump off the top = `dive` (committed arc; landing on her = 2 hits, generous reach).
+  Queen AI modes: walk (hops), windup→charge (bounces off ropes), slam (poo waves), retreat (you're on the
+  ropes; lobs poo if you camp), taunt (you're outside), hurt, down. 8 hits, counted on the jumbotron (no
+  bar). 3 hearts + nuggies via the normal HUD ('hud' event, lives = hearts). Ending: K.O., Queen flattened
+  + dizzy, speech, camera pull-out, King in the front row (KING_SEAT, behind the boards: depth between
+  crowd and front layers), zoom, he runs into the TUNNEL; then 'level-complete'. Losing: loseLife →
+  restart the fight (or game over). Level 3's goal starts it (levels.ts `wrestle: true`); the start screen
+  has a temporary "Wrestle (test)" button. Ring is red & white, POO PALACE in brown.
+- v0.116: Background clouds are cached canvas pictures per cloud (repainted every 0.3 s, staggered) instead
+  of Graphics redrawn every frame (~7.5k → <1k graphics commands per frame). BootScene now does the
+  deferred art + MenuScene's quiet jobs (`takeQuietJobs`) + 24 warm-up frames under the loading bar
+  (two-phase bar); the boot screen is the manifest blue with the rainbow PUFFY logo. Results after the last
+  level: Play again + Home screen. Account card: Sign out bottom-left.
 - v0.107 pacing (`src/shared/battle/sim.ts`): bad guys every 9–18 s (first at 10 s), at most 2 at once;
   prizes every 11–18 s (first at 5 s). Measured over 10 sim-minutes: enemies 99 → 67, prizes 125 → 82.
 - Plops: a four-step walk per size (small hop, medium waddle, big stomp), weapons held at the grip. Since
