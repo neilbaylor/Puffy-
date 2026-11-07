@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.86)
+## Where things stand (v0.87)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -38,6 +38,14 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   levels; picking another level draws its looks behind the fade. The start-screen fly-over loops over the first
   fifth of the level (`MenuScene.loopEnd`) instead of crossing and keeping the whole level. Measured: 86 MB
   with Part 2 / 62 MB with Part 1 at the start screen (was ~123 MB and growing).
+- v0.87: the loading screen draws only what the start screen shows (`textureSteps().now`); the rest
+  (`later`: heroes' game frames, bad guys, other looks, other hero card poses) is drawn piece by piece
+  afterwards, only when nobody has touched the screen for ~0.9 s (`BootScene.drawTheRest`); Play/Battle
+  pressed early emit `need-assets` to finish it first. Timings per step: `window.__boot` in the console.
+  Loading went 4.3 → 4.0 s (normal) and 9.5 → 6.4 s (CPU ×4); first hero tap on a slow CPU 3.7 s → 0.27 s.
+- v0.87: the version label shows the renderer (WebGL / Canvas). Slow devices (start screen under ~47 fps,
+  not a steady 30 fps cap) step the resolution down (1.25×, then 1×), remembered in `localStorage puffy.res`
+  ('lower res' on the label). Clearing the site's data resets it. Logic: `watchSpeed` in `main.ts`.
 - The loading screen hides the start screen underneath (`body.booting`) until it fades: on iPhones parts of
   the page underneath showed through / overflowed on the left.
 - v0.85: the start screen opens on the furthest level you've unlocked (`latestLevel()` in `levels.ts`); no
