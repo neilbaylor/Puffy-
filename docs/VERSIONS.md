@@ -1,2 +1,2 @@
 
-- v0.96: first click on another Part is instant too
+- v0.97: Plop Invasion gets longer, harder and a nicer beach

@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.96)
+## Where things stand (v0.97)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -60,8 +60,10 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   tries to start without a tap (works where the browser allows it, e.g. Chrome with the game installed;
   iPhones always need a first tap).
 
-### Plop Invasion · Part 1 (level 3, v0.91–v0.93)
-- World 2. `src/level/level3.ts` (downhill, 290 × 52), terrain palette `poo` and looks `p-muck` / `p-dusk` /
+### Plop Invasion · Part 1 (level 3, v0.91–v0.97)
+- World 2. `src/level/level3.ts` (downhill, 360 × 52; 4 checkpoints, 5 Giant Plops; jump sections "Poo Pits"
+  (3-wide pillars in poo, every puddle climbable) and "The Pits" (2-wide pillars over bottomless pits); tested
+  per jump with each hero: a walking jump + double jump works everywhere), terrain palette `poo` and looks `p-muck` / `p-dusk` /
   `p-stink` (`gfx/plopLooks.ts`); poo touches in `gfx/world.ts` for palettes with `poo: true`
   (drips, poo caps on trees, swirls, soft-serve hills, sludge sea); the volleyball court is pro-tour style, helpers in `gfx/plopworld.ts`.
 - Plops in `entities/enemies/Plops.ts`: `plop` / `bigplop` / `giantplop` reuse the Puffball / BigPuff / Giant
@@ -78,6 +80,8 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - `L.spawn('volley', cx, h, { w })`: beach volleyball (`entities/Volley.ts`, `VolleyMatch` + `VolleyPlop`). 4 Plops
   rally; within 250 px of one (or one gets hurt) they whistle and spike the ball at you (fetch → hold → spike
   again); shooting the ball pops it, then they charge. Reach is checked across the frame (`prevY`) for slow devices.
+- Volleyball court art: `drawBeachCourt` / `drawCourtBoard` / `drawRefChair` (plopworld.ts), a referee Plop that
+  hops on the whistle, a ball shadow. Terrain chunks are 800 px wide (`LevelView` CHUNK).
 - `poogoat` (poo-covered goat, spits poo: `PooGoat` in Plops.ts, sheet `goat-poo`). Drips: `GameScene.updateDrips`.
 - Music: `src/assets/plop-invasion.m4a` (`levelTrack(3) = 'plop'`). Sudden-death basketball plays at 1.3×.
 - Enemies walk down 1–2 tile steps (`Enemy.pitAt`: only a real drop counts as a gap); Big Puffs / Big Plops
