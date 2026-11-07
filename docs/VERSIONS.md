@@ -135,3 +135,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.130: Queen fight: a heart every 3-5 s
 - v0.131: Queen fight: 5 chairs, quick repeat chair swings
 - v0.132: Level 3: more of the Plops parachute in (7, same total)
+- v0.133: fix freeze on a chair K.O.
