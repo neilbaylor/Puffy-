@@ -719,7 +719,7 @@ export class UI {
       const r = await account.signIn(name.value, pw.value, create);
       btns.forEach((b) => (b.disabled = false));
       if (r.unknown && !create) {
-        say(`There's no player called “${name.value.trim()}” yet. Make a new player with this name and password?`, 'ask');
+        say(`There's no player called “${name.value.trim()}” yet.\nMake a new player with this name and password?`, 'ask');
         asking(true);
         sfx.select();
         return;
