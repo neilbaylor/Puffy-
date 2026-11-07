@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { MIN_VIEW_W, TILE, VIEW_H } from '../config';
+import { ensureLevelLooks, freeLooksExcept } from '../gfx/textures';
 import { buildLevel1 } from '../level/level1';
 import { levelInfo } from '../level/levels';
 import { Background } from '../world/Background';
@@ -34,32 +35,15 @@ export class MenuScene extends Phaser.Scene {
       });
     };
     this.game.events.on('menu-level', onLevel);
-    // while you look at the start screen, quietly draw the other level's opening scenery
-    // so switching to it is quick
-    this.time.delayedCall(1800, () => this.prewarmOther());
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.game.events.off('menu-level', onLevel));
     // the boot already put the start screen up; coming back from a game shows it again
     if (!data?.silent) this.game.events.emit('menu');
   }
 
   private levelId = 1;
-  private warmed = new Set<number>();
-
-  /** The level that isn't showing: its start-screen terrain drawn now (the loading screen does this, out of sight). */
-  prewarmOther() {
-    this.prewarm(this.levelId === 2 ? 1 : 2);
-  }
-
-  /** Draw a level's start-screen terrain textures now (then throw the objects away). */
-  private prewarm(id: number) {
-    const info = levelInfo(id);
-    if (!info.build || this.warmed.has(id) || this.levelId === id) return;
-    this.warmed.add(id);
-    const before = new Set(this.children.list);
-    const x0 = this.startX(id);
-    new LevelView(this, info.build(), { lazyNear: x0 + 500 });
-    for (const o of [...this.children.list]) if (!before.has(o)) o.destroy();
-  }
+  /** The fly-over loops over the first part of the level only (from x0 to here), so only that much is ever drawn. */
+  private loopEnd = 0;
+  private wrapping = false;
 
   private startX(id: number) {
     return id === 2 ? 86 * 32 : 0;
@@ -72,8 +56,22 @@ export class MenuScene extends Phaser.Scene {
     // green foothills that look like Part 1); only the terrain near the camera is drawn now,
     // the rest a chunk per frame, so switching levels is quick
     this.x0 = this.startX(id);
-    this.warmed.add(id);
-    this.level = new LevelView(this, (levelInfo(id).build ?? buildLevel1)(), { lazyNear: this.x0 + 500 });
+    // only this level's looks (backgrounds) and scenery stay in memory; the others are freed
+    // (picking another level draws its looks behind the fade)
+    // (not while a battle is showing too: it uses Part 1's looks and its own arena)
+    ensureLevelLooks(this, id);
+    const data = (levelInfo(id).build ?? buildLevel1)();
+    if (!this.scene.isActive('Battle') && !this.scene.isActive('Game')) {
+      freeLooksExcept(this, themesFor(id));
+      for (const k of this.textures.getTextureKeys())
+        if ((k.startsWith('terrain-') || k.startsWith('tree-')) && !k.startsWith(`terrain-${data.name}-`) && !k.startsWith(`tree-${data.name}-`)) this.textures.remove(k);
+    }
+    this.level = new LevelView(this, data, { lazyNear: this.x0 + 500 });
+    // loop over about a fifth of the level (at least a good stretch); nothing past it is drawn
+    const vw = this.scale.width / Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W);
+    this.loopEnd = this.x0 + Math.max(this.level.widthPx * 0.2, 1800);
+    this.level.trimPending(this.loopEnd + vw + 400);
+    this.wrapping = false;
     this.bg = new Background(this, this.level.heightPx - VIEW_H);
     this.amb = new Ambience(this, id, (x, y, max) => {
       for (let d = 0; d <= max; d += 8) if (this.level.isSolidAt(x, y + d)) return Math.floor((y + d) / TILE) * TILE;
@@ -90,13 +88,23 @@ export class MenuScene extends Phaser.Scene {
     cam.setZoom(zoom);
     const vw = this.scale.width / zoom;
     const vh = this.scale.height / zoom;
-    const maxX = this.level.widthPx - vw;
+    const maxX = Math.min(this.level.widthPx - vw, this.loopEnd);
     // a slow, slightly unsteady glide: speed breathes, the camera drifts up and down,
     // zooms gently in and out and banks a touch, like a camera drone
     this.t += dt;
     const t = this.t;
     this.x += dt * (36 + 10 * Math.sin(t * 0.21) + 5 * Math.sin(t * 0.53 + 1));
-    if (this.x > maxX) this.x = this.x0;
+    // the end of the loop: a soft fade back to the start of it
+    if (this.x > maxX && !this.wrapping) {
+      this.wrapping = true;
+      cam.fadeOut(450, 255, 248, 236);
+      cam.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+        this.x = this.x0;
+        this.top = null;
+        this.wrapping = false;
+        cam.fadeIn(600, 255, 248, 236);
+      });
+    }
     // follow the terrain up and down (the mountain climbs), smoothly
     const H = this.level.heightPx;
     const cx = this.x + vw / 2;

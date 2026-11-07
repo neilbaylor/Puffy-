@@ -63,33 +63,32 @@ body {
   position: fixed;
   inset: 0;
   z-index: 1000;
-  display: grid;
-  place-items: center;
-  font: 400 28px var(--display);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 calc(16px + var(--safe-r)) 0 calc(16px + var(--safe-l));
+  font: 400 clamp(20px, 6vmin, 28px) var(--display);
   color: #fff;
   background: linear-gradient(#6ec3ff, #fff3dc);
+  /* (its own layer, so nothing being prepared underneath can show through on iPhones) */
+  transform: translateZ(0);
   transition: opacity 0.3s ease;
 }
-#boot p { margin: 0 0 14px; -webkit-text-stroke: 6px var(--ink); paint-order: stroke fill; text-align: center; }
+.boot-in { display: flex; flex-direction: column; align-items: center; max-width: 100%; }
+#boot p { margin: 0 0 14px; -webkit-text-stroke: 6px var(--ink); paint-order: stroke fill; text-align: center; white-space: nowrap; }
 #boot.out { opacity: 0; pointer-events: none; }
-/* the loading bar: the game's art being drawn, then everything warmed up */
+/* the start screen stays hidden until the loading screen starts to fade away */
+body.booting #ui { visibility: hidden; }
+/* the loading bar: the game's art being drawn, then everything warmed up. One element, the gold
+   part is its background sized by --p (nothing to clip, so it can't poke out of the rounded ends) */
 .boot-bar {
-  width: min(280px, 62vw);
-  height: 16px;
-  margin: 0 auto;
+  box-sizing: border-box;
+  width: min(280px, 70vw);
+  height: 22px;
   border: 3px solid var(--ink);
   border-radius: 999px;
-  background: var(--paper);
+  background: linear-gradient(180deg, #ffe27a, var(--gold)) no-repeat 0 0 / calc(var(--p, 0) * 100%) 100%, var(--paper);
   box-shadow: 0 3px 0 var(--ink);
-  overflow: hidden;
-}
-.boot-bar i {
-  display: block;
-  height: 100%;
-  width: calc(var(--p, 0) * 100%);
-  border-radius: 999px;
-  background: linear-gradient(180deg, #ffe27a, var(--gold));
-  transition: width 0.2s ease;
 }
 
 /* ───────────── buttons ───────────── */

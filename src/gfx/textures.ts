@@ -14,6 +14,7 @@ import { FLAME_FRAMES, FLAME_H, FLAME_W, drawDyingFlame, drawFlame, drawScorch }
 import { ART_RES, ART_STYLE, CHAR_H, CHAR_W, POSES, canvas, drawCharacter, ellipse, type Ctx } from './draw';
 import { FACE_FRAMES, faceFromKey } from './face';
 import { STYLES } from './handdrawn';
+import { themesFor } from '../world/theme';
 import {
   DEFAULT_PALETTE,
   PALETTES,
@@ -323,17 +324,34 @@ export function ensureLook(scene: Phaser.Scene, id: string) {
   else if (PALETTES[id]) makeBackgrounds(scene, PALETTES[id]);
 }
 
+/** All the looks (backgrounds) one level cycles through, drawn now if they aren't already. */
+export function ensureLevelLooks(scene: Phaser.Scene, level: number) {
+  for (const id of themesFor(level)) ensureLook(scene, id);
+}
+
+/**
+ * Free the background looks no longer needed (only the level you're on, or picking, keeps
+ * its looks: memory stays the same however many levels there are).
+ */
+export function freeLooksExcept(scene: Phaser.Scene, keep: readonly string[]) {
+  for (const k of scene.textures.getTextureKeys()) {
+    const m = /^bg-[a-z]+:(.+)$/.exec(k);
+    if (m && !keep.includes(m[1])) scene.textures.remove(k);
+  }
+}
+
 /**
  * The same work as generateTextures, split into steps so the boot can draw one
- * per frame behind the start screen (the screen appears right away).
+ * per frame behind the loading screen. Only the starting level's looks are drawn
+ * (another level's are drawn when you pick it).
  */
-export function textureSteps(scene: Phaser.Scene, pal: WorldPalette = DEFAULT_PALETTE): { name: string; run: () => void }[] {
+export function textureSteps(scene: Phaser.Scene, level = 1, pal: WorldPalette = DEFAULT_PALETTE): { name: string; run: () => void }[] {
   return [
     { name: 'tiles', run: () => makeCollisionTiles(scene) },
     { name: 'heroes', run: () => makeCharacters(scene) },
     { name: 'baddies', run: () => makeBaddies(scene) },
     { name: 'items', run: () => makeItems(scene, pal) },
-    ...['puff', 'meadow', 'candy', 'golden', ...MOUNTAIN_LOOKS.map((l) => l.pal.id)].map((id) => ({ name: `bg-${id}`, run: () => ensureLook(scene, id) })),
+    ...themesFor(level).map((id) => ({ name: `bg-${id}`, run: () => ensureLook(scene, id) })),
   ];
 }
 

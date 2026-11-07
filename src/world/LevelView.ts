@@ -81,6 +81,11 @@ export class LevelView {
   /** Trees, flowers and grass that sway in the breeze. */
   private sway: { img: Phaser.GameObjects.Image; amp: number; speed: number; ph: number }[] = [];
 
+  /** Lazy views: never draw the terrain past `maxX` (the start-screen fly-over only loops over part of the level). */
+  trimPending(maxX: number) {
+    this.pending = this.pending.filter((p) => p.x0 < maxX);
+  }
+
   /** Sway the plants on screen; gusts come and go. `t` in seconds. */
   animate(t: number, left: number, right: number) {
     // lazy terrain: anything the view is about to reach right away, otherwise one chunk per frame
