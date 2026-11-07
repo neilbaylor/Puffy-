@@ -21,9 +21,11 @@ The concept screens are in this folder (`wide`, `plan`, `entrance`, `fight`, `fi
   the ending) use close-ups and zooms, like the basketball intro.
 
 ## You
-- **3 hearts** (like Battle mode) plus your **nuggies**. A hit costs a nuggie first. Only with no
-  nuggies left does it cost a heart, and you're out when the hearts are gone. Nuggies turn up
-  during the fight.
+- **3 hearts, shown over your head** (like Battle mode). No HUD and no nuggies in the ring (just
+  the pause button). A hit costs a heart; **hearts turn up in the ring** to win them back. Out of
+  hearts costs a life from the full game.
+- **The folding chair** drops into the ring a few times a fight ("CHAIR!" on the jumbotron). Pick it
+  up and hit her with it: **2 hits**, it bends and it's gone. Leave it and it fades away.
 - **The ropes:**
   - **Run into them and bounce off** fast, like a springboard.
   - **Climb them to the top turnbuckle.** Climbing has to look and feel good (hand over hand, a
@@ -39,8 +41,11 @@ The concept screens are in this folder (`wide`, `plan`, `entrance`, `fight`, `fi
   and a string of pearls (feminine, but not too much).
 - **Aggressive, and she jumps a lot** (hops, charges, slams).
 - **She backs off when she sees you on the ropes**, so you have to climb and jump off quickly.
-- **10 hits to beat her.** **The jumbotron counts down** the hits
-  left ("3 HITS TO GO").
+- **Aggressive, jumping more and higher**: big hops and lunges (her landings rumble the camera
+  and the ring, like the Giant Plops), charges, slams, and the Giant Plops' **big lump of poo**
+  that lands short of you and rolls on at you.
+- **20 hits to beat her.** **The jumbotron counts down** the hits
+  left ("3 HITS TO GO") and flashes "FROM THE TOP ROPE!" for a dive.
 - No referee: enough hits and she's done.
 
 ## The ending (cutscene)

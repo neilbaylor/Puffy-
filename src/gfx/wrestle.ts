@@ -404,3 +404,99 @@ export function drawWrestleJumbo(ctx: Ctx, c: JumboContent, t: number, crawl: [s
   }
   ctx.restore();
 }
+
+/** The steel folding chair's box (art units): its feet sit on the bottom edge, in the middle. */
+export const CHAIR_W = 48;
+export const CHAIR_H = 60;
+
+/**
+ * A steel folding chair, seen three-quarters on (the one that drops into the ring). `bent`: after it's
+ * been broken over Queen Plop's head (the back folded over, the seat caved in, the legs splayed).
+ */
+export function drawFoldingChair(ctx: Ctx, bent = false) {
+  const INK = '#1a0e06';
+  const STEEL = '#a7b0ba';
+  const STEEL_D = '#6d7782';
+  const STEEL_L = '#e2e7ec';
+  const tube = (pts: [number, number][], w = 3.4) => {
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = w + 2.2;
+    ctx.stroke();
+    ctx.strokeStyle = STEEL_D;
+    ctx.lineWidth = w;
+    ctx.stroke();
+    ctx.strokeStyle = STEEL_L;
+    ctx.lineWidth = w * 0.35;
+    ctx.stroke();
+  };
+  const panel = (pts: [number, number][], fill: string) => {
+    ctx.beginPath();
+    pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  };
+  ctx.save();
+  if (!bent) {
+    // back legs (behind), then the backrest on its uprights, the seat, the front legs
+    tube([[12, 6], [9, 58]]);
+    tube([[36, 6], [39, 58]]);
+    tube([[10, 46], [38, 46]], 2.4);
+    panel([[9, 4], [39, 4], [38, 22], [10, 22]], STEEL);
+    ctx.fillStyle = STEEL_L;
+    ctx.fillRect(12, 7, 24, 3);
+    ctx.fillStyle = INK;
+    ctx.beginPath();
+    ctx.roundRect(19, 13, 10, 4, 2);
+    ctx.fill();
+    panel([[8, 30], [40, 30], [45, 38], [3, 38]], STEEL);
+    ctx.fillStyle = STEEL_L;
+    ctx.fillRect(10, 31.5, 28, 2);
+    tube([[5, 38], [3, 58]]);
+    tube([[43, 38], [45, 58]]);
+    tube([[4, 52], [44, 52]], 2.2);
+  } else {
+    // folded and crumpled: the back bent forward over a caved-in seat, legs every which way
+    tube([[13, 26], [7, 58]]);
+    tube([[35, 24], [42, 58]]);
+    ctx.save();
+    ctx.translate(24, 28);
+    ctx.rotate(-0.75);
+    panel([[-14, -24], [12, -20], [13, -6], [-13, -4]], STEEL);
+    ctx.fillStyle = INK;
+    ctx.beginPath();
+    ctx.ellipse(0, -14, 5, 2, 0.1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    ctx.beginPath();
+    ctx.moveTo(6, 34);
+    ctx.quadraticCurveTo(24, 46, 42, 33);
+    ctx.lineTo(46, 40);
+    ctx.quadraticCurveTo(24, 52, 2, 41);
+    ctx.closePath();
+    ctx.fillStyle = STEEL;
+    ctx.fill();
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    tube([[4, 41], [-1, 58]]);
+    tube([[44, 40], [49, 57]]);
+    tube([[22, 47], [26, 58]], 2.6);
+    // a dent or two
+    ctx.strokeStyle = STEEL_D;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(18, 41);
+    ctx.lineTo(22, 44);
+    ctx.lineTo(27, 42);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
