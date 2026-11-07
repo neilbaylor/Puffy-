@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.113)
+## Where things stand (v0.114)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -164,6 +164,9 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   then fireball sprites (ADD), smoke sprites, dust, ember particles, fluff chunks that bounce.
   King Plop's sceptre redrawn (held in his hand). Big Muscles stamina 2.9 s (bar 3). Sign-in
   messages are boxed (red error / amber question), 16–19px. (Owner said: leave Railway crashes for now.)
+- v0.114: start-screen subtitle swap waits for MenuScene's 'menu-level-built' event (emitted the
+  frame after the new scenery's first render; 1.5 s fallback) before popping the new letters in, and
+  the words/separators that stay glide (FLIP with element.animate) when the line re-centres.
 - v0.107 pacing (`src/shared/battle/sim.ts`): bad guys every 9–18 s (first at 10 s), at most 2 at once;
   prizes every 11–18 s (first at 5 s). Measured over 10 sim-minutes: enemies 99 → 67, prizes 125 → 82.
 - Plops: a four-step walk per size (small hop, medium waddle, big stomp), weapons held at the grip. Since

@@ -116,3 +116,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.111: account card buttons 26px below the table (18px on short screens)
 - v0.112: Giant Plops sink cleanly into poo; camera pulls back over The Pits; account card Sign out top-right + hero by the table; smoother level fly-overs (lighter terrain drawing + the start screen pre-draws the level); Poo Palace / Queen Plop boss concepts + DESIGN.md
 - v0.113: clearer sign-in messages; King explosion redone (fireball, smoke, embers, flying fluff); King sceptre redrawn; Part 3 lighter (puddles drawn once, one shape for deep rock); Big Muscles more stamina; account hero by the greeting
+- v0.114: smooth start-screen title swap between Parts (letters pop in after the scenery is built; the rest of the line glides)
