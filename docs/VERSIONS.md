@@ -125,3 +125,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.120: Queen Plop: long cinematic entrance, tougher/jumpier AI, sharper art (Q_RES 4), top-rope pop text
 - v0.121: Queen Plop 20 hits, higher jumps + rumble, rolling poo throw, folding chair, hearts over head (no HUD/nuggies), shorter intro, nicer bubble
 - v0.122: folded grey chair held overhead + swung (hero carry frames), Queen name card, shorter intro
+- v0.123: Queen fight hearts: start 5, max 6, pick-ups every 4-7 s
