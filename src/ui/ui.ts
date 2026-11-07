@@ -1177,7 +1177,8 @@ export class UI {
           </dl>
           <div class="row">
             ${next ? `<button class="btn btn-next" data-act="next">Next: ${next.button ?? next.part} ▶</button>` : ''}
-            <button class="btn ${next ? 'btn-alt' : 'btn-go'}" data-act="again">Play again</button>
+            <button class="btn btn-alt" data-act="again">Play again</button>
+            ${next ? '' : '<button class="btn btn-go" data-act="home">Home screen</button>'}
           </div>
         </div>
       </div>
@@ -1185,12 +1186,17 @@ export class UI {
     this.liveHero(el.querySelector('canvas')!, characterById(r.charId), () => this.screen === el);
     // the default (and the big button) is on to the next level, when there is one
     const goNext = () => {
-      if (!next) return this.startGame(this.session);
+      if (!next) return this.quitToStart();
       this.level = next.id;
       this.startGame(this.session);
     };
     el.querySelector('[data-act=next]')?.addEventListener('click', goNext);
-    el.querySelector('[data-act=again]')!.addEventListener('click', () => this.startGame(this.session));
+    el.querySelector('[data-act=again]')!.addEventListener('click', () => {
+      this.level = r.level ?? this.level;
+      this.startGame(this.session);
+    });
+    // (the last level there is: back to the start screen)
+    el.querySelector('[data-act=home]')?.addEventListener('click', () => this.quitToStart());
     el.querySelector('[data-act=hero]')!.addEventListener('click', () => this.quitToStart());
     this.setScreen(el);
     const onKey = (e: KeyboardEvent) => {

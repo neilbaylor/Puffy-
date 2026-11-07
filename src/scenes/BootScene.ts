@@ -16,6 +16,8 @@ const nextFrame = () => new Promise<void>((r) => {
 });
 
 /** Fills the loading bar (0..1). */
+/** (the first part of the loading fills the bar this far; the second part, the rest) */
+const PHASE1 = 0.45;
 const setProgress = (p: number) => document.querySelector<HTMLElement>('#boot .boot-bar')?.style.setProperty('--p', String(Math.min(1, p)));
 
 /**
@@ -60,7 +62,7 @@ export class BootScene extends Phaser.Scene {
       const s0 = performance.now();
       step.run();
       times.push([`draw ${step.name}`, Math.round(performance.now() - s0)]);
-      setProgress(++done / total);
+      setProgress((++done / total) * PHASE1);
       await nextFrame();
     }
     mark('art (incl. frames between steps)');
@@ -68,20 +70,45 @@ export class BootScene extends Phaser.Scene {
     this.scene.launch('Menu', { silent: true, level });
     await nextFrame();
     mark('fly-over scene');
-    setProgress(++done / total);
+    setProgress((++done / total) * PHASE1);
     await nextFrame();
     // the start screen, built under the loading screen, its hero poses drawn
     this.game.events.emit('menu');
     await nextFrame();
     this.game.events.emit('warm-start');
     mark('start screen + hero poses');
-    setProgress(++done / total);
+    setProgress((++done / total) * PHASE1);
     await Promise.race([song, new Promise((r) => setTimeout(r, 2500))]);
     mark('song decode (waiting)');
-    setProgress(++done / total);
-    // a few frames of the fly-over drawn (its pictures sent to the graphics chip) before it's seen
-    for (let i = 0; i < 4; i++) await nextFrame();
-    mark('first fly-over frames');
+    setProgress((++done / total) * PHASE1);
+    // Everything else, now, while the loading bar is up (it used to be done after the start
+    // screen showed, in quiet moments: on slower tablets that made the first few seconds
+    // sluggish): the rest of the art, then the start screen's own jobs (the Parts next to this
+    // one, this Part's whole ground for its fly-over, its song, its other looks)
+    const menu = this.scene.get('Menu') as unknown as { takeQuietJobs?: () => (() => void)[] };
+    const rest = [{ name: 'other hero cards', run: () => this.game.events.emit('warm-cards') }, ...later];
+    const quiet = menu.takeQuietJobs?.() ?? [];
+    let k = 0;
+    const n2 = rest.length + quiet.length;
+    const step2 = () => setProgress(PHASE1 + (1 - PHASE1) * (++k / Math.max(1, n2)) * 0.97);
+    for (const step of rest) {
+      const s0 = performance.now();
+      step.run();
+      times.push([`draw ${step.name}`, Math.round(performance.now() - s0)]);
+      step2();
+      await nextFrame();
+    }
+    mark('the rest of the art');
+    for (const job of quiet) {
+      job();
+      step2();
+      await nextFrame();
+    }
+    mark('start screen jobs (other Parts, ground, looks)');
+    // and the fly-over run for a moment behind the loading screen (everything's pictures on the
+    // graphics chip, and the game's code warmed up), so it's smooth from the first moment
+    for (let i = 0; i < 24; i++) await nextFrame();
+    mark('warm-up frames');
     setProgress(1);
     // the start screen's song: browsers that allow it (e.g. the game installed as an app on
     // Android, or a site you play often on a computer) start it now, without a tap; the
@@ -93,7 +120,7 @@ export class BootScene extends Phaser.Scene {
       boot.classList.add('out');
       setTimeout(() => boot.remove(), 350);
     }
-    await this.drawTheRest([{ name: 'other hero cards', run: () => this.game.events.emit('warm-cards') }, ...later], times);
+    await this.drawTheRest([], times);
     this.registry.set('ready', true);
     this.game.events.emit('assets-ready');
     this.scene.stop();

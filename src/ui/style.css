@@ -71,7 +71,8 @@ body {
   padding: 80px calc(96px + var(--safe-r)) 80px calc(96px + var(--safe-l));
   font: 400 clamp(20px, 6vmin, 28px) var(--display);
   color: #fff;
-  background: linear-gradient(#6ec3ff, #fff3dc);
+  /* the same blue as the app's splash on Android (manifest background_color), so one runs into the other */
+  background: radial-gradient(ellipse at 50% 40%, #8fd6ff, #5fc4ff 70%);
   /* (its own layer, so nothing being prepared underneath can show through on iPhones) */
   transform: translateZ(0);
   transition: opacity 0.3s ease;
@@ -83,7 +84,9 @@ body {
 body.booting #ui { visibility: hidden; }
 /* (and whatever still peeks out matches the bottom of the loading screen) */
 html:has(body.booting),
-html:has(body.booting) body { background: #fff3dc; }
+html:has(body.booting) body { background: #5fc4ff; }
+/* the rainbow PUFFY over the loading bar */
+#boot .boot-logo { margin-bottom: clamp(10px, 3vmin, 22px); font-size: clamp(64px, 18vmin, 150px); }
 /* the loading bar: the game's art being drawn, then everything warmed up. One element, the gold
    part is its background sized by --p (nothing to clip, so it can't poke out of the rounded ends) */
 .boot-bar {
@@ -357,6 +360,8 @@ html:has(body.booting) body { background: #fff3dc; }
   align-items: center;
   gap: 4px;
 }
+/* first play (no Part picker yet): a bit more room between the heroes and Play */
+.start.no-levels .start-foot { margin-top: clamp(16px, 4vh, 40px); }
 /* a small, even margin under Play (it used to be nudged past the padding and
    could hang off the bottom of tablets) */
 .start { padding-bottom: calc(clamp(10px, 2vmin, 18px) + var(--safe-b)); }
@@ -2491,10 +2496,10 @@ kbd {
 /* signed in: the battle name is your player's (not editable) */
 .bl-namebox.locked input { cursor: default; }
 
-/* the signed-in account card: Sign out in the top-right corner, Done on the right under the table
+/* the signed-in account card: Sign out in the bottom-left corner, Done on the right under the table
    (a little space above it), and the hero lined up with the table (not the whole card) */
 .acct-card { position: relative; align-items: flex-start; }
-.acct-card .acct-out { position: absolute; top: 14px; right: 16px; }
+.acct-card .acct-out { position: absolute; left: 22px; bottom: 28px; }
 .acct-card .results-hero { margin-top: clamp(22px, 5vmin, 40px); }
 .acct-card .row { justify-content: flex-end; margin-top: 26px; }
 @media (max-height: 500px) {
@@ -2509,40 +2514,6 @@ kbd {
   pointer-events: none !important;
   font-family: var(--display);
   color: #fff;
-}
-/* her health: 8 pieces, under the jumbotron's countdown */
-.wr-boss {
-  position: absolute;
-  top: calc(10px + var(--safe-t));
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 12px 6px 14px;
-  border-radius: 999px;
-  background: rgba(20, 10, 4, 0.82);
-  box-shadow: 0 3px 0 #000a;
-  font-size: clamp(14px, 3vmin, 20px);
-  white-space: nowrap;
-}
-.wr-boss[hidden] { display: none; }
-.wr-boss b { font-weight: 400; color: #ffb3d4; }
-.wr-pips { display: flex; gap: 3px; }
-.wr-pips i {
-  display: block;
-  width: clamp(14px, 3vmin, 22px);
-  height: clamp(10px, 2.2vmin, 14px);
-  border-radius: 4px;
-  background: linear-gradient(#ff8ec4, #e8579a);
-  box-shadow: inset 0 -2px 0 #b23272, 0 0 0 1.5px #3a1d0c;
-  transition: transform 0.25s, opacity 0.25s, background 0.25s;
-}
-.wr-pips i.gone {
-  background: #3a2416;
-  box-shadow: inset 0 0 0 1.5px #5c3118;
-  transform: scale(0.8);
-  opacity: 0.6;
 }
 /* big words: FIGHT! K.O.! */
 .wr-callout {
@@ -2603,6 +2574,6 @@ kbd {
 .wr-test-btn {
   position: absolute;
   right: calc(12px + var(--safe-r));
-  bottom: calc(10px + var(--safe-b));
+  top: calc(66px + var(--safe-t));
   z-index: 2;
 }

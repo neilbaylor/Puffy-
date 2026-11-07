@@ -50,11 +50,12 @@ export const TUNNEL = { x: 470, top: 222, bottom: 297 };
 export const KING_SEAT = { x: 548, feet: 300 };
 
 export const STEEL: Fill = { base: '#3b3530', shade: '#1d1915', light: '#6d655c' };
-const PAD: Fill = { base: '#ffd23f', shade: '#c9971a', light: '#fff0a8' };
+const PAD: Fill = { base: '#d8243a', shade: '#9c1426', light: '#ff6a7a' };
+const PAD_WHITE: Fill = { base: '#f6f3ee', shade: '#cfc8bd', light: '#ffffff' };
 const PAD_BROWN: Fill = { base: '#7a4524', shade: '#4c2a14', light: '#b07a52' };
 const SKIRT: Fill = { base: '#3a1f0e', shade: '#22110a', light: '#5e3418' };
 /** Rope colours, bottom to top. */
-export const ROPE_COL = ['#c8102e', '#f4ead8', '#7a4524'];
+export const ROPE_COL = ['#d8243a', '#f6f3ee', '#d8243a'];
 
 /** The Poo Palace: the basketball arena, gone brown. */
 export const POO_PALACE: ArenaStyle = {
@@ -215,7 +216,7 @@ function flat(ctx: Ctx, pts: Pt[], top: string, bottom: string, y0: number, y1: 
 function post(ctx: Ctx, x: number, footY: number, h: number, s: number) {
   ST.shape(ctx, roundRectPts(x - 7 * s, footY - h, 14 * s, h, 3 * s), STEEL, Math.round(x), { lw: s });
   // turnbuckle pads at each rope, and a cap on top
-  RING.ropes.forEach((rh, i) => ST.shape(ctx, roundRectPts(x - 11 * s, footY - rh * s - 9 * s, 22 * s, 18 * s, 5 * s), i === 1 ? PAD_BROWN : PAD, Math.round(x) + i, { lw: 0.9 * s }));
+  RING.ropes.forEach((rh, i) => ST.shape(ctx, roundRectPts(x - 11 * s, footY - rh * s - 9 * s, 22 * s, 18 * s, 5 * s), i === 1 ? PAD_WHITE : PAD, Math.round(x) + i, { lw: 0.9 * s }));
   ST.shape(ctx, ellipsePts(x, footY - h, 9 * s, 4 * s, 0, 16), STEEL, Math.round(x) + 9, { lw: 0.8 * s });
 }
 
@@ -310,7 +311,7 @@ export function drawRing(ctx: Ctx) {
   const R = RING;
   for (const x of [backX(R.x0), backX(R.x1)]) post(ctx, x, R.backY, R.post * R.back, 0.9);
   const mat: Pt[] = [[backX(R.x0), R.backY], [backX(R.x1), R.backY], [R.x1 + R.apron, R.frontY], [R.x0 - R.apron, R.frontY]];
-  flat(ctx, mat, '#e9dcc4', '#c8b597', R.backY, R.frontY);
+  flat(ctx, mat, '#f8f5f0', '#d9d2c6', R.backY, R.frontY);
   ctx.save();
   ctx.translate(640, (R.backY + R.frontY) / 2 + 4);
   ctx.scale(1, 0.24);
@@ -318,7 +319,7 @@ export function drawRing(ctx: Ctx) {
   ctx.font = `400 92px ${FONT}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#8a5232';
+  ctx.fillStyle = '#c8102e';
   ctx.fillText('♛ QUEEN PLOP ♛', 0, 0);
   ctx.restore();
   const r = rng(404);
@@ -331,17 +332,29 @@ export function drawRing(ctx: Ctx) {
     ctx.fill();
   }
   pooPuddle(ctx, PUDDLE.x, R.floorY + 3);
-  flat(ctx, [[R.x0 - R.apron, R.frontY], [R.x1 + R.apron, R.frontY], [R.x1 + R.apron, R.skirtY], [R.x0 - R.apron, R.skirtY]], '#3a1f0e', '#22110a', R.frontY, R.skirtY);
-  ctx.fillStyle = '#ffd23f';
+  // the skirt: red, with white trim top and bottom; the show's name in brown
+  const sx0 = R.x0 - R.apron;
+  const sx1 = R.x1 + R.apron;
+  flat(ctx, [[sx0, R.frontY], [sx1, R.frontY], [sx1, R.skirtY], [sx0, R.skirtY]], '#e0303f', '#a3172a', R.frontY, R.skirtY);
+  ctx.fillStyle = '#f6f3ee';
+  ctx.fillRect(sx0 + 1.5, R.frontY + 1.5, sx1 - sx0 - 3, 9);
+  ctx.fillRect(sx0 + 1.5, R.skirtY - 12, sx1 - sx0 - 3, 7);
+  ctx.fillStyle = 'rgba(0,0,0,0.14)';
+  ctx.fillRect(sx0 + 1.5, R.frontY + 10.5, sx1 - sx0 - 3, 2);
   ctx.font = `400 46px ${FONT}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 7;
+  ctx.strokeStyle = '#fff3d6';
+  ctx.strokeText('POO PALACE', 640, (R.frontY + R.skirtY) / 2 + 2);
+  ctx.fillStyle = '#5c3118';
   ctx.fillText('POO PALACE', 640, (R.frontY + R.skirtY) / 2 + 2);
   ctx.font = `400 22px ${FONT}`;
-  ctx.fillStyle = '#c99064';
+  ctx.fillStyle = '#f6f3ee';
   ctx.fillText('♛', 640 - 175, (R.frontY + R.skirtY) / 2);
   ctx.fillText('♛', 640 + 175, (R.frontY + R.skirtY) / 2);
-  for (let x = R.x0; x < R.x1; x += 26 + r() * 50) drawDrip(ctx, x, R.frontY + 1, 6 + r() * 26, 5 + r() * 5, r() < 0.6 ? POO : POO_DARK);
+  for (let x = R.x0; x < R.x1; x += 50 + r() * 90) drawDrip(ctx, x, R.frontY + 1, 6 + r() * 22, 5 + r() * 5, r() < 0.6 ? POO : POO_DARK);
   ctx.fillStyle = 'rgba(0,0,0,0.35)';
   ctx.fillRect(R.x0 - R.apron, R.skirtY, R.x1 - R.x0 + R.apron * 2, 6);
 }
@@ -354,15 +367,10 @@ export function drawFrontPost(ctx: Ctx) {
 
 /** The steel steps and the announcers' table (stage units, untranslated: drawn where they stand). */
 export function drawRingside(ctx: Ctx) {
-  STEPS.forEach(([x0, x1, top], i) => ST.shape(ctx, roundRectPts(x0, top, x1 - x0, RING.groundY + 6 - top, 4), STEEL, 30 + i, { lw: 1, light: [x0 + 10, top] }));
-  // the edges of each step (so it reads as a stair)
-  ctx.strokeStyle = 'rgba(255,255,255,0.18)';
-  ctx.lineWidth = 2;
-  for (const [x0, x1, top] of STEPS) {
-    ctx.beginPath();
-    ctx.moveTo(x0 + 4, top + 3);
-    ctx.lineTo(x1 - 4, top + 3);
-    ctx.stroke();
+  // the steel steps: one staircase at each corner (diamond-plate treads, bolted side panels)
+  for (const side of [-1, 1]) {
+    const steps = STEPS.filter(([x0]) => (side < 0 ? x0 < 640 : x0 > 640)).sort((a, b) => b[2] - a[2]);
+    steps.forEach(([x0, x1, top], i) => stepBlock(ctx, x0, x1, top, RING.groundY + 6, side, 30 + i * 3 + (side > 0 ? 10 : 0)));
   }
   const [tx0, tx1, ttop] = TABLE;
   ST.shape(ctx, roundRectPts(tx0, ttop, tx1 - tx0, RING.groundY + 6 - ttop, 6), SKIRT, 40, { lw: 1.1 });
@@ -378,6 +386,54 @@ export function drawRingside(ctx: Ctx) {
   ctx.fillRect(tx0 + 74, ttop - 26, 38, 20);
   drawPooSwirl(ctx, 330, RING.groundY + 8, 30, POO, 51);
   drawPooSwirl(ctx, 960, RING.groundY + 14, 24, POO_DARK, 52);
+}
+
+/** One block of the steel steps: a riveted steel box with a diamond-plate tread on top. */
+function stepBlock(ctx: Ctx, x0: number, x1: number, top: number, bottom: number, side: number, seed: number) {
+  // its shadow on the floor
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.beginPath();
+  ctx.ellipse((x0 + x1) / 2, bottom - 2, (x1 - x0) / 2 + 8, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ST.shape(ctx, roundRectPts(x0, top, x1 - x0, bottom - top, 5), STEEL, seed, { lw: 1.1, light: [side < 0 ? x1 - 8 : x0 + 8, top] });
+  // the tread: a bright steel lip with a diamond pattern
+  const g = ctx.createLinearGradient(0, top, 0, top + 12);
+  g.addColorStop(0, '#b9b2a8');
+  g.addColorStop(1, '#6d655c');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.roundRect(x0 + 2, top + 2, x1 - x0 - 4, 11, 4);
+  ctx.fill();
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(x0 + 2, top + 2, x1 - x0 - 4, 11, 4);
+  ctx.clip();
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+  ctx.lineWidth = 1.2;
+  for (let x = x0 - 10; x < x1 + 10; x += 8) {
+    ctx.beginPath();
+    ctx.moveTo(x, top + 13);
+    ctx.lineTo(x + 6, top + 3);
+    ctx.moveTo(x + 6, top + 13);
+    ctx.lineTo(x, top + 3);
+    ctx.stroke();
+  }
+  ctx.restore();
+  // the side panel: a darker inset with rivets in each corner
+  const py0 = top + 18;
+  const py1 = bottom - 8;
+  if (py1 - py0 > 14) {
+    ctx.fillStyle = 'rgba(0,0,0,0.22)';
+    ctx.beginPath();
+    ctx.roundRect(x0 + 8, py0, x1 - x0 - 16, py1 - py0, 4);
+    ctx.fill();
+    ctx.fillStyle = '#c9c2b8';
+    for (const [rx, ry] of [[x0 + 13, py0 + 5], [x1 - 13, py0 + 5], [x0 + 13, py1 - 5], [x1 - 13, py1 - 5]]) {
+      ctx.beginPath();
+      ctx.arc(rx, ry, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
 }
 
 /** The jumbotron: one of the scoreboard's screens, with this show's own crawl along the bottom. */

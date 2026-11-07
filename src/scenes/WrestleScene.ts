@@ -18,6 +18,7 @@ import { addCanvas, hires } from '../gfx/textures';
 import { Player } from '../entities/Player';
 import { Rocket } from '../entities/Rocket';
 import { Fx } from '../world/Fx';
+import { stingerReveal, stingerTitle } from '../ui/stinger';
 import { SimpleConfetti } from '../world/SimpleConfetti';
 import { soloSource, sourceById } from '../input/devices';
 import type { GameOverState, HudState, ResultState } from './GameScene';
@@ -67,6 +68,8 @@ const Q_RES = 2.4;
 const Q_PAD = 18;
 const Q_TOP = 24;
 const HITS = 8;
+/** (the fight camera's own height is worked out in updateCamera) */
+const FIGHT_CAM_Y = MAT_Y;
 
 const RES = 2;
 type Side = -1 | 1;
@@ -388,6 +391,8 @@ export class WrestleScene extends Phaser.Scene {
   private climb: { side: Side; step: number; t: number; fx: number; fb: number; tx: number; tb: number } | null = null;
   private dive: { vx: number } | null = null;
   private perchedFor = 0;
+  /** Just up on the turnbuckle: you stay put until you let go of the direction you climbed with. */
+  private perchLock: Side | 0 = 0;
   private prevJump = false;
   private dark!: Phaser.GameObjects.Rectangle;
   private spot!: Phaser.GameObjects.Image;
@@ -498,7 +503,6 @@ export class WrestleScene extends Phaser.Scene {
     this.dom = document.createElement('div');
     this.dom.className = 'wrestle';
     this.dom.innerHTML = `
-      <div class="wr-boss" hidden><b>Queen Plop</b><span class="wr-pips">${'<i></i>'.repeat(HITS)}</span></div>
       <div class="wr-callout"></div>
       <div class="wr-speech" hidden></div>
       <button class="wr-skip" hidden>Skip ›</button>`;
@@ -588,7 +592,7 @@ export class WrestleScene extends Phaser.Scene {
   // ───────────────────────────────────────────── the hero's side ──
 
   heroInRing() {
-    return this.inRing;
+    return this.inRing || this.heroOnRopes();
   }
   heroOnRopes() {
     return !!this.climb || this.heroPerched();
@@ -873,8 +877,9 @@ export class WrestleScene extends Phaser.Scene {
         cl.tx = post;
         cl.tb = POST_TOP;
       } else {
-        // on top: turn to face the ring
+        // on top: turn to face the ring (and stay put while you're still pushing that way)
         this.endClimb();
+        this.perchLock = cl.side;
         p.facing = (-cl.side) as Side;
         p.squash = { x: 1.2, y: 0.85 };
         this.fx.dust(p.x, p.bottom, 3);
@@ -972,7 +977,6 @@ export class WrestleScene extends Phaser.Scene {
       sfx.cheer();
       this.flashJumbo({ kind: 'big', text: 'OH NO HE DIDN’T!', sub: 'OFF THE TOP ROPE: THAT ONE COUNTS DOUBLE', color: '#ffd23f', bg: '#5c3118' }, 2200);
     } else this.flashJumbo({ kind: 'big', text: words.replace(/!.*/, '!'), sub: `${q.hp} TO GO`, color: '#ffd23f', bg: '#5c3118' }, 900);
-    this.renderBoss();
     if (q.hp <= 0) void this.win();
   }
 
@@ -1013,6 +1017,15 @@ export class WrestleScene extends Phaser.Scene {
             else p.body.setVelocityX(this.dive.vx);
           }
           this.perchedFor = perched ? this.perchedFor + dt : 0;
+          if (this.perchLock) {
+            const still = this.perchLock > 0 ? input.right : input.left;
+            if (!still || !this.heroPerched()) this.perchLock = 0;
+            else {
+              p.body.setVelocityX(0);
+              p.body.x = (this.perchLock < 0 ? POST_L : POST_R) - p.body.halfWidth;
+              p.facing = (-this.perchLock) as Side;
+            }
+          }
         }
       }
       if (!this.climb) this.ropePhysics(dt);
@@ -1053,7 +1066,9 @@ export class WrestleScene extends Phaser.Scene {
     if (!p.alive || q.hp <= 0) return;
     const a = p.body;
     const b = q.body;
-    if (a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom) return;
+    // (a dive off the top rope is generous: coming down near her counts)
+    const reach = this.dive ? 22 : 0;
+    if (a.right < b.left - reach || a.left > b.right + reach || a.bottom < b.top - (this.dive ? 10 : 0) || a.top > b.bottom) return;
     if (a.velocity.y > 40 && a.bottom < b.top + b.height * 0.4) {
       const dive = !!this.dive;
       this.dive = null;
@@ -1113,8 +1128,10 @@ export class WrestleScene extends Phaser.Scene {
       const p = this.player;
       const q = this.queen;
       tx = p.x * 0.62 + q.x * 0.38;
-      ty = Math.min(MAT_Y, p.bottom) - 40;
-      tz = 1;
+      ty = FIGHT_CAM_Y;
+      // (a touch wider than a level, so the whole jumbotron — her hits to go — and the floor round
+      // the ring both fit)
+      tz = 0.92;
     }
     const k = snap ? 1 : 1 - Math.exp(-dt * 3.2);
     this.camX += (tx - this.camX) * k;
@@ -1125,8 +1142,9 @@ export class WrestleScene extends Phaser.Scene {
     const vw = this.scale.width / zoom;
     const vh = this.scale.height / zoom;
     const x = Phaser.Math.Clamp(this.camX, Math.min(vw / 2, WORLD_W / 2), Math.max(WORLD_W - vw / 2, WORLD_W / 2));
-    // (the line you fight on sits a bit below the middle; the jumbotron shows above)
-    const y = Phaser.Math.Clamp(this.camY - vh * 0.1, Math.min(vh / 2, WORLD_H / 2), Math.max(WORLD_H - vh / 2, WORLD_H / 2));
+    // (in the fight the view's top is just above the jumbotron; cutscenes centre on what they show)
+    const cy = this.camFocus ? this.camY : WY(JUMBO.y) - 8 + vh / 2;
+    const y = Phaser.Math.Clamp(cy, Math.min(vh / 2, WORLD_H / 2), Math.max(WORLD_H - vh / 2, WORLD_H / 2));
     cam.centerOn(x, y);
   }
 
@@ -1173,11 +1191,6 @@ export class WrestleScene extends Phaser.Scene {
     if (!force && key === this.lastHud) return;
     this.lastHud = key;
     this.game.events.emit('hud', s);
-  }
-
-  private renderBoss() {
-    const pips = this.dom.querySelectorAll<HTMLElement>('.wr-pips i');
-    pips.forEach((el, i) => el.classList.toggle('gone', i >= this.queen.hp));
   }
 
   private calloutToken = 0;
@@ -1234,6 +1247,10 @@ export class WrestleScene extends Phaser.Scene {
     const q = this.queen;
     const p = this.player;
     this.inIntro = true;
+    // (coming from the level, the TV bars are covering the screen: a title on them, then away they go)
+    stingerTitle('<small>Plop Invasion · Part 1</small>THE POO PALACE');
+    await this.wait(this.wd.checkpoint === -1 && !this.wd.result?.seconds ? 300 : 1100);
+    void stingerReveal();
     const skip = this.dom.querySelector<HTMLElement>('.wr-skip')!;
     skip.hidden = false;
     playHoops();
@@ -1285,9 +1302,6 @@ export class WrestleScene extends Phaser.Scene {
     sfx.whistle();
     sfx.cheer();
     this.jumbo = this.countJumbo();
-    const boss = this.dom.querySelector<HTMLElement>('.wr-boss')!;
-    boss.hidden = false;
-    this.renderBoss();
     q.setMode('idle', 0.8);
     this.fighting = true;
     this.emitHud(true);
@@ -1318,7 +1332,6 @@ export class WrestleScene extends Phaser.Scene {
     this.waves = [];
     for (const l of this.lobs) l.img.destroy();
     this.lobs = [];
-    this.dom.querySelector<HTMLElement>('.wr-boss')!.hidden = true;
     await this.wait(500);
     // flat on the mat, dazed
     this.tweens.add({ targets: q.spr, scaleY: (QS / Q_RES) * 0.55, scaleX: (QS / Q_RES) * 1.15, duration: 220, ease: 'Quad.easeOut' });
