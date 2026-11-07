@@ -2,6 +2,9 @@ import Phaser from 'phaser';
 import { DEPTH, TILE } from '../config';
 import { sfx } from '../core/sfx';
 import { ART_RES } from '../gfx/draw';
+import { PLOP_H, PLOP_W } from '../gfx/plops';
+import { drawBeachCourt, drawCourtBoard, drawRefChair } from '../gfx/plopworld';
+import { PLOP_PAD, PLOP_RES, PLOP_TOP, addCanvas, hires } from '../gfx/textures';
 import type { GameScene } from '../scenes/GameScene';
 import { Plop } from './enemies/Plops';
 import type { Player } from './Player';
@@ -35,6 +38,9 @@ export class VolleyMatch {
   private prevX = 0;
   private prevY = 0;
   private readonly netX: number;
+  private ref: Phaser.GameObjects.Sprite;
+  private refY = 0;
+  private shadow: Phaser.GameObjects.Ellipse;
   private readonly left: number;
   private readonly right: number;
 
@@ -49,42 +55,32 @@ export class VolleyMatch {
     this.left = cx - half;
     this.right = cx + half;
     // the court, like the pro tour: a raked sand court seen a little from the front (its far
-    // edge up and to the left), blue boundary tape, the net across the middle, sponsor boards
-    const D = { x: -28, y: -18 }; // from the front edge to the back edge
-    const L0 = this.left - 10;
-    const R0 = this.right + 10;
-    const sand = gs.add.graphics().setDepth(DEPTH.tiles + 0.5);
-    const quad = (g: Phaser.GameObjects.Graphics, x0: number, x1: number, y: number, dx: number, dy: number) =>
-      g.fillPoints([new Phaser.Math.Vector2(x0, y), new Phaser.Math.Vector2(x1, y), new Phaser.Math.Vector2(x1 + dx, y + dy), new Phaser.Math.Vector2(x0 + dx, y + dy)], true);
-    sand.fillStyle(0xd9b878, 1);
-    quad(sand, L0 - 4, R0 + 4, ground + 4, D.x, D.y - 4);
-    sand.fillStyle(0xedd6a2, 1);
-    quad(sand, L0, R0, ground + 1, D.x, D.y);
-    for (let i = 0; i < 70; i++) {
-      const t = (i * 0.618) % 1;
-      const u = (i * 0.414) % 1;
-      sand.fillStyle(i % 3 ? 0xd4b47a : 0xfff0c8, 0.8).fillCircle(L0 + 6 + t * (R0 - L0 - 12) + D.x * u, ground + D.y * u, 0.8);
-    }
-    // the tape: round the court and the centre line under the net
-    sand.lineStyle(1.8, 0x2a6fd6, 1);
-    const fx0 = this.left;
-    const fx1 = this.right;
-    const fy = ground - 1;
-    sand.strokePoints([new Phaser.Math.Vector2(fx0, fy), new Phaser.Math.Vector2(fx1, fy), new Phaser.Math.Vector2(fx1 + D.x * 0.85, fy + D.y * 0.85), new Phaser.Math.Vector2(fx0 + D.x * 0.85, fy + D.y * 0.85)], true);
-    sand.lineStyle(1.2, 0x2a6fd6, 0.8).lineBetween(cx, fy, cx + D.x * 0.85, fy + D.y * 0.85);
-    // sponsor boards along the back of the court
-    const boards = gs.add.graphics().setDepth(DEPTH.tiles + 0.45);
-    const by = ground + D.y - 4;
-    for (const [x0, x1] of [[L0 + D.x + 4, cx - 30], [cx + 2, R0 + D.x - 4]] as const) {
-      boards.fillStyle(0x1b4e9e, 1).fillRoundedRect(x0, by - 15, x1 - x0, 15, 2);
-      boards.fillStyle(0x2a6fd6, 1).fillRoundedRect(x0 + 1.5, by - 13.5, x1 - x0 - 3, 9, 1.5);
-      boards.lineStyle(1.2, 0x15233f, 1).strokeRoundedRect(x0, by - 15, x1 - x0, 15, 2);
-      gs.add
-        .text((x0 + x1) / 2, by - 8.5, 'PLOP BEACH TOUR', { fontFamily: '"Lilita One", sans-serif', fontSize: '22px', color: '#ffffff', stroke: '#15233f', strokeThickness: 5 })
-        .setOrigin(0.5)
-        .setScale(0.36)
-        .setDepth(DEPTH.tiles + 0.46);
-    }
+    // edge up and to the left), blue tape, the net across the middle, sponsor banners behind,
+    // the referee up in his chair at the far end of the net
+    const D = { x: -28, y: -18 };
+    const cw = half * 2 + 20;
+    const ckey = `volleycourt-${Math.round(cw)}`;
+    if (!gs.textures.exists(ckey))
+      addCanvas(gs, ckey, hires(cw - D.x + 8, -D.y + 14, 3, (ctx) => drawBeachCourt(ctx, 4 - D.x, -D.y + 4, cw, D.x, D.y)), undefined, { release: true });
+    gs.add.image(this.left - 10 - (4 - D.x), ground + 1 - (-D.y + 4), ckey).setOrigin(0, 0).setScale(1 / 3).setDepth(DEPTH.tiles + 0.5);
+    const bw = Math.round(half - 34);
+    const bkey = `volleyboard-${bw}`;
+    if (!gs.textures.exists(bkey)) addCanvas(gs, bkey, hires(bw, 22, 3, (ctx) => drawCourtBoard(ctx, bw, 16, 'PLOP BEACH TOUR')), undefined, { release: true });
+    const by = ground + D.y - 2;
+    for (const x0 of [this.left + D.x - 2, cx + 18]) gs.add.image(x0, by, bkey).setOrigin(0, 1).setScale(1 / 3).setDepth(DEPTH.tiles + 0.45);
+    if (!gs.textures.exists('refchair')) addCanvas(gs, 'refchair', hires(24, 52, 3, (ctx) => drawRefChair(ctx, 12, 50)));
+    const chairX = cx - 14 - 12;
+    const chairY = ground + D.y + 2;
+    gs.add.image(chairX, chairY, 'refchair').setOrigin(0.5, 50 / 52).setScale(1 / 3).setDepth(DEPTH.decor + 0.4);
+    // the referee: a little Plop up on the chair, facing the court
+    this.ref = gs.add
+      .sprite(chairX - 1, chairY - 33, 'gplop-small', 'idle')
+      .setOrigin((50 + PLOP_PAD) / (PLOP_W + PLOP_PAD * 2), (100 + PLOP_TOP) / (PLOP_H + PLOP_TOP))
+      .setScale(0.36 / PLOP_RES)
+      .setDepth(DEPTH.decor + 0.45);
+    this.refY = this.ref.y;
+    // the ball's shadow on the sand (so you can see where it's coming down)
+    this.shadow = gs.add.ellipse(cx, ground - 1, 18, 5, 0x5a3a1c, 0.3).setDepth(DEPTH.tiles + 0.55);
     gs.add.image(cx, ground + 2, 'volleynet').setOrigin(0.5, 96 / 100).setScale(1 / 3).setDepth(DEPTH.decor + 0.5);
 
     // two a side
@@ -120,7 +116,23 @@ export class VolleyMatch {
   }
 
   /** The player is at the ball when it comes down: bump it over (or spike it at you). */
+  /** The referee (hops and yells when the whistle goes) and the ball's shadow on the sand. */
+  private refT = 0;
+  private updateDecor(dt: number) {
+    const on = this.ball.active && this.ball.x > this.left - 40 && this.ball.x < this.right + 40;
+    this.shadow.setVisible(on);
+    if (on) {
+      const k = Phaser.Math.Clamp(1 - (this.ground - this.ball.y) / 260, 0.3, 1);
+      this.shadow.setPosition(this.ball.x, this.ground - 1).setScale(k).setAlpha(0.35 * k);
+    }
+    this.refT = Math.max(0, this.refT - dt);
+    this.ref.y = this.refY - (this.refT > 0 ? Math.abs(Math.sin(this.refT * 14)) * 5 : 0);
+    if (this.ball.active) this.ref.setFlipX(this.ball.x > this.ref.x);
+    this.ref.setFrame(this.refT > 0 ? (Math.floor(this.refT * 10) % 2 ? 'yell0' : 'yell1') : 'idle');
+  }
+
   update(dt: number) {
+    this.updateDecor(dt);
     if (this.state === 'done') return;
     const alive = this.alive;
     if (!this.ball.active) return;
@@ -266,6 +278,7 @@ export class VolleyMatch {
     this.dangerousMode = true;
     if (this.state === 'rally') this.state = 'alert';
     sfx.whistle();
+    this.refT = 1.1;
     for (const p of this.alive) p.alert(hero);
   }
 

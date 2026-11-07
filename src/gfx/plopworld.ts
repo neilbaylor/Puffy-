@@ -377,3 +377,184 @@ export function drawVolleyNet(ctx: Ctx, w: number, h: number, netH: number) {
   rope(near.x, topN - 1, near.x + 12, near.y + 1);
 }
 
+
+/**
+ * A pro beach volleyball court, seen a little from the front: a raised slab of raked sand
+ * (its far edge up and to the left by (dx, dy)), blue boundary tape with anchors at the
+ * corners, the centre line under the net. The front edge runs from (x0, y) to (x0 + w, y).
+ */
+export function drawBeachCourt(ctx: Ctx, x0: number, y: number, w: number, dx: number, dy: number) {
+  const P = (u: number, v: number): Pt => [x0 + u * w + v * dx, y + v * dy];
+  const slab = [P(0, 0), P(1, 0), P(1, 1), P(0, 1)];
+  // the sand's front face, then its top (lighter towards the back, like sunlight on it)
+  ctx.fillStyle = '#c99d5c';
+  ctx.beginPath();
+  ctx.moveTo(x0 - 2, y);
+  ctx.lineTo(x0 + w + 2, y);
+  ctx.lineTo(x0 + w, y + 5);
+  ctx.lineTo(x0, y + 5);
+  ctx.closePath();
+  ctx.fill();
+  const g = ctx.createLinearGradient(0, y + dy, 0, y);
+  g.addColorStop(0, '#fbe9bd');
+  g.addColorStop(1, '#ecd09a');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  slab.forEach(([px, py], i) => (i ? ctx.lineTo(px, py) : ctx.moveTo(px, py)));
+  ctx.closePath();
+  ctx.fill();
+  // raked sand: soft little arcs, and a scatter of grains
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  ctx.save();
+  ctx.clip();
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i < w / 5; i++) {
+    const [px, py] = P(rnd(), rnd());
+    ctx.strokeStyle = rnd() < 0.5 ? '#d8b77a99' : '#fff6dc99';
+    ctx.beginPath();
+    ctx.arc(px, py + 3, 3 + rnd() * 3, Math.PI * 1.15, Math.PI * 1.85);
+    ctx.stroke();
+  }
+  for (let i = 0; i < w / 2; i++) {
+    const [px, py] = P(rnd(), rnd());
+    ctx.fillStyle = rnd() < 0.6 ? '#c9a46a' : '#fffaf0';
+    ctx.fillRect(px, py, 0.7, 0.7);
+  }
+  // footprints, scuffed into the sand round where the players stand
+  for (let i = 0; i < 14; i++) {
+    const [px, py] = P(0.1 + rnd() * 0.8, 0.2 + rnd() * 0.6);
+    ctx.fillStyle = '#d6b57899';
+    ctx.beginPath();
+    ctx.ellipse(px, py, 1.3, 0.7, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+  // the tape (inset from the sand's edge), and the centre line under the net
+  const ins = 0.05;
+  const tape = [P(ins, 0.12), P(1 - ins, 0.12), P(1 - ins, 0.9), P(ins, 0.9)];
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#1f5fc0';
+  ctx.lineWidth = 1.7;
+  ctx.beginPath();
+  tape.forEach(([px, py], i) => (i ? ctx.lineTo(px, py) : ctx.moveTo(px, py)));
+  ctx.closePath();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(...P(0.5, 0.12));
+  ctx.lineTo(...P(0.5, 0.9));
+  ctx.stroke();
+  ctx.strokeStyle = '#ffffff99';
+  ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  tape.forEach(([px, py], i) => (i ? ctx.lineTo(px, py - 0.5) : ctx.moveTo(px, py - 0.5)));
+  ctx.closePath();
+  ctx.stroke();
+  for (const [px, py] of tape) {
+    ctx.fillStyle = INK;
+    ctx.fillRect(px - 1.2, py - 0.8, 2.4, 1.6);
+  }
+  // the ink outline round the slab (front face included)
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 1.1;
+  ctx.beginPath();
+  ctx.moveTo(...P(0, 1));
+  ctx.lineTo(...P(1, 1));
+  ctx.lineTo(...P(1, 0));
+  ctx.lineTo(x0 + w, y + 5);
+  ctx.lineTo(x0, y + 5);
+  ctx.lineTo(...P(0, 0));
+  ctx.closePath();
+  ctx.stroke();
+  ctx.lineWidth = 0.6;
+  ctx.beginPath();
+  ctx.moveTo(...P(0, 0));
+  ctx.lineTo(...P(1, 0));
+  ctx.stroke();
+}
+
+/** A sponsor banner on two posts (w × h, its feet at y = h + 6): white, an orange band, blue lettering. */
+export function drawCourtBoard(ctx: Ctx, w: number, h: number, text: string) {
+  for (const x of [w * 0.12, w * 0.88]) {
+    ctx.fillStyle = '#8d94a0';
+    ctx.fillRect(x - 0.8, h - 2, 1.6, 8);
+  }
+  const r = 2;
+  const panel = () => {
+    ctx.beginPath();
+    ctx.moveTo(r, 0);
+    ctx.lineTo(w - r, 0);
+    ctx.quadraticCurveTo(w, 0, w, r);
+    ctx.lineTo(w, h - r);
+    ctx.quadraticCurveTo(w, h, w - r, h);
+    ctx.lineTo(r, h);
+    ctx.quadraticCurveTo(0, h, 0, h - r);
+    ctx.lineTo(0, r);
+    ctx.quadraticCurveTo(0, 0, r, 0);
+    ctx.closePath();
+  };
+  panel();
+  ctx.fillStyle = '#fffaf0';
+  ctx.fill();
+  ctx.save();
+  ctx.clip();
+  ctx.fillStyle = '#ff8a2a';
+  ctx.fillRect(0, 0, w, h * 0.22);
+  ctx.fillStyle = '#2a6fd6';
+  ctx.fillRect(0, h * 0.82, w, h * 0.18);
+  // a poo swirl logo at each end
+  for (const x of [h * 0.45, w - h * 0.45]) drawPooSwirl(ctx, x, h * 0.78, h * 0.24, POO, 5400 + Math.round(x));
+  ctx.restore();
+  ctx.font = `${Math.round(h * 0.42)}px "Lilita One", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineWidth = h * 0.09;
+  ctx.strokeStyle = '#ffffff';
+  ctx.strokeText(text, w / 2, h * 0.53);
+  ctx.fillStyle = '#1f4fa8';
+  ctx.fillText(text, w / 2, h * 0.53);
+  panel();
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 0.9;
+  ctx.stroke();
+}
+
+/** The referee's high chair (white frame, blue seat), its feet at (x, groundY), seat ~34 px up. */
+export function drawRefChair(ctx: Ctx, x: number, groundY: number) {
+  const top = groundY - 34;
+  ctx.lineCap = 'round';
+  // legs and ladder
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 2.6;
+  for (const [a, b] of [[x - 7, x - 4], [x + 7, x + 4]] as const) {
+    ctx.beginPath();
+    ctx.moveTo(a, groundY);
+    ctx.lineTo(b, top + 2);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = '#f4f6f9';
+  ctx.lineWidth = 1.5;
+  for (const [a, b] of [[x - 7, x - 4], [x + 7, x + 4]] as const) {
+    ctx.beginPath();
+    ctx.moveTo(a, groundY);
+    ctx.lineTo(b, top + 2);
+    ctx.stroke();
+  }
+  for (let i = 1; i <= 4; i++) {
+    const t = i / 5;
+    const yy = groundY - (groundY - top) * t;
+    const hw = 7 - 3 * t;
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.moveTo(x - hw, yy);
+    ctx.lineTo(x + hw, yy);
+    ctx.stroke();
+    ctx.strokeStyle = '#d5d9e0';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+  }
+  // the seat and its back
+  ST.shape(ctx, [[x - 7, top - 1], [x + 7, top - 1], [x + 7, top + 3], [x - 7, top + 3]], { base: '#2a6fd6', shade: '#1b4e9e', light: '#5c96ee' }, 5501, { lw: 0.8, plain: true });
+  ST.shape(ctx, [[x + 4, top - 12], [x + 7.5, top - 12], [x + 7.5, top], [x + 4, top]], { base: '#2a6fd6', shade: '#1b4e9e', light: '#5c96ee' }, 5502, { lw: 0.8, plain: true });
+}
