@@ -113,3 +113,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.108: account card says "Current level" (the Part you are on now, not the furthest unlocked)
 - v0.109: account card: Sign out / Done on the right, 18px above (12px on short screens)
 - v0.110: root beer from 1000 up shown as 1.0k, 10.4k… (rounded down) in the HUD and account button (`shortCount` in ui.ts); the account card and results still show the full number
+- v0.111: account card buttons 26px below the table (18px on short screens)
