@@ -14,7 +14,12 @@ import { TouchControls } from './touchControls';
 import { drawNuggie, drawRootBeer } from '../gfx/collectibles';
 import { VERSION } from '../version';
 import { LEVELS, latestLevel, levelInfo, levelName, progress } from '../level/levels';
+import { account } from '../core/account';
 
+/** Text safe to put in HTML. */
+const esc = (t: string) => t.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+/** A little person icon (the account button). */
+const PERSON = '<svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><circle cx="10" cy="6.5" r="3.8" fill="currentColor"/><path d="M2.8 18.2c.6-4.2 3.6-6.6 7.2-6.6s6.6 2.4 7.2 6.6" fill="currentColor"/></svg>';
 const h = (html: string) => {
   const t = document.createElement('template');
   t.innerHTML = html.trim();
@@ -227,6 +232,18 @@ export class UI {
 
   constructor(private game: Phaser.Game) {
     this.root = document.getElementById('ui')!;
+    // still signed in from last time? pick the account back up (and its progress)
+    const beatenBefore = progress.beaten;
+    account.onChange(() => {
+      const btn = this.screen?.querySelector<HTMLElement>('[data-act=account]');
+      if (btn) btn.innerHTML = this.accountLabel();
+    });
+    void account.restore().then(() => {
+      if (progress.beaten !== beatenBefore && this.screen?.classList.contains('start')) {
+        this.level = latestLevel();
+        this.showStart();
+      }
+    });
     // the aura icon is a real nuggie, drawn once and shared by the HUD and results
     try {
       const c = document.createElement('canvas');
@@ -443,6 +460,7 @@ export class UI {
           : ''
       }
       <button class="icon-btn mute-btn" data-act="mute" aria-label="Sound on or off"></button>
+      <button class="icon-btn acct-btn" data-act="account" aria-label="Your player account">${this.accountLabel()}</button>
       <div class="start-tr">
         <button class="icon-btn fs-btn" data-act="fs" aria-label="Full screen" hidden>⛶</button>
         <button class="icon-btn battle-btn" data-act="battle" aria-label="Online battle with friends">Battle</button>
@@ -572,6 +590,10 @@ export class UI {
       sfx.select();
       this.battle.open();
     });
+    el.querySelector('[data-act=account]')!.addEventListener('click', () => {
+      sfx.select();
+      this.showAccount();
+    });
     const fsBtn = el.querySelector<HTMLButtonElement>('[data-act=fs]')!;
     const syncFs = () => (fsBtn.hidden = !canFullscreen() || isFullscreen() || isStandalone());
     syncFs();
@@ -608,6 +630,97 @@ export class UI {
       this.pickRaf = requestAnimationFrame(loop);
     };
     this.pickRaf = requestAnimationFrame(loop);
+  }
+
+  // ─────────────────────────────────────────── the (optional) account ──
+
+  /** The account button's label: your name once signed in, else "Sign in". */
+  private accountLabel() {
+    const u = account.user;
+    return `${PERSON}<span>${u ? esc(u.name) : 'Sign in'}</span>`;
+  }
+
+  /**
+   * Sign in (or make a player) with a name and password, so your root beer, nuggies and
+   * level are saved to your account; signed in, it shows them and lets you sign out.
+   * Playing never needs it.
+   */
+  private showAccount() {
+    const u = account.user;
+    const el = h(`<div class="screen modal acct">
+      <div class="panel acct-panel">
+        <p class="eyebrow">Your player</p>
+        ${
+          u
+            ? `<h2>Hi ${esc(u.name)}!</h2>
+        <div class="acct-stats">
+          <span><i class="rb-ico"></i><b>${u.rootbeer}</b> root beer</span>
+          <span><i class="aura-ico"></i><b>${u.nuggies}</b> ${u.nuggies === 1 ? 'nuggie' : 'nuggies'}</span>
+          <span><b>${esc(levelName(Math.min(u.level, latestLevel())))}</b></span>
+        </div>
+        <p class="acct-note">Saved to your player, so it follows you to any phone or tablet.</p>
+        <div class="row">
+          <button class="btn btn-alt" data-act="out">Sign out</button>
+          <button class="btn btn-go" data-act="back">Done</button>
+        </div>`
+            : `<h2>Sign in</h2>
+        <p class="acct-note">No need to sign in to play! With a name and password, your root beer, nuggies and level are saved, on any phone or tablet.</p>
+        <label class="bl-namebox acct-box"><input name="name" maxlength="16" placeholder="Name" autocomplete="username" autocapitalize="off" spellcheck="false" aria-label="Name"></label>
+        <label class="bl-namebox acct-box"><input name="pw" type="password" maxlength="64" placeholder="Password" autocomplete="current-password" aria-label="Password"></label>
+        <p class="acct-err" hidden></p>
+        <div class="row">
+          <button class="btn btn-alt" data-act="back">Back</button>
+          <button class="btn btn-alt" data-act="new">New player</button>
+          <button class="btn btn-go" data-act="in">Sign in</button>
+        </div>`
+        }
+      </div>
+    </div>`);
+    const back = () => {
+      sfx.back();
+      this.showStart();
+    };
+    el.querySelector('[data-act=back]')!.addEventListener('click', back);
+    el.querySelector('[data-act=out]')?.addEventListener('click', async () => {
+      sfx.back();
+      await account.signOut();
+      this.showStart();
+    });
+    const name = el.querySelector<HTMLInputElement>('input[name=name]');
+    const pw = el.querySelector<HTMLInputElement>('input[name=pw]');
+    const err = el.querySelector<HTMLElement>('.acct-err');
+    const btns = [...el.querySelectorAll<HTMLButtonElement>('.row .btn')];
+    const go = async (create: boolean) => {
+      if (!name || !pw || !err) return;
+      if (name.value.trim().length < 2 || pw.value.length < 4) {
+        err.textContent = name.value.trim().length < 2 ? 'Type your name (at least 2 letters).' : 'Passwords are at least 4 characters.';
+        err.hidden = false;
+        sfx.bump();
+        return;
+      }
+      btns.forEach((b) => (b.disabled = true));
+      const problem = await account.signIn(name.value, pw.value, create);
+      btns.forEach((b) => (b.disabled = false));
+      if (problem) {
+        err.textContent = problem;
+        err.hidden = false;
+        sfx.bump();
+        return;
+      }
+      sfx.select();
+      this.level = latestLevel();
+      this.showStart();
+      this.showBanner(`${create ? 'Welcome' : 'Welcome back'}, ${esc(account.user?.name ?? '')}!`, 1800);
+    };
+    el.querySelector('[data-act=in]')?.addEventListener('click', () => go(false));
+    el.querySelector('[data-act=new]')?.addEventListener('click', () => go(true));
+    for (const input of [name, pw])
+      input?.addEventListener('keydown', (e) => {
+        e.stopPropagation(); // typing isn't playing
+        if (e.key === 'Enter') go(false);
+      });
+    this.setScreen(el);
+    name?.focus();
   }
 
   private select(i: number, quiet = false) {

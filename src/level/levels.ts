@@ -1,3 +1,4 @@
+import { notifyProgress } from '../core/bank';
 import type { LevelData } from './builder';
 import { buildLevel1 } from './level1';
 import { buildLevel2 } from './level2';
@@ -60,7 +61,10 @@ export const progress = {
   },
   markBeaten(id: number) {
     try {
-      if (id > this.beaten) localStorage.setItem(KEY, String(id));
+      if (id > this.beaten) {
+        localStorage.setItem(KEY, String(id));
+        notifyProgress();
+      }
     } catch {
       /* private mode etc. */
     }

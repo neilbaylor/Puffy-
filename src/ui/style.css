@@ -2419,3 +2419,31 @@ kbd {
 .bl-fulldots i:nth-child(2) { animation-delay: 0.15s; }
 .bl-fulldots i:nth-child(3) { animation-delay: 0.3s; }
 .bl-fulldots i:nth-child(4) { animation-delay: 0.45s; }
+
+/* the (optional) account: a small button by the sound toggle, and its sign-in panel */
+.acct-btn {
+  position: absolute;
+  top: calc(10px + var(--safe-t));
+  left: calc(12px + 52px + var(--safe-l));
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px 0 10px;
+  font: 400 15px/1 var(--display);
+  color: var(--ink);
+  white-space: nowrap;
+  max-width: 40vw;
+}
+.acct-btn span { overflow: hidden; text-overflow: ellipsis; }
+.acct-panel { align-items: center; max-width: min(100%, 420px); }
+.acct-note { margin: 0; text-align: center; font-weight: 800; font-size: 13px; color: #7a5a44; max-width: 34ch; }
+.acct-box { width: min(100%, 300px); }
+.acct-box input { width: 100%; }
+.acct-err { margin: 0; font-weight: 900; font-size: 13px; color: #c0392b; text-align: center; }
+.acct-stats { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 16px; font-weight: 800; font-size: 15px; }
+.acct-stats span { display: inline-flex; align-items: center; gap: 6px; }
+.acct-stats i { display: inline-block; width: 22px; height: 22px; background: center / contain no-repeat; }
+.acct-stats .rb-ico { background-image: var(--rootbeer-img); }
+.acct-stats .aura-ico { background-image: var(--nuggie-img); }
+.acct .row { flex-wrap: wrap; justify-content: center; }

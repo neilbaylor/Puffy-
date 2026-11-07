@@ -9,6 +9,7 @@ import type { Session } from '../core/session';
 import { lives, loseLife, resetLives } from '../core/lives';
 import { sfx } from '../core/sfx';
 import type { Enemy } from '../entities/enemies/Enemy';
+import { bank } from '../core/bank';
 import { createBadGuy } from '../entities/enemies/Plops';
 import type { WeaponKind } from '../entities/enemies/Weapons';
 import { Aura, Checkpoint, Goal, RootBeer } from '../entities/Pickups';
@@ -93,22 +94,7 @@ const SCATTER_MAX = 10;
 const run = { startedAt: 0, faints: 0, popped: 0, giants: 0, bestAura: 0, rootbeer: new Set<string>() };
 
 /** Root beer is banked across plays (it'll buy things later). */
-export const bank = {
-  get rootbeer() {
-    try {
-      return Number(localStorage.getItem('puffy.rootbeer') ?? 0) || 0;
-    } catch {
-      return 0;
-    }
-  },
-  addRootbeer(n = 1) {
-    try {
-      localStorage.setItem('puffy.rootbeer', String(this.rootbeer + n));
-    } catch {
-      /* private mode */
-    }
-  },
-};
+export { bank } from '../core/bank';
 
 type Group = Phaser.GameObjects.Group;
 
@@ -1292,6 +1278,7 @@ export class GameScene extends Phaser.Scene {
       if (now < at) return true;
       if (p.state === 'fainted') return false;
       this.aura++;
+      bank.addNuggie();
       run.bestAura = Math.max(run.bestAura, this.aura);
       this.fx.auraSparkle(p.x, p.y - 6, 16);
       this.auraRing(p);
