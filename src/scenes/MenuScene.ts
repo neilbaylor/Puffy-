@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
 import { MIN_VIEW_W, TILE, VIEW_H } from '../config';
-import { ensureLevelLooks, freeLooksExcept } from '../gfx/textures';
+import { ensureLook, freeLooksExcept } from '../gfx/textures';
 import { buildLevel1 } from '../level/level1';
-import { levelInfo } from '../level/levels';
+import { LEVELS, levelInfo, levelName, progress } from '../level/levels';
 import { Background } from '../world/Background';
 import { Ambience } from '../world/Ambience';
 import { LevelView } from '../world/LevelView';
@@ -35,12 +35,41 @@ export class MenuScene extends Phaser.Scene {
       });
     };
     this.game.events.on('menu-level', onLevel);
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.game.events.off('menu-level', onLevel));
+    const onInput = () => (this.lastInput = performance.now());
+    window.addEventListener('pointerdown', onInput, true);
+    window.addEventListener('keydown', onInput, true);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.game.events.off('menu-level', onLevel);
+      window.removeEventListener('pointerdown', onInput, true);
+      window.removeEventListener('keydown', onInput, true);
+    });
     // the boot already put the start screen up; coming back from a game shows it again
     if (!data?.silent) this.game.events.emit('menu');
   }
 
   private levelId = 1;
+  /**
+   * Little jobs done in quiet moments (nobody has touched anything for a bit): this
+   * level's other looks, and the levels next to it in the Part picker (their looks and
+   * opening scenery), so switching to them is instant.
+   */
+  private quiet: (() => void)[] = [];
+  private lastInput = 0;
+  private lastQuiet = 0;
+
+  /** The unlocked levels next to this one in the Part picker. */
+  private neighbours(id: number) {
+    return LEVELS.filter((l) => l.build && l.id <= progress.beaten + 1 && Math.abs(l.id - id) === 1).map((l) => l.id);
+  }
+
+  /** Draw a level's opening scenery for the fly-over now (then throw the objects away; the pictures stay). */
+  private prewarm(id: number) {
+    const info = levelInfo(id);
+    if (!info.build) return;
+    const before = new Set(this.children.list);
+    new LevelView(this, info.build(), { lazyNear: this.startX(id) + 500 });
+    for (const o of [...this.children.list]) if (!before.has(o)) o.destroy();
+  }
   /** The fly-over loops over the first part of the level only (from x0 to here), so only that much is ever drawn. */
   private loopEnd = 0;
   private wrapping = false;
@@ -56,17 +85,25 @@ export class MenuScene extends Phaser.Scene {
     // green foothills that look like Part 1); only the terrain near the camera is drawn now,
     // the rest a chunk per frame, so switching levels is quick
     this.x0 = this.startX(id);
-    // only this level's looks (backgrounds) and scenery stay in memory; the others are freed
-    // (picking another level draws its looks behind the fade)
-    // (not while a battle is showing too: it uses Part 1's looks and its own arena)
-    // (while the game is still loading, the boot draws the level's other looks in quiet moments)
-    if (this.registry.get('ready')) ensureLevelLooks(this, id);
+    // the look showing right now is drawn straight away; the level's other looks and the
+    // levels next to it in the picker are drawn in quiet moments. Only those stay in memory:
+    // everything else is freed (not while a battle or a game is showing too: they have their own)
+    const looks = themesFor(id);
+    const mix = themeMix(themeClock.t, looks);
+    ensureLook(this, mix.a);
+    if (mix.w > 0) ensureLook(this, mix.b);
+    const near = this.neighbours(id);
     const data = (levelInfo(id).build ?? buildLevel1)();
     if (!this.scene.isActive('Battle') && !this.scene.isActive('Game')) {
-      freeLooksExcept(this, themesFor(id));
+      freeLooksExcept(this, [...looks, ...near.flatMap((n) => themesFor(n))]);
+      const keep = [data.name, ...near.map((n) => levelName(n))];
       for (const k of this.textures.getTextureKeys())
-        if ((k.startsWith('terrain-') || k.startsWith('tree-')) && !k.startsWith(`terrain-${data.name}-`) && !k.startsWith(`tree-${data.name}-`)) this.textures.remove(k);
+        if ((k.startsWith('terrain-') || k.startsWith('tree-')) && !keep.some((name) => k.startsWith(`terrain-${name}-`) || k.startsWith(`tree-${name}-`))) this.textures.remove(k);
     }
+    this.quiet = [
+      ...looks.map((l) => () => ensureLook(this, l)),
+      ...near.flatMap((n) => [...themesFor(n).map((l) => () => ensureLook(this, l)), () => this.prewarm(n)]),
+    ];
     this.level = new LevelView(this, data, { lazyNear: this.x0 + 500 });
     // loop over about a fifth of the level (at least a good stretch); nothing past it is drawn
     const vw = this.scale.width / Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W);
@@ -84,6 +121,12 @@ export class MenuScene extends Phaser.Scene {
 
   update(_t: number, deltaMs: number) {
     const dt = Math.min(deltaMs / 1000, 1 / 30);
+    // one quiet-moment job at a time (after the game has finished loading)
+    const now = performance.now();
+    if (this.quiet.length && now - this.lastInput > 900 && now - this.lastQuiet > 200 && this.registry.get('ready')) {
+      this.quiet.shift()!();
+      this.lastQuiet = performance.now();
+    }
     const cam = this.cameras.main;
     const zoom = Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W);
     cam.setZoom(zoom);

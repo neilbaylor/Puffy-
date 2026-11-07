@@ -151,10 +151,10 @@ export function buildLevel2(): LevelData {
   L.ground(263, 266, 49);
   L.spawn('goat', 265, 49);
   L.aura(262, 49);
-  // HARD: pillars over a crevasse (3 tiles wide each: room to land)
-  L.ground(268, 270, 50);
-  L.ground(273, 275, 51);
-  L.ground(278, 280, 52);
+  // HARD: pillars over a crevasse (2 tiles wide each)
+  L.ground(269, 270, 50);
+  L.ground(274, 275, 51);
+  L.ground(279, 280, 52);
   L.aura(274, 54);
   L.aura(279, 55);
   L.ground(283, 294, 52);
