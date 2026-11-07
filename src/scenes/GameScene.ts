@@ -10,6 +10,7 @@ import { lives, loseLife, resetLives } from '../core/lives';
 import { sfx } from '../core/sfx';
 import type { Enemy } from '../entities/enemies/Enemy';
 import { createBadGuy } from '../entities/enemies/Plops';
+import type { WeaponKind } from '../entities/enemies/Weapons';
 import { Aura, Checkpoint, Goal, RootBeer } from '../entities/Pickups';
 import { Player } from '../entities/Player';
 import { Rocket } from '../entities/Rocket';
@@ -349,7 +350,7 @@ export class GameScene extends Phaser.Scene {
           );
           break;
         default:
-          this.addEnemy(createBadGuy(this, s.type as EnemyKind, cx, surface(s.y) - 40), surface(s.y));
+          this.addEnemy(createBadGuy(this, s.type as EnemyKind, cx, surface(s.y) - 40, s.opts?.weapon as WeaponKind | undefined), surface(s.y));
       }
     }
 
@@ -1111,7 +1112,7 @@ export class GameScene extends Phaser.Scene {
       if (!this.rock) return;
     } else {
       const lead = hero ? hero.x - (R.x + R.r) : 0;
-      const want = hero && lead > 70 ? Math.max(R.target, Math.min(Math.abs(hero.body.velocity.x) + 170, hero.char.runSpeed * 1.4)) : R.target;
+      const want = hero && lead > 70 ? Math.max(R.target, Math.min(Math.abs(hero.body.velocity.x) + 155, hero.char.runSpeed * 1.3)) : R.target;
       R.v += (want - R.v) * (1 - Math.exp(-dt * 1.5));
       R.x += R.v * dt;
       R.img.rotation += (R.v * dt) / R.r;

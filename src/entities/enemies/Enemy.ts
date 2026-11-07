@@ -463,10 +463,13 @@ export class Giant extends Enemy {
         const aheadX = this.dir > 0 ? b.right + 4 : b.left - 4;
         const groundAhead = !this.pitAt(aheadX, b.bottom); // (a step down the hill is fine to walk off)
         const wallAhead = this.dir < 0 ? b.blocked.left : b.blocked.right;
-        b.setVelocityX(groundAhead && !wallAhead ? this.dir * 66 : 0);
+        // something overhead he can't fit under (a floating island): he waits there, rather
+        // than walking (or leaping) into it and getting jammed
+        const ceiling = this.lowCeiling(aheadX);
+        b.setVelocityX(groundAhead && !wallAhead && !ceiling ? this.dir * 66 : 0);
         // you're up on a step / another block, or across a gap: don't just stand at the
         // wall or edge — get ready to leap over to you soon
-        if (target && onGround && (wallAhead || !groundAhead || target.bottom < b.bottom - 24) && Math.abs(target.x - this.x) < 420)
+        if (target && onGround && !ceiling && (wallAhead || !groundAhead || target.bottom < b.bottom - 24) && Math.abs(target.x - this.x) < 420)
           this.timer = Math.min(this.timer, 0.35);
         this.setFrame(Math.floor(this.t * 5) % 2 ? 'w1' : 'w0');
         const dx = target ? Math.abs(target.x - this.x) : Infinity;
@@ -496,7 +499,7 @@ export class Giant extends Enemy {
         break;
       case 'charge': {
         const aheadX = this.dir > 0 ? b.right + 6 : b.left - 6;
-        const stop = this.pitAt(aheadX, b.bottom) || (this.dir < 0 ? b.blocked.left : b.blocked.right);
+        const stop = this.pitAt(aheadX, b.bottom) || (this.dir < 0 ? b.blocked.left : b.blocked.right) || this.lowCeiling(aheadX);
         b.setVelocityX(stop ? 0 : this.dir * 290);
         this.setFrame(Math.floor(this.t * 12) % 2 ? 'w1' : 'w0');
         if (Math.random() < 0.5) this.gs.fx.dust(this.dir > 0 ? b.left + 8 : b.right - 8, b.bottom, 1);
@@ -566,6 +569,16 @@ export class Giant extends Enemy {
     }
     this.setFlipX(this.dir > 0);
     this.drawPips();
+  }
+
+  /** Solid at head height just ahead (a ledge or island overhead that he won't fit under). */
+  private lowCeiling(aheadX: number) {
+    const b = this.body;
+    const x = aheadX + this.dir * 6;
+    // (an overhang: solid somewhere at head height, but open down at his feet — a wall he'd leap)
+    if (this.gs.level.isSolidAt(x, b.bottom - 8)) return false;
+    for (let y = b.top + 4; y < b.top + b.height * 0.55; y += 12) if (this.gs.level.isSolidAt(x, y)) return true;
+    return false;
   }
 
   private land(slam: boolean) {

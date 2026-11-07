@@ -434,73 +434,99 @@ export function drawVolleySand(ctx: Ctx, w: number) {
 }
 
 /**
- * The net, side on (the way you'd see it standing at the end of it): a padded post, the
- * net band (black mesh, white tape on top, blue at the bottom) and a red-and-white antenna.
- * Its foot at (w / 2, h); the top of the net netH above it.
+ * The net, nearly side on (seen from just a little in front, so it isn't a flat stick): the
+ * near post at (w/2 + 4, h) and the far post just behind it, a touch higher and smaller, with
+ * the net stretched between them (black mesh, white tape along the top, blue at the bottom)
+ * and a red-and-white antenna over each end. The top of the net netH above the near post's foot.
  */
 export function drawVolleyNetSide(ctx: Ctx, w: number, h: number, netH: number) {
   const cx = w / 2;
-  const top = h - netH;
-  const ant = top - netH * 0.32;
-  // the antenna
-  for (let i = 0; i < 6; i++) {
-    ctx.strokeStyle = i % 2 ? '#ffffff' : '#e8322a';
-    ctx.lineWidth = 1.3;
-    ctx.beginPath();
-    ctx.moveTo(cx, top - ((top - ant) * i) / 6);
-    ctx.lineTo(cx, top - ((top - ant) * (i + 1)) / 6);
-    ctx.stroke();
-  }
-  ctx.strokeStyle = INK;
-  ctx.lineWidth = 0.4;
-  ctx.strokeRect(cx - 0.65, ant, 1.3, top - ant);
-  // the post: metal, a blue foam pad round the bottom
-  const metal = ctx.createLinearGradient(cx - 1.6, 0, cx + 1.6, 0);
-  metal.addColorStop(0, '#9aa1ad');
-  metal.addColorStop(0.45, '#ffffff');
-  metal.addColorStop(1, '#8d94a0');
-  ctx.fillStyle = metal;
-  ctx.fillRect(cx - 2, top - 2, 4, h - top + 2);
-  ctx.strokeStyle = INK;
-  ctx.lineWidth = 0.6;
-  ctx.strokeRect(cx - 2, top - 2, 4, h - top + 2);
-  const padTop = h - netH * 0.42;
-  const pad = ctx.createLinearGradient(cx - 3.5, 0, cx + 3.5, 0);
-  pad.addColorStop(0, '#1b4e9e');
-  pad.addColorStop(0.4, '#4a8af0');
-  pad.addColorStop(1, '#18458c');
-  ctx.fillStyle = pad;
-  ctx.fillRect(cx - 3.4, padTop, 6.8, h - padTop);
-  ctx.strokeStyle = INK;
-  ctx.lineWidth = 0.7;
-  ctx.strokeRect(cx - 3.4, padTop, 6.8, h - padTop);
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(cx - 3.4, padTop + 4, 6.8, 1.4);
-  // the net band, edge on: mesh between the tapes
-  const nb = top + netH * 0.4;
-  const NW = 6.5; // half the net band's width
-  ctx.fillStyle = '#10121a40';
-  ctx.fillRect(cx - NW, top, NW * 2, nb - top);
-  ctx.strokeStyle = '#15161dcc';
+  const near = { x: cx + 4, y: h };
+  const far = { x: cx - 4, y: h - 5 };
+  const kF = 0.94;
+  const topN = near.y - netH;
+  const topF = far.y - netH * kF;
+  const botN = topN + netH * 0.4;
+  const botF = topF + netH * kF * 0.4;
+  const metal = (x: number, k: number) => {
+    const g = ctx.createLinearGradient(x - 1.6 * k, 0, x + 1.6 * k, 0);
+    g.addColorStop(0, '#9aa1ad');
+    g.addColorStop(0.45, '#ffffff');
+    g.addColorStop(1, '#8d94a0');
+    return g;
+  };
+  const post = (x: number, foot: number, top: number, k: number) => {
+    ctx.fillStyle = metal(x, k);
+    ctx.fillRect(x - 1.5 * k, top - 2, 3 * k, foot - top + 2);
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 0.6;
+    ctx.strokeRect(x - 1.5 * k, top - 2, 3 * k, foot - top + 2);
+    const padTop = foot - (foot - top) * 0.42;
+    const pad = ctx.createLinearGradient(x - 3 * k, 0, x + 3 * k, 0);
+    pad.addColorStop(0, '#1b4e9e');
+    pad.addColorStop(0.4, '#4a8af0');
+    pad.addColorStop(1, '#18458c');
+    ctx.fillStyle = pad;
+    ctx.fillRect(x - 3 * k, padTop, 6 * k, foot - padTop);
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 0.7;
+    ctx.strokeRect(x - 3 * k, padTop, 6 * k, foot - padTop);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(x - 3 * k, padTop + 4, 6 * k, 1.3);
+  };
+  const antenna = (x: number, top: number, k: number) => {
+    const len = netH * 0.3 * k;
+    for (let i = 0; i < 6; i++) {
+      ctx.strokeStyle = i % 2 ? '#ffffff' : '#e8322a';
+      ctx.lineWidth = 1.2 * k;
+      ctx.beginPath();
+      ctx.moveTo(x, top - (len * i) / 6);
+      ctx.lineTo(x, top - (len * (i + 1)) / 6);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 0.35;
+    ctx.strokeRect(x - 0.6 * k, top - len, 1.2 * k, len);
+  };
+  // behind: the far post and its antenna
+  antenna(far.x, topF, kF);
+  post(far.x, far.y, topF, kF);
+  // the net between the posts: a narrow, slanting panel of mesh
+  ctx.beginPath();
+  ctx.moveTo(far.x, topF);
+  ctx.lineTo(near.x, topN);
+  ctx.lineTo(near.x, botN);
+  ctx.lineTo(far.x, botF);
+  ctx.closePath();
+  ctx.fillStyle = '#10121a33';
+  ctx.fill();
+  ctx.strokeStyle = '#15161dbb';
   ctx.lineWidth = 0.35;
-  for (let y = top + 2; y < nb; y += 2.4) {
+  for (let j = 1; j < 12; j++) {
+    const t = j / 12;
     ctx.beginPath();
-    ctx.moveTo(cx - NW, y);
-    ctx.lineTo(cx + NW, y);
+    ctx.moveTo(far.x, topF + (botF - topF) * t);
+    ctx.lineTo(near.x, topN + (botN - topN) * t);
     ctx.stroke();
   }
-  for (let x = cx - NW + 2.4; x < cx + NW; x += 2.4) {
+  ctx.beginPath();
+  ctx.moveTo(cx, (topF + topN) / 2);
+  ctx.lineTo(cx, (botF + botN) / 2);
+  ctx.stroke();
+  // the tapes: white along the top, blue along the bottom
+  ctx.lineCap = 'round';
+  for (const [y0, y1, col, lw] of [[topF, topN, '#ffffff', 2.6], [botF, botN, '#2a6fd6', 1.8]] as const) {
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = lw + 1.2;
     ctx.beginPath();
-    ctx.moveTo(x, top);
-    ctx.lineTo(x, nb);
+    ctx.moveTo(far.x, y0);
+    ctx.lineTo(near.x, y1);
+    ctx.stroke();
+    ctx.strokeStyle = col;
+    ctx.lineWidth = lw;
     ctx.stroke();
   }
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(cx - NW - 0.6, top - 1.5, NW * 2 + 1.2, 4);
-  ctx.fillStyle = '#2a6fd6';
-  ctx.fillRect(cx - NW, nb - 2, NW * 2, 2.5);
-  ctx.strokeStyle = INK;
-  ctx.lineWidth = 0.7;
-  ctx.strokeRect(cx - NW - 0.6, top - 1.5, NW * 2 + 1.2, 4);
-  ctx.strokeRect(cx - NW, top, NW * 2, nb - top);
+  // in front: the near post and its antenna
+  post(near.x, near.y, topN, 1);
+  antenna(near.x, topN, 1);
 }
