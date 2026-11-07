@@ -35,8 +35,8 @@ The concept screens are in this folder (`wide`, `plan`, `entrance`, `fight`, `fi
 - **Fall off the ring** to the floor beside it and climb the steel steps back in.
 
 ## Queen Plop
-- A Plop queen: a pink royal cape with a pearl hem, a tiara, a bow on her swirl, long lashes,
-  pink lips, rosy cheeks and a string of pearls.
+- A Plop queen: a pink royal cape, a tiara, a bow on her swirl, short lashes, a touch of blush
+  and a string of pearls (feminine, but not too much).
 - **Aggressive, and she jumps a lot** (hops, charges, slams).
 - **She backs off when she sees you on the ropes**, so you have to climb and jump off quickly.
 - **8 hits to beat her.** Her health bar is in 8 pieces, and **the jumbotron counts down** the hits

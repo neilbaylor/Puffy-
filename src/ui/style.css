@@ -2449,14 +2449,31 @@ kbd {
 .acct-note { margin: 0; text-align: center; font-weight: 800; font-size: 13px; color: #7a5a44; max-width: 34ch; }
 .acct-box { width: min(100%, 300px); }
 .acct-box input { width: 100%; }
-.acct-err { margin: 0; font-weight: 900; font-size: 13px; color: #c0392b; text-align: center; white-space: pre-line; }
+/* sign-in messages: a clear coloured box ("Wrong password." in red, "no player called…" in amber) */
+.acct-err {
+  margin: 2px 0 0;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: #fde4df;
+  box-shadow: inset 0 0 0 2.5px #e8a297;
+  font-weight: 900;
+  font-size: clamp(16px, 3.2vmin, 19px);
+  line-height: 1.3;
+  color: #b42b1d;
+  text-align: center;
+  white-space: pre-line;
+  text-wrap: balance;
+  align-self: stretch;
+  /* (as wide as the boxes above it: a long message wraps rather than stretching the panel) */
+  contain: inline-size;
+}
 .acct-stats { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 16px; font-weight: 800; font-size: 15px; }
 .acct-stats span { display: inline-flex; align-items: center; gap: 6px; }
 .acct-stats i { display: inline-block; width: 22px; height: 22px; background: center / contain no-repeat; }
 .acct-stats .rb-ico { background-image: var(--rootbeer-img); }
 .acct-stats .aura-ico { background-image: var(--nuggie-img); }
 .acct-panel .row { flex-wrap: wrap; justify-content: center; }
-.acct-err.ask { color: #7a5a44; }
+.acct-err.ask { color: #6b4a1e; background: #fff1cf; box-shadow: inset 0 0 0 2.5px #e2b768; }
 .acct-rb {
   display: inline-flex;
   align-items: center;
@@ -2477,9 +2494,9 @@ kbd {
    (a little space above it), and the hero lined up with the table (not the whole card) */
 .acct-card { position: relative; align-items: flex-start; }
 .acct-card .acct-out { position: absolute; top: 14px; right: 16px; }
-.acct-card .results-hero { margin-top: clamp(46px, 10vmin, 70px); }
+.acct-card .results-hero { margin-top: clamp(22px, 5vmin, 40px); }
 .acct-card .row { justify-content: flex-end; margin-top: 26px; }
 @media (max-height: 500px) {
   .acct-card .row { margin-top: 18px; }
-  .acct-card .results-hero { margin-top: 44px; }
+  .acct-card .results-hero { margin-top: 22px; }
 }

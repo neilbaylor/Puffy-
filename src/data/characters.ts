@@ -112,14 +112,14 @@ export const CHARACTERS: CharacterDef[] = [
     accel: 1150,
     airAccel: 850,
     jump: 585,
-    staminaSecs: 2.4,
+    staminaSecs: 2.9, // (a bit more than Puffy: he's slow, so he needs it)
     refillSecs: 2.2,
     fireRate: 0.51,
     maxRockets: 2,
     rocketSpeed: 560,
     blastRadius: 86,
     damage: 1,
-    bars: { speed: 2, jump: 2, stamina: 2, blast: 5 },
+    bars: { speed: 2, jump: 2, stamina: 3, blast: 5 },
   },
 ];
 

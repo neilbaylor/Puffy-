@@ -193,13 +193,27 @@ export function drawPlop(ctx: Ctx, ox: number, oy: number, f: PlopFrame, st: Sty
   } else {
     st.line(ctx, [[cx - 12, botY + 4], [cx - 4, botY + 5], [cx + 6, botY + 4]], 2050, 1.1);
   }
-  // the King carries a little sceptre
+  // the King's sceptre, held up in his right hand: a gold rod with bands, an orb and a cross on top
   if (kind === 'king') {
-    const sx = cx + 39;
-    const sy = botY - (yell ? 30 : 20);
-    st.line(ctx, [[sx - 8, sy + 22], [sx, sy]], 2070, 2.6, '#c9971a');
-    st.shape(ctx, ellipsePts(sx + 1, sy - 2, 4.4, 4.4, 0, 16), GOLD, 2071, { lw: 0.9, light: [sx - 1, sy - 4] });
-    st.shape(ctx, ellipsePts(sx + 1, sy - 2, 1.8, 1.8, 0, 10), { base: '#e8463f', shade: '#b52c27', light: '#ff8a80' }, 2072, { lw: 0.4, plain: true });
+    const hx = cx + 30 * sqX + Math.cos(armR) * 18;
+    const hy = botY - 4 + Math.sin(armR) * 18;
+    const a = -Math.PI / 2 + 0.22; // (leaning out a little)
+    const ux = Math.cos(a);
+    const uy = Math.sin(a);
+    const px = -uy;
+    const py = ux;
+    const at = (d: number, w: number): Pt => [hx + ux * d + px * w, hy + uy * d + py * w];
+    // the rod, from just below his hand up to the orb
+    st.shape(ctx, [at(-12, -1.8), at(24, -1.8), at(24, 1.8), at(-12, 1.8)], GOLD, 2070, { lw: 0.8, light: at(10, -2) });
+    for (const d of [-11, 18]) st.shape(ctx, [at(d - 1.6, -2.8), at(d + 1.6, -2.8), at(d + 1.6, 2.8), at(d - 1.6, 2.8)], GOLD, 2073 + d, { lw: 0.7, plain: true });
+    // the orb, with a red jewel, and a little cross on top
+    const [ox, oy] = at(29, 0);
+    st.shape(ctx, ellipsePts(ox, oy, 5.2, 5.2, 0, 18), GOLD, 2071, { lw: 0.9, light: [ox - 2, oy - 2] });
+    st.shape(ctx, ellipsePts(ox, oy + 0.4, 2, 2, 0, 10), { base: '#e8463f', shade: '#b52c27', light: '#ff8a80' }, 2072, { lw: 0.4, plain: true });
+    st.shape(ctx, [at(33.5, -1), at(41, -1), at(41, 1), at(33.5, 1)], GOLD, 2074, { lw: 0.6, plain: true });
+    st.shape(ctx, [at(37.5, -3.6), at(39.5, -3.6), at(39.5, 3.6), at(37.5, 3.6)], GOLD, 2075, { lw: 0.6, plain: true });
+    // his hand wrapped round it
+    st.shape(ctx, ellipsePts(hx, hy, 4.6, 4, a, 14), BODY, 2076, { lw: 0.9, light: [hx - 2, hy - 2] });
   }
 
   if (crowned) {

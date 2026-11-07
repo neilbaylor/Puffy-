@@ -444,8 +444,8 @@ const PEARL: Fill = { base: '#fbf4ea', shade: '#dccfbf', light: '#ffffff' };
 const SILVER: Fill = { base: '#f1d36a', shade: '#c79a2c', light: '#fff6c4' };
 
 /**
- * Queen Plop (concept): a Plop with a pink royal cape, a tiara, long lashes, pink lips,
- * rosy cheeks, a pearl necklace and a bow on her swirl. Same frame layout as drawPlop.
+ * Queen Plop (concept): a Plop with a pink royal cape, a tiara, a bow on her swirl, short
+ * lashes, a touch of blush and a pearl necklace. Same frame layout as drawPlop.
  */
 function drawQueen(ctx: Ctx, ox: number, oy: number, f: PlopFrame) {
   const ground = oy + 100;
@@ -458,7 +458,6 @@ function drawQueen(ctx: Ctx, ox: number, oy: number, f: PlopFrame) {
   const topY = botY - 27 * sqY;
   // the pink cape, flowing out behind her (a frill along its hem)
   ST.shape(ctx, [[cx - 26, botY - 28], [cx + 26, botY - 28], [cx + 44, ground - 4], [cx + 22, ground], [cx, ground - 4], [cx - 22, ground], [cx - 44, ground - 4]], PINK, 3005, { lw: 1.1, light: [cx - 14, botY - 10] });
-  for (let k = -40; k <= 40; k += 8) ST.shape(ctx, ellipsePts(cx + k, ground - 3, 4.4, 3.2, 0, 12), PEARL, 3006 + k, { lw: 0.6, plain: true });
   drawPlop(ctx, ox, oy, f, ST, 'medium');
   // a bow on the swirl's tip
   const tx = cx + 10;
@@ -475,26 +474,22 @@ function drawQueen(ctx: Ctx, ox: number, oy: number, f: PlopFrame) {
   ctx.lineWidth = 1.4;
   ctx.lineCap = 'round';
   for (const [ex, er] of [[cx - 10, 9], [cx + 11, 8.4]] as const) {
-    for (const k of [-0.9, -0.45, 0]) {
+    for (const k of [-0.7, -0.2]) {
       const a = -Math.PI / 2 + k + (ex < cx ? -0.25 : 0.25);
       const x0 = ex + Math.cos(a) * er * 0.82 - (ex < cx ? 2 : -2);
       const y0 = topY - 3 + Math.sin(a) * er;
       ctx.beginPath();
       ctx.moveTo(x0, y0);
-      ctx.quadraticCurveTo(x0 + Math.cos(a) * 3, y0 + Math.sin(a) * 5, x0 + Math.cos(a - 0.5) * 6, y0 + Math.sin(a - 0.5) * 6 - 1);
+      ctx.quadraticCurveTo(x0 + Math.cos(a) * 2, y0 + Math.sin(a) * 3, x0 + Math.cos(a - 0.4) * 4, y0 + Math.sin(a - 0.4) * 4 - 0.5);
       ctx.stroke();
     }
   }
-  // rosy cheeks
-  ctx.fillStyle = 'rgba(255,110,150,0.5)';
+  // a touch of blush
+  ctx.fillStyle = 'rgba(255,110,150,0.3)';
   for (const bx of [cx - 23, cx + 23]) {
     ctx.beginPath();
     ctx.ellipse(bx, topY + 9, 5, 2.8, 0, 0, Math.PI * 2);
     ctx.fill();
-  }
-  // pink lips (over the little mouth line), unless she's shouting or hurt
-  if (!yell && !hurt) {
-    ST.shape(ctx, [[cx - 12, botY + 4], [cx - 7, botY + 1], [cx - 4, botY + 2.5], [cx - 1, botY + 1], [cx + 4, botY + 4], [cx - 4, botY + 8]], { base: '#ff6fae', shade: '#d4407f', light: '#ffc0dc' }, 3030, { lw: 0.8, plain: true });
   }
   // a string of pearls where her two tiers meet
   for (let k = -24; k <= 24; k += 5.5) {
@@ -695,17 +690,19 @@ function caption(ctx: Ctx, t: string) {
   ctx.fillText(t, 640, 686);
 }
 
-function bubble(ctx: Ctx, x: number, y: number, text: string) {
+function bubble(ctx: Ctx, x: number, y: number, text: string, tx = x + 26, ty = y + 58) {
   ctx.font = `400 34px ${FONT}`;
   const w = ctx.measureText(text).width + 50;
+  // the tail leaves the bubble's bottom edge at the point nearest the speaker
+  const bx = Math.max(x - w / 2 + 26, Math.min(x + w / 2 - 26, tx));
   ctx.fillStyle = '#5c3118';
   ctx.strokeStyle = '#fff3d6';
   ctx.lineWidth = 5;
   ctx.beginPath();
   ctx.roundRect(x - w / 2, y - 34, w, 68, 18);
-  ctx.moveTo(x + 10, y + 34);
-  ctx.lineTo(x + 26, y + 58);
-  ctx.lineTo(x + 40, y + 34);
+  ctx.moveTo(bx - 14, y + 34);
+  ctx.lineTo(tx, ty);
+  ctx.lineTo(bx + 14, y + 34);
   ctx.fill();
   ctx.stroke();
   ctx.fillStyle = '#ffd23f';
@@ -836,7 +833,8 @@ export async function render() {
       ctx.fillRect(R.x1 - 4 + Math.cos(a) * d, 420 + Math.sin(a) * d * 1.3, 2.2, 2.2);
     }
   }, (ctx) => {
-    bubble(ctx, 520, 120, '“Welcome to MY Poo Palace!”');
+    // (she's on the right-hand turnbuckle: the bubble sits beside her head, its tail pointing at her mouth)
+    bubble(ctx, 700, 110, '“Welcome to MY Poo Palace!”', 1000, 205);
   });
 
   // 5. The end of the fight: the Queen on the mat, dazed, and her warning
