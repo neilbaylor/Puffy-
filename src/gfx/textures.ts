@@ -10,6 +10,10 @@ import { BLASTER, SAW, W_RES, drawBlaster, drawBullet, drawChainsaw, drawFlailBa
 import { drawParachute } from './parachute';
 import { drawHockeyNet, drawPuck, drawRinkLines, drawStick } from './hockey';
 import { MOUNTAIN_LOOKS, drawMountainFar, drawMountainMid, drawMountainNear, type MountainLook } from './mountain';
+import './plopLooks'; // (registers Plop Invasion's palettes)
+import { POOWAVE_H, POOWAVE_W, drawPooPile, drawPooWave, drawStink } from './plopworld';
+import { PLOP_FRAMES, PLOP_H, PLOP_W, drawPlop, type PlopKind } from './plops';
+import { drawPoo } from './hazards';
 import { FLAME_FRAMES, FLAME_H, FLAME_W, drawDyingFlame, drawFlame, drawScorch } from './flame';
 import { ART_RES, ART_STYLE, CHAR_H, CHAR_W, POSES, canvas, drawCharacter, ellipse, type Ctx } from './draw';
 import { FACE_FRAMES, faceFromKey } from './face';
@@ -147,6 +151,9 @@ function baddiePieces(scene: Phaser.Scene): { name: string; run: () => void }[] 
         addCanvas(scene, 'spit', hires(36, 14, ART_RES, (ctx) => drawSpit(ctx, 24, 7, st)));
       },
     },
+    { name: 'plops small', run: () => makePlops(scene, 'small') },
+    { name: 'plops medium', run: () => makePlops(scene, 'medium') },
+    { name: 'plops large', run: () => makePlops(scene, 'large') },
     {
       // the armed bad guys' weapons
       name: 'weapons',
@@ -158,6 +165,34 @@ function baddiePieces(scene: Phaser.Scene): { name: string; run: () => void }[] 
       },
     },
   ];
+}
+
+/** Plops in the game: drawn this many times their art size (shown smaller), with room either side for the arms. */
+export const PLOP_RES = 2.5;
+export const PLOP_PAD = 16;
+
+/** One size of Plop's frames for the game (`gplop-<kind>`), plus what Plops throw and leave about. */
+function makePlops(scene: Phaser.Scene, kind: PlopKind) {
+  const key = `gplop-${kind}`;
+  if (scene.textures.exists(key)) return;
+  const st = STYLES[ART_STYLE];
+  const fw = Math.round((PLOP_W + PLOP_PAD * 2) * PLOP_RES);
+  const pw = fw + 4;
+  const fh = Math.round(PLOP_H * PLOP_RES);
+  const { c, ctx } = canvas(pw * PLOP_FRAMES.length, fh);
+  PLOP_FRAMES.forEach((f, i) => {
+    ctx.save();
+    ctx.translate(i * pw, 0);
+    ctx.scale(PLOP_RES, PLOP_RES);
+    drawPlop(ctx, PLOP_PAD, 0, f, st, kind);
+    ctx.restore();
+  });
+  addCanvas(scene, key, c, (t) => PLOP_FRAMES.forEach((f, i) => t.add(f, 0, i * pw, 0, fw, fh)));
+  if (!scene.textures.exists('poo')) {
+    addCanvas(scene, 'poo', hires(26, 24, ART_RES, (ctx2) => drawPoo(ctx2, 13, 22, 1)));
+    sheet(scene, 'poowave', POOWAVE_W, POOWAVE_H, ['w0', 'w1', 'w2', 'w3'] as const, (ctx2, f) => drawPooWave(ctx2, +f[1]), 3);
+    addCanvas(scene, 'stink', hires(12, 26, 2, (ctx2) => drawStink(ctx2)));
+  }
 }
 
 function makeBaddies(scene: Phaser.Scene) {
@@ -212,6 +247,7 @@ function makeItems(scene: Phaser.Scene, pal: WorldPalette) {
   addCanvas(scene, 'gate', hires(130, 130, PROP_RES, (ctx) => drawGate(ctx, 65, 126, pal)));
   addCanvas(scene, 'gate-swirl', hires(90, 90, PROP_RES, (ctx) => drawGateSwirl(ctx, 45, 45, 42)));
   sheet(scene, 'flower', 16, 24, ['f0', 'f1', 'f2', 'f3'] as const, (ctx, f) => drawFlower(ctx, 8, 23, pal.flowers[+f[1]], 30 + +f[1]), PROP_RES);
+  sheet(scene, 'poopile', 24, 26, ['p0', 'p1', 'p2', 'p3'] as const, (ctx, f) => drawPooPile(ctx, 12, 25, +f[1]), PROP_RES);
   addCanvas(
     scene,
     'tuft',

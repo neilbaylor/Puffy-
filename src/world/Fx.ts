@@ -18,6 +18,7 @@ export class Fx {
   private emberE: Emitter;
   private ashE: Emitter;
   private goopE: Emitter;
+  private pooE: Emitter;
   private crumbE: Emitter;
 
   constructor(private scene: Phaser.Scene) {
@@ -123,6 +124,16 @@ export class Fx {
       tint: [0xc8f26a, 0xe9ffc2, 0x9fd84a],
       gravityY: 700,
     }, DEPTH.projectiles);
+    // the same, in poo (Plop Invasion)
+    this.pooE = mk('puff', {
+      speed: { min: 40, max: 170 },
+      angle: { min: 190, max: 350 },
+      lifespan: { min: 280, max: 560 },
+      scale: { start: 0.34, end: 0.06 },
+      alpha: { start: 0.95, end: 0 },
+      tint: [0x8a5232, 0x5c3118, 0xb07a52],
+      gravityY: 700,
+    }, DEPTH.projectiles);
     // nuggie crumbs flying off a munch
     this.crumbE = mk('chip', {
       speed: { min: 50, max: 160 },
@@ -154,6 +165,11 @@ export class Fx {
   /** A glob of goat spit going splat. */
   splat(x: number, y: number, n = 9) {
     this.goopE.explode(n, x, y);
+  }
+
+  /** Poo going splat (and drips off a flying lump of it). */
+  pooSplat(x: number, y: number, n = 10) {
+    this.pooE.explode(n, x, y);
   }
 
   /** A drip or two flying off a spit glob in flight. */

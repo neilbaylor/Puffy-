@@ -123,7 +123,7 @@ export class LevelView {
   /** The terrain palette at world x (Part 2's zones; Part 1 is all Puff Ball Planet). */
   paletteAt(worldX: number): WorldPalette {
     const z = this.data.zones?.find((zz) => worldX >= zz.x0 * TILE && worldX < (zz.x1 + 1) * TILE);
-    return (z && PALETTES[z.pal]) || DEFAULT_PALETTE;
+    return (z && PALETTES[z.pal]) || (this.data.pal && PALETTES[this.data.pal]) || DEFAULT_PALETTE;
   }
 
   /** Top of the ground in column at world x (for framing the camera), or the level bottom. */
@@ -342,6 +342,11 @@ export class LevelView {
       const wx = x * TILE + TILE / 2 + (r() - 0.5) * 16;
       const wy = y * TILE + 3;
       const roll = r();
+      if (this.paletteAt(wx).poo) {
+        // Plop Invasion: little poo piles where the flowers were
+        if (roll < 0.34) this.scene.add.image(wx, wy + 1, 'poopile', `p${Math.floor(r() * 4)}`).setOrigin(0.5, 1).setScale(1 / PROP_RES).setDepth(DEPTH.decor);
+        continue;
+      }
       if (this.paletteAt(wx).flowers.length < 2) continue; // no flowers in the snow or on the ice
       if (roll < 0.28) {
         const img = this.scene.add.image(wx, wy, 'flower', `f${Math.floor(r() * 4)}`).setOrigin(0.5, 1).setScale(1 / PROP_RES).setDepth(DEPTH.decor);

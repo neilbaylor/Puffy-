@@ -1,11 +1,14 @@
 import Phaser from 'phaser';
 import { DEPTH, GRAVITY, MAX_FALL_SPEED, MIN_VIEW_W, TILE, VIEW_H } from '../config';
-import { PROP_RES, ensureLevelLooks, freeLooksExcept } from '../gfx/textures';
+import { PROP_RES, addCanvas, ensureLevelLooks, freeLooksExcept, hires } from '../gfx/textures';
+import { drawRock } from '../gfx/hazards';
+import { POO, POO_DARK } from '../gfx/plopworld';
 import { characterById } from '../data/characters';
 import type { Session } from '../core/session';
 import { lives, loseLife, resetLives } from '../core/lives';
 import { sfx } from '../core/sfx';
-import { createEnemy, type Enemy } from '../entities/enemies/Enemy';
+import type { Enemy } from '../entities/enemies/Enemy';
+import { createBadGuy } from '../entities/enemies/Plops';
 import { Aura, Checkpoint, Goal, RootBeer } from '../entities/Pickups';
 import { Player } from '../entities/Player';
 import { Rocket } from '../entities/Rocket';
@@ -74,6 +77,10 @@ const AURA_CHANCE = 0.6;
 const DEPTH_WAVE = 12;
 /** Display scale of the Giant's rolling flames (art is drawn at 3x). */
 const FLAME_S = 1.25 / 3;
+/** '#rrggbb' → 0xrrggbb */
+const hexOf = (h: string) => parseInt(h.slice(1, 7), 16);
+/** Display scale of the Big Plops' poo waves (art is drawn at 3x). */
+const POO_S = 1.2 / 3;
 /** A flame spends its last this-many seconds dying down. */
 const FLAME_FADE = 1.6; // the burn-out takes its time
 /** Max wisps that scatter when you get hit while carrying aura. */
@@ -146,10 +153,15 @@ export class GameScene extends Phaser.Scene {
   private auras: Aura[] = [];
   private rootbeers: RootBeer[] = [];
   private pendingAura: { at: number; p: Player }[] = [];
-  private waves: { img: Phaser.GameObjects.Image; glow: Phaser.GameObjects.Image; dir: number; speed: number; life: number; y: number; t: number; vy: number }[] = [];
+  private waves: { img: Phaser.GameObjects.Image; glow: Phaser.GameObjects.Image; dir: number; speed: number; life: number; y: number; t: number; vy: number; poo?: boolean }[] = [];
   private gRootbeer!: Group;
   private checkpoints: Checkpoint[] = [];
   private goal?: Goal;
+  /** Puddles of poo (quicksand): their extent, surface, and the picture. */
+  private puddles: { x0: number; x1: number; y: number; g: Phaser.GameObjects.Graphics; t: number }[] = [];
+  /** Boulder chases: where they start and end, how fast; and the rock while it's rolling. */
+  private chases: { x0: number; x1: number; speed: number; started: boolean }[] = [];
+  private rock: null | { img: Phaser.GameObjects.Image; x: number; y: number; v: number; target: number; vy: number; r: number; x1: number; falling: boolean; rumble: number } = null;
 
   private gPlayers!: Group;
   private gEnemies!: Group;
@@ -203,6 +215,9 @@ export class GameScene extends Phaser.Scene {
     this.waves = [];
     this.checkpoints = [];
     this.goal = undefined;
+    this.puddles = [];
+    this.chases = [];
+    this.rock = null;
     // every level (and every restart at a checkpoint) starts you with one nuggie
     this.aura = 1;
     this.ended = false;
@@ -278,6 +293,16 @@ export class GameScene extends Phaser.Scene {
         case 'para':
           this.paraWaiting.push({ kind: (s.opts?.kind as EnemyKind) ?? 'puffball', x: cx });
           break;
+        case 'puddle': {
+          const x0 = s.x * TILE;
+          const x1 = (s.x + Number(s.opts?.w ?? 4)) * TILE;
+          const g = this.add.graphics().setDepth(DEPTH.players + 0.6);
+          this.puddles.push({ x0, x1, y: s.y * TILE + 10, g, t: Math.random() * 10 });
+          break;
+        }
+        case 'chase':
+          this.chases.push({ x0: s.x * TILE, x1: Number(s.opts?.to ?? s.x + 40) * TILE, speed: Number(s.opts?.speed ?? 1.1), started: false });
+          break;
         case 'soccer':
           this.matches.push(
             new SoccerMatch(this, cx, surface(s.y), Number(s.opts?.w ?? 10), {
@@ -289,7 +314,7 @@ export class GameScene extends Phaser.Scene {
           );
           break;
         default:
-          this.addEnemy(createEnemy(this, s.type as EnemyKind, cx, surface(s.y) - 40), surface(s.y));
+          this.addEnemy(createBadGuy(this, s.type as EnemyKind, cx, surface(s.y) - 40), surface(s.y));
       }
     }
 
@@ -354,12 +379,12 @@ export class GameScene extends Phaser.Scene {
     const right = this.view.left + this.view.width;
     this.paraWaiting = this.paraWaiting.filter((w) => {
       if (right < w.x - 60) return true;
-      const e = createEnemy(this, w.kind, w.x, this.view.top - 70);
+      const e = createBadGuy(this, w.kind, w.x, this.view.top - 70);
       this.enemies.push(e);
       this.gEnemies.add(e);
       e.wake();
       e.body.setMaxVelocityY(75);
-      const big = w.kind !== 'puffball';
+      const big = w.kind !== 'puffball' && w.kind !== 'plop';
       const chute = this.add.image(e.x, e.body.top, 'chute').setOrigin(0.5, 58 / 60).setScale((big ? 1.5 : 1.05) / 3).setDepth(e.depth - 0.5);
       this.paras.push({ e, chute, t: Math.random() * 6 });
       return false;
@@ -385,7 +410,7 @@ export class GameScene extends Phaser.Scene {
 
   /** Spawn an enemy standing on the ground at `groundY` (used by level spawns and for testing). */
   spawnEnemy(kind: EnemyKind, x: number, groundY: number) {
-    const e = createEnemy(this, kind, x, groundY - 40);
+    const e = createBadGuy(this, kind, x, groundY - 40);
     this.addEnemy(e, groundY);
     return e;
   }
@@ -409,10 +434,13 @@ export class GameScene extends Phaser.Scene {
     const dt = Math.min(deltaMs / 1000, 1 / 30);
     if (this.intro) return this.updateIntro(dt);
 
+    this.updatePuddles(dt);
     for (const p of this.players) {
       p.update(dt);
       if (p.alive && p.body.top > this.level.heightPx + 40) p.faint(true);
     }
+    // (the rock moves on the same clock as the heroes' physics, even on a slow device)
+    this.updateChase(Math.min(deltaMs / 1000, 0.1));
 
     this.updateCamera(dt);
     if (this.players.length > 1)
@@ -484,7 +512,7 @@ export class GameScene extends Phaser.Scene {
     this.intro = { u: 0, x0: widthPx - 300, x1: startX, phase: 'fly' };
     this.introU = 0;
     const info = levelInfo(this.levelId);
-    this.game.events.emit('level-intro', { world: 'World 1', title: info.title, part: info.part });
+    this.game.events.emit('level-intro', { world: info.world, title: info.title, part: info.part });
     const tw = this.tweens.add({ targets: this.intro, u: 1, duration: 6400, ease: 'Linear', onComplete: () => this.endIntro() });
     // skipping just fast-forwards the same flight (still lands smoothly)
     this.introSkip = () => tw.setTimeScale(5);
@@ -505,6 +533,8 @@ export class GameScene extends Phaser.Scene {
     this.updateCamera(0);
     for (const p of this.players) p.spawnProtection();
     this.game.events.emit('level-intro-end');
+    const line = levelInfo(this.levelId).speech;
+    if (line && this.players[0]) this.time.delayedCall(350, () => this.say(this.players[0], line));
   }
 
   private updateIntro(dt: number) {
@@ -617,7 +647,8 @@ export class GameScene extends Phaser.Scene {
 
   /** Part 2 is a climb: the whole view leans uphill a touch, so it always feels like going up. */
   private get uphill() {
-    return this.levelId === 2 ? UPHILL_TILT : 0;
+    // (Plop Invasion runs downhill: a gentle lean the other way)
+    return this.levelId === 2 ? UPHILL_TILT : this.levelId === 3 ? -UPHILL_TILT * 0.5 : 0;
   }
 
   // ─────────────────────────────────────────── interactions ──
@@ -708,8 +739,18 @@ export class GameScene extends Phaser.Scene {
     this.waves.push({ img, glow, dir, speed, life: 1.5 + FLAME_FADE * 0.85, y: groundY, t: Math.random(), vy: 0 });
   }
 
+  /** A Big Plop's wave of poo: rolls along the ground like the Giants' fire (jump it!), then slumps into a splat. */
+  spawnPooWave(x: number, groundY: number, dir: number, speed: number) {
+    const glow = this.add.image(x, groundY - 4, 'glow').setTint(0x3a1e0c).setAlpha(0.3).setScale(1.3, 0.35).setDepth(DEPTH_WAVE - 0.1);
+    const img = this.add.image(x, groundY + 3, 'poowave', 'w0').setOrigin(0.5, 34 / 36).setScale(0.1 * POO_S, POO_S).setFlipX(dir < 0).setDepth(DEPTH_WAVE);
+    this.tweens.add({ targets: img, scaleX: POO_S, duration: 160, ease: 'Back.easeOut' });
+    this.fx.pooSplat(x, groundY - 6, 10);
+    this.waves.push({ img, glow, dir, speed, life: 1.5 + FLAME_FADE * 0.85, y: groundY, t: Math.random(), vy: 0, poo: true });
+  }
+
   private updateWaves(dt: number) {
     this.waves = this.waves.filter((w) => {
+      if (w.poo) return this.updatePooWave(w, dt);
       w.life -= dt;
       w.t += dt;
       // the last stretch of a flame's life: it shrinks, slows, sputters and smokes
@@ -762,6 +803,270 @@ export class GameScene extends Phaser.Scene {
           if (onWaveLevel && Math.abs(p.x - w.img.x) < 16 + p.body.width / 2) this.hitPlayer(p, w.img.x - w.dir * 30);
         }
       return true;
+    });
+  }
+
+  private updatePooWave(w: (typeof this.waves)[number], dt: number) {
+    w.life -= dt;
+    w.t += dt;
+    const vigor = Phaser.Math.Clamp(w.life / FLAME_FADE, 0, 1);
+    const grounded = w.vy === 0 && this.level.isSolidAt(w.img.x, w.y + 6);
+    w.img.x += w.dir * w.speed * dt * (0.4 + 0.6 * vigor) * (grounded ? 1 : 0.75);
+    if (!grounded) {
+      w.vy = Math.min(900, w.vy + 1600 * dt);
+      const ny = w.y + w.vy * dt;
+      const landY = Math.floor(ny / TILE) * TILE;
+      if (this.level.isSolidAt(w.img.x, ny) && !this.level.isSolidAt(w.img.x, landY - 4)) {
+        w.y = landY;
+        w.vy = 0;
+        this.fx.pooSplat(w.img.x, w.y - 4, 8);
+      } else w.y = ny;
+      if (w.y > this.level.heightPx + 60) {
+        w.img.destroy();
+        w.glow.destroy();
+        return false;
+      }
+    }
+    w.img.y = w.y + 3;
+    w.img.setFrame(`w${Math.floor(w.t * 9) % 4}`);
+    // it slumps lower as it runs out of push
+    w.img.scaleY = POO_S * (0.55 + 0.45 * vigor) * (1 + Math.sin(w.t * 13) * 0.04);
+    w.img.scaleX = POO_S * (0.85 + 0.15 * vigor);
+    w.glow.setPosition(w.img.x, w.y - 3).setAlpha(0.3 * vigor);
+    if (Math.random() < 0.35 * vigor) this.fx.pooSplat(w.img.x - w.dir * 18, w.y - 8, 1);
+    const front = w.img.x + w.dir * 22;
+    if (this.level.isSolidAt(front, w.y - 8) && w.life > FLAME_FADE) w.life = FLAME_FADE;
+    if (w.life <= 0) {
+      // it slumps into a flat splat that fades away
+      this.fx.pooSplat(w.img.x, w.y - 4, 6);
+      const mark = this.add.image(w.img.x, w.y + 2, 'poopile', 'p3').setOrigin(0.5, 1).setScale(1.6 / PROP_RES, 1.2 / PROP_RES).setDepth(DEPTH.tiles + 0.55);
+      this.tweens.add({ targets: mark, alpha: 0, delay: 1800, duration: 2200, onComplete: () => mark.destroy() });
+      this.tweens.add({ targets: w.img, scaleY: 0.02, alpha: 0, duration: 500, ease: 'Sine.easeIn', onComplete: () => w.img.destroy() });
+      this.tweens.add({ targets: w.glow, alpha: 0, duration: 400, onComplete: () => w.glow.destroy() });
+      return false;
+    }
+    if (vigor > 0.35)
+      for (const p of this.players) {
+        if (!p.alive || p.invulnerable) continue;
+        const onWaveLevel = p.bottom > w.y - 20 && p.bottom < w.y + 6;
+        if (onWaveLevel && Math.abs(p.x - w.img.x) < 18 + p.body.width / 2) this.hitPlayer(p, w.img.x - w.dir * 30);
+      }
+    return true;
+  }
+
+  // ─────────────────────────────────────────── Plop Invasion: poo puddles, boulder chases ──
+
+  /**
+   * Puddles of poo, like quicksand: you sink slowly while you're in one (the
+   * picture covers you as you go down), every jump pops you up and on, and if
+   * you go right under, that's a life gone.
+   */
+  private updatePuddles(dt: number) {
+    for (const p of this.players) {
+      let goo = 0;
+      if (p.alive)
+        for (const pd of this.puddles) {
+          if (p.x < pd.x0 || p.x > pd.x1 || p.bottom <= pd.y) continue;
+          goo = p.bottom - pd.y;
+          if (p.body.top > pd.y + 3) {
+            // sank right under
+            this.fx.pooSplat(p.x, pd.y, 18);
+            this.fx.popText(p.x, pd.y - 30, 'BLUB!', '#c99064', 20);
+            sfx.dribble(1);
+            p.faint(true);
+            goo = 0;
+          }
+          break;
+        }
+      p.goo = goo;
+    }
+    const left = this.view.left - 40;
+    const right = this.view.left + this.view.width + 40;
+    for (const pd of this.puddles) {
+      pd.t += dt;
+      const g = pd.g;
+      g.clear();
+      if (pd.x1 < left || pd.x0 > right) continue;
+      const y = pd.y;
+      const bottom = this.level.heightPx + 40;
+      // the body of the puddle, all the way down (whatever sinks in it, disappears)
+      const pts: Phaser.Types.Math.Vector2Like[] = [];
+      for (let x = pd.x0 - 2; x <= pd.x1 + 2; x += 6) pts.push({ x, y: y + Math.sin(x * 0.07 + pd.t * 2.2) * 1.8 + Math.sin(x * 0.19 - pd.t * 3.1) * 0.9 });
+      g.fillStyle(hexOf(POO_DARK.shade), 1).fillRect(pd.x0 - 2, y + 8, pd.x1 - pd.x0 + 4, bottom - y);
+      g.fillStyle(hexOf(POO.base), 1);
+      g.beginPath();
+      g.moveTo(pd.x0 - 2, bottom);
+      for (const q of pts) g.lineTo(q.x, q.y);
+      g.lineTo(pd.x1 + 2, bottom);
+      g.closePath();
+      g.fillPath();
+      // darker further down, a glossy rim along the top
+      g.fillStyle(hexOf(POO.shade), 0.8).fillRect(pd.x0 - 2, y + 16, pd.x1 - pd.x0 + 4, 14);
+      g.fillStyle(hexOf(POO_DARK.base), 1).fillRect(pd.x0 - 2, y + 30, pd.x1 - pd.x0 + 4, bottom - y - 30);
+      g.lineStyle(2, 0x3a2418, 1).strokePoints(pts);
+      g.lineStyle(1.5, hexOf(POO.light), 0.9);
+      g.beginPath();
+      pts.forEach((q, i) => (i ? g.lineTo(q.x, q.y + 3) : g.moveTo(q.x, q.y + 3)));
+      g.strokePath();
+      // bubbles swelling and popping on the surface
+      for (let i = 0; i < 4; i++) {
+        const ph = (pd.t * 0.6 + i * 0.27) % 1;
+        const bx = pd.x0 + ((i * 0.31 + Math.floor(pd.t * 0.6 + i * 0.27) * 0.53) % 1) * (pd.x1 - pd.x0);
+        const br = 1.5 + ph * 4;
+        g.fillStyle(hexOf(POO.light), 0.9 * (1 - ph * ph)).fillCircle(bx, y + 2 - br * 0.4, br);
+        g.lineStyle(1, 0x3a2418, 0.7 * (1 - ph * ph)).strokeCircle(bx, y + 2 - br * 0.4, br);
+      }
+      // a ring rippling round anyone wading in it
+      for (const p of this.players)
+        if (p.goo > 0) g.lineStyle(1.5, hexOf(POO.light), 0.7).strokeEllipse(p.x, y + 2, 26 + Math.sin(pd.t * 6) * 4, 5);
+    }
+  }
+
+  /** The first solid ground at or below (x, fromY), or null (a pit). */
+  private groundUnder(x: number, fromY: number) {
+    for (let y = Math.max(0, fromY); y < this.level.heightPx + 16; y += 6) if (this.level.isSolidAt(x, y)) return Math.floor(y / TILE) * TILE;
+    return null;
+  }
+
+  /**
+   * Boulder chases (Plop Invasion): past the marker, a giant rock comes rolling
+   * down the hill after you, squashing any Plops in its way. Keep running (you
+   * don't tire while it's after you) and jump the chasm at the end: the rock
+   * tumbles in.
+   */
+  private updateChase(dt: number) {
+    const hero = this.players.find((p) => p.alive);
+    if (!this.rock && hero)
+      for (const c of this.chases)
+        if (!c.started && hero.x > c.x0) {
+          c.started = true;
+          this.startChase(c, hero);
+          break;
+        }
+    const R = this.rock;
+    for (const p of this.players) p.freeRun = !!R && !R.falling;
+    if (!R) return;
+    // it hangs right behind you: if you've got well ahead it rolls faster (nearly a run)
+    // to stay close; at its own pace it's faster than walking, so keep running!
+    const lead = hero ? hero.x - (R.x + R.r) : 0;
+    const want = hero && lead > 190 && !R.falling ? Math.max(R.target, Math.min(Math.abs(hero.body.velocity.x) + 50, hero.char.runSpeed * 1.08)) : R.target;
+    R.v += (want - R.v) * (1 - Math.exp(-dt * 1.5));
+    R.x += R.v * dt;
+    R.img.rotation += (R.v * dt) / R.r;
+    const ground = this.groundUnder(R.x, R.y);
+    if (ground === null || ground > R.y + R.r + 2 || R.vy < 0) {
+      // in the air: off a step (it bounces down the hill) or into the chasm
+      R.vy = Math.min(1400, R.vy + 1600 * dt);
+      R.y += R.vy * dt;
+      if (ground !== null && R.y + R.r >= ground && R.vy > 0) {
+        R.y = ground - R.r;
+        if (R.vy > 260) {
+          this.shakeFrom(R.x, ground, 160, 0.006);
+          this.fx.dust(R.x - R.r * 0.5, ground, 6);
+          this.fx.dust(R.x + R.r * 0.5, ground, 6);
+          sfx.thud();
+          R.vy = -R.vy * 0.25; // a little bounce
+        } else R.vy = 0;
+      }
+      if (ground === null && R.x > R.x1 - R.r && !R.falling) {
+        R.falling = true;
+        sfx.whoosh();
+        this.fx.popText(R.x, R.y - R.r - 10, 'BYE ROCK!', '#ffffff', 18);
+      }
+      if (R.y > this.level.heightPx + 200) {
+        this.time.delayedCall(250, () => {
+          sfx.thud();
+          this.cameras.main.shake(260, 0.008);
+        });
+        R.img.destroy();
+        this.rock = null;
+        return;
+      }
+    } else {
+      R.y = ground - R.r;
+      if (Math.random() < 0.45) this.fx.dust(R.x - R.r * 0.7, ground, 1);
+    }
+    R.img.setPosition(R.x, R.y);
+    R.rumble -= dt;
+    if (R.rumble <= 0 && !R.falling) {
+      R.rumble = 0.22;
+      this.shakeFrom(R.x, R.y + R.r, 200, 0.0028);
+    }
+    // anyone in the way gets flattened (you: knocked on ahead of it, and it costs your aura)
+    const hits = (b: Phaser.Physics.Arcade.Body, k = 0.9) => {
+      const cx = Phaser.Math.Clamp(R.x, b.left, b.right);
+      const cy = Phaser.Math.Clamp(R.y, b.top, b.bottom);
+      return Math.hypot(cx - R.x, cy - R.y) < R.r * k;
+    };
+    for (const p of this.players) if (p.alive && !p.invulnerable && hits(p.body)) this.hitPlayer(p, R.x - R.r);
+    for (const e of this.enemies)
+      if (e.active && !e.dead && hits(e.body, 1)) {
+        this.fx.popText(e.x, e.body.top - 10, 'SQUISH!', '#ffffff', 15);
+        e.damage(99, 'stomp', null);
+      }
+  }
+
+  private startChase(c: { x0: number; x1: number; speed: number }, hero: Player) {
+    if (!this.textures.exists('bigrock'))
+      addCanvas(
+        this,
+        'bigrock',
+        hires(42, 42, 7, (ctx) => {
+          drawRock(ctx);
+          // smeared with poo, like everything else round here
+          ctx.fillStyle = POO.base;
+          for (const [x, y, rx, ry] of [[14, 12, 5, 3], [29, 27, 6, 3.4], [21, 32, 3.4, 2.2], [32, 13, 2.6, 2]] as const) {
+            ctx.beginPath();
+            ctx.ellipse(x, y, rx, ry, 0.5, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }),
+      );
+    const r = 54;
+    const x = this.view.left - r - 8;
+    const gy = this.groundUnder(x, this.view.top) ?? hero.bottom;
+    const target = Math.min(hero.char.walkSpeed * c.speed, hero.char.runSpeed * 0.92);
+    const img = this.add.image(x, gy - r, 'bigrock').setScale((2 * r) / 42 / 7).setDepth(DEPTH.enemies + 2);
+    this.rock = { img, x, y: gy - r, v: hero.char.runSpeed, target, vy: 0, r, x1: c.x1, falling: false, rumble: 0 };
+    sfx.roar();
+    this.cameras.main.shake(400, 0.008);
+    this.fx.popText(hero.x, hero.body.top - 36, 'RUN!', '#ffd23f', 30);
+  }
+
+  /** A speech bubble over a hero's head for a few seconds. */
+  private say(p: Player, text: string) {
+    const t = this.add
+      .text(0, 0, text, { fontFamily: 'Nunito, sans-serif', fontSize: '12px', fontStyle: '900', color: '#3a2418', align: 'center', wordWrap: { width: 168 } })
+      .setOrigin(0.5)
+      .setResolution(3);
+    const w = t.width + 22;
+    const h = t.height + 14;
+    const g = this.add.graphics();
+    g.fillStyle(0x3a2418, 1).fillRoundedRect(-w / 2 - 2, -h / 2 - 2, w + 4, h + 4, 12);
+    g.fillTriangle(-9, h / 2 - 2, 7, h / 2 - 2, -8, h / 2 + 13);
+    g.fillStyle(0xffffff, 1).fillRoundedRect(-w / 2, -h / 2, w, h, 10);
+    g.fillTriangle(-6.5, h / 2 - 3, 4.5, h / 2 - 3, -6.5, h / 2 + 8.5);
+    const c = this.add.container(p.x, p.body.top - 20 - h / 2, [g, t]).setDepth(DEPTH.text + 3).setScale(0.2).setAlpha(0);
+    const follow = () => {
+      if (!c.active) return;
+      const x = Phaser.Math.Clamp(p.x + 6, this.view.left + w / 2 + 8, this.view.left + this.view.width - w / 2 - 8);
+      c.setPosition(x, p.body.top - 22 - h / 2);
+    };
+    follow();
+    this.events.on(Phaser.Scenes.Events.POST_UPDATE, follow);
+    sfx.bump();
+    p.squash = { x: 0.8, y: 1.25 };
+    this.tweens.add({ targets: c, scale: 1, alpha: 1, duration: 260, ease: 'Back.easeOut' });
+    this.tweens.add({
+      targets: c,
+      alpha: 0,
+      scale: 0.9,
+      delay: 3900,
+      duration: 300,
+      onComplete: () => {
+        this.events.off(Phaser.Scenes.Events.POST_UPDATE, follow);
+        c.destroy();
+      },
     });
   }
 
@@ -839,9 +1144,11 @@ export class GameScene extends Phaser.Scene {
 
   onEnemyDefeated(e: Enemy, by: Player | null) {
     if (!by) return;
-    if (e.kind === 'giant') run.giants++;
+    const giant = e.kind === 'giant' || e.kind === 'giantplop';
+    if (giant) run.giants++;
     else run.popped++;
-    this.fx.popText(e.x, e.y - e.displayHeight / 2 - 6, e.kind === 'giant' ? 'GIANT DOWN!' : 'POP!', '#ffffff', e.kind === 'giant' ? 22 : 15);
+    const plop = e.kind === 'plop' || e.kind === 'bigplop';
+    this.fx.popText(e.x, e.y - e.displayHeight / 2 - 6, e.kind === 'giantplop' ? 'BIG PLOP DOWN!' : giant ? 'GIANT DOWN!' : plop ? 'SPLAT!' : 'POP!', '#ffffff', giant ? 22 : 15);
   }
 
   // ─────────────────────────────────────────── bazooka ──
@@ -1013,6 +1320,11 @@ export class GameScene extends Phaser.Scene {
       lives: lives.left,
       seconds: Math.round((Date.now() - run.startedAt) / 1000),
     };
+    // no basketball at the end of this one (yet): the level's done at the gate
+    if (!levelInfo(this.levelId).hoops) {
+      this.time.delayedCall(2200, () => this.game.events.emit('level-complete', { ...res, level: this.levelId } satisfies ResultState));
+      return;
+    }
     // ── transition to King Puff Ball's Basketball Palace ──
     // the world rumbles, the camera pushes in on the hero, a flash, then the palace
     this.tweens.add({

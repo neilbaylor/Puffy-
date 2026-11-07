@@ -8,10 +8,10 @@ import { T } from './tiles';
 
 export type Cell = 'ground' | 'rock' | 'boulder' | 'bramble' | 'cloud' | null;
 
-export type EnemyKind = 'puffball' | 'bigpuff' | 'giant' | 'goat';
+export type EnemyKind = 'puffball' | 'bigpuff' | 'giant' | 'goat' | 'plop' | 'bigplop' | 'giantplop';
 
 export interface Spawn {
-  type: EnemyKind | 'aura' | 'rootbeer' | 'checkpoint' | 'goal' | 'player' | 'tree' | 'soccer' | 'hockey' | 'para';
+  type: EnemyKind | 'aura' | 'rootbeer' | 'checkpoint' | 'goal' | 'player' | 'tree' | 'soccer' | 'hockey' | 'para' | 'puddle' | 'chase';
   x: number; // tile column (may be fractional for aura / trees)
   y: number; // tile row the thing occupies
   opts?: Record<string, number | string | boolean>;
@@ -22,6 +22,8 @@ export interface LevelData {
   world: string;
   /** Terrain looks by column range (Part 2: snowy rock, green valley, frozen pond). */
   zones?: { x0: number; x1: number; pal: string }[];
+  /** The terrain palette everywhere else (default: Puff Ball Planet; Plop Invasion: 'poo'). */
+  pal?: string;
   width: number;
   height: number;
   tiles: number[][];
@@ -33,6 +35,8 @@ export class LevelBuilder {
   readonly cells: Cell[][];
   readonly spawns: Spawn[] = [];
   readonly zones: { x0: number; x1: number; pal: string }[] = [];
+  /** The level's terrain palette (where no zone says otherwise). */
+  pal?: string;
 
   /** Columns x0..x1 use terrain palette `pal` (by piece centre). */
   zone(x0: number, x1: number, pal: string) {
@@ -110,6 +114,28 @@ export class LevelBuilder {
     return this;
   }
 
+  /**
+   * A puddle of poo filling a gap (columns x0..x1), its surface just under ground
+   * height h. Like quicksand: you sink slowly while you're in it, and every jump
+   * pops you up and on; go right under and you're done for.
+   */
+  puddle(x0: number, x1: number, h: number) {
+    this.pit(x0, x1);
+    this.spawns.push({ type: 'puddle', x: x0, y: this.top(h), opts: { w: x1 - x0 + 1 } });
+    return this;
+  }
+
+  /**
+   * A boulder chase: crossing column x0 sets a giant rock rolling down the hill
+   * after you; it tumbles into the chasm at column x1 (leave a pit there to jump).
+   * `speed`: its own pace × your walking speed (1.3: walking gets you caught; 1.55:
+   * you really have to run). It also speeds up to stay close if you get far ahead.
+   */
+  chase(x0: number, x1: number, speed = 1.3) {
+    this.spawns.push({ type: 'chase', x: x0, y: 0, opts: { to: x1, speed } });
+    return this;
+  }
+
   /** A possible aura spot floating at height h (each play, only some spots get aura). */
   aura(x: number, h: number) {
     this.spawns.push({ type: 'aura', x, y: this.top(h) });
@@ -143,6 +169,7 @@ export class LevelBuilder {
       name: this.name,
       world: this.world,
       zones: this.zones.length ? this.zones : undefined,
+      pal: this.pal,
       width: this.width,
       height: this.height,
       tiles: this.cells.map((row) => row.map((c) => (c ? idx[c] : T.EMPTY))),

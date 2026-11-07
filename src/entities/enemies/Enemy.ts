@@ -222,9 +222,9 @@ abstract class Walker extends Enemy {
 /** Puffball: small fluffy walker. Lots of them. One shot or one stomp. */
 export class Puffball extends Walker {
   readonly kind: EnemyKind = 'puffball';
-  constructor(gs: GameScene, x: number, y: number) {
-    super(gs, x, y, 'puffball', 'w0');
-    hiRes(this, 22, 30, 13, 16);
+  constructor(gs: GameScene, x: number, y: number, texture = 'puffball') {
+    super(gs, x, y, texture, 'w0');
+    if (texture === 'puffball') hiRes(this, 22, 30, 13, 16);
   }
 
   tick(dt = 0) {
@@ -255,9 +255,9 @@ export class BigPuff extends Walker {
   private pounceCd = 1.2;
   private crouch = 0;
   private hopCd = 0;
-  constructor(gs: GameScene, x: number, y: number) {
-    super(gs, x, y, 'bigpuff', 'w0');
-    hiRes(this, 36, 68, 18, 18);
+  constructor(gs: GameScene, x: number, y: number, texture = 'bigpuff') {
+    super(gs, x, y, texture, 'w0');
+    if (texture === 'bigpuff') hiRes(this, 36, 68, 18, 18);
     this.hp = 2;
     this.speed = 40;
     this.animRate = 4;
@@ -368,9 +368,9 @@ export class BigPuff extends Walker {
 export class Giant extends Enemy {
   readonly kind: EnemyKind = 'giant';
   static readonly REACTION = 0.27;
-  private dir = -1;
-  private mode: 'walk' | 'crouch' | 'air' | 'slamWindup' | 'slam' | 'chargeWindup' | 'charge' = 'walk';
-  private timer = 1.0;
+  protected dir = -1;
+  protected mode: 'walk' | 'crouch' | 'air' | 'slamWindup' | 'slam' | 'chargeWindup' | 'charge' = 'walk';
+  protected timer = 1.0;
   private chargeCooldown = 1.8;
   private underFor = 0;
   private chaseT = 0;
@@ -379,9 +379,9 @@ export class Giant extends Enemy {
   private pips: Phaser.GameObjects.Graphics;
   private readonly maxHp = 5;
 
-  constructor(gs: GameScene, x: number, y: number) {
-    super(gs, x, y, 'giant', 'w0');
-    hiRes(this, 104, 176, 36, 24, 2.5);
+  constructor(gs: GameScene, x: number, y: number, texture = 'giant') {
+    super(gs, x, y, texture, 'w0');
+    if (texture === 'giant') hiRes(this, 104, 176, 36, 24, 2.5);
     this.hp = this.maxHp;
     this.stompable = false;
     this.bouncyTop = true;
@@ -548,9 +548,14 @@ export class Giant extends Enemy {
     this.gs.fx.dust(b.right - 10, b.bottom, slam ? 14 : 8);
     if (slam) this.gs.fx.shockwave(this.x, b.bottom, 70);
     // every landing sends a shockwave rolling along the ground both ways: jump it!
-    this.gs.spawnShockwave(b.left + 6, b.bottom, -1, slam ? 275 : 220);
-    this.gs.spawnShockwave(b.right - 6, b.bottom, 1, slam ? 275 : 220);
+    this.sendWaves(b.left + 6, b.right - 6, b.bottom, slam ? 275 : 220);
     sfx.thud();
+  }
+
+  /** What rolls out along the ground when he lands (flames; a Big Plop's are poo). */
+  protected sendWaves(left: number, right: number, groundY: number, speed: number) {
+    this.gs.spawnShockwave(left, groundY, -1, speed);
+    this.gs.spawnShockwave(right, groundY, 1, speed);
   }
 
   protected shutFrame(f: string) {
@@ -665,7 +670,7 @@ export class Goat extends Enemy {
     let vx = (tx - sx) / T;
     if (Math.sign(vx) !== this.dir) vx = this.dir * 60;
     const vy = (ty - sy - 0.5 * G * T * T) / T;
-    new SpitGlob(this.gs, sx, sy, vx, vy, G);
+    new Glob(this.gs, sx, sy, vx, vy, G);
     sfx.spit();
     this.gs.fx.drip(sx, sy);
   }
@@ -732,8 +737,23 @@ export class Goat extends Enemy {
   }
 }
 
-/** A flying glob of goat spit: arcs under gravity, splats on the ground or on you. */
-class SpitGlob {
+export interface GlobStyle {
+  /** Texture and how it's shown. */
+  tex: string;
+  scale: number;
+  /** Tumbles end over end (a lump of poo) rather than pointing along its path (spit). */
+  spin?: number;
+  /** Hits the ground: what happens there (the default: a flattened puddle that fades). */
+  onLand?: (x: number, y: number, vx: number) => void;
+  /** How big it is (for hitting you). */
+  r?: number;
+  /** Poo (brown splats and drips) rather than goat spit (green). */
+  poo?: boolean;
+}
+const SPIT: GlobStyle = { tex: 'spit', scale: 1.5 };
+
+/** A flying glob (goat spit, a lump of poo): arcs under gravity, splats on the ground or on you. */
+export class Glob {
   private img: Phaser.GameObjects.Image;
   private life = 2.2;
   private dripT = 0;
@@ -746,8 +766,9 @@ class SpitGlob {
     private vx: number,
     private vy: number,
     private g: number,
+    private style: GlobStyle = SPIT,
   ) {
-    this.img = gs.add.image(x, y, 'spit').setOrigin(24 / 36, 0.5).setScale(1.5 / ART_RES).setDepth(DEPTH.projectiles);
+    this.img = gs.add.image(x, y, style.tex).setOrigin(style.tex === 'spit' ? 24 / 36 : 0.5, 0.5).setScale(style.scale / ART_RES).setDepth(DEPTH.projectiles);
     this.onUpdate = (_t, delta) => this.step(Math.min(delta / 1000, 0.05));
     gs.events.on(Phaser.Scenes.Events.UPDATE, this.onUpdate);
     gs.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.gone());
@@ -760,30 +781,40 @@ class SpitGlob {
     this.vy += this.g * dt;
     img.x += this.vx * dt;
     img.y += this.vy * dt;
-    img.setRotation(Math.atan2(this.vy, this.vx));
+    const st = this.style;
+    if (st.spin) img.setRotation(img.rotation + st.spin * Math.sign(this.vx || 1) * dt);
+    else img.setRotation(Math.atan2(this.vy, this.vx));
     const wob = 1 + Math.sin(this.life * 40) * 0.08;
-    img.setScale((1.5 * wob) / ART_RES, (1.5 * (2 - wob)) / ART_RES);
+    img.setScale((st.scale * wob) / ART_RES, (st.scale * (2 - wob)) / ART_RES);
     this.dripT -= dt;
     if (this.dripT <= 0) {
       this.dripT = 0.07;
-      this.gs.fx.drip(img.x - Math.cos(img.rotation) * 8, img.y - Math.sin(img.rotation) * 8);
+      if (this.style.poo) this.gs.fx.pooSplat(img.x, img.y, 1);
+      else this.gs.fx.drip(img.x - Math.cos(img.rotation) * 8, img.y - Math.sin(img.rotation) * 8);
     }
     // hit a hero?
     for (const p of this.gs.players) {
       if (!p.alive) continue;
       const pb = p.body;
-      if (img.x + 7 < pb.left || img.x - 7 > pb.right || img.y + 7 < pb.top || img.y - 7 > pb.bottom) continue;
+      const r = st.r ?? 7;
+      if (img.x + r < pb.left || img.x - r > pb.right || img.y + r < pb.top || img.y - r > pb.bottom) continue;
       this.gs.hitPlayer(p, img.x - Math.sign(this.vx) * 20);
-      return this.splat();
+      return this.splat(true);
     }
     if (this.gs.level.isSolidAt(img.x, img.y + 3) || this.life <= 0 || img.y > this.gs.level.heightPx + 50) this.splat();
   }
 
-  private splat() {
+  private splat(onHero = false) {
     const { x, y } = this.img;
-    this.gs.fx.splat(x, y);
+    if (this.style.poo) this.gs.fx.pooSplat(x, y, 12);
+    else this.gs.fx.splat(x, y);
+    if (this.style.onLand && !onHero) {
+      this.style.onLand(x, y, this.vx);
+      sfx.dribble(0.4);
+      return this.gone();
+    }
     // a flattened goop puddle that fades
-    const puddle = this.gs.add.image(x, y, 'spit').setOrigin(24 / 36, 0.5).setScale(2 / ART_RES, 0.6 / ART_RES).setDepth(DEPTH.projectiles - 1);
+    const puddle = this.gs.add.image(x, y, this.style.tex).setOrigin(this.style.tex === 'spit' ? 24 / 36 : 0.5, 0.5).setScale(2 / ART_RES, 0.6 / ART_RES).setDepth(DEPTH.projectiles - 1);
     this.gs.tweens.add({ targets: puddle, alpha: 0, scaleX: 2.6 / ART_RES, delay: 250, duration: 500, onComplete: () => puddle.destroy() });
     sfx.dribble(0.4);
     this.gone();
@@ -796,7 +827,7 @@ class SpitGlob {
 }
 
 /** A fixed pseudo-random number per level column (so who's armed is the same every play). */
-const colHash = (x: number) => Math.imul(Math.floor(x / TILE) + 101, 2654435761) >>> 0;
+export const colHash = (x: number) => Math.imul(Math.floor(x / TILE) + 101, 2654435761) >>> 0;
 
 export function createEnemy(gs: GameScene, kind: EnemyKind, x: number, y: number): Enemy {
   const h = colHash(x);
@@ -820,5 +851,8 @@ export function createEnemy(gs: GameScene, kind: EnemyKind, x: number, y: number
       return new Goat(gs, x, y);
     case 'giant':
       return new Giant(gs, x, y);
+    default:
+      // (the Plops are made by createBadGuy in Plops.ts)
+      throw new Error(`createEnemy: ${kind}`);
   }
 }

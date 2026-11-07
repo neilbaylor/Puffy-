@@ -11,7 +11,9 @@ import { PALETTES, seaColor } from '../gfx/world';
 export const THEMES = ['puff', 'candy', 'golden', 'meadow'] as const;
 /** Part 2's looks: the three mountain moods. */
 export const MOUNTAIN_THEMES = ['m-pastel', 'm-frost', 'm-sunset'] as const;
-export type ThemeId = (typeof THEMES)[number] | (typeof MOUNTAIN_THEMES)[number];
+/** Plop Invasion's looks: murky noon, smoggy dusk, stinky haze. */
+export const PLOP_THEMES = ['p-muck', 'p-dusk', 'p-stink'] as const;
+export type ThemeId = (typeof THEMES)[number] | (typeof MOUNTAIN_THEMES)[number] | (typeof PLOP_THEMES)[number];
 
 const HOLD = 20;
 const BLEND = 10;
@@ -38,7 +40,7 @@ export function themeMix(t: number, themes: readonly ThemeId[] = THEMES): ThemeM
 }
 
 /** The looks a level cycles through. */
-export const themesFor = (level: number): readonly ThemeId[] => (level === 2 ? MOUNTAIN_THEMES : THEMES);
+export const themesFor = (level: number): readonly ThemeId[] => (level === 2 ? MOUNTAIN_THEMES : level === 3 ? PLOP_THEMES : THEMES);
 
 /** A soft colour grade for the foreground (terrain, trees, flowers) in each look. */
 const TINT: Record<ThemeId, number> = {
@@ -49,6 +51,9 @@ const TINT: Record<ThemeId, number> = {
   'm-pastel': 0xfdf4ff,
   'm-frost': 0xeef6ff,
   'm-sunset': 0xffe6cc,
+  'p-muck': 0xfff2e0,
+  'p-dusk': 0xffe2d4,
+  'p-stink': 0xf0f4dc,
 };
 
 export const lerpRgb = (x: number, y: number, w: number) => {

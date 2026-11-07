@@ -438,7 +438,7 @@ export class UI {
       ${
         progress.beaten >= 1
           ? `<div class="levels" role="radiogroup" aria-label="Pick a level">${LEVELS.map(
-              (l) => `<button class="lvl" data-lvl="${l.id}" ${l.build ? '' : 'disabled'}>${l.part}${l.build ? '' : '<small>coming soon</small>'}</button>`,
+              (l) => `<button class="lvl" data-lvl="${l.id}" ${l.build ? '' : 'disabled'}>${l.button ?? l.part}${l.build ? '' : '<small>coming soon</small>'}</button>`,
             ).join('')}</div>`
           : ''
       }
@@ -947,12 +947,12 @@ export class UI {
             <dt>Lives left <i class="life-ico"></i></dt><dd>${r.lives}</dd>
             <dt>Aura carried <i class="aura-ico"></i></dt><dd>${r.aura}</dd>
             <dt>Root beer found <i class="rb-ico"></i></dt><dd>${r.rootbeerTotal}</dd>
-            <dt>Puffballs popped</dt><dd>${r.popped}</dd>
-            <dt>Giants beaten</dt><dd>${r.giants}</dd>
+            <dt>${levelInfo(r.level ?? this.level).world === 'World 2' ? 'Plops splatted' : 'Puffballs popped'}</dt><dd>${r.popped}</dd>
+            <dt>${levelInfo(r.level ?? this.level).world === 'World 2' ? 'Giant Plops beaten' : 'Giants beaten'}</dt><dd>${r.giants}</dd>
             <dt>Time</dt><dd>${mins}:${secs}</dd>
           </dl>
           <div class="row">
-            ${next ? `<button class="btn btn-next" data-act="next">Next: ${next.part} ▶</button>` : ''}
+            ${next ? `<button class="btn btn-next" data-act="next">Next: ${next.button ?? next.part} ▶</button>` : ''}
             <button class="btn ${next ? 'btn-alt' : 'btn-go'}" data-act="again">Play again</button>
           </div>
         </div>

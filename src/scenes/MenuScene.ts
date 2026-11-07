@@ -27,11 +27,13 @@ export class MenuScene extends Phaser.Scene {
     const onLevel = (id: number) => {
       if (id === this.levelId || !levelInfo(id).build) return;
       const cam = this.cameras.main;
-      cam.fadeOut(180, 255, 248, 236);
+      // (into or out of Plop Invasion, the fade goes through poo brown)
+      const c = id === 3 || this.levelId === 3 ? [92, 52, 28] : [255, 248, 236];
+      cam.fadeOut(id === 3 ? 320 : 180, c[0], c[1], c[2]);
       cam.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
         this.children.removeAll(true);
         this.build(id);
-        cam.fadeIn(380, 255, 248, 236);
+        cam.fadeIn(id === 3 ? 600 : 380, c[0], c[1], c[2]);
       });
     };
     this.game.events.on('menu-level', onLevel);
@@ -75,7 +77,7 @@ export class MenuScene extends Phaser.Scene {
   private wrapping = false;
 
   private startX(id: number) {
-    return id === 2 ? 86 * 32 : 0;
+    return id === 2 ? 86 * 32 : id === 3 ? 0 : 0;
   }
   private top: number | null = null;
 

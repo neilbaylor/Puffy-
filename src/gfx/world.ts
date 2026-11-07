@@ -11,6 +11,7 @@
 import { rng, type Ctx } from './draw';
 import { STYLES, ellipsePts, paddlePts, petalPts, roundRectPts, trace, type Fill, type Pt, type Style } from './handdrawn';
 import { fluffPts } from './baddies';
+import { POO, POO_DARK, drawDrip, drawPooMountain, drawPooSwirl } from './plopworld';
 
 const ST = STYLES.polished;
 const INK = ST.ink;
@@ -38,6 +39,8 @@ export interface WorldPalette {
   trunk: Fill;
   bramble: Fill;
   flowers: string[];
+  /** Plop Invasion: everything covered in poo (drips, poo caps, poo piles, soft-serve hills). */
+  poo?: boolean;
 }
 
 export const PALETTES: Record<string, WorldPalette> = {
@@ -421,6 +424,17 @@ export function drawTerrainPiece(ctx: Ctx, o: TerrainPieceOpts) {
         ctx.fill();
       }
       strokeRun(ctx, run, 4, pal.grass.light);
+      if (pal.poo) {
+        // Plop Invasion: the poo layer is glossy and oozes down into the earth below it
+        ctx.globalAlpha = 0.55;
+        strokeRun(ctx, run, 2, '#ffffff');
+        ctx.globalAlpha = 1;
+        for (const { p, dx, dy } of along(run, 9 + r() * 5, r() * 8)) {
+          if (Math.abs(dy) > 0.6 || r() < 0.45) continue; // (drips only hang from fairly flat tops)
+          const len = 7 + r() * 16;
+          drawDrip(ctx, p[0] - dy * 14, p[1] + dx * 14 - 2, len, 3 + r() * 3, r() < 0.3 ? POO_DARK : pal.grass);
+        }
+      }
     }
   } else {
     // rock: cracks + facets
@@ -466,6 +480,9 @@ export function drawTerrainPiece(ctx: Ctx, o: TerrainPieceOpts) {
         if (roll < 0.5) {
           const rr = 3.2 + r() * 2.6;
           ST.shape(ctx, ellipsePts(p[0], p[1] - rr * 0.35, rr * 1.2, rr, 0, 16), pal.grass, seed + p[0], { lw: 0.6, plain: true });
+        } else if (roll < 0.62 && pal.poo) {
+          // a little poo swirl sitting on top
+          drawPooSwirl(ctx, p[0], p[1] + 1, 9 + r() * 6, r() < 0.3 ? POO_DARK : pal.grass, seed + p[0]);
         } else if (roll < 0.58) {
           const h = 9 + r() * 7;
           const lean = (r() - 0.5) * 5;
@@ -578,6 +595,13 @@ export function drawCloudPlatform(ctx: Ctx, x: number, y: number, w: number, pal
     ctx.fill();
   }
   ctx.globalAlpha = 1;
+  if (pal.poo) {
+    // a poo smear along the top, dripping off the cloud
+    const sx = x + w * (0.15 + r() * 0.3);
+    const sw = w * 0.45;
+    ST.shape(ctx, ellipsePts(sx + sw / 2, y - 2, sw / 2, 3, 0, 18), POO, seed + 7, { lw: 0.6, plain: true });
+    for (let k = 0; k < 2; k++) drawDrip(ctx, sx + sw * (0.25 + k * 0.5), y + 12, 5 + r() * 8, 3);
+  }
 }
 
 /** Puff-ball tree: curvy trunk with a cluster of pastel puff canopies. Feet at (x, groundY). */
@@ -604,6 +628,24 @@ export function drawPuffTree(ctx: Ctx, x: number, groundY: number, h: number, pa
     [topX + 16, topY + 22, 8],
   ];
   for (const [bx, by, br] of blobs) ST.shape(ctx, fluffPts(bx, by, br, br * 0.95, 7, 0.08, r() * 3), canopy, seed + bx, { lw: 0.95, light: [bx - br * 0.3, by - br * 0.4] });
+  if (pal.poo) {
+    // Plop Invasion: a big dollop of poo on top of the tree, oozing down over the puffs
+    const cx = topX;
+    const cy = topY - 12;
+    const cap: Pt[] = [];
+    for (let k = 0; k <= 20; k++) {
+      const a = Math.PI + (k / 20) * Math.PI;
+      cap.push([cx + Math.cos(a) * 21, cy + Math.sin(a) * 13]);
+    }
+    // a wavy lower edge with drips
+    for (let k = 0; k <= 8; k++) {
+      const x = cx + 21 - (k / 8) * 42;
+      cap.push([x, cy + (k % 2 ? 7 + r() * 5 : 2)]);
+    }
+    ST.shape(ctx, cap, POO, seed + 41, { lw: 0.95, light: [cx - 7, cy - 8] });
+    for (const dx of [-14, 2, 13]) drawDrip(ctx, cx + dx + (r() - 0.5) * 3, cy + 5, 5 + r() * 9, 3.2);
+    drawPooSwirl(ctx, cx + 2, cy - 10, 13, POO, seed + 43);
+  }
 }
 
 /** Little puff flower (round fluffy head on a stem). */
@@ -722,7 +764,22 @@ export function drawFarLayer(ctx: Ctx, W: number, H: number, pal: WorldPalette) 
     ctx.beginPath();
     ctx.ellipse(px, py, 66, 15, -0.25, Math.PI * 0.95, Math.PI * 2.05);
     ctx.stroke();
-    far.shape(ctx, fluffPts(px, py, 38, 38, 9, 0.05), { base: '#ffd2b8', shade: '#f0a8a8', light: '#fff0e2' }, 30, { lw: 0.8, light: [px - 14, py - 16] });
+    far.shape(ctx, fluffPts(px, py, 38, 38, 9, 0.05), pal.poo ? { base: '#b07a50', shade: '#865634', light: '#d8a87e' } : { base: '#ffd2b8', shade: '#f0a8a8', light: '#fff0e2' }, 30, { lw: 0.8, light: [px - 14, py - 16] });
+    if (pal.poo) {
+      // the Plops' planet now: a big brown swirl
+      ctx.strokeStyle = '#6e4428aa';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      for (let t = 0; t < 1; t += 0.02) {
+        const a = t * Math.PI * 5;
+        const rr = 4 + t * 28;
+        const sx = px + Math.cos(a) * rr;
+        const sy = py + Math.sin(a) * rr * 0.9;
+        if (t === 0) ctx.moveTo(sx, sy);
+        else ctx.lineTo(sx, sy);
+      }
+      ctx.stroke();
+    }
     ctx.strokeStyle = pal.far.light;
     ctx.lineWidth = 7;
     ctx.beginPath();
@@ -743,8 +800,8 @@ export function drawFarLayer(ctx: Ctx, W: number, H: number, pal: WorldPalette) 
   for (const [ix, iy, iw] of [[150, 70, 70], [520, 44, 54], [820, 90, 80]] as const) {
     wrapX(W, (dx) => {
       const x = ix + dx;
-      // waterfall
-      ctx.fillStyle = '#ffffffaa';
+      // waterfall (a brown one, now)
+      ctx.fillStyle = pal.poo ? '#8a5a38bb' : '#ffffffaa';
       ctx.fillRect(x + iw * 0.25, iy + 12, 5, 70);
       // rocky underside
       const under: Pt[] = [
@@ -809,6 +866,11 @@ export function drawHillsLayer(ctx: Ctx, W: number, H: number, pal: WorldPalette
         const t = k / 30;
         pts.push([x - hw + t * hw * 2, H + 10 - Math.pow(Math.sin(t * Math.PI), 0.8) * (H + 10 - hy)]);
       }
+      if (pal.poo && i % 2 === 0) {
+        // Plop Invasion: some of the hills are soft-serve poo mountains
+        drawPooMountain(ctx, x, H + 10, hw * 1.5, H + 10 - hy, pal.hill, mid, 600 + i);
+        return;
+      }
       mid.shape(ctx, pts, i % 2 ? pal.hill : pal.hill2, 600 + i, { lw: 0.9, light: [x - hw * 0.3, hy + 10] });
       // a couple of tiny puff trees on the crest
       for (let k = 0; k < 2; k++) {
@@ -828,9 +890,11 @@ export function drawHillsLayer(ctx: Ctx, W: number, H: number, pal: WorldPalette
 export function drawNearLayer(ctx: Ctx, W: number, H: number, pal: WorldPalette) {
   const sea = inked(pal.farInk);
   const r = rng(33);
-  const back: Fill = { base: pal.cloud.shade, shade: pal.far.shade, light: pal.cloud.base };
+  // (Plop Invasion: a sea of sludge instead of clouds)
+  const front: Fill = pal.poo ? pal.near : pal.cloud;
+  const back: Fill = pal.poo ? { base: pal.near.shade, shade: pal.near.shade, light: pal.near.base } : { base: pal.cloud.shade, shade: pal.far.shade, light: pal.cloud.base };
   // back row of cloud tops (a little darker), then a brighter front row
-  for (const [row, fill, y0, rMin] of [[0, back, 34, 22], [1, pal.cloud, 58, 26]] as const) {
+  for (const [row, fill, y0, rMin] of [[0, back, 34, 22], [1, front, 58, 26]] as const) {
     for (let x = row * 30; x < W + 60; x += 52 + r() * 30) {
       const rr = rMin + r() * 18;
       const y = y0 + r() * 12;
@@ -838,13 +902,13 @@ export function drawNearLayer(ctx: Ctx, W: number, H: number, pal: WorldPalette)
     }
   }
   const g = ctx.createLinearGradient(0, 70, 0, H);
-  g.addColorStop(0, pal.cloud.base);
-  g.addColorStop(1, pal.cloud.shade);
+  g.addColorStop(0, front.base);
+  g.addColorStop(1, front.shade);
   ctx.fillStyle = g;
   ctx.fillRect(0, 74, W, H - 74);
 }
 
 /** Colour under the cloud sea (fills the bottom of the screen). */
-export const seaColor = (pal: WorldPalette) => pal.cloud.shade;
+export const seaColor = (pal: WorldPalette) => (pal.poo ? pal.near.shade : pal.cloud.shade);
 
 export { drawNuggie, drawRootBeer } from './collectibles';

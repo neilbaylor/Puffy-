@@ -17,6 +17,8 @@ const RESPAWN_INVULN = 1.5;
 /** After running the meter dry you have to let it refill this much before running again. */
 const EXHAUSTED_UNTIL = 0.3;
 const RECOIL_TIME = 0.16;
+/** How fast you sink in a puddle of poo (px/s). */
+const GOO_SINK = 28;
 
 const HIT_W = 22;
 const HIT_H = 34;
@@ -41,6 +43,11 @@ export class Player {
 
   /** 0..1 */
   stamina = 1;
+  /** Running doesn't tire you (a boulder is chasing you!). */
+  freeRun = false;
+  /** How deep in a puddle of poo you are (px; 0 = not in one). Set by the scene each frame. */
+  goo = 0;
+  private wasInGoo = false;
   exhausted = false;
   running = false;
 
@@ -125,7 +132,7 @@ export class Player {
     // ── Stamina: running drains it fast; it refills as soon as you stop ──
     const wantsRun = input.run && dir !== 0;
     this.running = wantsRun && !this.exhausted && this.stamina > 0;
-    if (this.running && onGround) {
+    if (this.running && onGround && !this.freeRun) {
       this.stamina -= dt / c.staminaSecs;
       if (this.stamina <= 0) {
         this.stamina = 0;
@@ -138,8 +145,23 @@ export class Player {
       if (this.exhausted && this.stamina >= EXHAUSTED_UNTIL) this.exhausted = false;
     }
 
+    // ── In a puddle of poo: you wade slowly and sink; every jump pops you up and on ──
+    const inGoo = this.goo > 0 && this.state === 'alive';
+    if (inGoo && !this.wasInGoo) {
+      this.scene.fx.pooSplat(this.x, this.bottom - this.goo, 10);
+      sfx.dribble(0.6);
+    }
+    this.wasInGoo = inGoo;
+    // sinking slowly and steadily (it's thick): no gravity in it, just the sink — about
+    // a second and a half to go right under; a hop out falls back with gravity as usual
+    if (inGoo && b.velocity.y >= 0) {
+      b.setAllowGravity(false);
+      b.setVelocityY(GOO_SINK);
+    } else if (!b.allowGravity) b.setAllowGravity(true);
+
     // ── Horizontal movement ──
     let maxSpeed = this.running ? c.runSpeed : c.walkSpeed;
+    if (inGoo) maxSpeed = c.walkSpeed * 0.45;
     if (!onGround) maxSpeed = Math.max(maxSpeed, Math.min(this.launchSpeed, c.runSpeed)); // keep run-jump momentum
     let vx = b.velocity.x;
     if (dir !== 0) {
@@ -161,7 +183,19 @@ export class Player {
     this.coyote = onGround ? COYOTE : this.coyote - dt;
     this.jumpBuffer = jumpPressed ? JUMP_BUFFER : this.jumpBuffer - dt;
     let jumpedNow = false;
-    if (controllable && this.jumpBuffer > 0 && this.coyote > 0) {
+    if (inGoo && controllable && this.jumpBuffer > 0) {
+      // a squelchy hop up out of the poo (weaker the deeper you've sunk)
+      jumpedNow = true;
+      const depth = Phaser.Math.Clamp(this.goo / (c.hitH ?? HIT_H), 0, 1);
+      b.setVelocity(vx, -c.jump * (0.8 - depth * 0.25));
+      this.launchSpeed = c.walkSpeed;
+      this.jumpBuffer = 0;
+      this.jumping = true;
+      this.airJumps = 1;
+      this.squash = { x: 0.78, y: 1.28 };
+      this.scene.fx.pooSplat(this.x, this.bottom - this.goo, 8);
+      sfx.jump();
+    } else if (controllable && this.jumpBuffer > 0 && this.coyote > 0) {
       jumpedNow = true;
       const runBoost = this.running ? 1.06 : 1; // running jumps go a little further
       b.setVelocity(vx * runBoost, -(c.jump + Math.abs(vx) * 0.1));
