@@ -90,3 +90,5 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.85: opens on your latest level, no auto full screen, music without a tap where allowed
 - v0.86: iPhone loading screen fix, less memory (one level at a time, fly-over loops a fifth of the level)
 - v0.87: shorter loading screen, renderer on the label, lower resolution on slow devices
+- v0.88: loading screen fills the whole iPhone screen
+- v0.89: 2-wide pillars, instant Part switching, no resolution drop
