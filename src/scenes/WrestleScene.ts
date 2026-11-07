@@ -1209,11 +1209,15 @@ export class WrestleScene extends Phaser.Scene {
     el.hidden = false;
     const place = () => {
       const cam = this.cameras.main;
-      const sx = (wx - cam.worldView.x) * cam.zoom;
-      const sy = (wy - cam.worldView.y) * cam.zoom;
-      el.style.left = `${Phaser.Math.Clamp(sx, 150, this.scale.width - 150)}px`;
+      // (the game draws at up to 2× the screen's pixels: the page's own pixels are what the bubble needs)
+      const css = this.game.canvas.getBoundingClientRect();
+      const k = css.width / this.scale.width;
+      const sx = (wx - cam.worldView.x) * cam.zoom * k;
+      const sy = (wy - cam.worldView.y) * cam.zoom * k;
+      const x = Phaser.Math.Clamp(sx, 150, css.width - 150);
+      el.style.left = `${x}px`;
       el.style.top = `${Math.max(70, sy)}px`;
-      el.style.setProperty('--tail', `${sx - Phaser.Math.Clamp(sx, 150, this.scale.width - 150)}px`);
+      el.style.setProperty('--tail', `${sx - x}px`);
     };
     place();
     const ev = this.time.addEvent({ delay: 16, loop: true, callback: place });
