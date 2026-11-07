@@ -47,7 +47,10 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   devices; the owner didn't want it, v0.89 removed it (and clears the saved `puffy.res`).
 - v0.89: the start screen keeps the current level and its neighbours in the Part picker in memory; their
   looks and opening scenery are drawn in quiet moments (`MenuScene.quiet`), so switching Parts is instant.
-- Open question: an old iPad plays slowly (not smooth in the levels). Not solved yet; see HANDOFF ideas.
+- Open question: an old iPad plays slowly (not smooth in the levels). Not solved yet. Likely causes: the canvas
+  is drawn at 1.75× on tablets (lots of pixels for an old GPU) and several full-screen layers (sky, 3 hill
+  layers, light shafts, vignette). Next step: find out the iPad model / iOS version and what the label says,
+  then measure frame rate on it (e.g. a small fps readout) before changing anything.
 - The loading screen hides the start screen underneath (`body.booting`) until it fades: on iPhones parts of
   the page underneath showed through / overflowed on the left.
 - v0.85: the start screen opens on the furthest level you've unlocked (`latestLevel()` in `levels.ts`); no
