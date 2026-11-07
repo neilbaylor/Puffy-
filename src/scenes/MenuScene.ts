@@ -29,7 +29,9 @@ export class MenuScene extends Phaser.Scene {
       if (id === this.levelId || !levelInfo(id).build) return;
       const cam = this.cameras.main;
       const c = [255, 248, 236];
-      cam.fadeOut(180, c[0], c[1], c[2]);
+      // (the fade is long enough for the new title to swap in first — its letters animate on
+      // their own — before the new level's scenery is drawn behind the white)
+      cam.fadeOut(320, c[0], c[1], c[2]);
       cam.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
         this.children.removeAll(true);
         this.build(id);
@@ -49,7 +51,9 @@ export class MenuScene extends Phaser.Scene {
     if (!data?.silent) this.game.events.emit('menu');
   }
 
-  private levelId = 1;
+  private levelId = 0;
+  /** The level shown before this one (kept drawn too: hopping back to it is instant). */
+  private prevId = 0;
   /**
    * Little jobs done in quiet moments (nobody has touched anything for a bit): this
    * level's other looks, and the levels next to it in the Part picker (their looks and
@@ -59,10 +63,16 @@ export class MenuScene extends Phaser.Scene {
   private lastInput = 0;
   private lastQuiet = 0;
 
-  /** The levels next to this one in the Part picker (it shows every built level once you've beaten one). */
+  /**
+   * The levels near this one in the Part picker (it shows every built level once you've beaten
+   * one): up to two either side, nearest first. Their opening scenery is small (only the fly-over's
+   * first view, ~6 MB) and their looks ~6 MB each, so memory stays bounded however many levels.
+   */
   private neighbours(id: number) {
     if (progress.beaten < 1) return [];
-    return LEVELS.filter((l) => l.build && Math.abs(l.id - id) === 1).map((l) => l.id);
+    return LEVELS.filter((l) => l.build && l.id !== id && Math.abs(l.id - id) <= 2)
+      .sort((a, b) => Math.abs(a.id - id) - Math.abs(b.id - id))
+      .map((l) => l.id);
   }
 
   /** Draw a level's opening scenery for the fly-over now (then throw the objects away; the pictures stay). */
@@ -70,12 +80,18 @@ export class MenuScene extends Phaser.Scene {
     const info = levelInfo(id);
     if (!info.build) return;
     const before = new Set(this.children.list);
-    new LevelView(this, info.build(), { lazyNear: this.startX(id) + 500 });
+    new LevelView(this, info.build(), { lazyNear: this.startX(id), lazySpan: this.firstSpan() });
     for (const o of [...this.children.list]) if (!before.has(o)) o.destroy();
   }
   /** The fly-over loops over the first part of the level only (from x0 to here), so only that much is ever drawn. */
   private loopEnd = 0;
   private wrapping = false;
+
+  /** Only what the fly-over's first view shows is drawn at once (the rest a chunk per frame, as it glides on). */
+  private firstSpan(): [number, number] {
+    const vw = this.scale.width / Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W);
+    return [100, vw + 150];
+  }
 
   private startX(id: number) {
     return id === 2 ? 86 * 32 : id === 3 ? 0 : 0;
@@ -83,6 +99,7 @@ export class MenuScene extends Phaser.Scene {
   private top: number | null = null;
 
   private build(id: number) {
+    if (this.levelId !== id) this.prevId = this.levelId;
     this.levelId = id;
     // the fly-over starts somewhere that shows off the level (Part 2: up in the snow, not the
     // green foothills that look like Part 1); only the terrain near the camera is drawn now,
@@ -95,7 +112,8 @@ export class MenuScene extends Phaser.Scene {
     const mix = themeMix(themeClock.t, looks);
     ensureLook(this, mix.a);
     if (mix.w > 0) ensureLook(this, mix.b);
-    const near = this.neighbours(id);
+    // (kept drawn: the Parts next to this one in the picker, and the one you just came from)
+    const near = [...new Set([...this.neighbours(id), this.prevId])].filter((n) => n && n !== id && levelInfo(n).build);
     const data = (levelInfo(id).build ?? buildLevel1)();
     if (!this.scene.isActive('Battle') && !this.scene.isActive('Game')) {
       freeLooksExcept(this, [...looks, ...near.flatMap((n) => themesFor(n))]);
@@ -104,12 +122,15 @@ export class MenuScene extends Phaser.Scene {
         if ((k.startsWith('terrain-') || k.startsWith('tree-')) && !keep.some((name) => k.startsWith(`terrain-${name}-`) || k.startsWith(`tree-${name}-`))) this.textures.remove(k);
     }
     this.quiet = [
-      // (this Part's song, decoded ahead so pressing Play doesn't wait for it)
+      // first, what a click on a neighbouring Part needs: the look it'd show right now and
+      // its opening scenery; then this Part's song (so Play doesn't wait for it), then the
+      // other looks, which only show up later as the colours drift
+      ...near.flatMap((n) => [() => ensureLook(this, themeMix(themeClock.t, themesFor(n)).a), () => this.prewarm(n)]),
       () => preloadLevelMusic(id),
       ...looks.map((l) => () => ensureLook(this, l)),
-      ...near.flatMap((n) => [...themesFor(n).map((l) => () => ensureLook(this, l)), () => this.prewarm(n)]),
+      ...near.flatMap((n) => themesFor(n).map((l) => () => ensureLook(this, l))),
     ];
-    this.level = new LevelView(this, data, { lazyNear: this.x0 + 500 });
+    this.level = new LevelView(this, data, { lazyNear: this.x0, lazySpan: this.firstSpan() });
     // loop over about a fifth of the level (at least a good stretch); nothing past it is drawn
     const vw = this.scale.width / Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W);
     this.loopEnd = this.x0 + Math.max(this.level.widthPx * 0.2, 1800);
@@ -126,9 +147,10 @@ export class MenuScene extends Phaser.Scene {
 
   update(_t: number, deltaMs: number) {
     const dt = Math.min(deltaMs / 1000, 1 / 30);
-    // one quiet-moment job at a time (after the game has finished loading)
+    // one quiet-moment job at a time (straight away, not after the rest of the game's art:
+    // a click on another Part is the very next thing people do)
     const now = performance.now();
-    if (this.quiet.length && now - this.lastInput > 900 && now - this.lastQuiet > 200 && this.registry.get('ready')) {
+    if (this.quiet.length && now - this.lastInput > 600 && now - this.lastQuiet > 200) {
       this.quiet.shift()!();
       this.lastQuiet = performance.now();
     }
