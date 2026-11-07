@@ -6,6 +6,7 @@ import { GameScene } from './scenes/GameScene';
 import { MenuScene } from './scenes/MenuScene';
 import { HoopsScene } from './scenes/HoopsScene';
 import { BattleScene } from './scenes/BattleScene';
+import { WrestleScene } from './scenes/WrestleScene';
 import { UI } from './ui/ui';
 
 installInput();
@@ -82,7 +83,7 @@ function start(refreshMs: number) {
     input: { activePointers: 4 },
     physics: { default: 'arcade', arcade: { gravity: { x: 0, y: 1600 }, debug: false } },
     fps: { target: 60, limit: fpsLimitFor(refreshMs), smoothStep: true },
-    scene: [BootScene, MenuScene, GameScene, HoopsScene, BattleScene],
+    scene: [BootScene, MenuScene, GameScene, HoopsScene, BattleScene, WrestleScene],
   });
 
   const resize = () => {

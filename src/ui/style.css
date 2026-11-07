@@ -2501,3 +2501,108 @@ kbd {
   .acct-card .row { margin-top: 18px; }
   .acct-card .results-hero { margin-top: 22px; }
 }
+
+/* ── Queen Plop's ring (WrestleScene) ── */
+.wrestle {
+  position: absolute;
+  inset: 0;
+  pointer-events: none !important;
+  font-family: var(--display);
+  color: #fff;
+}
+/* her health: 8 pieces, under the jumbotron's countdown */
+.wr-boss {
+  position: absolute;
+  top: calc(10px + var(--safe-t));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px 6px 14px;
+  border-radius: 999px;
+  background: rgba(20, 10, 4, 0.82);
+  box-shadow: 0 3px 0 #000a;
+  font-size: clamp(14px, 3vmin, 20px);
+  white-space: nowrap;
+}
+.wr-boss[hidden] { display: none; }
+.wr-boss b { font-weight: 400; color: #ffb3d4; }
+.wr-pips { display: flex; gap: 3px; }
+.wr-pips i {
+  display: block;
+  width: clamp(14px, 3vmin, 22px);
+  height: clamp(10px, 2.2vmin, 14px);
+  border-radius: 4px;
+  background: linear-gradient(#ff8ec4, #e8579a);
+  box-shadow: inset 0 -2px 0 #b23272, 0 0 0 1.5px #3a1d0c;
+  transition: transform 0.25s, opacity 0.25s, background 0.25s;
+}
+.wr-pips i.gone {
+  background: #3a2416;
+  box-shadow: inset 0 0 0 1.5px #5c3118;
+  transform: scale(0.8);
+  opacity: 0.6;
+}
+/* big words: FIGHT! K.O.! */
+.wr-callout {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  transform: translate(-50%, -50%) scale(0.5);
+  opacity: 0;
+  font-size: clamp(44px, 12vmin, 96px);
+  color: #ffd23f;
+  -webkit-text-stroke: 0.14em #3a1d0c;
+  paint-order: stroke fill;
+  text-shadow: 0 0.08em 0 #3a1d0c;
+  transition: transform 0.28s cubic-bezier(0.2, 1.6, 0.4, 1), opacity 0.2s;
+  white-space: nowrap;
+}
+.wr-callout.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+.wr-callout.bad { color: #ff8a80; }
+/* a speech bubble over someone's head (placed by the scene; --tail points it at them) */
+.wr-speech {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  max-width: min(80vw, 520px);
+  padding: 12px 22px 11px;
+  border-radius: 20px;
+  background: #5c3118;
+  border: 4px solid #fff3d6;
+  box-shadow: 0 10px 24px #0008;
+  color: #ffd23f;
+  font-size: clamp(18px, 4.4vmin, 32px);
+  line-height: 1.1;
+  text-align: center;
+}
+.wr-speech[hidden] { display: none; }
+.wr-speech b { font-weight: 400; color: #fff; }
+.wr-speech::after {
+  content: '';
+  position: absolute;
+  left: calc(50% + var(--tail, 0px) - 14px);
+  bottom: -22px;
+  border: 14px solid transparent;
+  border-top: 18px solid #fff3d6;
+}
+.wr-skip {
+  position: absolute;
+  right: calc(14px + var(--safe-r));
+  bottom: calc(14px + var(--safe-b));
+  pointer-events: auto;
+  padding: 8px 16px;
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  font: 400 18px/1 var(--display);
+  color: var(--ink);
+}
+.wr-skip[hidden] { display: none; }
+/* (temporary) the start screen's straight-to-the-wrestling button */
+.wr-test-btn {
+  position: absolute;
+  right: calc(12px + var(--safe-r));
+  bottom: calc(10px + var(--safe-b));
+  z-index: 2;
+}

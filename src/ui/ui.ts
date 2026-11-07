@@ -15,6 +15,8 @@ import { drawNuggie, drawRootBeer } from '../gfx/collectibles';
 import { VERSION } from '../version';
 import { LEVELS, latestLevel, levelInfo, levelName, progress } from '../level/levels';
 import { account } from '../core/account';
+import { testWrestleData } from '../scenes/WrestleScene';
+import { resetLives } from '../core/lives';
 import { bank } from '../core/bank';
 
 /** A count kept short where space is tight: 1000 and up as 1.0k, 10.4k… (rounded down, so it never shows more than you have). */
@@ -202,7 +204,8 @@ export class UI {
   private touch: TouchControls;
   private rotate: HTMLElement;
   private session: Session = { players: [] };
-  private gameScene: GameScene | null = null;
+  /** The scene being played right now (a level, or Queen Plop's ring): what Pause pauses. */
+  private gameScene: Phaser.Scene | null = null;
   private pickRaf = 0;
   private subtitleTimer = 0;
   /** Which subtitle change is the latest (a quick second pick cancels the first one's pop-in). */
@@ -385,6 +388,17 @@ export class UI {
         if (window.innerHeight > window.innerWidth && isTouchDevice() && game.scene.isActive('Hoops')) game.scene.pause('Hoops');
       });
     });
+    // Queen Plop's ring: the HUD and controls come once her entrance is over
+    game.events.on('wrestle-start', (s: Phaser.Scene) => {
+      this.introEl?.remove();
+      this.introEl = null;
+      this.gameScene = s;
+      this.setScreen(null);
+      this.hud.hidden = true;
+      this.banner.hidden = true;
+      this.touch.hide();
+    });
+    game.events.on('wrestle-fight', () => this.showHud());
     game.events.on('level-complete', (r: ResultState) => this.showResults(r));
     game.events.on('game-over', (g: GameOverState) => this.showGameOver(g));
 
@@ -475,6 +489,7 @@ export class UI {
         <button class="icon-btn fs-btn" data-act="fs" aria-label="Full screen" hidden>⛶</button>
         <button class="icon-btn battle-btn" data-act="battle" aria-label="Online battle with friends">Battle</button>
       </div>
+      <button class="btn btn-small wr-test-btn" data-act="wrestle" aria-label="Go straight to the Queen Plop fight (for testing)">Wrestle (test)</button>
       <p class="version">v${VERSION} · ${this.game.renderer.type === Phaser.WEBGL ? 'WebGL' : 'Canvas'}${this.lowRes()}</p>
       <div class="start-foot">
         <button class="btn btn-big btn-go" data-act="play">Play</button>
@@ -623,6 +638,8 @@ export class UI {
       sfx.select();
       this.battle.open();
     });
+    // (temporary, for testing: straight into Queen Plop's ring)
+    el.querySelector('[data-act=wrestle]')?.addEventListener('click', () => this.playWrestle());
     el.querySelector('[data-act=account]')!.addEventListener('click', () => {
       sfx.select();
       this.showAccount();
@@ -946,6 +963,28 @@ export class UI {
     this.startGame({ players: [{ slot: 0, characterId: hero.id, inputId: 'solo' }] });
   }
 
+  /** (Temporary, for testing) straight into the Queen Plop fight with the picked hero. */
+  private playWrestle() {
+    if (!this.game.registry.get('ready')) {
+      this.game.events.once('assets-ready', () => this.playWrestle());
+      this.game.events.emit('need-assets');
+      return;
+    }
+    unlockAudio();
+    primeMusic();
+    const hero = CHARACTERS[this.selected];
+    store.set('puffy.hero', hero.id);
+    sfx.select();
+    stopMusic();
+    resetLives();
+    this.session = { players: [{ slot: 0, characterId: hero.id, inputId: 'solo' }] };
+    this.setScreen(null);
+    this.game.scene.stop('Menu');
+    this.game.scene.stop('Hoops');
+    this.game.scene.stop('Game');
+    this.game.scene.start('Wrestle', testWrestleData(this.session, hero.id));
+  }
+
   private startGame(session: Session, checkpoint = -1) {
     sfx.select();
     stopMusic(); // (the start screen's song)
@@ -955,6 +994,7 @@ export class UI {
     this.setScreen(null);
     this.game.scene.stop('Menu');
     this.game.scene.stop('Hoops');
+    this.game.scene.stop('Wrestle');
     this.game.scene.stop('Game');
     this.game.scene.start('Game', { session, checkpoint, level: this.level } satisfies GameData);
   }
@@ -1017,7 +1057,7 @@ export class UI {
 
   private pause() {
     if (!this.gameScene || this.screen) return;
-    this.game.scene.pause('Game');
+    this.game.scene.pause(this.gameScene.scene.key);
     this.touch.reset();
     const el = h(`<div class="screen modal">
       <div class="panel">
@@ -1049,7 +1089,7 @@ export class UI {
 
   private resume() {
     this.setScreen(null);
-    this.game.scene.resume('Game');
+    if (this.gameScene) this.game.scene.resume(this.gameScene.scene.key);
   }
 
   private quitToStart() {
@@ -1058,6 +1098,7 @@ export class UI {
     this.setScreen(null);
     stopMusic();
     this.game.scene.stop('Hoops');
+    this.game.scene.stop('Wrestle');
     this.game.scene.stop('Game');
     this.gameScene = null;
     this.hud.hidden = true;
