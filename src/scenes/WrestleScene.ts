@@ -1291,7 +1291,7 @@ export class WrestleScene extends Phaser.Scene {
       this.heartIn = 2;
       return;
     }
-    this.heartIn = 2.5 + Math.random() * 1.5;
+    this.heartIn = 3 + Math.random() * 3;
     const x = this.ringSpot();
     const y = MAT_Y - 30 - Math.random() * 60;
     const img = this.add.image(x, y, 'prize-heart').setScale(0.9 / ART_RES).setDepth(DEPTH.pickups);
