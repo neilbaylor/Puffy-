@@ -659,6 +659,7 @@ export class UI {
     const el = u
       ? h(`<div class="screen modal acct">
       <div class="panel results acct-card">
+        <button class="btn btn-alt btn-small acct-out" data-act="out">Sign out</button>
         <div class="results-hero"><canvas width="160" height="160"></canvas></div>
         <div class="results-body">
           <p class="eyebrow">Your player</p>
@@ -670,7 +671,6 @@ export class UI {
             <dt>Current level</dt><dd>${esc(levelName(this.level))}</dd>
           </dl>
           <div class="row">
-            <button class="btn btn-alt" data-act="out">Sign out</button>
             <button class="btn btn-go" data-act="back">Done</button>
           </div>
         </div>
