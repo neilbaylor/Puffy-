@@ -115,6 +115,7 @@ function arenaBackdrop(jumbo: JumboContent, excited: boolean) {
   const signs = ['POOPA!', 'GO PUFFY', 'STINKY!', 'QUEEN ♛ PLOP', 'POO PALACE', 'P.U.!'];
   for (let i = 0; i < 9; i++) {
     const x = -60 + i * 160 + r() * 50;
+    if (i === 3) continue; // (clear of the tunnel out of the stands)
     const y = 175 + r() * 90;
     sign(ctx, x, y, signs[i % signs.length], i % 3 === 1 ? '#ffd23f' : '#f6efe2', i % 3 === 1 ? '#3a1d0c' : '#5c3118', (r() - 0.5) * 0.18);
   }
@@ -228,7 +229,7 @@ function ringBack(ctx: Ctx) {
     ctx.fill();
   }
   // a poo puddle in the far-right corner of the mat (a hazard: slows you, like the level's puddles)
-  pooPuddle(ctx, 925, R.floorY + 3);
+  pooPuddle(ctx, 975, R.floorY + 3);
   // the skirt (the front face of the ring) with the show's name
   flat(ctx, [[R.x0 - 12, R.frontY], [R.x1 + 12, R.frontY], [R.x1 + 12, R.skirtY], [R.x0 - 12, R.skirtY]], '#3a1f0e', '#22110a', R.frontY, R.skirtY);
   ctx.fillStyle = '#ffd23f';
@@ -282,40 +283,81 @@ function ringside(ctx: Ctx) {
 
 /** The poo puddle on the mat: big, glossy, bubbling and stinking (you can't miss it). */
 function pooPuddle(ctx: Ctx, x: number, y: number) {
-  // a dark rim where it's soaked into the mat, then the glossy poo, raised a little
-  ctx.fillStyle = 'rgba(70,35,12,0.45)';
+  const r = rng(31);
+  // splats flung out round it across the mat
+  for (let i = 0; i < 9; i++) {
+    const a = r() * Math.PI * 2;
+    const d = 112 + r() * 40;
+    splat(ctx, x + Math.cos(a) * d, y + Math.sin(a) * d * 0.16, 5 + r() * 6, r);
+  }
+  // a dark wet stain soaked into the mat, then a big glossy heap of poo, bulging up
+  ctx.fillStyle = 'rgba(70,35,12,0.5)';
   ctx.beginPath();
-  ctx.ellipse(x, y + 1, 84, 15, 0, 0, Math.PI * 2);
+  ctx.ellipse(x, y + 2, 112, 18, 0, 0, Math.PI * 2);
   ctx.fill();
-  ST.shape(ctx, ellipsePts(x, y - 1, 74, 12, 0, 40), POO_DARK, 21, { lw: 1.1 });
-  ST.shape(ctx, ellipsePts(x - 4, y - 3, 62, 9, 0, 40), POO, 22, { lw: 0.6, plain: true });
-  // ripples, shine and bubbles
-  ctx.strokeStyle = 'rgba(255,230,200,0.45)';
-  ctx.lineWidth = 1.4;
-  for (const [rx, ry] of [[22, 3.5], [38, 6]]) {
+  const heap: Pt[] = [];
+  for (let i = 0; i <= 40; i++) {
+    const t = (i / 40) * Math.PI;
+    // the top edge lumpy, the bottom edge flat on the mat
+    heap.push([x - Math.cos(t) * 100, y + 4 - Math.sin(t) * (16 + Math.sin(i * 1.7) * 3)]);
+  }
+  for (let i = 40; i >= 0; i--) heap.push([x - Math.cos((i / 40) * Math.PI) * 100, y + 6 + Math.sin((i / 40) * Math.PI) * 9]);
+  ST.shape(ctx, heap, POO_DARK, 21, { lw: 1.4, light: [x - 40, y - 20] });
+  ST.shape(ctx, ellipsePts(x - 6, y - 4, 82, 10, 0, 40), POO, 22, { lw: 0.6, plain: true });
+  // ripples and a big wet shine
+  ctx.strokeStyle = 'rgba(255,230,200,0.55)';
+  ctx.lineWidth = 1.8;
+  for (const [rx, ry] of [[24, 3.5], [44, 6.5]]) {
     ctx.beginPath();
-    ctx.ellipse(x + 14, y - 3, rx, ry, 0, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.ellipse(x + 20, y - 4, rx, ry, 0, Math.PI * 1.1, Math.PI * 1.9);
     ctx.stroke();
   }
-  ctx.fillStyle = '#ffffffaa';
+  ctx.fillStyle = '#ffffffcc';
   ctx.beginPath();
-  ctx.ellipse(x - 30, y - 6, 16, 2.6, -0.05, 0, Math.PI * 2);
+  ctx.ellipse(x - 40, y - 9, 22, 3, -0.05, 0, Math.PI * 2);
   ctx.fill();
-  for (const [bx, by, br] of [[x + 30, y - 6, 5], [x - 8, y - 4, 3.5], [x + 48, y - 2, 3]]) ST.shape(ctx, ellipsePts(bx, by - br, br, br, 0, 14), POO, Math.round(bx), { lw: 0.7, light: [bx - br / 2, by - br * 1.5] });
-  // a swirl poking up out of it, and stink
-  drawPooSwirl(ctx, x - 44, y - 2, 20, POO, 23);
-  ctx.strokeStyle = 'rgba(160,200,90,0.75)';
-  ctx.lineWidth = 2.4;
-  ctx.lineCap = 'round';
-  for (const sx of [x - 20, x + 6, x + 32]) {
+  ctx.beginPath();
+  ctx.ellipse(x + 52, y - 7, 8, 2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // bubbles (one popping)
+  for (const [bx, by, br] of [[x + 34, y - 7, 7], [x - 6, y - 5, 4.5], [x + 64, y - 3, 4], [x - 66, y - 3, 3.5]])
+    ST.shape(ctx, ellipsePts(bx, by - br, br, br, 0, 16), POO, Math.round(bx), { lw: 0.8, light: [bx - br / 2, by - br * 1.5] });
+  ctx.strokeStyle = 'rgba(255,230,200,0.8)';
+  ctx.lineWidth = 1.6;
+  for (let k = 0; k < 6; k++) {
+    const a = (k / 6) * Math.PI * 2;
     ctx.beginPath();
-    for (let k = 0; k <= 12; k++) {
-      const yy = y - 14 - k * 4;
-      const xx = sx + Math.sin(k * 0.9 + sx) * 4;
+    ctx.moveTo(x + 10 + Math.cos(a) * 7, y - 16 + Math.sin(a) * 5);
+    ctx.lineTo(x + 10 + Math.cos(a) * 11, y - 16 + Math.sin(a) * 8);
+    ctx.stroke();
+  }
+  // swirls poking up out of it, and a big cloud of stink (with flies)
+  drawPooSwirl(ctx, x - 58, y - 4, 26, POO, 23);
+  drawPooSwirl(ctx, x + 76, y - 2, 18, POO_DARK, 24);
+  ctx.strokeStyle = 'rgba(150,200,70,0.85)';
+  ctx.lineWidth = 3.2;
+  ctx.lineCap = 'round';
+  for (const sx of [x - 34, x - 6, x + 22, x + 50]) {
+    ctx.beginPath();
+    for (let k = 0; k <= 16; k++) {
+      const yy = y - 18 - k * 4.5;
+      const xx = sx + Math.sin(k * 0.8 + sx) * 5;
       if (k) ctx.lineTo(xx, yy);
       else ctx.moveTo(xx, yy);
     }
     ctx.stroke();
+  }
+  ctx.fillStyle = '#1a120c';
+  for (const [fx, fy] of [[x - 20, y - 70], [x + 40, y - 84], [x + 8, y - 98]]) {
+    ctx.beginPath();
+    ctx.ellipse(fx, fy, 2.6, 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.beginPath();
+    ctx.ellipse(fx - 2, fy - 3, 2.4, 1.4, -0.5, 0, Math.PI * 2);
+    ctx.ellipse(fx + 2, fy - 3, 2.4, 1.4, 0.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#1a120c';
   }
 }
 
@@ -559,6 +601,9 @@ function healthBars(ctx: Ctx, you: number, boss: number, nugs = 2) {
   ctx.fillStyle = '#ffd23f';
   ctx.fillText('× ' + nugs, 266, 49);
   bar(870, 380, 'QUEEN PLOP', boss, '#e8579a', true);
+  // 8 hits to beat her: the bar is in 8 pieces
+  ctx.fillStyle = 'rgba(20,10,4,0.85)';
+  for (let k = 1; k < 8; k++) ctx.fillRect(870 + (380 * k) / 8 - 1.5, 48, 3, 16);
 }
 
 function heart(ctx: Ctx, x: number, y: number, r: number, full: boolean) {
@@ -690,7 +735,7 @@ export async function render() {
   await document.fonts.ready;
   const out: Record<string, HTMLCanvasElement> = {};
   const title = arenaBackdrop({ kind: 'title' }, false);
-  const loud = arenaBackdrop({ kind: 'big', text: 'OH NO HE DIDN’T!', sub: 'PUFFY OFF THE TOP ROPE', color: '#ffd23f', bg: '#5c3118' }, true);
+  const loud = arenaBackdrop({ kind: 'big', text: '3 HITS TO GO', sub: 'OFF THE TOP ROPE: THAT ONE COUNTS DOUBLE', color: '#ffd23f', bg: '#5c3118' }, true);
   const count = arenaBackdrop({ kind: 'big', text: 'K.O.!', sub: 'NEW CHAMPION', color: '#ffd23f', bg: '#2a6a1a' }, true);
   const R = RING;
 
@@ -699,14 +744,14 @@ export async function render() {
     ringBack(ctx);
     spot(ctx, 640, -90, R.frontY, 700, 0.08);
     hero(ctx, 'puffy', 300, R.floorY, 'idle0');
-    king(ctx, 790, R.floorY, 'grin');
+    king(ctx, 680, R.floorY, 'grin');
     ringFront(ctx);
     ringside(ctx);
     vignette(ctx, 0.35);
   });
 
   // 2. A moment mid-fight (the camera a little closer, following the action)
-  out.fight = frame(loud, 1.12, 640, 400, (ctx) => {
+  out.fight = frame(loud, 0.98, 640, 318, (ctx) => {
     ringBack(ctx);
     spot(ctx, 470, -90, R.frontY, 380, 0.1);
     spot(ctx, 860, -90, R.frontY, 420, 0.09);
@@ -740,7 +785,7 @@ export async function render() {
     ringFront(ctx);
     ringside(ctx);
     vignette(ctx, 0.3);
-  }, (ctx) => healthBars(ctx, 2, 0.38, 2));
+  }, (ctx) => healthBars(ctx, 2, 3 / 8, 2));
 
   // 3. The ring as a level: what each part does
   out.plan = frame(title, 0.93, 640, 352, (ctx) => {
@@ -766,7 +811,7 @@ export async function render() {
     tag(ctx, 640, R.floorY, '1', 'The mat = the floor. The whole fight\nis normal 2D along this one line.', 640, 610);
     tag(ctx, R.x1, R.frontY - R.post, '2', 'Climb the ropes to the top turnbuckle;\ndive off and hit her: counts double', 1010, 150);
     tag(ctx, 500, R.frontY - 60, '3', 'Ropes: run into them and\nbounce back fast (springboard)', 360, 250);
-    tag(ctx, 800, R.floorY - 150, '8', 'Queen Plop: jumps a lot, aggressive;\nbacks off when you climb the ropes', 830, 245);
+    tag(ctx, 800, R.floorY - 150, '8', 'Queen Plop: 8 hits to win (the scoreboard\ncounts them down); jumps a lot, aggressive;\nbacks off when you climb the ropes', 830, 245);
     tag(ctx, 960, R.floorY, '4', 'Poo puddle: sinks you\nlike the level', 1060, 420);
     tag(ctx, 1190, 690, '5', 'Fall off = ringside floor;\nclimb the steps back in', 1000, 560);
     tag(ctx, 80, 650, '6', 'Announce table + steel steps:\nringside props to jump on', 240, 470);
@@ -828,9 +873,12 @@ export async function render() {
     bubble2(ctx, 800, 170, ['“Nice work…', 'but you’ll never out-wrestle', 'THE KING!”']);
   });
 
-  // 6. …then the camera pulls right out: there's the King, up in the stands, and he RUNS
+  // 6. …then the camera pulls right out, finds the King, and zooms in on him: he's down on the
+  // arena floor by the exit tunnel (he was watching the whole time), and he RUNS
   const king2 = arenaBackdrop({ kind: 'big', text: 'THE KING?!', sub: 'HE WAS HERE ALL ALONG', color: '#ffd23f', bg: '#3d1478' }, true);
-  out.king = frame(king2, 0.8, 640, 330, (ctx) => {
+  // (he's in the front row of the stands, behind the LED boards, heading for the tunnel out)
+  const KX = 548;
+  const kingScene = (ctx: Ctx) => {
     ringBack(ctx);
     shadow(ctx, 760, R.floorY, 92);
     ctx.save();
@@ -842,30 +890,59 @@ export async function render() {
     hero(ctx, 'puffy', 520, R.floorY, 'idle0', 1.7, true);
     ringFront(ctx);
     ringside(ctx);
-    ctx.fillStyle = 'rgba(5,2,0,0.45)';
-    ctx.fillRect(-260, -190, 1800, 1100);
-    // the King in an aisle of the lower bowl, caught in a follow-spot, running for the exit
-    spot(ctx, 1235, -150, 300, 200, 0.26);
-    ctx.fillStyle = '#0b0705';
-    ctx.fillRect(1290, 196, 90, 104);
-    ctx.fillStyle = '#ffd23f';
-    ctx.font = `400 16px ${FONT}`;
+    // the tunnel out of the lower bowl at the top of an aisle (a dark opening, an EXIT sign)
+    const tx = 470;
+    ctx.fillStyle = '#050302';
+    ctx.beginPath();
+    ctx.moveTo(tx - 24, 297);
+    ctx.lineTo(tx - 24, 236);
+    ctx.quadraticCurveTo(tx, 222, tx + 24, 236);
+    ctx.lineTo(tx + 24, 297);
+    ctx.fill();
+    ctx.strokeStyle = '#3b3530';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.fillStyle = '#1d6b2a';
+    ctx.fillRect(tx - 15, 208, 30, 11);
+    ctx.fillStyle = '#eafff0';
+    ctx.font = `400 9px ${FONT}`;
     ctx.textAlign = 'center';
-    ctx.fillText('EXIT', 1335, 190);
+    ctx.textBaseline = 'middle';
+    ctx.fillText('EXIT', tx, 214);
+    // the King, running along the front row for it (the boards hide his feet, like everyone's)
     ctx.save();
-    ctx.translate(1235, 300);
-    ctx.scale(-1.15, 1.15);
+    ctx.translate(KX, 300);
+    ctx.scale(0.62, 0.62);
     drawPlop(ctx, -50, -100, 'run1', ST, 'king');
     ctx.restore();
-    ctx.fillStyle = 'rgba(255,255,255,0.6)';
-    for (let i = 0; i < 4; i++) ctx.fillRect(1150 - i * 22, 230 + i * 12, 46, 4);
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    for (let i = 0; i < 3; i++) ctx.fillRect(KX + 26 + i * 6, 262 + i * 9, 22, 2.2);
+  };
+  /** The LED boards along the front of the stands, drawn again over the King's feet. */
+  const boards = (ctx: Ctx, back: HTMLCanvasElement) => {
+    const y0 = 296;
+    const y1 = 332;
+    ctx.drawImage(back, 0, (y0 + STAGE_OY) * 2, back.width, (y1 - y0) * 2, -STAGE_OX, y0, ARENA_W, y1 - y0);
+  };
+  out.kingWide = frame(king2, 0.8, 640, 330, (ctx) => {
+    kingScene(ctx);
+    boards(ctx, king2);
+    ctx.fillStyle = 'rgba(5,2,0,0.4)';
+    ctx.fillRect(-260, -190, 1800, 1100);
+    spot(ctx, KX, -150, 330, 120, 0.3);
     ctx.strokeStyle = '#ffd23f';
-    ctx.lineWidth = 6;
+    ctx.lineWidth = 4;
     ctx.beginPath();
-    ctx.ellipse(1240, 250, 80, 80, 0, 0, Math.PI * 2);
+    ctx.ellipse(KX, 288, 48, 48, 0, 0, Math.PI * 2);
     ctx.stroke();
+  }, (ctx) => caption(ctx, '1 · The camera pulls out… who’s that in the front row?'));
+  out.king = frame(king2, 2.6, 520, 268, (ctx) => {
+    kingScene(ctx);
+    boards(ctx, king2);
+    spot(ctx, KX, -150, 330, 130, 0.22);
   }, (ctx) => {
-    caption(ctx, 'Zoom out… the King was watching. He runs out — end of the fight.');
+    bubble(ctx, 470, 120, '“THE KING?!”');
+    caption(ctx, '2 · …zooms in: the King! He runs for the exit. End of the fight.');
   });
   return out;
 }

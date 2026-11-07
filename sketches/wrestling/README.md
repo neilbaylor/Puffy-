@@ -10,6 +10,9 @@ plus a side-on wrestling ring. To redraw them:
 - wide.jpg — the fight camera ("hard cam"): the whole ring side-on, arena behind
 - plan.jpg — the ring as a level (what each part does)
 - entrance.jpg — Queen Plop's entrance on the top turnbuckle
-- fight.jpg — mid-fight: 3 hearts + nuggies vs. her health bar; a top-rope dive counts double
+- fight.jpg — mid-fight: 3 hearts + nuggies vs. her 8-hit bar; the scoreboard counts down; a top-rope dive counts double
 - finish.jpg — the end: Queen Plop dazed on the mat ("Nice work… but you'll never out-wrestle THE KING!")
-- king.jpg — the camera pulls out: the King was watching from the stands, and runs out (end of the fight)
+- kingWide.jpg — the camera pulls out: someone in the front row of the stands…
+- king.jpg — …zooms in: the King! He runs for the exit tunnel (end of the fight)
+
+The whole fight design is in DESIGN.md.
