@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.112)
+## Where things stand (v0.113)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -158,6 +158,12 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   selected Part's whole ground in quiet time (`LevelView.paintJobs`, freed when you switch Part) so the
   level fly-over only puts pictures up; neighbours kept warm reduced to ±1 (memory). Account card:
   Sign out top-right, hero lined up with the table.
+- v0.113: puddles' still part (bands + deep fill) drawn once (`puddleBody`), only the surface each
+  frame; one Graphics for all deep-rock fills (`LevelView.deepG`) — Part 3 had ~39 Graphics on screen
+  vs 6 in Part 1. King's explosion (HoopsScene `blastFx`, gfx/blast.ts): starburst frames b0–b4 only,
+  then fireball sprites (ADD), smoke sprites, dust, ember particles, fluff chunks that bounce.
+  King Plop's sceptre redrawn (held in his hand). Big Muscles stamina 2.9 s (bar 3). Sign-in
+  messages are boxed (red error / amber question), 16–19px. (Owner said: leave Railway crashes for now.)
 - v0.107 pacing (`src/shared/battle/sim.ts`): bad guys every 9–18 s (first at 10 s), at most 2 at once;
   prizes every 11–18 s (first at 5 s). Measured over 10 sim-minutes: enemies 99 → 67, prizes 125 → 82.
 - Plops: a four-step walk per size (small hop, medium waddle, big stomp), weapons held at the grip. Since
