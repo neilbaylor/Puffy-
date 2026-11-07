@@ -22,7 +22,7 @@ The concept screens are in this folder (`wide`, `plan`, `entrance`, `fight`, `fi
 
 ## You
 - **5 hearts, shown over your head** (like Battle mode), up to 6 with pick-ups. No HUD and no nuggies in the ring (just
-  the pause button). A hit costs a heart; **hearts turn up in the ring** often (every 2–4 s) until you have 6. Out of
+  the pause button). A hit costs a heart; **hearts turn up in the ring** often (every 3–5 s) until you have 6. Out of
   hearts costs a life from the full game.
 - **The folding chair** (folded flat, grey steel) drops into the ring **4 times a match** (about every 11–15 s, sooner as she weakens) ("CHAIR!" on
   the jumbotron). Walk over it to pick it up: the hero bends down and holds it up over their head in
