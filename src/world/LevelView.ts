@@ -43,6 +43,7 @@ export class LevelView {
   private pending: { x0: number; x1: number; make: () => void }[] = [];
   private readonly lazy: boolean;
   private readonly lazyNear: number;
+  private readonly lazySpan: [number, number];
 
   constructor(
     private scene: Phaser.Scene,
@@ -50,10 +51,12 @@ export class LevelView {
     /** Lazy: only draw the terrain near `nearX` now, the rest bit by bit (the start screen). */
     /** keep: leave other levels' terrain alone (a battle watched while the start screen still shows). */
     /** free: free other levels' terrain (the game; default when not lazy). */
-    opts?: { lazyNear?: number; keep?: boolean; free?: boolean },
+    /** lazySpan: how far before / after `lazyNear` the terrain is drawn straight away (default 900 / 1800). */
+    opts?: { lazyNear?: number; keep?: boolean; free?: boolean; lazySpan?: [number, number] },
   ) {
     this.lazy = opts?.lazyNear !== undefined;
     this.lazyNear = opts?.lazyNear ?? 0;
+    this.lazySpan = opts?.lazySpan ?? [900, 1800];
     // only one level's terrain lives in memory at a time in the game (phones run out
     // otherwise); the start screen's lazy views keep theirs (they only draw a little)
     if ((opts?.free ?? opts?.lazyNear === undefined) && !opts?.keep)
@@ -268,7 +271,7 @@ export class LevelView {
             if (gx1 === x1 - 3) g.fillRect(x1 - 3.5, cut - 6, 2.5, this.heightPx + 200 - cut);
           }
           };
-          if (this.lazy && (cx0 + cw < (this.lazyNear - 900) || cx0 > this.lazyNear + 1800)) this.pending.push({ x0: cx0, x1: cx0 + cw, make });
+          if (this.lazy && (cx0 + cw < this.lazyNear - this.lazySpan[0] || cx0 > this.lazyNear + this.lazySpan[1])) this.pending.push({ x0: cx0, x1: cx0 + cw, make });
           else make();
         }
       }
