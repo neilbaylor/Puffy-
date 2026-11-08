@@ -56,7 +56,7 @@ export function buildLevel3(): LevelData {
 
   // ── A Big Plop, and a floating island off the ledge ──────────
   L.ground(47, 52, 41);
-  L.spawn('bigplop', 50, 41);
+  L.spawn('bigplop', 50, 41, { weapon: 'flail' }); // a ball and chain (one of each weapon in the level)
   // the island hangs over the lower ground, 3 tiles above the ledge: a running jump off the
   // ledge lands on it with any hero (Big Muscles too), and there's room to walk under it
   // (it starts four tiles past the ledge (a Giant Plop is three wide), high enough for a Giant Plop to walk under once he's stepped

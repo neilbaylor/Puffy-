@@ -49,7 +49,7 @@ import {
 export const PROP_RES = 2;
 /** The ground (by far the biggest pictures): lower in light mode. */
 export const TERRAIN_RES = LIGHT ? 1.25 : PROP_RES;
-export const BG_RES = LIGHT ? 1 : 1.5;
+export const BG_RES = LIGHT ? 1 : 1.25;
 
 /**
  * Register a drawn canvas as a (static) texture. Uses a plain image texture —
