@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.146)
+## Where things stand (v0.147)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -187,6 +187,10 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   deferred art + MenuScene's quiet jobs (`takeQuietJobs`) + 24 warm-up frames under the loading bar
   (two-phase bar); the boot screen is the manifest blue with the rainbow PUFFY logo. Results after the last
   level: Play again + Home screen. Account card: Sign out bottom-left.
+- v0.147: ui.ts `bossIntro`: hoops-start / wrestle-start hide the HUD (pause) and block Esc/P; 'hoops-play'
+  (end of the Hoops intro) and 'wrestle-fight' show the bare HUD; 'boss-cutscene' (Hoops youWin/kingWins,
+  Wrestle win) hides it again. gameScene is still set from the start (auto-pause on hide/rotate works).
+  Sign out smaller again. Test: t123.
 - v0.146: boss fights show the HUD in `.bare` mode (pause button only, top right, z-index over the letterbox)
   from 'hoops-start' / 'wrestle-start'; Hoops is now `gameScene` (pausable; its window tap listener ignores
   taps on `.hud`/`.screen`). `.lvl-side` is a normal flex item again (row centred with it). Wrestle:
