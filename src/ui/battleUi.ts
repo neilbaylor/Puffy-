@@ -102,7 +102,7 @@ export class BattleUI {
       return;
     }
     // the battle's art (every hero — anyone can pick any — and the bad guys), drawn first if it isn't yet
-    const jobs = gameArtJobs(this.host.game.scene.getScene('Menu'), { heroes: CHARACTERS.map((c) => c.id), baddies: true });
+    const jobs = gameArtJobs(this.host.game.scene.getScene('Menu'), { heroes: CHARACTERS.map((c) => c.id), level: 'battle' });
     if (jobs.length) {
       void loadArt(jobs).then(() => this.open(code));
       return;

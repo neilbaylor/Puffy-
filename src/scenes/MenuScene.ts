@@ -5,6 +5,7 @@ import { bgKey, ensureLook, freeLooksExcept, lookJobs } from '../gfx/textures';
 import { buildLevel1 } from '../level/level1';
 import { LEVELS, levelInfo, levelName, progress } from '../level/levels';
 import { Background } from '../world/Background';
+import { LIGHT } from '../core/light';
 import { Ambience } from '../world/Ambience';
 import { LevelView } from '../world/LevelView';
 import { mixTint, themeClock, themeMix, themesFor } from '../world/theme';
@@ -95,7 +96,8 @@ export class MenuScene extends Phaser.Scene {
    * Play), so only the nearest are kept, to stay within what phones can hold.
    */
   private neighbours(id: number) {
-    if (progress.beaten < 1) return [];
+    // (light mode: none — only the Part showing is kept, to save memory)
+    if (progress.beaten < 1 || LIGHT) return [];
     // (every Part: there are only a few, and with one still look each on the start screen they're
     // light enough to keep; the nearest first)
     return LEVELS.filter((l) => l.build && l.id !== id)
@@ -205,7 +207,7 @@ export class MenuScene extends Phaser.Scene {
     themeClock.t = 0;
     ensureLook(this, looks[0]);
     // (kept drawn: the Parts next to this one in the picker, and the one you just came from)
-    const near = [...new Set([...this.neighbours(id), this.prevId])].filter((n) => n && n !== id && levelInfo(n).build);
+    const near = LIGHT ? [] : [...new Set([...this.neighbours(id), this.prevId])].filter((n) => n && n !== id && levelInfo(n).build);
     const data = (levelInfo(id).build ?? buildLevel1)();
     // a whole level's ground drawn ahead (for its fly-over) is only kept for the Part showing
     // (memory: two whole levels at once is too much for phones)
@@ -287,7 +289,8 @@ export class MenuScene extends Phaser.Scene {
       () => preloadLevelMusic(id),
     ];
     jobs.push(
-      ...this.level.paintJobs().map((job) => () => {
+      // (not in light mode: the level draws its ground as its fly-over reaches it)
+      ...(LIGHT ? [] : this.level.paintJobs()).map((job) => () => {
         const key = job();
         if (key) this.painted.push(key);
         if (key) this.warmOnGpu([this.add.image(0, 0, key).setOrigin(0).setScrollFactor(0).setScale(0.05)]);

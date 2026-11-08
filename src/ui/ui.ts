@@ -7,6 +7,7 @@ import { drawHeroCard, drawPortrait, renderPoseSet } from '../gfx/draw';
 import { NEUTRAL_FACE, type Face } from '../gfx/face';
 import { BattleUI } from './battleUi';
 import { loadArt } from './artLoader';
+import { LIGHT } from '../core/light';
 import { gameArtJobs } from '../gfx/textures';
 import { gamepadSources } from '../input/gamepad';
 import { isKeyDown } from '../input/keyboard';
@@ -935,6 +936,7 @@ export class UI {
 
   /** ' · lower res' on the version label when this device was found slow and draws at a lower resolution. */
   private lowRes() {
+    if (LIGHT) return ' · light';
     try {
       return Number(localStorage.getItem('puffy.res')) ? ' · lower res' : '';
     } catch {
@@ -1051,7 +1053,7 @@ export class UI {
   /** The game's own art for these heroes (and a level's bad guys), drawn first behind a little loading card if it isn't yet. */
   private gameArt(heroes: string[], level: number | null) {
     const scene = this.game.scene.getScene('Menu');
-    return loadArt(gameArtJobs(scene, { heroes, baddies: level !== null, plops: level === 3 }));
+    return loadArt(gameArtJobs(scene, { heroes, level }));
   }
 
   private starting = false;

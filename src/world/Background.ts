@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { DEPTH } from '../config';
 import { BG_LAYERS, BG_RES, bgKey, ensureLook } from '../gfx/textures';
 import { rng } from '../gfx/draw';
+import { LIGHT } from '../core/light';
 import { PALETTES } from '../gfx/world';
 import { hex, lerpRgb, mixSea, type ThemeId, type ThemeMix } from './theme';
 
@@ -33,7 +34,7 @@ interface Cloud {
 
 /** A cloud's picture: this box (in cloud units, × its size) and resolution; how often it's redrawn (s). */
 const CB = { x0: -92, y0: -62, w: 184, h: 80 };
-const CLOUD_RES = 1.5;
+const CLOUD_RES = LIGHT ? 1 : 1.5;
 const CLOUD_EVERY = 0.45;
 /** A cloud's outline is worked out at this many angles round it (the sines and cosines once, here). */
 const SIL_N = 60;

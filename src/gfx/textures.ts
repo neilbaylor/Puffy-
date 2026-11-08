@@ -19,6 +19,7 @@ import { ART_RES, ART_STYLE, CARRY_SWING, CHAR_H, CHAR_W, POSES, canvas, carry, 
 import { FACE_FRAMES, faceFromKey } from './face';
 import { STYLES } from './handdrawn';
 import { themesFor } from '../world/theme';
+import { LIGHT } from '../core/light';
 import {
   DEFAULT_PALETTE,
   PALETTES,
@@ -46,7 +47,9 @@ import {
 
 /** Resolution for world props and terrain (multiple of world px). */
 export const PROP_RES = 2;
-export const BG_RES = 1.5;
+/** The ground (by far the biggest pictures): lower in light mode. */
+export const TERRAIN_RES = LIGHT ? 1.25 : PROP_RES;
+export const BG_RES = LIGHT ? 1 : 1.5;
 
 /**
  * Register a drawn canvas as a (static) texture. Uses a plain image texture —
@@ -214,19 +217,6 @@ export const PLOP_RES = 2.5;
 export const PLOP_PAD = 16;
 /** Headroom over the art (the big Plops' swirl tip pokes up past the art's own frame). */
 export const PLOP_TOP = 22;
-
-/**
- * Plop Invasion's Plops (only that level has them): each size's frames as a job of its own. Drawn
- * when Part 3 is picked on the start screen (or when its level starts), and freed in the other levels.
- */
-export function plopJobs(scene: Phaser.Scene): (() => void)[] {
-  return (['small', 'medium', 'large'] as const).map((k) => () => makePlops(scene, k));
-}
-
-/** Free the Plops' pictures (in a level without them). */
-export function dropPlops(scene: Phaser.Scene) {
-  for (const k of ['gplop-small', 'gplop-medium', 'gplop-large']) if (scene.textures.exists(k)) scene.textures.remove(k);
-}
 
 /** One size of Plop's frames for the game (`gplop-<kind>`), plus what Plops throw and leave about. */
 function makePlops(scene: Phaser.Scene, kind: PlopKind) {
@@ -505,14 +495,30 @@ export function textureSteps(scene: Phaser.Scene, level = 1, pal: WorldPalette =
   };
 }
 
-/** The key each bad-guy piece makes (to skip the ones already drawn). */
-const BADDIE_KEY: Record<string, string> = { puffball: 'puffball', bigpuff: 'bigpuff', giant: 'giant', goat: 'goat', weapons: 'w-blaster' };
+/** The pictures each bad-guy piece makes (to skip the ones already drawn, and free the ones a level doesn't use). */
+const BADDIE_KEYS: Record<string, string[]> = {
+  puffball: ['puffball'],
+  bigpuff: ['bigpuff'],
+  giant: ['giant'],
+  goat: ['goat', 'goat-poo', 'spit'],
+  weapons: ['w-blaster', 'w-saw', 'w-ball', 'w-bullet'],
+  plops: ['gplop-small', 'gplop-medium', 'gplop-large'],
+};
+
+/** The bad guys each level has (and a battle): only those are drawn, the others freed. */
+const BADDIES_FOR: Record<string, string[]> = {
+  1: ['puffball', 'bigpuff', 'giant', 'weapons'],
+  2: ['puffball', 'bigpuff', 'giant', 'goat', 'weapons'],
+  3: ['goat', 'weapons', 'plops'],
+  battle: ['puffball', 'bigpuff', 'giant', 'weapons'],
+};
 
 /**
  * What a game needs drawn that the start screen doesn't: the heroes' game frames (and faces),
- * the bad guys, Plop Invasion's Plops. Only what isn't drawn yet, as small steps.
+ * and the bad guys of that level (or a battle; none for a boss). Only what isn't drawn yet,
+ * as small steps.
  */
-export function gameArtJobs(scene: Phaser.Scene, opts: { heroes: readonly string[]; baddies?: boolean; plops?: boolean }): Step[] {
+export function gameArtJobs(scene: Phaser.Scene, opts: { heroes: readonly string[]; level?: number | 'battle' | null }): Step[] {
   const T = scene.textures;
   const out: Step[] = [];
   for (const id of new Set(opts.heroes)) {
@@ -521,8 +527,15 @@ export function gameArtJobs(scene: Phaser.Scene, opts: { heroes: readonly string
     if (!T.exists(`char-${id}`)) out.push({ name: `hero ${id}`, run: () => makeCharacter(scene, ch, false) });
     if (!T.exists(`char-${id}-face`)) out.push({ name: `hero ${id} faces`, run: () => makeCharacter(scene, ch, true) });
   }
-  if (opts.baddies) for (const b of baddiePieces(scene)) if (!T.exists(BADDIE_KEY[b.name] ?? b.name)) out.push(b);
-  if (opts.plops) (['small', 'medium', 'large'] as const).forEach((k) => !T.exists(`gplop-${k}`) && out.push({ name: `plops ${k}`, run: () => makePlops(scene, k) }));
+  const want = opts.level == null ? [] : (BADDIES_FOR[String(opts.level)] ?? BADDIES_FOR[1]);
+  for (const b of baddiePieces(scene)) if (want.includes(b.name) && !BADDIE_KEYS[b.name].every((k) => T.exists(k))) out.push(b);
+  if (want.includes('plops')) (['small', 'medium', 'large'] as const).forEach((k) => !T.exists(`gplop-${k}`) && out.push({ name: `plops ${k}`, run: () => makePlops(scene, k) }));
   return out;
+}
+
+/** Free the bad guys a level doesn't have (memory: older tablets can't hold every level's at once). */
+export function dropBaddiesExcept(scene: Phaser.Scene, level: number | 'battle') {
+  const want = BADDIES_FOR[String(level)] ?? BADDIES_FOR[1];
+  for (const [name, keys] of Object.entries(BADDIE_KEYS)) if (!want.includes(name)) for (const k of keys) if (scene.textures.exists(k)) scene.textures.remove(k);
 }
 
