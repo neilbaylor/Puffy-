@@ -9,7 +9,7 @@ import { sfx } from '../core/sfx';
 import { fadeOutMusic, playBattleMusic, playMenuMusic, preloadBattleMusic } from '../core/music';
 import { MATCH_SECS } from '../shared/battle/sim';
 import { CHARACTERS, characterById } from '../data/characters';
-import { drawPortrait } from '../gfx/draw';
+import { drawHeroCard, drawPortrait } from '../gfx/draw';
 import { FaceClock, faceFromKey } from '../gfx/face';
 import { recolorForSlot } from '../gfx/recolor';
 import { gameArtJobs } from '../gfx/textures';
@@ -75,6 +75,21 @@ function slotPortrait(target: HTMLCanvasElement, hero: string, slot: number, pos
   tmp.width = target.width;
   tmp.height = target.height;
   drawPortrait(tmp, characterById(hero), pose, faceKey ? faceFromKey(faceKey) : undefined, 'idle0');
+  const out = recolorForSlot(tmp, slot);
+  const ctx = target.getContext('2d')!;
+  ctx.clearRect(0, 0, target.width, target.height);
+  ctx.drawImage(out, 0, 0);
+}
+
+/**
+ * A hero standing in a lobby square, in the slot's colour: drawn like the start screen's cards
+ * (feet on the bottom edge, each hero at their own size — Big Muscles the biggest).
+ */
+function slotCard(target: HTMLCanvasElement, hero: string, slot: number, pose: 'idle0' | 'idle1', faceKey: string | null) {
+  const tmp = document.createElement('canvas');
+  tmp.width = target.width;
+  tmp.height = target.height;
+  drawHeroCard(tmp, characterById(hero), pose, faceKey ? faceFromKey(faceKey) : undefined);
   const out = recolorForSlot(tmp, slot);
   const ctx = target.getContext('2d')!;
   ctx.clearRect(0, 0, target.width, target.height);
@@ -336,7 +351,7 @@ export class BattleUI {
       const p = r?.players.find((q) => q.slot === slot);
       const me = p && p.id === this.net?.myId;
       const el = h(`<div class="bl-slot${p ? '' : ' empty'}${me ? ' me' : ''}${p && !p.connected ? ' away' : ''}" style="--sc:${SLOT_COLORS[slot]}">
-        ${p ? '<canvas width="120" height="120"></canvas>' : '<div class="bl-wait">?</div>'}
+        ${p ? '<canvas width="160" height="200"></canvas>' : '<div class="bl-wait">?</div>'}
         <b>${p ? esc(p.name) : 'Waiting…'}</b>
         <small>${p ? `${me ? 'You · ' : ''}${characterById(p.hero).name}` : SLOT_NAMES[slot]}</small>
         ${p && played && p.kos > 0 ? `<span class="bl-last${p.id === r?.winner ? ' won' : ''}" title="Last battle">${p.id === r?.winner ? '🏆 ' : ''}${p.kos} KO${p.kos === 1 ? '' : 's'}</span>` : ''}
@@ -356,7 +371,7 @@ export class BattleUI {
       const k = `${pose}|${face.key}`;
       if (k === shown) return;
       shown = k;
-      slotPortrait(cv, hero, slot, pose, face.key);
+      slotCard(cv, hero, slot, pose, face.key);
     };
     draw();
     const iv = window.setInterval(() => {
