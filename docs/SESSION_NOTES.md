@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.149)
+## Where things stand (v0.150)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -187,6 +187,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   deferred art + MenuScene's quiet jobs (`takeQuietJobs`) + 24 warm-up frames under the loading bar
   (two-phase bar); the boot screen is the manifest blue with the rainbow PUFFY logo. Results after the last
   level: Play again + Home screen. Account card: Sign out bottom-left.
+- v0.150: player card Done 2 px shorter (padding 9/8).
 - v0.149: Sign out restored to the v0.146 size (the user liked that one; don't shrink it further).
 - v0.148: player card is a grid (hero | stats, then `.acct-done-row` spanning both): Done centred, min-width
   clamp(150px, 26vmin, 210px); the card keeps its old width (a wrapping flex row stretched it).
