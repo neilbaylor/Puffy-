@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.133)
+## Where things stand (v0.139)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -187,6 +187,28 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   deferred art + MenuScene's quiet jobs (`takeQuietJobs`) + 24 warm-up frames under the loading bar
   (two-phase bar); the boot screen is the manifest blue with the rainbow PUFFY logo. Results after the last
   level: Play again + Home screen. Account card: Sign out bottom-left.
+- v0.139 basketball shots (HoopsScene playerShot/kingShot): hero = brace (tilt −0.36, crouch) → fire
+  (squash/stretch, kick back + up, `puffs()` smoke at the muzzle and dust at the feet, camera kick) →
+  Back.easeOut settle; uses 'idle1' as the held frame (the idle hops only fire on 'idle0'). King = new
+  frames puff0/puff1/spit in gfx/hoops.ts (KING_LEAN puff1/spit; kingCrownAt lifts the crown when
+  puffed) → shiver tween → PTOO! (`spray()` of spit, a burst, lurch back). Test: t117.
+- v0.138 perf: LevelView.pieces() caches each level's terrain piece outlines (`PIECES`, by name|kind):
+  the flood fill + trace was ~120 ms of a Part 3 switch. Profile tool: tprof.cjs (CDP sampling).
+- v0.137 Bosses menu (ui.ts `BOSSES`, `showBosses`, `playBoss`, `showBossResults`): a `.lvl-bosses`
+  button after the level buttons; lists the bosses of beaten levels; fights get `bossData()` with
+  `result.practice = true` → Hoops kingWins / Wrestle faint restart the boss with no life lost;
+  win → boss card (Fight again / Home screen). Wrestle test button removed. Test: t116.
+- v0.136: battle star power 8 s (sim POWER_SECS); Plop browns per size (SMALL/MED/BIG_BODY; the
+  royals keep BODY0 — drawPlop takes an optional body Fill).
+- v0.135 Queen: HITS 12, CHAIRS 4 (CHAIR_AT_HP [–,9,6,3]), chair + dive = 3, start with 6 hearts,
+  hearts every 2–4 s, ~15% calmer (speed 94 etc.), hurt 0.55 s, head reach +6 px / 0.5 h, chair cd 0.2 s
+  with one queued press. New K.O. art `drawQueenKO` (4 frames, 'wr-queen-ko'; Queen.ko stops her own
+  update). Ending ~1 s longer: jumbotron close-up then a crash zoom on the King (camManual/camTo).
+  FIX: `skipping` stayed true after a skipped intro (ending camera moves were instant) — reset when
+  the fight starts. King seat x 520 (a crowd sign covered him). Tests: t115 (ending), t113 KO modes.
+- v0.134 UI: home cards + everything below 10 px lower (8 on phones; bottom padding gives the room);
+  Sign out = Done size and level; user modal shows `latestLevel()`; battle room box left-aligned;
+  signed-in battle name = account name by default, editable (`puffy.name.<user>`). Tests: home.cjs, t114.
 - v0.133 fix: a chair-shot K.O. froze the game: `hitQueen` → `win()` runs synchronously and destroyed the
   held chair, then `chairHit` called setTexture on the destroyed image. `chairHit` now clears `this.chair`
   before `hitQueen` (restoring it if the hit didn't count). Test: t113 chair|rocket.

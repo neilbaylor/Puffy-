@@ -136,3 +136,9 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.131: Queen fight: 5 chairs, quick repeat chair swings
 - v0.132: Level 3: more of the Plops parachute in (7, same total)
 - v0.133: fix freeze on a chair K.O.
+- v0.134: home spacing, Sign out size, furthest level, battle name/room box
+- v0.135: Queen 12 hits, x3 chair/dive, 6 hearts, easier, K.O. art, longer ending, skip fix
+- v0.136: battle star 8 s; three Plop browns
+- v0.137: Bosses menu (practice boss fights); test button removed
+- v0.138: faster level switching (terrain shapes cached)
+- v0.139: basketball shot animations (hero recoil, King puff + PTOO)
