@@ -384,10 +384,15 @@ export class UI {
       if (window.innerHeight > window.innerWidth && isTouchDevice()) this.pause();
     });
     game.events.on('hud', (s: HudState) => this.renderHud(s));
-    game.events.on('hoops-start', () => {
-      this.gameScene = null;
+    // boss fights: no HUD, just the pause button (top right), from the very start
+    const pauseOnly = () => {
+      this.hud.hidden = false;
+      this.hud.classList.add('bare');
+    };
+    game.events.on('hoops-start', (s: Phaser.Scene) => {
+      this.gameScene = s;
       this.setScreen(null);
-      this.hud.hidden = true;
+      pauseOnly();
       this.banner.hidden = true;
       this.touch.hide();
       // the phone is upright as basketball begins: start it frozen (turning back carries on)
@@ -401,7 +406,7 @@ export class UI {
       this.introEl = null;
       this.gameScene = s;
       this.setScreen(null);
-      this.hud.hidden = true;
+      pauseOnly();
       this.banner.hidden = true;
       this.touch.hide();
     });

@@ -1147,7 +1147,7 @@ export class WrestleScene extends Phaser.Scene {
   }
 
   /** A hit on her: counts down the jumbotron; the 8th is the end of her. */
-  private hitQueen(n: number, how: 'dive' | 'stomp' | 'chair' | 'rocket', fromX: number) {
+  private hitQueen(n: number, how: 'dive' | 'stomp' | 'chair' | 'topchair' | 'rocket', fromX: number) {
     const q = this.queen;
     // (a rocket is half a hit: it knocks her back every time, but it takes two to count one off.
     // Nothing shows halves: the count just goes down on every second rocket)
@@ -1155,8 +1155,8 @@ export class WrestleScene extends Phaser.Scene {
     if (how === 'rocket') n = rocketCounts ? 1 : 0;
     if (!this.fighting || !q.hit(n, fromX)) return false;
     if (how === 'rocket') this.rocketHalf = !this.rocketHalf;
-    const big = how === 'dive' || how === 'chair';
-    const words = how === 'dive' ? 'TOP ROPE! ×2' : how === 'chair' ? 'CHAIR SHOT! ×2' : how === 'stomp' ? ['BONK!', 'SPLAT!', 'BOING!'][q.hp % 3] : ['POW!', 'BAM!', 'KABOOM!'][q.hp % 3];
+    const big = how === 'dive' || how === 'chair' || how === 'topchair';
+    const words = how === 'topchair' ? 'TOP ROPE CHAIR SHOT! ×3' : how === 'dive' ? 'TOP ROPE! ×2' : how === 'chair' ? 'CHAIR SHOT! ×2' : how === 'stomp' ? ['BONK!', 'SPLAT!', 'BOING!'][q.hp % 3] : ['POW!', 'BAM!', 'KABOOM!'][q.hp % 3];
     this.fx.popText(q.x, q.top - 16, words, big ? '#ffd23f' : '#ffffff', big ? 26 : 20);
     this.fx.stars(q.x, q.top + 10, big ? 10 : 5);
     sfx.stomp();
@@ -1165,7 +1165,8 @@ export class WrestleScene extends Phaser.Scene {
       this.cameras.main.shake(300, 0.014);
       this.shakeRopes(6);
       sfx.cheer();
-      if (how === 'dive') this.flashJumbo({ kind: 'big', text: 'FROM THE TOP ROPE!', sub: `THAT ONE COUNTS DOUBLE · ${q.hp} TO GO`, color: '#ffd23f', bg: '#c8102e' }, 2200);
+      if (how === 'topchair') this.flashJumbo({ kind: 'big', text: 'TOP ROPE CHAIR SHOT!', sub: `THAT ONE COUNTS TRIPLE · ${q.hp} TO GO`, color: '#ffd23f', bg: '#c8102e' }, 2600);
+      else if (how === 'dive') this.flashJumbo({ kind: 'big', text: 'FROM THE TOP ROPE!', sub: `THAT ONE COUNTS DOUBLE · ${q.hp} TO GO`, color: '#ffd23f', bg: '#c8102e' }, 2200);
       else this.flashJumbo({ kind: 'big', text: 'CHAIR SHOT!', sub: `THAT ONE COUNTS DOUBLE · ${q.hp} TO GO`, color: '#ffd23f', bg: '#3a4652' }, 2200);
     } else this.flashJumbo({ kind: 'big', text: words.replace(/!.*/, '!'), sub: `${q.hp} TO GO`, color: '#ffd23f', bg: '#5c3118' }, 900);
     if (q.hp <= 0) void this.win();
@@ -1275,6 +1276,13 @@ export class WrestleScene extends Phaser.Scene {
     // (where you were last frame counts too: on a slow phone you can drop right past her head in one frame)
     const falling = a.velocity.y > 40 || a.bottom > this.prevHeroBottom + 1;
     const fromAbove = Math.min(a.bottom, this.prevHeroBottom) < b.top + b.height * 0.5;
+    // off the top rope with the chair in your hands: it comes down on her head (three hits)
+    if (this.dive && this.chair?.state === 'held' && fromAbove) {
+      this.chairHit();
+      this.dive = null;
+      p.bounce();
+      return;
+    }
     if (!rising && falling && fromAbove) {
       const dive = !!this.dive;
       this.dive = null;
@@ -1529,7 +1537,9 @@ export class WrestleScene extends Phaser.Scene {
     // (a chair that connects always counts — even while she's still flashing from your last hit —
     // and then it's spent: one hit per chair)
     q.invulnUntil = 0;
-    if (!this.hitQueen(2, 'chair', p.x)) {
+    // (swung off the top rope, mid-dive: three)
+    const fromTop = !!this.dive;
+    if (!this.hitQueen(fromTop ? 3 : 2, fromTop ? 'topchair' : 'chair', p.x)) {
       this.chair = c;
       return false;
     }
@@ -1852,13 +1862,13 @@ export class WrestleScene extends Phaser.Scene {
     await this.camTo(jx, jy + 6, 2.35, 1600, -0.018, 'Sine.easeInOut');
     // (and stay on it a moment, so it reads)
     // (and stay on it, so both its messages read: TONIGHT!… then her title)
-    await this.camTo(jx, jy + 4, 2.46, 1900, -0.012, 'Sine.easeOut');
+    await this.camTo(jx, jy + 4, 2.46, 1800, -0.012, 'Sine.easeOut');
     if (!this.skipping) {
       this.jumbo = { kind: 'title' };
       this.jumboUntil = 0;
       sfx.drum();
     }
-    await this.camTo(jx, jy + 3, 2.52, 2000, -0.008, 'Sine.easeInOut');
+    await this.camTo(jx, jy + 3, 2.52, 1900, -0.008, 'Sine.easeInOut');
 
     // ── 2. a crash zoom out to the ring… lights down, BOOM: a spotlight finds her ──
     if (!this.skipping) {
