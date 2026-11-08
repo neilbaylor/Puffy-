@@ -168,3 +168,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.163: subtitle cross-fade.
 - v0.164: light mode keeps the start screen fly-over on Part switches.
 - v0.165: subtitle cross-fade fixed.
+- v0.166: level ground drawn behind the loading card (smooth opening fly-over).
