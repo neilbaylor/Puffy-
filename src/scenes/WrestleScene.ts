@@ -1526,6 +1526,9 @@ export class WrestleScene extends Phaser.Scene {
     // (out of your hands before the hit counts: if it's the knock-out, the ending tidies away any
     // chair still lying about, and this one's busy flying off her head)
     this.chair = null;
+    // (a chair that connects always counts — even while she's still flashing from your last hit —
+    // and then it's spent: one hit per chair)
+    q.invulnUntil = 0;
     if (!this.hitQueen(3, 'chair', p.x)) {
       this.chair = c;
       return false;
