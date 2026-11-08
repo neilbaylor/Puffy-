@@ -2643,6 +2643,9 @@ kbd {
   flex-wrap: nowrap;
   white-space: nowrap;
   contain: layout style;
-  transition: opacity 0.17s ease;
 }
-.start .world-name.swap { opacity: 0; }
+/* a Part switch: the old subtitle fades out while the new one fades in, in the same spot */
+.start .world-name.wn-old { animation: wn-xout 0.32s ease forwards; pointer-events: none; }
+.start .world-name.wn-new { animation: wn-xin 0.32s ease both; }
+@keyframes wn-xout { to { opacity: 0; } }
+@keyframes wn-xin { from { opacity: 0; } }
