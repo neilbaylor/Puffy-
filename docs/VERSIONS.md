@@ -192,3 +192,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.187: level 4: parachute drops, the Plop King's jetpack opening, new fly-over, Plops stay on their ledges; the Plop Dome boss fight (testers).
 - v0.188: the Plop King without the white band across his face.
 - v0.189: faster parachute drops; every Plop in a drop has a blaster and comes down closer to you.
+- v0.190: the Plop King's opening at the start of level 4 a touch quicker.
