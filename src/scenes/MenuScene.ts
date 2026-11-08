@@ -430,9 +430,13 @@ export class MenuScene extends Phaser.Scene {
       });
     }
     const top = H - vh - this.x + 18 * Math.sin(t * 0.17 + 0.7);
-    const left = this.x0 + 40 + 30 * Math.sin(t * 0.11);
+    // (the drone drifts across as it climbs: a slow wide swing over the climb with a quicker wander
+    // on top, and it leans into its drift — so it isn't one straight line up)
+    const wide = Math.min(Math.max(0, this.level.widthPx * 0.2 - vw), 520);
+    const left = Math.max(0, this.x0 + 30 + wide * (0.5 + 0.5 * Math.sin(t * 0.083 + 0.4)) + 46 * Math.sin(t * 0.29 + 1.1) + 18 * Math.sin(t * 0.61));
     cam.setZoom(zoom * (1.04 + 0.04 * Math.sin(t * 0.13 + 2)));
-    cam.setRotation(0.012 * Math.sin(t * 0.19) + 0.005 * Math.sin(t * 0.47 + 1.3));
+    const drift = wide * 0.083 * 0.5 * Math.cos(t * 0.083 + 0.4) + 46 * 0.29 * Math.cos(t * 0.29 + 1.1);
+    cam.setRotation(0.012 * Math.sin(t * 0.19) + 0.005 * Math.sin(t * 0.47 + 1.3) - drift * 0.0007);
     cam.centerOn(left + vw / 2, top + vh / 2);
     const m = themeMix(0, themesFor(this.levelId));
     this.bg.setTheme(m);

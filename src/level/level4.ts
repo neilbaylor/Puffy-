@@ -10,16 +10,18 @@ export const LEDGES: { x0: number; x1: number; h: number }[][] = [];
  * Heights are in tiles from the bottom of the level. A jump clears ~3.5 tiles (~5 with the
  * second jump), so the ledges go up 3 at a time.
  *
- *    0- 30  CLIMB 1: ledges zig-zagging up (and drifting right) from the bottom to ~92
- *   22- 41  the top: a plateau, checkpoint, a poo goat; then the edge (drop 1)
- *   42- 95  DROP 1 down to the bottom, a short walk right, then the ballpark (flat, for now)
- *   96-132  CLIMB 2 (longer): up to ~128, a plateau, checkpoint; the edge (drop 2, longer)
- *  134-148  DROP 2 down to the bottom of the second canyon
- *  150-170  CLIMB 3 up to the gate
+ *    0- 41  CLIMB 1: ledges zig-zagging up (and drifting right) from the floor to ~91; a plateau,
+ *           checkpoint, a poo goat; then the edge
+ *   42- 93  DROP 1 by parachute (a wall at 94-95 keeps you out of climb 2: you land at the bottom),
+ *           a short walk right, the ballpark (flat, for now), quicksand poo
+ *   96-133  CLIMB 2 (longer): up to ~127, a plateau, checkpoint; the edge
+ *  134-147  DROP 2 by parachute (longer, harder: a narrow shaft, more Plops; its far wall rises above
+ *           the plateau, so there's no steering over to climb 3 or the gate)
+ *  150-179  CLIMB 3 up to the gate
  */
 export function buildLevel4(): LevelData {
   LEDGES.length = 0;
-  const W = 172;
+  const W = 180;
   const H = 140;
   const L = new LevelBuilder('Plop Invasion · Part 2', 'World 2', W, H);
   L.pal = 'poo';
@@ -99,13 +101,14 @@ export function buildLevel4(): LevelData {
   L.ground(0, 41, 4);
   L.spawn('player', 4, 4);
   L.spawn('tree', 1.5, 4, { h: 58 });
-  L.spawn('plop', 12, 4);
+  // the Plop King, waiting for you at the bottom: he laughs, then blasts off up the climb by jetpack
+  L.spawn('king', 11, 4);
+  L.spawn('plop', 18, 4);
 
   // ── CLIMB 1 ─────────────────────────────────────────────────
   const t1 = climb(2, 22, 4, 89, 8, [4, 14, 24], [9, 19]);
-  // a Plop or two parachuting in partway up (not all the time)
-  L.spawn('para', 12, 40, { kind: 'plop' });
-  L.spawn('para', 20, 70, { kind: 'plop' });
+  // Plops parachuting in now and then on the way up
+  for (const [x, h, k] of [[10, 26, 'plop'], [16, 44, 'plop'], [12, 62, 'bigplop'], [22, 80, 'plop']] as const) L.spawn('para', x, h, { kind: k });
 
   // ── The top: a plateau to the edge of the first drop ────────
   // (each plateau starts just beside the top ledge, a jump up from it: nothing under it to get stuck in)
@@ -115,29 +118,52 @@ export function buildLevel4(): LevelData {
   L.auraArc(p1.x0 + 6, 4, p1.h + 3, 1);
   L.rock(40, 41, 5, p1.h); // (a cliff from the floor up to the plateau's end: no walking round the climb)
 
-  // ── DROP 1, the bottom, a short walk right, the ballpark (flat for now) ──
+  // ── DROP 1 (by parachute), the bottom, a short walk right, the ballpark (flat for now) ──
+  // the drop: from the plateau's edge down to the floor, x 42..93 (a wall on the far side keeps you
+  // out of climb 2 on the way down: you land at the bottom)
+  L.spawn('drop', 42, p1.h, { w: 52, speed: 105, n: 9 });
+  L.rock(94, 95, 16, p1.h + 6);
   L.ground(42, 133, 4); // (on under climb 2 too)
-  L.auraArc(46, 3, 7, 1);
-  L.spawn('checkpoint', 56, 4);
+  L.auraArc(55, 3, 7, 1);
+  // quicksand poo on the flat stretches at the bottom (never right under a climb: a missed jump
+  // shouldn't land you in it)
+  L.puddle(47, 50, 4);
+  L.spawn('checkpoint', 60, 4);
   L.spawn('plop', 70, 4);
+  L.puddle(74, 77, 4);
   L.spawn('bigplop', 80, 4);
-  L.spawn('plop', 90, 4);
+  L.puddle(87, 90, 4);
+  L.spawn('plop', 92, 4);
 
   // ── CLIMB 2 (longer) ────────────────────────────────────────
   const t2 = climb(97, 119, 4, 125, 8, [4, 9, 19, 29, 34], [14, 24, 39]);
-  L.spawn('para', 110, 50, { kind: 'plop' });
-  L.spawn('para', 118, 95, { kind: 'bigplop' });
+  for (const [x, h, k] of [[106, 20, 'plop'], [114, 38, 'plop'], [108, 55, 'bigplop'], [118, 72, 'plop'], [110, 90, 'plop'], [120, 108, 'bigplop']] as const)
+    L.spawn('para', x, h, { kind: k });
   const p2 = plateau(t2, 133, LEDGES[1]);
   L.spawn('checkpoint', p2.x0 + 3, p2.h);
   L.spawn('poogoat', 130, p2.h);
   L.rock(132, 133, 5, p2.h);
 
-  // ── DROP 2 (longer), then CLIMB 3 to the gate ───────────────
+  // ── DROP 2 (longer, harder: a narrow shaft, more Plops), then CLIMB 3 to the gate ──
+  // (the shaft's far wall reaches well above the plateau: no steering over to climb 3 or the gate)
+  L.spawn('drop', 134, p2.h, { w: 14, speed: 118, n: 15, hard: 1 });
+  L.rock(148, 149, 18, p2.h + 6);
   L.ground(134, W - 1, 10);
-  L.spawn('checkpoint', 140, 10);
-  const t3 = climb(146, 164, 10, 64, 2, [4, 9, 14], [9]);
+  L.puddle(137, 140, 10);
+  L.spawn('checkpoint', 144, 10);
+  const t3 = climb(152, 170, 10, 64, 2, [4, 9, 14], [9]);
+  for (const [x, h, k] of [[158, 26, 'plop'], [166, 42, 'bigplop'], [160, 56, 'plop']] as const) L.spawn('para', x, h, { kind: k });
   const p3 = plateau(t3, W - 1, LEDGES[2]);
   L.spawn('goal', W - 4, p3.h);
+  // the fly-over: from the gate, up over the top of climb 2 (the highest point), straight down it
+  // to the ballpark, then on along the bottom past drop 1 to the foot of climb 1
+  L.flyPath = [
+    [W - 6, p3.h + 4],
+    [p2.x0 + 2, p2.h + 2],
+    [112, 60],
+    [100, 12],
+    [62, 10],
+  ];
   // (for the tests: the ledges, in order)
   (globalThis as unknown as { __ledges?: unknown }).__ledges = LEDGES.slice(-3);
   return L.build();

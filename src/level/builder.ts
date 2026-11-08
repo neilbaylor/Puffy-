@@ -12,7 +12,7 @@ export type Cell = 'ground' | 'rock' | 'boulder' | 'bramble' | 'cloud' | null;
 export type EnemyKind = 'puffball' | 'bigpuff' | 'giant' | 'goat' | 'plop' | 'bigplop' | 'giantplop' | 'poogoat';
 
 export interface Spawn {
-  type: EnemyKind | 'aura' | 'rootbeer' | 'checkpoint' | 'goal' | 'player' | 'tree' | 'soccer' | 'hockey' | 'para' | 'puddle' | 'chase' | 'volley';
+  type: EnemyKind | 'aura' | 'rootbeer' | 'checkpoint' | 'goal' | 'player' | 'tree' | 'soccer' | 'hockey' | 'para' | 'puddle' | 'chase' | 'volley' | 'drop' | 'king';
   x: number; // tile column (may be fractional for aura / trees)
   y: number; // tile row the thing occupies
   opts?: Record<string, number | string | boolean>;
@@ -29,6 +29,8 @@ export interface LevelData {
   pal?: string;
   /** Mostly climbing up (Plop Invasion · Part 2): the camera and the background follow you up. */
   vertical?: boolean;
+  /** A climb's fly-over: the points it flies through (tile x, height in tiles), from the start of the flight; it ends on the hero. */
+  flyPath?: [number, number][];
   width: number;
   height: number;
   tiles: number[][];
@@ -45,6 +47,7 @@ export class LevelBuilder {
   pal?: string;
   /** Mostly climbing up (see LevelData.vertical). */
   vertical = false;
+  flyPath: [number, number][] | undefined;
 
   /** Columns x0..x1 use terrain palette `pal` (by piece centre). */
   zone(x0: number, x1: number, pal: string) {
@@ -186,6 +189,7 @@ export class LevelBuilder {
       wide: this.wides.length ? this.wides : undefined,
       pal: this.pal,
       vertical: this.vertical || undefined,
+      flyPath: this.flyPath,
       width: this.width,
       height: this.height,
       tiles: this.cells.map((row) => row.map((c) => (c ? idx[c] : T.EMPTY))),

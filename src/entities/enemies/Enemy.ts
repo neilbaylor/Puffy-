@@ -226,7 +226,8 @@ abstract class Walker extends Enemy {
     const b = this.body;
     if (b.blocked.left) this.dir = 1;
     else if (b.blocked.right) this.dir = -1;
-    if (this.careful && b.blocked.down) {
+    // (on a climb everyone's careful: walking off a ledge would send them all the way down)
+    if ((this.careful || this.gs.level.data.vertical) && b.blocked.down) {
       const aheadX = this.dir > 0 ? b.right + 2 : b.left - 2;
       // (turns at a real drop; a step down the hill is fine)
       if (this.pitAt(aheadX, b.bottom)) this.dir *= -1;
@@ -336,7 +337,9 @@ export class BigPuff extends Walker {
       }
       return;
     }
-    if (Math.abs(dx) < 170 && Math.abs(dy) < 60 && this.pounceCd <= 0) {
+    // (on a climb only when you're on his own ledge: no pouncing off into thin air)
+    const pounceOff = this.gs.level.data.vertical && this.pitAt(this.x + Math.sign(dx) * Math.min(Math.abs(dx), 150), b.bottom);
+    if (Math.abs(dx) < 170 && Math.abs(dy) < 60 && this.pounceCd <= 0 && !pounceOff) {
       this.crouch = 0.28;
       return;
     }
@@ -347,7 +350,9 @@ export class BigPuff extends Walker {
     // (a step down the hill isn't a gap: he just walks off it, so he never stalls at one
     // when you're further down)
     const gap = this.pitAt(aheadX, b.bottom);
-    if ((wall || (gap && dy <= 40)) && this.hopCd <= 0) {
+    // (on a climb he stays on his ledge: a leap off one is a long way down)
+    if (gap && this.gs.level.data.vertical) b.setVelocityX(0);
+    else if ((wall || (gap && dy <= 40)) && this.hopCd <= 0) {
       b.setVelocity(this.dir * sp * 1.6, wall ? -560 : -430);
       this.hopCd = 0.6;
     } else if (gap && dy > 40) {

@@ -65,7 +65,8 @@ const WIP: LevelInfo[] = [
     part: 'Part 2',
     button: 'Part 4',
     build: buildLevel4,
-    speech: 'Up we go!',
+    speech: 'I guess up we go!',
+    wrestle: true,
     wip: true,
   },
 ];

@@ -2,6 +2,7 @@
 const { chromium } = require('playwright');
 const HERO = process.argv[2] || 'puffy';
 const CLIMB = +(process.argv[3] || 0);
+const MAXMIN = +(process.argv[4] || 2);
 (async () => {
   const br = await chromium.launch({ args: ['--use-gl=swiftshader'] });
   const ctx = await br.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 1 });
@@ -16,7 +17,10 @@ const CLIMB = +(process.argv[3] || 0);
   await p.waitForFunction(() => window.game.scene.isActive('Game') && window.game.scene.getScene('Game').players?.[0]?.body, null, { timeout: 120000 });
   await p.evaluate(() => window.game.events.emit('skip-intro'));
   await p.waitForSelector('.lvl-intro', { state: 'detached', timeout: 60000 }).catch(() => {});
-  await p.waitForTimeout(1500);
+  // (and the King's little scene at the start)
+  await p.waitForFunction(() => { const g = window.game.scene.getScene('Game'); return !g.intro && !g.cutscene; }, null, { timeout: 60000 });
+  await p.waitForTimeout(500);
+  await p.evaluate((m) => (window.__maxMin = m), MAXMIN);
   const res = await p.evaluate((CLIMB) => new Promise((done) => {
     const g = window.game.scene.getScene('Game');
     const pl = g.players[0];
@@ -35,8 +39,8 @@ const CLIMB = +(process.argv[3] || 0);
     const yOf = (l) => (H - l.h) * T;
     const step = () => {
       frames++;
-      if (frames > 60 * 60 * 2) return finish('timeout');
-      if (frames % 300 === 0) (window.__stk ||= []).push({ i, phase, airT, used2, tries, vy: Math.round(pl.body.velocity.y), grounded: pl.body.blocked.down, x: Math.round(pl.x), bottom: Math.round(pl.bottom), vx: Math.round(pl.body.velocity.x), blocked: JSON.stringify(pl.body.blocked), btn: JSON.stringify(btn) });
+      if (frames > 60 * 60 * (window.__maxMin || 2)) return finish('timeout');
+      if (frames % 300 === 0) (window.__stk ||= []).push({ i, phase, airT, used2, tries, intro: !!g.intro, cut: g.cutscene, paused: g.physics.world.isPaused, alive: pl.alive, chute: !!pl.chute, grav: pl.body.allowGravity, goo: pl.goo, vy: Math.round(pl.body.velocity.y), grounded: pl.body.blocked.down, x: Math.round(pl.x), bottom: Math.round(pl.bottom), vx: Math.round(pl.body.velocity.x), blocked: JSON.stringify(pl.body.blocked), btn: JSON.stringify(btn) });
       const b = ledges[i + 1];
       if (!b) return finish('done');
       const a = i >= 0 ? ledges[i] : { x0: 0, x1: 16, h: 4 };

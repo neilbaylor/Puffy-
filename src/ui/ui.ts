@@ -27,6 +27,7 @@ const BOSSES = [
   { level: 1, name: 'King Puff Ball Basketball 1', scene: 'Hoops' },
   { level: 2, name: 'King Puff Ball Basketball 2', scene: 'Hoops' },
   { level: 3, name: 'Queen Plop Wrestling', scene: 'Wrestle' },
+  { level: 4, name: 'Plop King Wrestling', scene: 'Wrestle' },
 ] as const;
 import { resetLives } from '../core/lives';
 import { bank } from '../core/bank';
@@ -977,7 +978,8 @@ export class UI {
   /** (Temporary, for testing) straight into the Queen Plop fight with the picked hero. */
   /** The Bosses menu: fight the boss of any level you've beaten, straight away (as practice). */
   private showBosses() {
-    const open = BOSSES.filter((b) => progress.beaten >= b.level);
+    // (and the work-in-progress levels' bosses, for the testers)
+    const open = BOSSES.filter((b) => progress.beaten >= b.level || LEVELS.some((l) => l.wip && l.id === b.level));
     const el = h(`<div class="screen modal bosses">
       <div class="panel boss-panel">
         <h2>Boss Battles</h2>
@@ -1040,8 +1042,19 @@ export class UI {
       sfx.groan();
     }
     const boss = BOSSES.find((b) => b.level === r.level) ?? BOSSES[0];
-    const queen = boss.scene === 'Wrestle';
-    const title = won ? (queen ? 'Queen Plop is down!' : 'You beat the King!') : queen ? 'Queen Plop wins!' : 'The King wins!';
+    const queen = boss.scene === 'Wrestle' && boss.level === 3;
+    const plopKing = boss.level === 4;
+    const title = plopKing
+      ? won
+        ? 'The Plop King is done for!'
+        : 'The Plop King wins!'
+      : won
+        ? queen
+          ? 'Queen Plop is down!'
+          : 'You beat the King!'
+        : queen
+          ? 'Queen Plop wins!'
+          : 'The King wins!';
     const result = `<dt>Result</dt><dd>${won ? 'Won' : 'Lost'}</dd>` + (r.hoops ? `<dt>Final score</dt><dd>${esc(r.hoops)}</dd>` : '');
     const el = h(`<div class="screen modal">
       <div class="panel results${won ? '' : ' gameover'}">
