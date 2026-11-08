@@ -12,6 +12,8 @@ import { CHARACTERS, characterById } from '../data/characters';
 import { drawPortrait } from '../gfx/draw';
 import { FaceClock, faceFromKey } from '../gfx/face';
 import { recolorForSlot } from '../gfx/recolor';
+import { gameArtJobs } from '../gfx/textures';
+import { loadArt } from './artLoader';
 import { BattleNet, battleUrl, type NetStatus } from '../net/battleNet';
 import type { BattleHud } from '../scenes/BattleScene';
 import { MAX_BATTLERS, SLOT_COLORS, SLOT_NAMES, type RoomState } from '../shared/battle/protocol';
@@ -97,6 +99,12 @@ export class BattleUI {
     // (the game's art may still be being drawn in the background: finish it first)
     if (!this.host.game.registry.get('ready')) {
       this.host.game.events.once('assets-ready', () => this.open(code));
+      return;
+    }
+    // the battle's art (every hero — anyone can pick any — and the bad guys), drawn first if it isn't yet
+    const jobs = gameArtJobs(this.host.game.scene.getScene('Menu'), { heroes: CHARACTERS.map((c) => c.id), baddies: true });
+    if (jobs.length) {
+      void loadArt(jobs).then(() => this.open(code));
       return;
     }
     this.code = code;

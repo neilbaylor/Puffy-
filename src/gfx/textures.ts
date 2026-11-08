@@ -480,7 +480,7 @@ export function freeLooksExcept(scene: Phaser.Scene, keep: readonly string[]) {
   }
 }
 
-type Step = { name: string; run: () => void };
+export type Step = { name: string; run: () => void };
 
 /**
  * The game's art in small steps. `now`: what the start screen needs (drawn behind the
@@ -498,13 +498,31 @@ export function textureSteps(scene: Phaser.Scene, level = 1, pal: WorldPalette =
       ...itemParts(scene, pal).map((run, i) => ({ name: `items ${i}`, run })),
       ...lookJobs(scene, first).map((run, i) => ({ name: `bg-${first} ${i}`, run })),
     ],
-    later: [
-      ...CHARACTERS.flatMap((ch) => [
-        { name: `hero ${ch.id}`, run: () => makeCharacter(scene, ch, false) },
-        { name: `hero ${ch.id} faces`, run: () => makeCharacter(scene, ch, true) },
-      ]),
-      ...baddiePieces(scene),
-    ],
+    // (the game's own art — the heroes' game frames, the bad guys — is drawn when a game starts:
+    // see gameArtJobs; the start screen doesn't need it, and drawing it all here was too much
+    // at once for older devices)
+    later: [],
   };
+}
+
+/** The key each bad-guy piece makes (to skip the ones already drawn). */
+const BADDIE_KEY: Record<string, string> = { puffball: 'puffball', bigpuff: 'bigpuff', giant: 'giant', goat: 'goat', weapons: 'w-blaster' };
+
+/**
+ * What a game needs drawn that the start screen doesn't: the heroes' game frames (and faces),
+ * the bad guys, Plop Invasion's Plops. Only what isn't drawn yet, as small steps.
+ */
+export function gameArtJobs(scene: Phaser.Scene, opts: { heroes: readonly string[]; baddies?: boolean; plops?: boolean }): Step[] {
+  const T = scene.textures;
+  const out: Step[] = [];
+  for (const id of new Set(opts.heroes)) {
+    const ch = CHARACTERS.find((c) => c.id === id);
+    if (!ch) continue;
+    if (!T.exists(`char-${id}`)) out.push({ name: `hero ${id}`, run: () => makeCharacter(scene, ch, false) });
+    if (!T.exists(`char-${id}-face`)) out.push({ name: `hero ${id} faces`, run: () => makeCharacter(scene, ch, true) });
+  }
+  if (opts.baddies) for (const b of baddiePieces(scene)) if (!T.exists(BADDIE_KEY[b.name] ?? b.name)) out.push(b);
+  if (opts.plops) (['small', 'medium', 'large'] as const).forEach((k) => !T.exists(`gplop-${k}`) && out.push({ name: `plops ${k}`, run: () => makePlops(scene, k) }));
+  return out;
 }
 

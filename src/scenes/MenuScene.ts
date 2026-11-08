@@ -1,9 +1,9 @@
 import Phaser from 'phaser';
 import { preloadLevelMusic } from '../core/music';
 import { MIN_VIEW_W, TILE, VIEW_H } from '../config';
-import { bgKey, ensureLook, freeLooksExcept, lookJobs, plopJobs } from '../gfx/textures';
+import { bgKey, ensureLook, freeLooksExcept, lookJobs } from '../gfx/textures';
 import { buildLevel1 } from '../level/level1';
-import { LEVELS, latestLevel, levelInfo, levelName, progress } from '../level/levels';
+import { LEVELS, levelInfo, levelName, progress } from '../level/levels';
 import { Background } from '../world/Background';
 import { Ambience } from '../world/Ambience';
 import { LevelView } from '../world/LevelView';
@@ -12,6 +12,23 @@ import { mixTint, themeClock, themeMix, themesFor } from '../world/theme';
 /** Animated backdrop behind the start screen: a slow fly-over of Puff Ball Planet. */
 /** Look textures already shown once (warmed on the graphics chip). */
 const shown = new WeakSet<Phaser.Textures.Texture>();
+
+/**
+ * A Part's fly-over, kept (hidden) when you pick another Part, so going back to it is just
+ * showing it again — not building it all over (that build was what made switching stutter).
+ */
+interface World {
+  objs: Phaser.GameObjects.GameObject[];
+  level: LevelView;
+  bg: Background;
+  amb: Ambience;
+  x0: number;
+  x: number;
+  loopEnd: number;
+  top: number | null;
+  lastSurf: number;
+  t: number;
+}
 
 export class MenuScene extends Phaser.Scene {
   private bg!: Background;
@@ -26,22 +43,21 @@ export class MenuScene extends Phaser.Scene {
   }
 
   create(data?: { silent?: boolean; level?: number }) {
+    // (a fresh start: anything kept from before went with the scene)
+    this.worlds.clear();
     this.build(data?.level ?? 1);
     // picking a level on the start screen fades the fly-over to that level's world
     const onLevel = (id: number) => {
       if (id === this.levelId || !levelInfo(id).build) return;
       const cam = this.cameras.main;
       const c = [255, 248, 236];
-      // (the fade is long enough for the new title to swap in first — its letters animate on
-      // their own — before the new level's scenery is drawn behind the white)
-      cam.fadeOut(320, c[0], c[1], c[2]);
+      // (a quick dip to white: the new Part's fly-over is usually kept or built ahead, so behind
+      // the white it only has to be shown)
+      cam.fadeOut(240, c[0], c[1], c[2]);
       cam.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
-        this.children.removeAll(true);
+        this.stashWorld();
         this.build(id);
-        cam.fadeIn(380, c[0], c[1], c[2]);
-        // (the start screen's title pops its new letters in only now, once the new scenery has
-        // been drawn the first time: doing both at once made the letters stutter)
-        this.events.once(Phaser.Scenes.Events.RENDER, () => requestAnimationFrame(() => this.game.events.emit('menu-level-built', id)));
+        cam.fadeIn(320, c[0], c[1], c[2]);
       });
     };
     this.game.events.on('menu-level', onLevel);
@@ -67,18 +83,6 @@ export class MenuScene extends Phaser.Scene {
    */
   private quiet: (() => void)[] = [];
 
-  /** How many of the quiet jobs at the front of the list are what a first tap needs (the other Parts' openings, this Part's song). */
-  private essential = 0;
-
-  /**
-   * The quiet-moment jobs a first tap needs, taken off the list (the loading screen does those up
-   * front; the rest — this Part's whole ground, its other looks — are left for quiet moments after).
-   */
-  takeQuietJobs() {
-    const jobs = this.quiet.splice(0, this.essential);
-    this.essential = 0;
-    return jobs;
-  }
   /** Ground pictures drawn ahead in quiet moments (a whole level's, for its fly-over). */
   private painted: string[] = [];
   private lastInput = 0;
@@ -92,9 +96,9 @@ export class MenuScene extends Phaser.Scene {
    */
   private neighbours(id: number) {
     if (progress.beaten < 1) return [];
-    // (…and the furthest Part you've unlocked: it's the one most often picked, even from far away)
-    const latest = latestLevel();
-    return LEVELS.filter((l) => l.build && l.id !== id && (Math.abs(l.id - id) <= 1 || l.id === latest))
+    // (every Part: there are only a few, and with one still look each on the start screen they're
+    // light enough to keep; the nearest first)
+    return LEVELS.filter((l) => l.build && l.id !== id)
       .sort((a, b) => Math.abs(a.id - id) - Math.abs(b.id - id))
       .map((l) => l.id);
   }
@@ -102,10 +106,11 @@ export class MenuScene extends Phaser.Scene {
   /** Draw a level's opening scenery for the fly-over now (then throw the objects away; the pictures stay). */
   private prewarm(id: number) {
     const info = levelInfo(id);
-    if (!info.build) return;
-    const before = new Set(this.children.list);
-    new LevelView(this, info.build(), { lazyNear: this.startX(id), lazySpan: this.firstSpan() });
-    this.warmOnGpu(this.children.list.filter((o) => !before.has(o)));
+    if (!info.build || this.worlds.has(id) || id === this.levelId) return;
+    // its whole fly-over, built now and kept hidden: picking that Part only has to show it
+    const w = this.createWorld(id, true);
+    for (const o of w.objs) (o as unknown as { setVisible?: (v: boolean) => void }).setVisible?.(false);
+    this.worlds.set(id, w);
   }
 
   /**
@@ -152,6 +157,38 @@ export class MenuScene extends Phaser.Scene {
   /** The ground height the camera last followed (kept over a long gap). */
   private lastSurf = 0;
 
+  /** The Parts' fly-overs kept hidden (see World). */
+  private worlds = new Map<number, World>();
+
+  /** Put the showing Part's fly-over away (hidden, not thrown away). */
+  private stashWorld() {
+    const others = new Set([...this.worlds.values()].flatMap((w) => w.objs));
+    const objs = this.children.list.filter((o) => !others.has(o));
+    for (const o of objs) (o as unknown as { setVisible?: (v: boolean) => void }).setVisible?.(false);
+    this.worlds.set(this.levelId, { objs, level: this.level, bg: this.bg, amb: this.amb, x0: this.x0, x: this.x, loopEnd: this.loopEnd, top: this.top, lastSurf: this.lastSurf, t: this.t });
+  }
+
+  /** A kept fly-over, if everything in it is still there (its pictures may have been freed meanwhile). */
+  private keptWorld(id: number): World | null {
+    const w = this.worlds.get(id);
+    if (!w) return null;
+    const ok = w.objs.every((o) => {
+      if (!o.scene) return true; // (gone already: a temporary one)
+      const t = (o as unknown as { texture?: Phaser.Textures.Texture }).texture;
+      return !t || t.key === '__DEFAULT' || t.key === '__MISSING' || this.textures.exists(t.key);
+    });
+    if (ok) return w;
+    this.dropWorld(id);
+    return null;
+  }
+
+  private dropWorld(id: number) {
+    const w = this.worlds.get(id);
+    if (!w) return;
+    for (const o of w.objs) if (o.scene) o.destroy();
+    this.worlds.delete(id);
+  }
+
   private build(id: number) {
     if (this.levelId !== id) this.prevId = this.levelId;
     this.levelId = id;
@@ -172,31 +209,84 @@ export class MenuScene extends Phaser.Scene {
     const data = (levelInfo(id).build ?? buildLevel1)();
     // a whole level's ground drawn ahead (for its fly-over) is only kept for the Part showing
     // (memory: two whole levels at once is too much for phones)
-    const stale = this.painted.filter((k) => !k.startsWith(`terrain-${data.name}-`));
+    // (kept fly-overs of Parts that aren't next to this one any more are let go)
+    for (const wid of [...this.worlds.keys()]) if (wid !== id && !near.includes(wid)) this.dropWorld(wid);
+    // (pictures a kept fly-over is showing are never freed here)
+    const inUse = new Set<string>();
+    for (const w of this.worlds.values())
+      for (const o of w.objs) {
+        const t = (o as unknown as { texture?: Phaser.Textures.Texture }).texture;
+        if (o.scene && t) inUse.add(t.key);
+      }
+    const stale = this.painted.filter((k) => !k.startsWith(`terrain-${data.name}-`) && !inUse.has(k));
     for (const k of stale) if (this.textures.exists(k)) this.textures.remove(k);
     this.painted = this.painted.filter((k) => !stale.includes(k));
     if (!this.scene.isActive('Battle') && !this.scene.isActive('Game')) {
       freeLooksExcept(this, [...looks, ...near.map((n) => themesFor(n)[0])]);
       const keep = [data.name, ...near.map((n) => levelName(n))];
       for (const k of this.textures.getTextureKeys())
-        if ((k.startsWith('terrain-') || k.startsWith('tree-')) && !keep.some((name) => k.startsWith(`terrain-${name}-`) || k.startsWith(`tree-${name}-`))) this.textures.remove(k);
+        if ((k.startsWith('terrain-') || k.startsWith('tree-')) && !inUse.has(k) && !keep.some((name) => k.startsWith(`terrain-${name}-`) || k.startsWith(`tree-${name}-`))) this.textures.remove(k);
     }
-    this.level = new LevelView(this, data, { lazyNear: this.x0, lazySpan: this.firstSpan() });
-    this.quiet = [
+    // this Part's fly-over as it was left, if it's kept: just shown again
+    const kept = this.keptWorld(id);
+    if (kept) {
+      this.worlds.delete(id);
+      for (const o of kept.objs) if (o.scene && (o as unknown as { alpha?: number }).alpha !== 0.003) (o as unknown as { setVisible?: (v: boolean) => void }).setVisible?.(true);
+      ({ level: this.level, bg: this.bg, amb: this.amb, x0: this.x0, x: this.x, loopEnd: this.loopEnd, top: this.top, lastSurf: this.lastSurf, t: this.t } = kept);
+      this.wrapping = false;
+      this.quiet = this.planQuiet(id, near, looks);
+      return;
+    }
+    const w = this.createWorld(id);
+    ({ level: this.level, bg: this.bg, amb: this.amb, x0: this.x0, x: this.x, loopEnd: this.loopEnd, top: this.top, lastSurf: this.lastSurf, t: this.t } = w);
+    this.wrapping = false;
+    this.quiet = this.planQuiet(id, near, looks);
+  }
+
+  /** A Part's fly-over: its scenery (only what its first view shows; the rest as it glides on), sky and wildlife. */
+  private createWorld(id: number, ahead = false): World {
+    const before = new Set(this.children.list);
+    const data = (levelInfo(id).build ?? buildLevel1)();
+    const x0 = this.startX(id);
+    // (built ahead, out of sight: a little more of its ground, everything the fly-over would
+    // otherwise draw in its first frames — LevelView draws what's within 400 px of the view at once)
+    const span = this.firstSpan();
+    const level = new LevelView(this, data, { lazyNear: x0, lazySpan: ahead ? [span[0] + 400, span[1] + 400] : span });
+    // loop over about a fifth of the level (at least a good stretch); nothing past it is drawn
+    const vw = this.scale.width / Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W);
+    const loopEnd = x0 + Math.max(level.widthPx * 0.2, 1800);
+    level.trimPending(loopEnd + vw + 400);
+    const bg = new Background(this, level.heightPx - VIEW_H);
+    // (in its own look from the start, even built ahead out of sight)
+    const look0 = themesFor(id)[0];
+    ensureLook(this, look0);
+    const mix = themeMix(0, themesFor(id));
+    bg.setTheme(mix);
+    level.setTint(mixTint(mix));
+    const amb = new Ambience(this, id, (x, y, max) => {
+      for (let d = 0; d <= max; d += 8) if (level.isSolidAt(x, y + d)) return Math.floor((y + d) / TILE) * TILE;
+      return null;
+    });
+    const objs = this.children.list.filter((o) => !before.has(o));
+    return { objs, level, bg, amb, x0, x: x0, loopEnd, top: null, lastSurf: 0, t: 0 };
+  }
+
+  /** The quiet-moment jobs for a Part being shown (see `quiet`). */
+  private planQuiet(id: number, near: number[], looks: readonly string[]): (() => void)[] {
+    const jobs: (() => void)[] = [
       // first, what a click on a neighbouring Part needs: its look and its opening scenery; then
-      // this Part's song (the loading screen does these up front: see takeQuietJobs); then the
-      // rest of this Part's ground (the level's fly-over sweeps all of it in a few seconds: drawn
+      // this Part's song; then the rest of this Part's ground (the level's fly-over sweeps all of it in a few seconds: drawn
       // here, it only has to be put up; if not, it's drawn a piece per frame as it goes)
-      ...near.flatMap((n) => {
-        const a = themesFor(n)[0];
-        return [...lookJobs(this, a), () => this.warmLook(a), () => this.prewarm(n)];
-      }),
+      // (a Part whose fly-over is kept needs nothing)
+      ...near
+        .filter((n) => !this.worlds.has(n))
+        .flatMap((n) => {
+          const a = themesFor(n)[0];
+          return [...lookJobs(this, a), () => this.warmLook(a), () => this.prewarm(n)];
+        }),
       () => preloadLevelMusic(id),
-      // (Plop Invasion's Plops: only that level has them)
-      ...(id === 3 ? plopJobs(this) : []),
     ];
-    this.essential = this.quiet.length;
-    this.quiet.push(
+    jobs.push(
       ...this.level.paintJobs().map((job) => () => {
         const key = job();
         if (key) this.painted.push(key);
@@ -205,18 +295,7 @@ export class MenuScene extends Phaser.Scene {
       // (this Part's other looks last: the game only drifts into them 20 seconds in)
       ...looks.slice(1).flatMap((l) => [...lookJobs(this, l), () => this.warmLook(l)]),
     );
-    // loop over about a fifth of the level (at least a good stretch); nothing past it is drawn
-    const vw = this.scale.width / Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W);
-    this.loopEnd = this.x0 + Math.max(this.level.widthPx * 0.2, 1800);
-    this.level.trimPending(this.loopEnd + vw + 400);
-    this.wrapping = false;
-    this.bg = new Background(this, this.level.heightPx - VIEW_H);
-    this.amb = new Ambience(this, id, (x, y, max) => {
-      for (let d = 0; d <= max; d += 8) if (this.level.isSolidAt(x, y + d)) return Math.floor((y + d) / TILE) * TILE;
-      return null;
-    });
-    this.x = this.x0;
-    this.top = null;
+    return jobs;
   }
 
   update(_t: number, deltaMs: number) {

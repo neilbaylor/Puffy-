@@ -6,6 +6,8 @@ import { isMuted, setMuted, sfx, unlockAudio } from '../core/sfx';
 import { drawHeroCard, drawPortrait, renderPoseSet } from '../gfx/draw';
 import { NEUTRAL_FACE, type Face } from '../gfx/face';
 import { BattleUI } from './battleUi';
+import { loadArt } from './artLoader';
+import { gameArtJobs } from '../gfx/textures';
 import { gamepadSources } from '../input/gamepad';
 import { isKeyDown } from '../input/keyboard';
 import { isTouchDevice, onInputModeChange, usingTouch } from '../input/touch';
@@ -217,8 +219,6 @@ export class UI {
   private bossIntro = false;
   private pickRaf = 0;
   private subtitleTimer = 0;
-  /** Which subtitle change is the latest (a quick second pick cancels the first one's pop-in). */
-  private subtitleToken = 0;
   private hudFace: FaceLife | null = null;
   private hudIdle = 0;
   /** The online battle screens (made the first time you tap Battle). */
@@ -583,59 +583,15 @@ export class UI {
       const text = levelName(this.level);
       if (wn.getAttribute('aria-label') === text) return;
       wn.setAttribute('aria-label', text);
-      // only the parts that changed (e.g. "Part 1" → "Part 2"; the world only when
-      // it's a new world) hop away, and the new words pop in letter by letter
+      // the whole line fades out, swaps and fades back in (it used to hop each changed word
+      // away and pop the new letters in one by one, measuring the line as it went: on slower
+      // devices that stuttered, right while the new Part's scenery was being put up)
       clearTimeout(this.subtitleTimer);
-      const parts = text.split(' · ');
-      const segs = [...wn.querySelectorAll<HTMLElement>('.seg')];
-      if (segs.length !== parts.length) {
+      wn.classList.add('swap');
+      this.subtitleTimer = window.setTimeout(() => {
         wn.innerHTML = waveText(text);
-        return;
-      }
-      const changed: number[] = [];
-      segs.forEach((seg, k) => {
-        seg.classList.remove('swap-in');
-        // (a part still hopping away from a quick switch back also pops in again)
-        if (seg.classList.contains('swap-out') || seg.textContent !== parts[k].replace(/ /g, '')) {
-          changed.push(k);
-          seg.classList.add('swap-out');
-        }
-      });
-      // the new words pop in once the old ones have hopped away AND the new level's scenery behind
-      // has been built and drawn (building it is heavy: the letters would stutter through it); if
-      // the scenery doesn't change (or takes too long), they go in anyway
-      const token = ++this.subtitleToken;
-      const out = new Promise<void>((res) => (this.subtitleTimer = window.setTimeout(res, 260)));
-      const built = new Promise<void>((res) => {
-        const done = () => {
-          this.game.events.off('menu-level-built', done);
-          res();
-        };
-        this.game.events.on('menu-level-built', done);
-        window.setTimeout(done, 1500);
-      });
-      void Promise.all([out, built]).then(() => {
-        if (token !== this.subtitleToken) return;
-        // where the words that stay are now (the line re-centres when a part's length changes:
-        // they glide to their new place instead of jumping)
-        const stay = [...wn.querySelectorAll<HTMLElement>('.sep')];
-        segs.forEach((seg, k) => !changed.includes(k) && stay.push(...seg.querySelectorAll<HTMLElement>('.w')));
-        const before = stay.map((e) => e.getBoundingClientRect().left);
-        let i = 0;
-        segs.forEach((seg, k) => {
-          if (changed.includes(k)) {
-            seg.innerHTML = waveWords(parts[k], i);
-            seg.classList.remove('swap-out');
-            void seg.offsetWidth;
-            seg.classList.add('swap-in');
-          }
-          i += parts[k].replace(/ /g, '').length;
-        });
-        stay.forEach((e, n) => {
-          const dx = before[n] - e.getBoundingClientRect().left;
-          if (Math.abs(dx) > 0.5) e.animate([{ transform: `translateX(${dx}px)` }, { transform: 'none' }], { duration: 420, easing: 'cubic-bezier(0.25, 0.9, 0.3, 1)' });
-        });
-      });
+        wn.classList.remove('swap');
+      }, 180);
     };
     el.querySelectorAll<HTMLButtonElement>('.lvl[data-lvl]').forEach((b) =>
       b.addEventListener('click', () => {
@@ -1034,6 +990,15 @@ export class UI {
     primeMusic();
     preloadHoopsMusic();
     const hero = CHARACTERS[this.selected];
+    if (this.starting) return;
+    this.starting = true;
+    void this.gameArt([hero.id], null).then(() => {
+      this.starting = false;
+      this.launchBoss(boss, hero, level);
+    });
+  }
+
+  private launchBoss(boss: (typeof BOSSES)[number], hero: CharacterDef, level: number) {
     store.set('puffy.hero', hero.id);
     sfx.select();
     stopMusic();
@@ -1083,8 +1048,28 @@ export class UI {
     this.setScreen(el);
   }
 
+  /** The game's own art for these heroes (and a level's bad guys), drawn first behind a little loading card if it isn't yet. */
+  private gameArt(heroes: string[], level: number | null) {
+    const scene = this.game.scene.getScene('Menu');
+    return loadArt(gameArtJobs(scene, { heroes, baddies: level !== null, plops: level === 3 }));
+  }
+
+  private starting = false;
+
   private startGame(session: Session, checkpoint = -1) {
+    if (this.starting) return;
+    this.starting = true;
     sfx.select();
+    void this.gameArt(
+      session.players.map((p) => p.characterId),
+      this.level,
+    ).then(() => {
+      this.starting = false;
+      this.launchGame(session, checkpoint);
+    });
+  }
+
+  private launchGame(session: Session, checkpoint: number) {
     stopMusic(); // (the start screen's song)
     this.introEl?.remove();
     this.introEl = null;
