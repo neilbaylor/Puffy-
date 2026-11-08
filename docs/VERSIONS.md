@@ -146,3 +146,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.141: Queen 15 hits, 3 chairs, a touch harder; no stinger title / coming soon; bazooka-tip shot origin
 - v0.142: one hit per chair (a connecting chair always counts, then breaks)
 - v0.143: chair/dive worth 2; longer jumbotron holds in the Queen intro
+- v0.144: Queen fight hearts 10% bigger

@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.143)
+## Where things stand (v0.144)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -187,6 +187,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   deferred art + MenuScene's quiet jobs (`takeQuietJobs`) + 24 warm-up frames under the loading bar
   (two-phase bar); the boot screen is the manifest blue with the rainbow PUFFY logo. Results after the last
   level: Play again + Home screen. Account card: Sign out bottom-left.
+- v0.144: Queen fight heart pick-ups drawn 10% bigger (scale 0.99/ART_RES) with a matching pick-up reach (22 × 28).
 - v0.143: chair + dive = 2 hits (DOUBLE texts). Intro: TONIGHT! stays (1e9) through the sweep + a 1.9 s hold,
   then the jumbotron switches to her title for a 2 s hold before the crash zoom.
 - v0.142: `chairHit` clears her invulnerability first, so a connecting chair always counts and is spent
