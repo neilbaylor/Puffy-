@@ -168,7 +168,7 @@ export function drawBallparkFront(ctx: Ctx, w: number) {
  * Behind the field (BACK_UP tall, ground line at the bottom): the padded outfield wall with ads,
  * the scoreboard over left field, the foul pole, the backstop net behind home, and floodlights.
  */
-export function drawBallparkBack(ctx: Ctx, w: number, score: [number, number] = [3, 0]) {
+export function drawBallparkBack(ctx: Ctx, w: number, score: [number, number] = [3, 2]) {
   const { END, BACK_UP } = PARK;
   const x0 = END;
   const x1 = END + w;
@@ -238,7 +238,7 @@ export function drawBallparkBack(ctx: Ctx, w: number, score: [number, number] = 
   // the foul pole (left field)
   ST.shape(ctx, [[x0 + 8, gy], [x0 + 12, gy], [x0 + 11, gy - 170], [x0 + 9, gy - 170]], F('#ffd23f', '#d9a514', '#fff0a0'), 3150, { lw: 0.8 });
   ST.shape(ctx, [[x0 + 12, gy - 168], [x0 + 26, gy - 160], [x0 + 26, gy - 120], [x0 + 12, gy - 118]], F('#ffd23f', '#d9a514', '#fff0a0'), 3151, { lw: 0.7, plain: true });
-  // the scoreboard over left-centre field: PLOPS vs YOU, the inning, balls / strikes / outs
+  // the scoreboard over left-centre field: PLOPS vs POOS, the inning, balls / strikes / outs
   const sx = x0 + w * 0.22;
   const sw = 200;
   const sy = gy - 170;
@@ -253,8 +253,8 @@ export function drawBallparkBack(ctx: Ctx, w: number, score: [number, number] = 
   ctx.font = `13px ${FONT}`;
   ctx.textAlign = 'left';
   ctx.fillStyle = '#ffd23f';
-  ctx.fillText('PLOPS', sx + 14, sy + 20);
-  ctx.fillText('YOU', sx + 14, sy + 42);
+  ctx.fillText(TEAM.plops.name, sx + 14, sy + 20);
+  ctx.fillText(TEAM.poos.name, sx + 14, sy + 42);
   // the score in lit bulbs
   ctx.textAlign = 'center';
   ctx.font = `20px ${FONT}`;
@@ -411,20 +411,20 @@ function drawCap(ctx: Ctx, col: Fill, seed: number, helmet = false) {
 }
 
 /**
- * The two teams: the Stink Sox (blue caps: fielding — pitcher, catcher, fielders) and the
- * Fly Swatters (red caps and batting helmets: the batter, the one on deck, the runner).
+ * The two teams: the Plops (blue caps: fielding — pitcher, catcher, fielders) and the Poos
+ * (red caps and batting helmets: the batter, the one on deck, the runner).
  */
 export const TEAM = {
-  sox: { name: 'STINK SOX', cap: F('#2f5fd6', '#1c3f9e', '#6e96f0') },
-  swatters: { name: 'FLY SWATTERS', cap: F('#c8102e', '#8a0a1f', '#ff5a6e') },
+  plops: { name: 'PLOPS', cap: F('#2f5fd6', '#1c3f9e', '#6e96f0') },
+  poos: { name: 'POOS', cap: F('#c8102e', '#8a0a1f', '#ff5a6e') },
 } as const;
 export type Team = keyof typeof TEAM;
 
 export type BaseballRole = 'pitch-windup' | 'pitch-throw' | 'bat-stance' | 'bat-swing' | 'on-deck' | 'runner' | 'catcher' | 'fielder' | 'fielder-throw';
 /** Which team plays each part. */
 export const ROLE_TEAM: Record<BaseballRole, Team> = {
-  'pitch-windup': 'sox', 'pitch-throw': 'sox', catcher: 'sox', fielder: 'sox', 'fielder-throw': 'sox',
-  'bat-stance': 'swatters', 'bat-swing': 'swatters', 'on-deck': 'swatters', runner: 'swatters',
+  'pitch-windup': 'plops', 'pitch-throw': 'plops', catcher: 'plops', fielder: 'plops', 'fielder-throw': 'plops',
+  'bat-stance': 'poos', 'bat-swing': 'poos', 'on-deck': 'poos', runner: 'poos',
 };
 
 /**

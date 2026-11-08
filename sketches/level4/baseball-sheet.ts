@@ -26,7 +26,7 @@ const sheet = (name: string, w: number, h: number) => { const c = document.creat
   // a far canyon wall (we're at the bottom of the drop)
   ST.shape(ctx, [[-20, ground - 120], [140, ground - 220], [360, ground - 170], [600, ground - 240], [860, ground - 180], [1100, ground - 250], [W + 20, ground - 190], [W + 20, ground], [-20, ground]], { base: '#a8794a', shade: '#7a5230', light: '#c99a68' }, 9, { lw: 1 });
   ctx.translate(0, ground - PARK.BACK_UP);
-  drawBallparkBack(ctx, FW, [3, 0]);
+  drawBallparkBack(ctx, FW, [3, 2]);
   ctx.translate(0, PARK.BACK_UP);
   // the ground (poo dirt)
   { const gg = ctx.createLinearGradient(0, 0, 0, 160); gg.addColorStop(0, '#9a6638'); gg.addColorStop(1, '#5e3a1e'); ctx.fillStyle = gg; ctx.fillRect(-20, 0, W + 40, 160); }
@@ -36,15 +36,16 @@ const sheet = (name: string, w: number, h: number) => { const c = document.creat
   // the players, standing on the ground line (y = 0)
   const sp = parkSpots(FW);
   let ci = 0;
-  const plop = (x: number, role: BaseballRole, flip = false, k = 0.68) => { const body = PLOP_COLOURS[ci++ % PLOP_COLOURS.length]; at(ctx, flip ? x + 48 * k : x - 48 * k, -100 * k, k, () => drawBaseballPlop(ctx, role, 'medium', 7 + x, body), flip); };
+  // (small Plops at 0.68 the size of the medium ones, like in the levels)
+  const plop = (x: number, role: BaseballRole, flip = false, kind: 'small' | 'medium' = 'small') => { const k = 0.8 * (kind === 'small' ? 0.68 : 1); const body = PLOP_COLOURS[ci++ % PLOP_COLOURS.length]; at(ctx, flip ? x + 48 * k : x - 48 * k, -100 * k, k, () => drawBaseballPlop(ctx, role, kind, 7 + x, body), flip); };
   plop(sp.mound.x, 'pitch-throw');
-  plop(sp.home.x + 4, 'bat-swing', true);
-  plop(sp.home.x + 52, 'catcher', true);
+  plop(sp.home.x + 4, 'bat-swing', true, 'medium');
+  plop(sp.home.x + 60, 'catcher', true);
   plop(sp.second.x - 30, 'fielder');
-  plop(PARK.END + 300, 'fielder');
+  plop(PARK.END + 300, 'fielder', false, 'medium');
   plop(PARK.END + 520, 'fielder-throw');
   plop(sp.first.x - 95, 'runner', true);
-  plop(sp.home.x + 96, 'on-deck', true);
+  plop(sp.home.x + 100, 'on-deck', true);
   // you, walking in from the left
   const hero = CHARACTERS[0];
   at(ctx, PARK.END + 90 - 28, -54, 1, () => drawCharacter(ctx, 0, 0, hero, 'walk2'));
@@ -59,16 +60,17 @@ const sheet = (name: string, w: number, h: number) => { const c = document.creat
   const sox: [BaseballRole, string, boolean][] = [['pitch-windup', 'pitcher: wind-up', false], ['pitch-throw', 'pitcher: throw!', false], ['catcher', 'catcher', true], ['fielder', 'fielder', false], ['fielder-throw', 'fielder: throws it in', false]];
   const swat: [BaseballRole, string, boolean][] = [['bat-stance', 'batter: stance', true], ['bat-swing', 'batter: CRACK!', true], ['on-deck', 'on deck', true], ['runner', 'runner', false]];
   const ctx = sheet('players', 1240, 760);
-  label(ctx, 'The Plops playing baseball: two teams, every Plop its own colour', 620, 40, 26);
+  label(ctx, 'Plops vs Poos: two teams, every player its own colour, small and medium', 620, 40, 26);
   let ci = 0;
-  ([[TEAM.sox.name + ' (blue caps): fielding', sox, 330], [TEAM.swatters.name + ' (red caps): batting', swat, 690]] as const).forEach(([title, list, base]) => {
+  ([[TEAM.plops.name + ' (blue caps): fielding', sox, 330], [TEAM.poos.name + ' (red caps): batting', swat, 690]] as const).forEach(([title, list, base]) => {
     label(ctx, title, 620, base - 236, 22, '#5a3a22');
     list.forEach(([role, t, flip], i) => {
       const x = 130 + i * 245;
-      const k = 1.7;
+      const kind = role === 'bat-swing' || role === 'bat-stance' || role === 'fielder' ? 'medium' : 'small';
+      const k = 1.7 * (kind === 'small' ? 0.68 : 1);
       const body = PLOP_COLOURS[ci++ % PLOP_COLOURS.length];
-      at(ctx, flip ? x + 48 * k : x - 48 * k, base - 100 * k, k, () => drawBaseballPlop(ctx, role, 'medium', 30 + i, body), flip);
-      label(ctx, t, x, base + 30, 17);
+      at(ctx, flip ? x + 48 * k : x - 48 * k, base - 100 * k, k, () => drawBaseballPlop(ctx, role, kind, 30 + i, body), flip);
+      label(ctx, t + (role === 'bat-swing' || role === 'bat-stance' || role === 'fielder' ? ' (medium)' : ''), x, base + 30, 17);
     });
   });
 }
