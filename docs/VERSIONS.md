@@ -172,3 +172,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.167: no out-of-memory messages.
 - v0.168: light mode still titles on the start screen.
 - v0.169: no song decoding while browsing Parts.
+- v0.170: Part buttons unlock one at a time (in step with bosses).
