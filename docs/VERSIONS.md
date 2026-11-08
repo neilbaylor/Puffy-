@@ -143,3 +143,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.138: faster level switching (terrain shapes cached)
 - v0.139: basketball shot animations (hero recoil, King puff + PTOO)
 - v0.140: Bosses button/modal polish, Play again replays the boss, longer jumbotron + cutscene holds, livelier K.O.
+- v0.141: Queen 15 hits, 3 chairs, a touch harder; no stinger title / coming soon; bazooka-tip shot origin
