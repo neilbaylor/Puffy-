@@ -2048,6 +2048,7 @@ export class WrestleScene extends Phaser.Scene {
   private async win() {
     if (this.ended) return;
     this.ended = true;
+    this.game.events.emit('boss-cutscene');
     this.fighting = false;
     const q = this.queen;
     const p = this.player;
