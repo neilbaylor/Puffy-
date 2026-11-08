@@ -1561,6 +1561,18 @@ html.rotating body {
 .lvl.picked {
   background: var(--gold);
 }
+/* the Bosses button, after the level buttons: a crown-gold-on-purple one */
+.lvl.lvl-bosses { background: #6b3fb0; color: #fff; -webkit-text-stroke: 4px var(--ink); paint-order: stroke fill; margin-left: 6px; }
+/* the Bosses menu */
+.boss-panel { align-items: center; text-align: center; min-width: min(100%, 380px); }
+.boss-panel h2 { margin: 0; }
+.boss-list { display: grid; gap: 10px; width: 100%; margin: 4px 0 8px; }
+.boss-btn { display: grid; gap: 2px; justify-items: center; }
+.boss-btn small { font: 800 12px/1.2 var(--body); letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.75; }
+@media (max-height: 500px) {
+  .boss-list { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+  .boss-btn { padding: 8px 14px 7px; }
+}
 .lvl small {
   font: 800 10px/1.2 var(--body);
   letter-spacing: 0.04em;
@@ -2599,11 +2611,4 @@ kbd {
   color: var(--ink);
 }
 .wr-skip[hidden] { display: none; }
-/* (temporary) the start screen's straight-to-the-wrestling button */
-.wr-test-btn {
-  position: absolute;
-  right: calc(12px + var(--safe-r));
-  top: calc(66px + var(--safe-t));
-  z-index: 2;
-}
 .tbtn[hidden] { display: none !important; }

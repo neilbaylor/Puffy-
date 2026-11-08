@@ -787,7 +787,8 @@ export class WrestleScene extends Phaser.Scene {
       this.callout('HA HA HA!', 'bad', 1500);
       sfx.laugh();
     });
-    const hadLife = loseLife();
+    // (from the Bosses menu: no life lost, the match just starts again)
+    const hadLife = this.wd.result?.practice || loseLife();
     this.emitHud(true);
     this.time.delayedCall(2300, () => {
       fadeOutMusic(500);
@@ -2127,14 +2128,14 @@ export class WrestleScene extends Phaser.Scene {
   }
 }
 
-/** For the start screen's test button: what a fight needs when you jump straight into it. */
-export function testWrestleData(session: Session, charId: string): WrestleData {
+/** For the Bosses menu: what a boss fight needs when you jump straight into it (a practice fight). */
+export function bossData(session: Session, charId: string, level: number): WrestleData {
   const ch = characterById(charId);
   return {
     session,
     charId,
     checkpoint: -1,
-    level: 3,
-    result: { charId, name: ch.name, aura: 1, rootbeer: 0, rootbeerTotal: bank.rootbeer, popped: 0, giants: 0, faints: 0, lives: lives.left, seconds: 0, level: 3 },
+    level,
+    result: { charId, name: ch.name, aura: 1, rootbeer: 0, rootbeerTotal: bank.rootbeer, popped: 0, giants: 0, faints: 0, lives: lives.left, seconds: 0, level, practice: true },
   };
 }
