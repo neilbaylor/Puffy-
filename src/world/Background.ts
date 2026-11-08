@@ -291,7 +291,9 @@ export class Background {
         // only while it's on screen (a cloud off to the side keeps its last shape till it's back)
         if (this.t >= c.next && x < view.width + 120) {
           this.paintCloud(c, hi);
-          c.next = this.stillClouds ? Infinity : this.t + CLOUD_EVERY;
+          // (light mode: still shapes — a new one a few times a second is a steady trickle of
+          // pictures to make and send to the graphics chip)
+          c.next = this.stillClouds || LIGHT ? Infinity : this.t + CLOUD_EVERY;
         }
         const y = c.y + Math.sin(this.t * 0.35 + c.bob) * 5;
         let n = 0;

@@ -111,3 +111,13 @@ try {
 }
 
 server.listen(PORT, '0.0.0.0', () => console.log(`Puffy is being served on port ${PORT}`));
+
+// Railway stops the old copy with SIGTERM on every deploy: finish cleanly (a plain exit, not a
+// "command failed" in the logs)
+for (const sig of ['SIGTERM', 'SIGINT']) {
+  process.on(sig, () => {
+    console.log(`${sig}: shutting down`);
+    server.close();
+    process.exit(0);
+  });
+}
