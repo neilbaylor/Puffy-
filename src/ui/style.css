@@ -2656,3 +2656,21 @@ html.light .start .world-name,
 html.light .start .world-name i,
 html.light .start .card-name i { animation: none; }
 html.light .start .logo span { transform: rotate(-2deg); }
+
+/* the battle lobby sits a little lower (the title had no room above it), and on tablets and
+   computers the player squares are bigger (the row, the name box and hero buttons under it widen
+   together, so they stay lined up) */
+.battle-lobby { padding-top: calc(clamp(14px, 3.5vh, 34px) + var(--safe-t)); }
+@media (min-height: 501px) {
+  .battle-lobby { --lobw: min(100%, 1000px); }
+  .bl-slots, .bl-me { width: var(--lobw); }
+  .bl-slot { padding: 14px 8px 12px; gap: 4px; border-radius: 20px; }
+  .bl-slot canvas,
+  .bl-wait { width: clamp(80px, 19vh, 160px); height: clamp(80px, 19vh, 160px); }
+  .bl-wait { font-size: clamp(34px, 8vh, 64px); }
+  .bl-slot b { font-size: clamp(18px, 3.4vh, 27px); }
+  .bl-slot small { font-size: clamp(11px, 1.7vh, 14px); }
+}
+@media (max-height: 500px) {
+  .battle-lobby { padding-top: calc(14px + var(--safe-t)); }
+}
