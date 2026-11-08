@@ -213,6 +213,8 @@ export class UI {
   private session: Session = { players: [] };
   /** The scene being played right now (a level, or Queen Plop's ring): what Pause pauses. */
   private gameScene: Phaser.Scene | null = null;
+  /** A boss fight's intro is playing (no pause button until it's over). */
+  private bossIntro = false;
   private pickRaf = 0;
   private subtitleTimer = 0;
   /** Which subtitle change is the latest (a quick second pick cancels the first one's pop-in). */
@@ -336,6 +338,7 @@ export class UI {
     game.events.on('warm-cards', () => this.warmCards(false));
     game.events.on('game-start', (s: GameScene, info: { fresh: boolean; atStart: boolean; level: string; world: string }) => {
       this.gameScene = s;
+      this.bossIntro = false;
       this.setScreen(null);
       // a new run starts the song from the top; restarts after a faint keep it going
       if (info.fresh) playLevelSong(this.level);
@@ -384,15 +387,22 @@ export class UI {
       if (window.innerHeight > window.innerWidth && isTouchDevice()) this.pause();
     });
     game.events.on('hud', (s: HudState) => this.renderHud(s));
-    // boss fights: no HUD, just the pause button (top right), from the very start
+    // boss fights: no HUD, just the pause button (top right), once the intro's over (nothing to
+    // press by mistake during the cut scene; Esc / P wait too)
     const pauseOnly = () => {
       this.hud.hidden = false;
       this.hud.classList.add('bare');
+      this.bossIntro = false;
     };
+    const introStarts = () => {
+      this.hud.hidden = true;
+      this.bossIntro = true;
+    };
+    game.events.on('hoops-play', pauseOnly);
     game.events.on('hoops-start', (s: Phaser.Scene) => {
       this.gameScene = s;
       this.setScreen(null);
-      pauseOnly();
+      introStarts();
       this.banner.hidden = true;
       this.touch.hide();
       // the phone is upright as basketball begins: start it frozen (turning back carries on)
@@ -406,7 +416,7 @@ export class UI {
       this.introEl = null;
       this.gameScene = s;
       this.setScreen(null);
-      pauseOnly();
+      introStarts();
       this.banner.hidden = true;
       this.touch.hide();
     });
@@ -414,6 +424,13 @@ export class UI {
       this.showHud();
       // (no HUD in the ring, just the pause button: your hearts are over your head)
       this.hud.classList.add('bare');
+      this.bossIntro = false;
+    });
+    // a boss fight's ending: the pause button goes again for the cut scene
+    game.events.on('boss-cutscene', () => {
+      this.hud.hidden = true;
+      this.touch.hide();
+      this.bossIntro = true;
     });
     // holding the chair: the FIRE button swings it
     game.events.on('wrestle-chair', (on: boolean) => this.touch.setChair(on));
@@ -421,7 +438,7 @@ export class UI {
     game.events.on('game-over', (g: GameOverState) => this.showGameOver(g));
 
     window.addEventListener('keydown', (e) => {
-      if ((e.code === 'Escape' || e.code === 'KeyP') && this.gameScene && !this.screen) this.pause();
+      if ((e.code === 'Escape' || e.code === 'KeyP') && this.gameScene && !this.screen && !this.bossIntro) this.pause();
     });
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && this.gameScene && !this.screen) this.pause();
@@ -1168,6 +1185,7 @@ export class UI {
   }
 
   private quitToStart() {
+    this.bossIntro = false;
     this.introEl?.remove();
     this.introEl = null;
     this.setScreen(null);

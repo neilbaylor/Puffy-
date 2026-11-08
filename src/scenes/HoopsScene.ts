@@ -1192,6 +1192,7 @@ export class HoopsScene extends Phaser.Scene {
     }
     // back to the game: everything in its final state (also after a skip)
     this.inIntro = false;
+    this.game.events.emit('hoops-play');
     this.dom.querySelector<HTMLElement>('.hoops-skip')!.hidden = true;
     this.skipping = false;
     this.tapped = false;
@@ -1650,6 +1651,7 @@ export class HoopsScene extends Phaser.Scene {
   // ── endings ──
 
   private async youWin() {
+    this.game.events.emit('boss-cutscene');
     const kp = { x: this.king.x, y: this.king.y - 6 };
     this.cut(kp.x - 40, kp.y - 120, 1.9);
     this.kingAnim = { frames: ['sad'], fps: 1 };
@@ -1769,6 +1771,7 @@ export class HoopsScene extends Phaser.Scene {
   }
 
   private async kingWins() {
+    this.game.events.emit('boss-cutscene');
     const kp = { x: this.king.x, y: this.king.y - 6 };
     this.cut(kp.x - 10, kp.y - 140, 2.3);
     this.kingAnim = { frames: ['laugh0', 'laugh1'], fps: 7 };
