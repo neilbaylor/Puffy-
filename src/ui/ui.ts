@@ -587,6 +587,11 @@ export class UI {
       // the old line and the new one cross-fade in the same spot (both sit in a fixed slot, out
       // of the page's layout: nothing else moves). The old one is a copy that fades away.
       el.querySelectorAll('.world-name.wn-old').forEach((o) => o.remove());
+      // (light mode: just the new words, no cross-fade)
+      if (LIGHT) {
+        wn.innerHTML = waveText(text);
+        return;
+      }
       const old = wn.cloneNode(true) as HTMLElement;
       old.classList.remove('wn-new');
       old.classList.add('wn-old');

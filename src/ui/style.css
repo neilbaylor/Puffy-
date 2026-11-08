@@ -2649,3 +2649,10 @@ kbd {
 .start .world-name.wn-old { animation: wn-xout 0.35s ease forwards; pointer-events: none; }
 @keyframes wn-xout { to { opacity: 0; } }
 @keyframes wn-xin { from { opacity: 0; } }
+
+/* light mode (older devices): the start screen's titles sit still — no letter hops or waves */
+html.light .start .logo span,
+html.light .start .world-name,
+html.light .start .world-name i,
+html.light .start .card-name i { animation: none; }
+html.light .start .logo span { transform: rotate(-2deg); }
