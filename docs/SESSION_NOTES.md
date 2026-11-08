@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.162)
+## Where things stand (v0.163)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -187,6 +187,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   deferred art + MenuScene's quiet jobs (`takeQuietJobs`) + 24 warm-up frames under the loading bar
   (two-phase bar); the boot screen is the manifest blue with the rainbow PUFFY logo. Results after the last
   level: Play again + Home screen. Account card: Sign out bottom-left.
+- v0.163: subtitle cross-fade: syncLevels clones the old .world-name as .wn-old (fades out, removed on animationend / 600 ms), new gets .wn-new (fades in). Both absolute in the fixed slot. Medium tablet doesn't pick light mode (user prefers full mode there).
 - v0.162: Menu switching on a mid Android tablet still slow. LevelView option ahead:false (menu: no chunk-per-frame painting ahead); prewarmed Worlds warmOnGpu their textures; Background(stillClouds) + refreshClouds() on switch; quiet jobs after 2.5 s idle. Old tablet now falls back to Canvas (user OK with that for now).
 - v0.161: WrestleScene Q_TOUGH = 1.05 (rage × 1.05, cdCharge/cdHeave/cdBlock ÷ 1.05). Pending: user is testing the fixed-slot subtitle before deciding on an old/new crossfade.
 - v0.160: user's old tablet hit 'graphics out of memory'. core/light.ts LIGHT (localStorage puffy.light, deviceMemory<=2, MAX_TEXTURE_SIZE<=4096); webglcontextlost sets puffy.light=1 and reloads (once). LIGHT: resCap 1, TERRAIN_RES 1.25, BG_RES 1, CLOUD_RES 1, Menu neighbours [] and no ground paint jobs. gameArtJobs({heroes, level}) with BADDIES_FOR per level/battle + dropBaddiesExcept in GameScene. Subtitle .world-name absolute in .start-head (padding-bottom var(--wn)*1.3), contain: layout.
