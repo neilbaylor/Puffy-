@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.154)
+## Where things stand (v0.155)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -187,6 +187,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   deferred art + MenuScene's quiet jobs (`takeQuietJobs`) + 24 warm-up frames under the loading bar
   (two-phase bar); the boot screen is the manifest blue with the rainbow PUFFY logo. Results after the last
   level: Play again + Home screen. Account card: Sign out bottom-left.
+- v0.155: Queen HITS 13 (CHAIR_AT_HP [-1, 9, 4]); tablet home Play 10px off the bottom (padding-bottom 10px + safe-b at min-height 501px).
 - v0.154: tablet home screen: Play ~21px off the bottom (was 6px) via a min-height:501px padding rule; the cards shrink. NOTE: src/version.ts holds VERSION = '0.xxx' (no 'v'), bump that string — v0.151–0.153 shipped still labelled 0.150.
 - v0.153: boss card always shows Result: Won / Lost (basketball adds Final score).
 - v0.152: boss loss card: "Result: Lost" (was Pinned!); basketball losses also show the final score.
