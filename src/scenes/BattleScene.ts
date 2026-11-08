@@ -2,9 +2,9 @@ import Phaser from 'phaser';
 import { DEPTH, VIEW_H } from '../config';
 import { sfx } from '../core/sfx';
 import { characterById } from '../data/characters';
-import { ART_RES, WALK_FRAMES } from '../gfx/draw';
+import { ART_RES, CARRY_SWING, CHAR_H, CHAR_W, WALK_FRAMES, carryHand } from '../gfx/draw';
 import { recolorForSlot } from '../gfx/recolor';
-import { addCanvas, ensureLevelLooks, frameGrid, hires } from '../gfx/textures';
+import { HERO_SHEET_M, addCanvas, ensureLevelLooks, frameGrid, hires, makeCarrySheet } from '../gfx/textures';
 import { PRIZE_COLOR, drawBombBall, drawChute, drawFireball, drawPrize } from '../gfx/prizes';
 import { PLOP_FRAMES, PLOP_H, PLOP_W, drawPlop, type PlopKind } from '../gfx/plops';
 import { canvas } from '../gfx/draw';
@@ -101,6 +101,8 @@ interface HeroView {
   face: FaceClock;
   /** A soft glow around your own hero, so you can find yourself in the scrum. */
   halo?: Phaser.GameObjects.Image;
+  /** Holding a chair: the arms' angle (over the head, or mid-swing); null otherwise. */
+  chairA: number | null;
   /** The block of ice they're stuck in (someone grabbed the ice). */
   ice: Phaser.GameObjects.Image;
   /** Off screen: an arrow at the edge pointing to them, with their name (not for you). */
@@ -273,7 +275,7 @@ export class BattleScene extends Phaser.Scene {
   private renderChairs(chairs: SnapChair[], dt: number) {
     const S = 0.55 / ART_RES;
     const live = new Set<number>();
-    for (const [id, x, y, holder, , swing, age] of chairs) {
+    for (const [id, x, y, holder, , , age] of chairs) {
       live.add(id);
       let img = this.chairViews.get(id);
       if (!img) {
@@ -286,23 +288,25 @@ export class BattleScene extends Phaser.Scene {
           img.setVisible(false);
           continue;
         }
-        const isMe = holder === this.net.myId && this.me;
-        const facing = (isMe ? this.me!.facing : v.sprite.flipX ? -1 : 1) as 1 | -1;
-        const c = characterById(isMe ? this.me!.hero : this.views.get(holder)?.hero ?? 'puffy');
-        const hh = (c.hitH ?? 34) * v.size;
-        // held by its feet at shoulder height, up and a little forward (clear of the name over the
-        // head); a swing winds it back, then smashes it forward and down in front
-        const u = swing > 0 ? 1 - swing / CHAIR_SWING : -1;
-        const ang = u < 0 ? 0.25 : u < 0.3 ? 0.25 - (u / 0.3) * 1.1 : -0.85 + Math.sin(((u - 0.3) / 0.7) * Math.PI * 0.5) * 2.6;
+        // gripped by its feet in both hands, carried along the arms (up over the head; the swing
+        // brings it over the top and down in front) — as in the Poo Palace
+        const facing = (v.sprite.flipX ? -1 : 1) as 1 | -1;
+        const a = v.chairA ?? -1.75;
+        const kx = Math.abs(v.sprite.scaleX) * ART_RES;
+        const ky = Math.abs(v.sprite.scaleY) * ART_RES;
+        const [hx, hy] = carryHand(v.hero, a);
+        const dx = (hx + HERO_SHEET_M - (CHAR_W + HERO_SHEET_M * 2) / 2) * kx;
+        const dy = (hy - CHAR_H) * ky;
+        const dirA = facing > 0 ? a : Math.PI - a;
         img
           .setVisible(true)
-          .setOrigin(0.5, 1)
-          .setScale(S * 1.3 * v.size)
+          .setOrigin(0.5, (CHAIR_H - 2) / (CHAIR_H + 4))
+          .setScale(kx / ART_RES / characterById(v.hero).scale)
           .setFlipX(facing < 0)
-          .setDepth(DEPTH.players + 0.5)
+          .setDepth(DEPTH.players - 0.1)
           .setAlpha(1)
-          .setPosition(v.sprite.x + facing * 9 * v.size, v.sprite.y - hh * 0.42)
-          .setRotation(facing * ang);
+          .setPosition(v.sprite.x + facing * dx, v.sprite.y + dy)
+          .setRotation(dirA + Math.PI / 2);
         continue;
       }
       img.setVisible(true).setOrigin(0.5, 0.5).setScale(S).setDepth(DEPTH.pickups).setFlipX(false);
@@ -602,6 +606,36 @@ export class BattleScene extends Phaser.Scene {
     return key;
   }
 
+  /** The hero's chair-carrying frames (arms up, both hands on it; the swing) in this player's colour. */
+  private carryTextureFor(hero: string, slot: number) {
+    const base = makeCarrySheet(this, characterById(hero));
+    if (slot === 0) return base;
+    const key = `bchar-${hero}-${slot}-carry`;
+    if (!this.textures.exists(key)) {
+      const src = this.textures.get(base);
+      const canvas = recolorForSlot(src.getSourceImage() as HTMLCanvasElement, slot);
+      addCanvas(this, key, canvas, (t) => {
+        for (const name of src.getFrameNames()) {
+          const f = src.get(name);
+          t.add(name, 0, f.cutX, f.cutY, f.cutWidth, f.cutHeight);
+        }
+      });
+    }
+    return key;
+  }
+
+  /** The carry frame nearest arm angle a. */
+  private static carryFrame(a: number) {
+    let best = 'sw0';
+    let d = Infinity;
+    for (const [f, fa] of Object.entries(CARRY_SWING))
+      if (Math.abs(fa - a) < d) {
+        d = Math.abs(fa - a);
+        best = f;
+      }
+    return best;
+  }
+
   /** The hero's face frames (blink, glance, mouth) in this player's colour. */
   private faceTextureFor(hero: string, slot: number) {
     if (slot === 0) return `char-${hero}-face`;
@@ -642,7 +676,7 @@ export class BattleScene extends Phaser.Scene {
       const hearts = this.add.graphics().setDepth(DEPTH.text);
       const halo = p.id === this.net.myId ? this.add.image(p.x, p.y, 'bhalo').setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.players - 0.05) : undefined;
       const ice = this.add.image(p.x, p.y, 'bice').setOrigin(0.5, 1).setScale(1 / ART_RES).setDepth(DEPTH.players + 0.2).setVisible(false);
-      v = { cheer: -1, sprite, tag, hearts, anim: 0, tilt: 0, slot: p.slot, hero: p.hero, size: 1, sparkT: 0, face: new FaceClock(), halo, ice };
+      v = { cheer: -1, sprite, tag, hearts, anim: 0, tilt: 0, slot: p.slot, hero: p.hero, size: 1, sparkT: 0, face: new FaceClock(), halo, ice, chairA: null };
       if (p.id !== this.net.myId) v.arrow = this.makeArrow(this.names.get(p.id) ?? '', col);
       this.views.set(p.id, v);
     }
@@ -802,6 +836,8 @@ export class BattleScene extends Phaser.Scene {
     this.fix.x -= this.fix.x * k;
     this.fix.y -= this.fix.y * k;
     const seen = new Set<string>();
+    // (who's holding a chair, and how far into a swing)
+    const held = new Map(cur.chairs.filter((c) => c[3]).map((c) => [c[3], c[5]] as const));
     for (const [id, p0] of cur.players) {
       seen.add(id);
       const isMe = id === this.net.myId && this.me;
@@ -830,10 +866,20 @@ export class BattleScene extends Phaser.Scene {
         v.anim += dt * 1.6;
         frame = `idle${Math.floor(v.anim) % 2}`;
       }
+      // holding a chair: the arms-up frames (and the swing: wind back, then over the top and down)
+      const swing = held.get(id);
+      v.chairA = null;
+      if (swing !== undefined) {
+        const t = swing > 0 ? CHAIR_SWING - swing : -1;
+        const UP = 0.09;
+        const DOWN = 0.17;
+        v.chairA = t < 0 ? -1.75 : t < UP ? -1.75 + (CARRY_SWING.sw0 + 1.75) * (t / UP) : CARRY_SWING.sw0 + (CARRY_SWING.sw3 - CARRY_SWING.sw0) * Math.min(1, (t - UP) / DOWN) ** 1.4;
+        if (t >= 0 && p.stun <= 0) frame = BattleScene.carryFrame(v.chairA);
+      }
       // standing about: blink, glance around, breathe (the face frames, as in the levels)
       v.face.tick(dt);
-      const fk = frame.startsWith('idle') ? v.face.key : null;
-      const bodyKey = this.textureFor(p.hero, v.slot);
+      const fk = frame.startsWith('idle') && v.chairA === null ? v.face.key : null;
+      const bodyKey = v.chairA !== null ? this.carryTextureFor(p.hero, v.slot) : this.textureFor(p.hero, v.slot);
       if (fk) v.sprite.setTexture(this.faceTextureFor(p.hero, v.slot), fk);
       else if (v.sprite.texture.key !== bodyKey) v.sprite.setTexture(bodyKey, frame);
       const targetTilt = (p.vx / c.runSpeed) * (p.onGround ? 0.14 : 0.06);
@@ -1344,6 +1390,8 @@ export class BattleScene extends Phaser.Scene {
           break;
         }
         case 'chair': {
+          // (everyone's chair-carrying frames, ready before anyone can grab it)
+          for (const v of this.views.values()) this.carryTextureFor(v.hero, v.slot);
           // a folding chair's coming in from the crowd: CHAIR!
           this.fx.popText(e.x, 70, 'CHAIR!', '#e2e7ec', 26);
           sfx.whoosh();

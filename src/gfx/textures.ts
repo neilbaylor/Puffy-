@@ -105,7 +105,8 @@ export function frameGrid(n: number, fw: number, fh: number, gap = 4) {
 }
 
 /** The heroes' own sheets are read back (recoloured for the other players in a battle); everything else lets its pixels go once uploaded. */
-const keepPixels = (key: string) => /^char-[a-z]+(-face)?$/.test(key);
+// (the heroes' frames, faces and chair-carrying frames: Battle recolours them for each player)
+const keepPixels = (key: string) => /^char-[a-z]+(-face|-carry)?$/.test(key);
 
 /** A frame sheet: each frame is drawn in world units w × h at `res`. */
 function sheet<F extends string>(
