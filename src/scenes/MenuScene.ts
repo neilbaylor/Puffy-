@@ -6,7 +6,7 @@ import { LEVELS, levelInfo, levelName, progress } from '../level/levels';
 import { Background } from '../world/Background';
 import { LIGHT } from '../core/light';
 import { Ambience } from '../world/Ambience';
-import { LevelView, groundPaintJobs } from '../world/LevelView';
+import { LevelView, groundPaintJobs, levelPieces } from '../world/LevelView';
 import { mixTint, themeClock, themeMix, themesFor } from '../world/theme';
 
 /** Animated backdrop behind the start screen: a slow fly-over of Puff Ball Planet. */
@@ -45,6 +45,8 @@ export class MenuScene extends Phaser.Scene {
   create(data?: { silent?: boolean; level?: number }) {
     // (a fresh start: anything kept from before went with the scene)
     this.worlds.clear();
+    this.building = null;
+    this.pendingWorld = null;
     this.build(data?.level ?? 1);
     // picking a level on the start screen fades the fly-over to that level's world
     const onLevel = (id: number) => {
@@ -107,23 +109,81 @@ export class MenuScene extends Phaser.Scene {
       .map((l) => l.id);
   }
 
-  /** Draw a level's opening scenery for the fly-over now (then throw the objects away; the pictures stay). */
-  private prewarm(id: number) {
+  /**
+   * Another Part's whole fly-over, built ahead and kept hidden (picking that Part only has to show
+   * it) — in small steps, one per quiet moment, so none of them is a noticeable hitch: its terrain
+   * shapes, the scenery (no ground pictures yet), its opening ground a piece at a time, then the
+   * sky and wildlife. Only what each step itself makes goes into the hidden world.
+   */
+  private prewarmJobs(id: number): (() => void)[] {
     const info = levelInfo(id);
-    if (!info.build || this.worlds.has(id) || id === this.levelId) return;
-    // its whole fly-over, built now and kept hidden: picking that Part only has to show it
-    const w = this.createWorld(id, true);
-    for (const o of w.objs) (o as unknown as { setVisible?: (v: boolean) => void }).setVisible?.(false);
-    this.worlds.set(id, w);
-    // its pictures shown once (invisibly), so they're really on the graphics chip: showing the
-    // Part later doesn't stall on the first frame
-    const keys = new Set<string>();
-    for (const o of w.objs) {
-      const t = (o as unknown as { texture?: Phaser.Textures.Texture }).texture;
-      if (t && t.key !== '__DEFAULT' && t.key !== '__MISSING') keys.add(t.key);
-    }
-    this.warmOnGpu([...keys].map((k) => this.add.image(0, 0, k).setOrigin(0).setScrollFactor(0).setScale(0.05)));
+    if (!info.build || this.worlds.has(id) || id === this.levelId) return [];
+    const data = info.build();
+    const objs: Phaser.GameObjects.GameObject[] = [];
+    this.building = objs;
+    let level: LevelView | null = null;
+    const gone = () => this.worlds.has(id) || id === this.levelId || !this.sys.isActive();
+    const step = (fn: () => void) => () => {
+      if (gone()) return;
+      const before = new Set(this.children.list);
+      fn();
+      for (const o of this.children.list)
+        if (!before.has(o)) {
+          (o as unknown as { setVisible?: (v: boolean) => void }).setVisible?.(false);
+          objs.push(o);
+        }
+    };
+    const x0 = this.startX(id);
+    const span = this.firstSpan();
+    const vw = this.scale.width / Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W);
+    const loopEnd = { v: 0 };
+    return [
+      () => !gone() && levelPieces(data, 'ground'),
+      () => !gone() && levelPieces(data, 'rock'),
+      step(() => {
+        // (no ground drawn by the view itself: the next steps draw it a piece at a time)
+        level = new LevelView(this, data, { lazyNear: x0, lazySpan: [-1e9, -1e9], ahead: false });
+        loopEnd.v = x0 + Math.max(level.widthPx * 0.2, 1800);
+        level.trimPending(loopEnd.v + vw + 400);
+        // its opening ground (what the fly-over would draw in its first frames), a piece per step,
+        // put next in line
+        const pieces = level.pendingJobs(x0 - span[0] - 400, x0 + span[1] + 400).map((job) => step(job));
+        this.quiet.unshift(...pieces);
+      }),
+      step(() => {
+        const lv = level!;
+        const bg = new Background(this, lv.heightPx - VIEW_H, true);
+        const look0 = themesFor(id)[0];
+        ensureLook(this, look0);
+        const mix = themeMix(0, themesFor(id));
+        bg.setTheme(mix);
+        lv.setTint(mixTint(mix));
+        const amb = new Ambience(this, id, (x, y, max) => {
+          for (let d = 0; d <= max; d += 8) if (lv.isSolidAt(x, y + d)) return Math.floor((y + d) / TILE) * TILE;
+          return null;
+        });
+        this.pendingWorld = { id, w: { objs, level: lv, bg, amb, x0, x: x0, loopEnd: loopEnd.v, top: null, lastSurf: 0, t: 0 } };
+      }),
+      () => {
+        const pw = this.pendingWorld;
+        this.pendingWorld = null;
+        if (!pw || gone()) return;
+        this.worlds.set(pw.id, pw.w);
+        if (this.building === pw.w.objs) this.building = null;
+        // its pictures shown once (invisibly), so they're really on the graphics chip: showing the
+        // Part later doesn't stall on the first frame
+        const keys = new Set<string>();
+        for (const o of pw.w.objs) {
+          const t = (o as unknown as { texture?: Phaser.Textures.Texture }).texture;
+          if (t && t.key !== '__DEFAULT' && t.key !== '__MISSING') keys.add(t.key);
+        }
+        this.warmOnGpu([...keys].map((k) => this.add.image(0, 0, k).setOrigin(0).setScrollFactor(0).setScale(0.05)));
+      },
+    ];
   }
+  private pendingWorld: { id: number; w: World } | null = null;
+  /** A hidden fly-over still being built in steps (thrown away if the Parts change before it's done). */
+  private building: Phaser.GameObjects.GameObject[] | null = null;
 
   /**
    * Pictures drawn ahead of time aren't really on the graphics chip until they're first shown
@@ -195,6 +255,12 @@ export class MenuScene extends Phaser.Scene {
 
   /** Put the showing Part's fly-over away (hidden, not thrown away). */
   private stashWorld() {
+    // (a fly-over half-built in the background: thrown away — the plan for the next Part starts afresh)
+    if (this.building) {
+      for (const o of this.building) if (o.scene) o.destroy();
+      this.building = null;
+      this.pendingWorld = null;
+    }
     const others = new Set([...this.worlds.values()].flatMap((w) => w.objs));
     const objs = this.children.list.filter((o) => !others.has(o));
     for (const o of objs) (o as unknown as { setVisible?: (v: boolean) => void }).setVisible?.(false);
@@ -317,16 +383,12 @@ export class MenuScene extends Phaser.Scene {
         .filter((n) => !this.worlds.has(n))
         .flatMap((n) => {
           const a = themesFor(n)[0];
-          return [...lookJobs(this, a), () => this.warmLook(a), () => this.prewarm(n)];
+          return [...lookJobs(this, a), () => this.warmLook(a), ...this.prewarmJobs(n)];
         }),
     ];
     jobs.push(
-      // (not in light mode: the level draws its ground as its fly-over reaches it)
-      ...(LIGHT ? [] : this.level.paintJobs()).map((job) => () => {
-        const key = job();
-        if (key) this.painted.push(key);
-        if (key) this.warmOnGpu([this.add.image(0, 0, key).setOrigin(0).setScrollFactor(0).setScale(0.05)]);
-      }),
+      // (the rest of this Part's ground isn't drawn here any more: the loading card before the
+      // level draws whatever's missing — doing it here was a string of hitches after every switch)
       // (this Part's other looks last: the game only drifts into them 20 seconds in)
       ...looks.slice(1).flatMap((l) => [...lookJobs(this, l), () => this.warmLook(l)]),
     );

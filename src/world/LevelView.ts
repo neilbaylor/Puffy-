@@ -176,6 +176,17 @@ export class LevelView {
     this.pending = this.pending.filter((p) => p.x0 < maxX);
   }
 
+  /** Lazy views: the chunks not drawn yet overlapping a..b, each as a job (drawn and put up when run). */
+  pendingJobs(a: number, b: number): (() => void)[] {
+    return this.pending
+      .filter((p) => p.x1 > a && p.x0 < b)
+      .map((p) => () => {
+        if (!this.pending.includes(p)) return;
+        p.make();
+        this.pending = this.pending.filter((q) => q !== p);
+      });
+  }
+
   /** Sway the plants on screen; gusts come and go. `t` in seconds. */
   animate(t: number, left: number, right: number) {
     // lazy terrain: anything the view is about to reach right away, otherwise one chunk per frame
