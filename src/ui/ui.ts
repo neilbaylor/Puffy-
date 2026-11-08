@@ -587,12 +587,13 @@ export class UI {
       // of the page's layout: nothing else moves). The old one is a copy that fades away.
       el.querySelectorAll('.world-name.wn-old').forEach((o) => o.remove());
       const old = wn.cloneNode(true) as HTMLElement;
+      old.classList.remove('wn-new');
       old.classList.add('wn-old');
       old.removeAttribute('aria-label');
       old.setAttribute('aria-hidden', 'true');
       wn.after(old);
       old.addEventListener('animationend', (e) => e.target === old && old.remove());
-      window.setTimeout(() => old.remove(), 600);
+      window.setTimeout(() => old.remove(), 800);
       wn.innerHTML = waveText(text);
       wn.classList.remove('wn-new');
       void wn.offsetWidth;

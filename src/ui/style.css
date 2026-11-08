@@ -2645,7 +2645,7 @@ kbd {
   contain: layout style;
 }
 /* a Part switch: the old subtitle fades out while the new one fades in, in the same spot */
-.start .world-name.wn-old { animation: wn-xout 0.32s ease forwards; pointer-events: none; }
-.start .world-name.wn-new { animation: wn-xin 0.32s ease both; }
+.start .world-name.wn-new { animation: wn-xin 0.35s ease both; }
+.start .world-name.wn-old { animation: wn-xout 0.35s ease forwards; pointer-events: none; }
 @keyframes wn-xout { to { opacity: 0; } }
 @keyframes wn-xin { from { opacity: 0; } }
