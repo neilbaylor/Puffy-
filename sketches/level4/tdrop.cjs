@@ -19,7 +19,7 @@ const HOLD = process.argv[3] || 'right';
   await p.waitForFunction(() => { const g = window.game.scene.getScene('Game'); return !g.intro && !g.cutscene; }, null, { timeout: 60000 });
   await p.waitForTimeout(500);
   for (const [di, label] of [[0, 'drop1'], [1, 'drop2']]) {
-    const res = await p.evaluate(([di, HOLD]) => new Promise((done) => {
+    const resP = p.evaluate(([di, HOLD]) => new Promise((done) => {
       const g = window.game.scene.getScene('Game');
       const pl = g.players[0];
       const d = g.chuteDrops[di];
@@ -36,16 +36,24 @@ const HOLD = process.argv[3] || 'right';
         if (chuteAt > 0) { btn.right = HOLD === 'right'; btn.left = HOLD === 'left'; btn.fire = frames % 40 < 2; }
         for (const q of g.dropPlops) if (!seen.has(q.e)) { seen.add(q.e); spawned++; }
         maxPlops = Math.max(maxPlops, g.dropPlops.length);
-        if (frames === chuteAt + 300 || frames === chuteAt + 900) shots.push(frames);
+        const nb = g.children.list.filter((o) => o.texture?.key === 'w-bullet').length;
+        if (nb > (window.__nb || 0)) shots.push(frames);
+        window.__nb = nb;
+        if (frames === chuteAt + 240) window.__shotNow = true;
         if (!pl.alive || (chuteAt > 0 && !pl.chute && pl.onGround) || frames > 60 * 45) {
           g.events.off('preupdate', step);
           const cp = g.checkpoints.filter((c) => c.reached).map((c) => Math.round(c.x / 32));
-          done({ why: !pl.alive ? 'fainted' : frames > 60 * 45 ? 'timeout' : 'landed', secs: +((frames - chuteAt) / 60).toFixed(1), landX: +(pl.x / 32).toFixed(1), landH: g.level.data.height - Math.round(pl.bottom / 32), zone: [d.x0 / 32, d.x1 / 32], spawned, maxPlops, alive: pl.alive, checkpointsReached: cp, state: { x: +(pl.x / 32).toFixed(1), h: +((g.level.data.height * 32 - pl.bottom) / 32).toFixed(1), chute: !!pl.chute, ground: pl.onGround, goo: pl.goo, vy: Math.round(pl.body.velocity.y), chuteAt }, fps: Math.round(window.game.loop.actualFps) });
+          done({ why: !pl.alive ? 'fainted' : frames > 60 * 45 ? 'timeout' : 'landed', secs: +((frames - chuteAt) / 60).toFixed(1), landX: +(pl.x / 32).toFixed(1), landH: g.level.data.height - Math.round(pl.bottom / 32), zone: [d.x0 / 32, d.x1 / 32], spawned, maxPlops, shotsFired: shots.length, alive: pl.alive, checkpointsReached: cp, state: { x: +(pl.x / 32).toFixed(1), h: +((g.level.data.height * 32 - pl.bottom) / 32).toFixed(1), chute: !!pl.chute, ground: pl.onGround, goo: pl.goo, vy: Math.round(pl.body.velocity.y), chuteAt }, fps: Math.round(window.game.loop.actualFps) });
         }
       };
       g.events.on('preupdate', step);
     }), [di, HOLD]);
+    await p.waitForFunction(() => window.__shotNow, null, { timeout: 120000 }).catch(() => {});
+    await p.evaluate(() => (window.__shotNow = false));
+    await p.screenshot({ path: `shots/drop-mid-${label}.png` });
+    const res = await resP;
     console.log(HERO, HOLD, label, JSON.stringify(res));
+    await p.screenshot({ path: `shots/drop-${label}.png` });
   }
   console.log(errs.join('\n') || 'no errors');
   await br.close();
