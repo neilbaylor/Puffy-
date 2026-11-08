@@ -1,5 +1,4 @@
 import Phaser from 'phaser';
-import { preloadLevelMusic } from '../core/music';
 import { MIN_VIEW_W, TILE, VIEW_H } from '../config';
 import { bgKey, ensureLook, freeLooksExcept, lookJobs } from '../gfx/textures';
 import { buildLevel1 } from '../level/level1';
@@ -308,10 +307,10 @@ export class MenuScene extends Phaser.Scene {
   }
 
   /** The quiet-moment jobs for a Part being shown (see `quiet`). */
-  private planQuiet(id: number, near: number[], looks: readonly string[]): (() => void)[] {
+  private planQuiet(_id: number, near: number[], looks: readonly string[]): (() => void)[] {
     const jobs: (() => void)[] = [
       // first, what a click on a neighbouring Part needs: its look and its opening scenery; then
-      // this Part's song; then the rest of this Part's ground (the level's fly-over sweeps all of it in a few seconds: drawn
+      // the rest of this Part's ground (the level's fly-over sweeps all of it in a few seconds: drawn
       // here, it only has to be put up; if not, it's drawn a piece per frame as it goes)
       // (a Part whose fly-over is kept needs nothing)
       ...near
@@ -320,7 +319,6 @@ export class MenuScene extends Phaser.Scene {
           const a = themesFor(n)[0];
           return [...lookJobs(this, a), () => this.warmLook(a), () => this.prewarm(n)];
         }),
-      () => preloadLevelMusic(id),
     ];
     jobs.push(
       // (not in light mode: the level draws its ground as its fly-over reaches it)

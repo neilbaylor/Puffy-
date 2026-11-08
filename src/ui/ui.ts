@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { CHARACTERS, characterById, type CharacterDef } from '../data/characters';
 import type { Session } from '../core/session';
-import { fadeOutMusic, playLevelClear, playLevelMusic, playLevelSong, playMenuMusic, preloadHoopsMusic, primeMusic, setMusicMuted, stopMusic } from '../core/music';
+import { fadeOutMusic, playLevelClear, playLevelMusic, playLevelSong, playMenuMusic, preloadHoopsMusic, preloadLevelMusic, primeMusic, setMusicMuted, stopMusic } from '../core/music';
 import { isMuted, setMuted, sfx, unlockAudio } from '../core/sfx';
 import { drawHeroCard, drawPortrait, renderPoseSet } from '../gfx/draw';
 import { NEUTRAL_FACE, type Face } from '../gfx/face';
@@ -1086,6 +1086,9 @@ export class UI {
     if (this.starting) return;
     this.starting = true;
     sfx.select();
+    // the level's song: fetched and decoded while the loading card is up (not on the start screen
+    // for every Part looked at: that was work and memory spent while browsing)
+    preloadLevelMusic(this.level);
     void this.gameArt(
       session.players.map((p) => p.characterId),
       this.level,
