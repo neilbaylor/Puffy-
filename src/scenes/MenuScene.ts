@@ -102,7 +102,7 @@ export class MenuScene extends Phaser.Scene {
     if (progress.beaten < 1 || LIGHT) return [];
     // (every Part: there are only a few, and with one still look each on the start screen they're
     // light enough to keep; the nearest first)
-    return LEVELS.filter((l) => l.build && l.id !== id)
+    return LEVELS.filter((l) => l.build && l.id !== id && l.id <= progress.beaten + 1)
       .sort((a, b) => Math.abs(a.id - id) - Math.abs(b.id - id))
       .map((l) => l.id);
   }
