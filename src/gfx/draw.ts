@@ -219,7 +219,28 @@ const EDGE = 12;
 /** Each hero + pose's drawn outline, measured once (so redrawing a new face is cheap). */
 const portraitBox = new Map<string, [number, number, number, number]>();
 
+/**
+ * Finished portraits (hero + pose + face, at a size), kept: the HUD's and the cards' heroes flip
+ * between the same few every second or so, and drawing the whole hero each time made a little
+ * stutter on phones. (A handful at most, so they're cheap to keep.)
+ */
+const portraitCache = new Map<string, HTMLCanvasElement>();
+
 export function drawPortrait(target: HTMLCanvasElement, ch: CharacterDef, pose: Pose = 'idle0', f?: Face, boxPose: Pose = pose) {
+  const key = `${ch.id}|${ch.colors.main}|${pose}|${boxPose}|${f ? `${f.lookX},${f.lookY},${f.blink ? 1 : 0},${f.mouth}` : '-'}|${target.width}x${target.height}`;
+  let done = portraitCache.get(key);
+  if (!done) {
+    done = canvas(target.width, target.height).c;
+    paintPortrait(done, ch, pose, f, boxPose);
+    if (portraitCache.size >= 48) portraitCache.delete(portraitCache.keys().next().value!);
+    portraitCache.set(key, done);
+  }
+  const ctx = target.getContext('2d')!;
+  ctx.clearRect(0, 0, target.width, target.height);
+  ctx.drawImage(done, 0, 0);
+}
+
+function paintPortrait(target: HTMLCanvasElement, ch: CharacterDef, pose: Pose, f: Face | undefined, boxPose: Pose) {
   const R = 4;
   const { c: tmp, ctx: t } = canvas((CHAR_W + EDGE * 2) * R, (CHAR_H + EDGE) * R);
   t.scale(R, R);

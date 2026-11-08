@@ -556,9 +556,10 @@ export class WrestleScene extends Phaser.Scene {
     this.crowd = this.add.image(0, 0, 'wr-crowd').setOrigin(0).setScale(AS_).setDepth(DEPTH_W.crowd);
     this.add.image(0, 0, 'wr-front').setOrigin(0).setScale(AS_).setDepth(DEPTH_W.front);
     this.jumboTex = this.textures.exists('wr-jumbo') ? (this.textures.get('wr-jumbo') as Phaser.Textures.CanvasTexture) : this.textures.createCanvas('wr-jumbo', JUMBO.w * 2, JUMBO.h * 2)!;
-    this.add.image(WX(JUMBO.x), WY(JUMBO.y), 'wr-jumbo').setOrigin(0).setScale((JUMBO.s * K) / 2).setDepth(DEPTH_W.screens);
+    // (the screens glow: they're in front of the darkness when the lights go down, like the basketball jumbotron)
+    this.add.image(WX(JUMBO.x), WY(JUMBO.y), 'wr-jumbo').setOrigin(0).setScale((JUMBO.s * K) / 2).setDepth(DEPTH_W.dark + 0.05);
     this.ribbonTex = this.textures.exists('wr-ribbon') ? (this.textures.get('wr-ribbon') as Phaser.Textures.CanvasTexture) : this.textures.createCanvas('wr-ribbon', RIBBON.w * 2, RIBBON.h * 2)!;
-    this.add.image(WX(RIBBON.x), WY(RIBBON.y), 'wr-ribbon').setOrigin(0).setScale(K / 2).setDepth(DEPTH_W.screens);
+    this.add.image(WX(RIBBON.x), WY(RIBBON.y), 'wr-ribbon').setOrigin(0).setScale(K / 2).setDepth(DEPTH_W.dark + 0.05);
     this.add.image(WX(RING_BOX.x), WY(RING_BOX.y), 'wr-ring').setOrigin(0).setScale(K / RES).setDepth(DEPTH_W.ring);
     this.add.image(WX(-160), WY(500), 'wr-ringside').setOrigin(0).setScale(K / 1.5).setDepth(DEPTH_W.ringside);
     for (const x of [RING.x0, RING.x1])

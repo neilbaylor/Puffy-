@@ -3,7 +3,7 @@
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve } from 'node:path';
-import { gzipSync } from 'node:zlib';
+import { brotliCompress, constants as zlibConst, gzipSync } from 'node:zlib';
 
 // (Node's built-in SQLite, used for player accounts, is still labelled "experimental" and says so
 // at start-up; it works fine, so that one warning is skipped to keep the logs clean)
@@ -33,8 +33,14 @@ async function load(path) {
   if (cache.has(path)) return cache.get(path);
   const body = await readFile(path);
   const ext = extname(path);
-  const entry = { body, gz: COMPRESS.has(ext) ? gzipSync(body) : null, type: TYPES[ext] ?? 'application/octet-stream' };
+  const entry = { body, gz: COMPRESS.has(ext) ? gzipSync(body) : null, br: null, type: TYPES[ext] ?? 'application/octet-stream' };
   cache.set(path, entry);
+  // brotli as well (about a fifth smaller than gzip for the game's code: a quicker first load on
+  // phones), made in the background at its best setting; gzip is served until it's ready
+  if (entry.gz)
+    brotliCompress(body, { params: { [zlibConst.BROTLI_PARAM_QUALITY]: 11, [zlibConst.BROTLI_PARAM_SIZE_HINT]: body.length } }, (err, out) => {
+      if (!err) entry.br = out;
+    });
   return entry;
 }
 
@@ -45,6 +51,15 @@ try {
   userApi = await createUserApi();
 } catch (e) {
   console.warn('User accounts not available:', e.message);
+}
+
+// the game's own files compressed straight away at start-up (not on the first visit)
+try {
+  const { readdir } = await import('node:fs/promises');
+  for (const f of await readdir(join(ROOT, 'assets'))) if (COMPRESS.has(extname(f))) await load(join(ROOT, 'assets', f));
+  await load(join(ROOT, 'index.html'));
+} catch {
+  /* (no build yet) */
 }
 
 const server = createServer(async (req, res) => {
@@ -70,7 +85,12 @@ const server = createServer(async (req, res) => {
       res.writeHead(206, { ...headers, 'Accept-Ranges': 'bytes', 'Content-Range': `bytes ${start}-${end}/${f.body.length}`, 'Content-Length': end - start + 1 });
       return void res.end(f.body.subarray(start, end + 1));
     }
-    if (f.gz && /\bgzip\b/.test(req.headers['accept-encoding'] ?? '')) {
+    const accept = req.headers['accept-encoding'] ?? '';
+    if (f.br && /\bbr\b/.test(accept)) {
+      res.writeHead(200, { ...headers, 'Content-Encoding': 'br', Vary: 'Accept-Encoding' });
+      return void res.end(f.br);
+    }
+    if (f.gz && /\bgzip\b/.test(accept)) {
       res.writeHead(200, { ...headers, 'Content-Encoding': 'gzip', Vary: 'Accept-Encoding' });
       return void res.end(f.gz);
     }

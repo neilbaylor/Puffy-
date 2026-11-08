@@ -171,7 +171,9 @@ export class VolleyMatch {
         const through = this.prevY <= bottom && this.ball.y >= top;
         const reach = Math.abs(rec.x - this.ball.x) < 26 && through && b.velocity.y > 0;
         if (reach) {
-          if (this.state === 'alert' && hero && hero.alive) this.spike(rec, hero);
+          // (only once the spiker is well on screen, so you see it coming: till then they keep
+          // the rally going)
+          if (this.state === 'alert' && hero && hero.alive && this.onScreen(rec.x)) this.spike(rec, hero);
           else this.bump(rec);
         } else if (b.blocked.down && Math.abs(b.velocity.y) < 40) {
           // it hit the sand: whoever's nearest picks it up and serves again
@@ -201,6 +203,7 @@ export class VolleyMatch {
         if (Math.abs(f.x - this.ball.x) < 16 && (b.blocked.down || this.ball.y > this.ground - 30)) {
           this.state = 'hold';
           this.timer = 0.55;
+          this.held = 0;
           b.moves = false;
           b.setVelocity(0, 0);
         }
@@ -216,6 +219,9 @@ export class VolleyMatch {
         }
         this.ball.setPosition(f.x, f.body.top - R - 2);
         this.timer -= dt;
+        this.held += dt;
+        // (holds it up a little longer, up to 2 s, till it's well on screen: then you see the spike)
+        if (this.timer <= 0 && this.dangerousMode && hero && hero.alive && Math.abs(hero.x - f.x) < 460 && !this.onScreen(f.x) && this.held < 2) this.timer = 0.05;
         if (this.timer <= 0) {
           b.moves = true;
           if (this.dangerousMode && hero && hero.alive && Math.abs(hero.x - f.x) < 460) this.spike(f, hero);
@@ -232,6 +238,14 @@ export class VolleyMatch {
 
   /** Once they've seen you, every touch is a spike at you. */
   private dangerousMode = false;
+  /** How long the ball has been held up (before a spike). */
+  private held = 0;
+
+  /** Well inside the camera's view (not just peeking in at an edge). */
+  private onScreen(x: number) {
+    const v = this.gs.cameras.main.worldView;
+    return x > v.x + v.width * 0.2 && x < v.right - v.width * 0.2;
+  }
 
   private nearest(list: VolleyPlop[], x: number) {
     return list.reduce((a, c) => (Math.abs(c.x - x) < Math.abs(a.x - x) ? c : a));

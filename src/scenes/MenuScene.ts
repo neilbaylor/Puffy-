@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { preloadLevelMusic } from '../core/music';
 import { MIN_VIEW_W, TILE, VIEW_H } from '../config';
-import { bgKey, ensureLook, freeLooksExcept } from '../gfx/textures';
+import { bgKey, ensureLook, freeLooksExcept, lookJobs } from '../gfx/textures';
 import { buildLevel1 } from '../level/level1';
 import { LEVELS, latestLevel, levelInfo, levelName, progress } from '../level/levels';
 import { Background } from '../world/Background';
@@ -177,19 +177,22 @@ export class MenuScene extends Phaser.Scene {
     this.level = new LevelView(this, data, { lazyNear: this.x0, lazySpan: this.firstSpan() });
     this.quiet = [
       // first, what a click on a neighbouring Part needs: the look it'd show right now and
-      // its opening scenery; then this Part's song (so Play doesn't wait for it), then the rest
+      // its opening scenery; then this Part's song and its other looks (Play needs all of them
+      // straight away: not drawn yet, pressing Play stalled while they were), then the rest
       // of this Part's ground (the level's fly-over sweeps all of it in a few seconds: drawn
-      // here, it only has to be put up), then the other looks, which only show up later as
-      // the colours drift
-      ...near.flatMap((n) => [() => this.warmLook(themeMix(themeClock.t, themesFor(n)).a), () => this.prewarm(n)]),
+      // here, it only has to be put up; if not, it's drawn a piece per frame as it goes)
+      ...near.flatMap((n) => {
+        const a = themeMix(themeClock.t, themesFor(n)).a;
+        return [...lookJobs(this, a), () => this.warmLook(a), () => this.prewarm(n)];
+      }),
       () => preloadLevelMusic(id),
+      ...looks.flatMap((l) => [...lookJobs(this, l), () => this.warmLook(l)]),
       ...this.level.paintJobs().map((job) => () => {
         const key = job();
         if (key) this.painted.push(key);
         if (key) this.warmOnGpu([this.add.image(0, 0, key).setOrigin(0).setScrollFactor(0).setScale(0.05)]);
       }),
-      ...looks.map((l) => () => this.warmLook(l)),
-      ...near.flatMap((n) => themesFor(n).map((l) => () => this.warmLook(l))),
+      ...near.flatMap((n) => themesFor(n).flatMap((l) => [...lookJobs(this, l), () => this.warmLook(l)])),
     ];
     // loop over about a fifth of the level (at least a good stretch); nothing past it is drawn
     const vw = this.scale.width / Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W);
@@ -210,7 +213,9 @@ export class MenuScene extends Phaser.Scene {
     // one quiet-moment job at a time (straight away, not after the rest of the game's art:
     // a click on another Part is the very next thing people do)
     const now = performance.now();
-    if (this.quiet.length && now - this.lastInput > 600 && now - this.lastQuiet > 200) {
+    // (a second after the last tap: someone tapping their way around the start screen is never
+    // kept waiting behind one)
+    if (this.quiet.length && now - this.lastInput > 1000 && now - this.lastQuiet > 200) {
       this.quiet.shift()!();
       this.lastQuiet = performance.now();
     }
