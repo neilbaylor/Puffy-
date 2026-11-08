@@ -29,9 +29,12 @@ const WALK: Record<'walk0' | 'walk1' | 'walk2' | 'walk3', [number, number, numbe
 export const PLOP_W = 96;
 export const PLOP_H = 104;
 
+/** The royals' brown (Queen Plop, the King). */
 const BODY0: Fill = { base: '#8b5434', shade: '#5f3520', light: '#b98058' };
-const BIG_BODY: Fill = { base: '#74432a', shade: '#4c2a18', light: '#a06a48' };
-const SMALL_BODY: Fill = { base: '#9c6240', shade: '#6e4128', light: '#c99068' };
+/** Each size of Plop its own shade of poo: small ones a light caramel, medium a reddish brown, the big ones dark chocolate. */
+const SMALL_BODY: Fill = { base: '#a8743f', shade: '#7a4f26', light: '#d6a46c' };
+const MED_BODY: Fill = { base: '#894a2c', shade: '#5c2f1a', light: '#b77856' };
+const BIG_BODY: Fill = { base: '#5c3a22', shade: '#3a2213', light: '#8c6346' };
 const CAPE: Fill = { base: '#d8243a', shade: '#9c1426', light: '#ff6a7a' };
 const LEG: Fill = { base: '#6e3f25', shade: '#4a2716', light: '#9a6440' };
 const EYE: Fill = { base: '#ffffff', shade: '#ece4dc', light: '#ffffff' };
@@ -59,11 +62,11 @@ export const PLOP_KINDS: PlopKind[] = ['small', 'medium', 'large', 'king'];
 /** How big each kind is shown in the game (relative). */
 export const PLOP_SCALE: Record<PlopKind, number> = { small: 0.68, medium: 1, large: 1.32, king: 1.5 };
 
-export function drawPlop(ctx: Ctx, ox: number, oy: number, f: PlopFrame, st: Style, kind: PlopKind | boolean = 'medium') {
+export function drawPlop(ctx: Ctx, ox: number, oy: number, f: PlopFrame, st: Style, kind: PlopKind | boolean = 'medium', body?: Fill) {
   if (kind === true) kind = 'king';
   if (kind === false) kind = 'medium';
   const crowned = kind === 'king';
-  const BODY = kind === 'large' ? BIG_BODY : kind === 'small' ? SMALL_BODY : BODY0;
+  const BODY = body ?? (kind === 'large' ? BIG_BODY : kind === 'small' ? SMALL_BODY : kind === 'medium' ? MED_BODY : BODY0);
   const ground = oy + 100;
   const cx = ox + 50;
   const walk = f in WALK ? WALK[f as keyof typeof WALK] : null;
@@ -255,7 +258,7 @@ export function drawQueen(ctx: Ctx, ox: number, oy: number, f: PlopFrame, st: St
   ST.shape(ctx, [[cx - 26, botY - 28], [cx + 26, botY - 28], ...hem], PINK, 3005, { lw: 1.1, light: [cx - 14, botY - 10] });
   for (let k = -40; k <= 40; k += 10) ST.shape(ctx, ellipsePts(cx + k + flare * (Math.abs(k) / 44), ground - 4 + (Math.abs(k) % 20 === 0 ? -1 : 2), 2.1, 2.1, 0, 10), SILVER, 3006 + k, { lw: 0.5, plain: true });
   for (const fx of [-20, 18]) st.line(ctx, [[cx + fx * 0.45, botY - 18], [cx + fx * 0.8 + flare, ground - 12]], 3007 + fx, 0.8, '#b23272');
-  drawPlop(ctx, ox, oy, f, st, 'medium');
+  drawPlop(ctx, ox, oy, f, st, 'medium', BODY0);
   // her championship belt: leather round her middle, a big gold plate with a crown on it
   const beltY = botY + 11 + (hurt ? 1 : 0);
   ST.shape(ctx, [[cx - 33, beltY - 4], [cx - 16, beltY - 1], [cx + 16, beltY - 1], [cx + 33, beltY - 4], [cx + 31, beltY + 3], [cx + 15, beltY + 6], [cx - 15, beltY + 6], [cx - 31, beltY + 3]], LEATHER, 3050, { lw: 0.9, light: [cx - 10, beltY - 2] });
