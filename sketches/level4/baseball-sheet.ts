@@ -1,7 +1,8 @@
 import { CHARACTERS } from '../wt-battle/src/data/characters';
 import { drawCharacter } from '../wt-battle/src/gfx/draw';
 import { STYLES, type Pt } from '../wt-battle/src/gfx/handdrawn';
-import { PARK, drawBallparkBack, drawBallparkFront, drawBaseball, drawBaseballPlop, drawBat, drawLineDrive, parkSpots, type BaseballRole } from '../wt-battle/src/gfx/baseball';
+import { PLOP_COLOURS } from '../wt-battle/src/gfx/plops';
+import { PARK, TEAM, drawBallparkBack, drawBallparkFront, drawBaseball, drawBaseballPlop, drawBat, drawLineDrive, parkSpots, type BaseballRole } from '../wt-battle/src/gfx/baseball';
 
 const ST = STYLES.polished;
 const FONT = '"Lilita One", "Arial Black", sans-serif';
@@ -34,13 +35,16 @@ const sheet = (name: string, w: number, h: number) => { const c = document.creat
   ctx.translate(0, PARK.FRONT_UP);
   // the players, standing on the ground line (y = 0)
   const sp = parkSpots(FW);
-  const plop = (x: number, role: BaseballRole, flip = false, k = 0.68) => at(ctx, flip ? x + 48 * k : x - 48 * k, -100 * k, k, () => drawBaseballPlop(ctx, role, 'medium', 7 + x), flip);
+  let ci = 0;
+  const plop = (x: number, role: BaseballRole, flip = false, k = 0.68) => { const body = PLOP_COLOURS[ci++ % PLOP_COLOURS.length]; at(ctx, flip ? x + 48 * k : x - 48 * k, -100 * k, k, () => drawBaseballPlop(ctx, role, 'medium', 7 + x, body), flip); };
   plop(sp.mound.x, 'pitch-throw');
   plop(sp.home.x + 4, 'bat-swing', true);
   plop(sp.home.x + 52, 'catcher', true);
   plop(sp.second.x - 30, 'fielder');
   plop(PARK.END + 300, 'fielder');
   plop(PARK.END + 520, 'fielder-throw');
+  plop(sp.first.x - 95, 'runner', true);
+  plop(sp.home.x + 96, 'on-deck', true);
   // you, walking in from the left
   const hero = CHARACTERS[0];
   at(ctx, PARK.END + 90 - 28, -54, 1, () => drawCharacter(ctx, 0, 0, hero, 'walk2'));
@@ -52,17 +56,20 @@ const sheet = (name: string, w: number, h: number) => { const c = document.creat
 }
 // 2) the players
 {
-  const roles: [BaseballRole, string, boolean][] = [
-    ['pitch-windup', 'pitcher: wind-up', false], ['pitch-throw', 'pitcher: throw!', false], ['bat-stance', 'batter: stance', true], ['bat-swing', 'batter: CRACK!', true],
-    ['catcher', 'catcher', true], ['fielder', 'fielder', false], ['fielder-throw', 'fielder: throws it in', false],
-  ];
-  const ctx = sheet('players', 1600, 380);
-  label(ctx, 'The Plops playing baseball', 800, 40, 28);
-  roles.forEach(([role, t, flip], i) => {
-    const x = 120 + i * 225;
-    const k = 1.9;
-    at(ctx, flip ? x + 48 * k : x - 48 * k, 320 - 100 * k, k, () => drawBaseballPlop(ctx, role, 'medium', 30 + i), flip);
-    label(ctx, t, x, 360, 18);
+  const sox: [BaseballRole, string, boolean][] = [['pitch-windup', 'pitcher: wind-up', false], ['pitch-throw', 'pitcher: throw!', false], ['catcher', 'catcher', true], ['fielder', 'fielder', false], ['fielder-throw', 'fielder: throws it in', false]];
+  const swat: [BaseballRole, string, boolean][] = [['bat-stance', 'batter: stance', true], ['bat-swing', 'batter: CRACK!', true], ['on-deck', 'on deck', true], ['runner', 'runner', false]];
+  const ctx = sheet('players', 1240, 760);
+  label(ctx, 'The Plops playing baseball: two teams, every Plop its own colour', 620, 40, 26);
+  let ci = 0;
+  ([[TEAM.sox.name + ' (blue caps): fielding', sox, 330], [TEAM.swatters.name + ' (red caps): batting', swat, 690]] as const).forEach(([title, list, base]) => {
+    label(ctx, title, 620, base - 236, 22, '#5a3a22');
+    list.forEach(([role, t, flip], i) => {
+      const x = 130 + i * 245;
+      const k = 1.7;
+      const body = PLOP_COLOURS[ci++ % PLOP_COLOURS.length];
+      at(ctx, flip ? x + 48 * k : x - 48 * k, base - 100 * k, k, () => drawBaseballPlop(ctx, role, 'medium', 30 + i, body), flip);
+      label(ctx, t, x, base + 30, 17);
+    });
   });
 }
 // 3) the ball, the bat

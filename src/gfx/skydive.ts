@@ -307,7 +307,7 @@ export function drawHeroChute(ctx: Ctx, ch: CharacterDef, pose: Pose, state: Chu
  *  - 'fast': just a little streamer chute, flapping, coming down fast (speed lines)
  *  - 'popped': hit: the canopy torn and flapping, the Plop dropping out of the sky
  */
-export function drawPlopChute(ctx: Ctx, kind: PlopKind, how: 'slow' | 'mid' | 'fast' | 'popped', seed = 3) {
+export function drawPlopChute(ctx: Ctx, kind: PlopKind, how: 'slow' | 'mid' | 'fast' | 'popped', seed = 3, body?: Fill) {
   const cx = 48;
   // (the lines clip on at either side of the body; a belt round its middle)
   const grip: [Pt, Pt] = [[20, 64], [76, 64]];
@@ -364,7 +364,7 @@ export function drawPlopChute(ctx: Ctx, kind: PlopKind, how: 'slow' | 'mid' | 'f
     drawLines(ctx, hem, grip[0], grip[1], seed + 20);
     if (how === 'slow') flies(ctx, cx, top + H * 0.4, W, seed + 30);
   }
-  drawPlop(ctx, 0, 0, frame, ST, kind);
+  drawPlop(ctx, 0, 0, frame, ST, kind, body);
   // a belt round its middle, rings where the lines clip on
   {
     ST.line(ctx, [[grip[0][0] + 2, 76], [cx, 79], [grip[1][0] - 2, 76]], seed + 80, 1.4, '#3c5a8a');
