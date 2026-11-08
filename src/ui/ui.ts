@@ -19,8 +19,8 @@ import { bossData } from '../scenes/WrestleScene';
 
 /** The boss at the end of each level (the Bosses menu lists the ones from levels you've beaten). */
 const BOSSES = [
-  { level: 1, name: 'King Basketball 1', scene: 'Hoops' },
-  { level: 2, name: 'King Basketball 2', scene: 'Hoops' },
+  { level: 1, name: 'King Puff Ball Basketball 1', scene: 'Hoops' },
+  { level: 2, name: 'King Puff Ball Basketball 2', scene: 'Hoops' },
   { level: 3, name: 'Queen Plop Wrestling', scene: 'Wrestle' },
 ] as const;
 import { resetLives } from '../core/lives';
@@ -992,7 +992,6 @@ export class UI {
       const btn = this.screen?.querySelector<HTMLButtonElement>('[data-act=play]');
       if (btn) btn.textContent = 'Loading…';
       this.game.events.once('assets-ready', () => this.play());
-      this.game.events.emit('need-assets');
       return;
     }
     unlockAudio();
@@ -1008,7 +1007,7 @@ export class UI {
     const open = BOSSES.filter((b) => progress.beaten >= b.level);
     const el = h(`<div class="screen modal bosses">
       <div class="panel boss-panel">
-        <h2>Boss battles</h2>
+        <h2>Boss Battles</h2>
         <div class="boss-list">${open
           .map((b) => `<button class="btn boss-btn" data-boss="${b.level}"><b>${b.name}</b><small>${esc(levelName(b.level))}</small></button>`)
           .join('')}</div>
@@ -1027,7 +1026,6 @@ export class UI {
   private playBoss(level: number) {
     if (!this.game.registry.get('ready')) {
       this.game.events.once('assets-ready', () => this.playBoss(level));
-      this.game.events.emit('need-assets');
       return;
     }
     const boss = BOSSES.find((b) => b.level === level);

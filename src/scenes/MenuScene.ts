@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { preloadLevelMusic } from '../core/music';
 import { MIN_VIEW_W, TILE, VIEW_H } from '../config';
-import { bgKey, ensureLook, freeLooksExcept, lookJobs } from '../gfx/textures';
+import { bgKey, ensureLook, freeLooksExcept, lookJobs, plopJobs } from '../gfx/textures';
 import { buildLevel1 } from '../level/level1';
 import { LEVELS, latestLevel, levelInfo, levelName, progress } from '../level/levels';
 import { Background } from '../world/Background';
@@ -67,10 +67,16 @@ export class MenuScene extends Phaser.Scene {
    */
   private quiet: (() => void)[] = [];
 
-  /** The quiet-moment jobs still to do, taken off the list (the loading screen does them up front). */
+  /** How many of the quiet jobs at the front of the list are what a first tap needs (the other Parts' openings, this Part's song). */
+  private essential = 0;
+
+  /**
+   * The quiet-moment jobs a first tap needs, taken off the list (the loading screen does those up
+   * front; the rest — this Part's whole ground, its other looks — are left for quiet moments after).
+   */
   takeQuietJobs() {
-    const jobs = this.quiet;
-    this.quiet = [];
+    const jobs = this.quiet.splice(0, this.essential);
+    this.essential = 0;
     return jobs;
   }
   /** Ground pictures drawn ahead in quiet moments (a whole level's, for its fly-over). */
@@ -157,9 +163,10 @@ export class MenuScene extends Phaser.Scene {
     // levels next to it in the picker are drawn in quiet moments. Only those stay in memory:
     // everything else is freed (not while a battle or a game is showing too: they have their own)
     const looks = themesFor(id);
-    const mix = themeMix(themeClock.t, looks);
-    ensureLook(this, mix.a);
-    if (mix.w > 0) ensureLook(this, mix.b);
+    // the start screen shows each level in its first look, still (no drifting between looks here:
+    // only one look per level to draw and keep); the game starts from that look too
+    themeClock.t = 0;
+    ensureLook(this, looks[0]);
     // (kept drawn: the Parts next to this one in the picker, and the one you just came from)
     const near = [...new Set([...this.neighbours(id), this.prevId])].filter((n) => n && n !== id && levelInfo(n).build);
     const data = (levelInfo(id).build ?? buildLevel1)();
@@ -169,31 +176,35 @@ export class MenuScene extends Phaser.Scene {
     for (const k of stale) if (this.textures.exists(k)) this.textures.remove(k);
     this.painted = this.painted.filter((k) => !stale.includes(k));
     if (!this.scene.isActive('Battle') && !this.scene.isActive('Game')) {
-      freeLooksExcept(this, [...looks, ...near.flatMap((n) => themesFor(n))]);
+      freeLooksExcept(this, [...looks, ...near.map((n) => themesFor(n)[0])]);
       const keep = [data.name, ...near.map((n) => levelName(n))];
       for (const k of this.textures.getTextureKeys())
         if ((k.startsWith('terrain-') || k.startsWith('tree-')) && !keep.some((name) => k.startsWith(`terrain-${name}-`) || k.startsWith(`tree-${name}-`))) this.textures.remove(k);
     }
     this.level = new LevelView(this, data, { lazyNear: this.x0, lazySpan: this.firstSpan() });
     this.quiet = [
-      // first, what a click on a neighbouring Part needs: the look it'd show right now and
-      // its opening scenery; then this Part's song and its other looks (Play needs all of them
-      // straight away: not drawn yet, pressing Play stalled while they were), then the rest
-      // of this Part's ground (the level's fly-over sweeps all of it in a few seconds: drawn
+      // first, what a click on a neighbouring Part needs: its look and its opening scenery; then
+      // this Part's song (the loading screen does these up front: see takeQuietJobs); then the
+      // rest of this Part's ground (the level's fly-over sweeps all of it in a few seconds: drawn
       // here, it only has to be put up; if not, it's drawn a piece per frame as it goes)
       ...near.flatMap((n) => {
-        const a = themeMix(themeClock.t, themesFor(n)).a;
+        const a = themesFor(n)[0];
         return [...lookJobs(this, a), () => this.warmLook(a), () => this.prewarm(n)];
       }),
       () => preloadLevelMusic(id),
-      ...looks.flatMap((l) => [...lookJobs(this, l), () => this.warmLook(l)]),
+      // (Plop Invasion's Plops: only that level has them)
+      ...(id === 3 ? plopJobs(this) : []),
+    ];
+    this.essential = this.quiet.length;
+    this.quiet.push(
       ...this.level.paintJobs().map((job) => () => {
         const key = job();
         if (key) this.painted.push(key);
         if (key) this.warmOnGpu([this.add.image(0, 0, key).setOrigin(0).setScrollFactor(0).setScale(0.05)]);
       }),
-      ...near.flatMap((n) => themesFor(n).flatMap((l) => [...lookJobs(this, l), () => this.warmLook(l)])),
-    ];
+      // (this Part's other looks last: the game only drifts into them 20 seconds in)
+      ...looks.slice(1).flatMap((l) => [...lookJobs(this, l), () => this.warmLook(l)]),
+    );
     // loop over about a fifth of the level (at least a good stretch); nothing past it is drawn
     const vw = this.scale.width / Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W);
     this.loopEnd = this.x0 + Math.max(this.level.widthPx * 0.2, 1800);
@@ -259,9 +270,8 @@ export class MenuScene extends Phaser.Scene {
     cam.setZoom(zoom * (1.04 + 0.04 * Math.sin(t * 0.13 + 2)));
     cam.setRotation(0.012 * Math.sin(t * 0.19) + 0.005 * Math.sin(t * 0.47 + 1.3));
     cam.centerOn(this.x + vw / 2, top + vh / 2);
-    // the looks keep drifting behind the start screen too (same clock as the game)
-    themeClock.t += dt;
-    const m = themeMix(themeClock.t, themesFor(this.levelId));
+    // (one still look per level here: see build)
+    const m = themeMix(0, themesFor(this.levelId));
     this.bg.setTheme(m);
     this.level.setTint(mixTint(m));
     this.level.animate(this.time.now / 1000, this.x, this.x + vw);

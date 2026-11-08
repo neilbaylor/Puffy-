@@ -9,7 +9,7 @@
 import { CHARACTERS, type CharacterDef } from '../../data/characters';
 import type { LevelData } from '../../level/builder';
 import { ONE_WAY_TILES, SOLID_TILES } from '../../level/tiles';
-import { ARENA_RAMPS, ARENA_SPAWNS, type Ramp } from './arena';
+import { ARENA_RAMPS, ARENA_SECTION, ARENA_SPAWNS, ARENA_STARTS, type Ramp } from './arena';
 
 export const TICK_HZ = 30;
 export const DT = 1 / TICK_HZ;
@@ -179,7 +179,7 @@ export type BEvent =
   | { k: 'jump'; id: string; air: boolean }
   | { k: 'boom'; x: number; y: number; r: number }
   | { k: 'hit'; id: string; by: string }
-  | { k: 'ko'; id: string; by: string | null }
+  | { k: 'ko'; id: string; by: string | null; gift?: boolean }
   | { k: 'spawn'; id: string }
   | { k: 'drop'; x: number; kind: PrizeKind }
   | { k: 'prize'; id: string; kind: PrizeKind; x: number; y: number }
@@ -499,7 +499,7 @@ export class BattleSim {
   /** Put a hero at a spawn point: the given one, or the one farthest from everyone else. */
   private spawn(p: BPlayer, index?: number) {
     let best = ARENA_SPAWNS[0];
-    if (index !== undefined) best = ARENA_SPAWNS[index % ARENA_SPAWNS.length];
+    if (index !== undefined) best = ARENA_STARTS[index % ARENA_STARTS.length];
     else {
       let bestD = -1;
       for (const s of ARENA_SPAWNS) {
@@ -682,10 +682,16 @@ export class BattleSim {
       p.respawn = RESPAWN_SECS;
       p.deaths++;
       const killer = this.players.get(by);
+      let gift = false;
       if (killer) killer.kos++;
-      // knocked out by a bad guy or something from the sky (not a friend): you lose a point (never below 0)
-      else p.kos = Math.max(0, p.kos - 1);
-      ev.push({ k: 'ko', id: p.id, by });
+      // knocked out by a bad guy or something from the sky (not a friend): you lose a point; with
+      // none to lose, everyone else gets one instead
+      else if (p.kos > 0) p.kos--;
+      else {
+        gift = true;
+        for (const q of this.players.values()) if (q !== p) q.kos++;
+      }
+      ev.push({ k: 'ko', id: p.id, by, gift });
     }
   }
 
@@ -776,7 +782,7 @@ export class BattleSim {
         let x = 0;
         const high = (px: number) => landingY(this.map, px) < 7 * TILE_PX;
         for (let tries = 0; tries < 16; tries++) {
-          x = (2 + Math.floor(Math.random() * (this.map.w - 4)) + 0.5) * TILE_PX;
+          x = (Math.floor(this.nearSomeone(ARENA_SECTION * 0.45) / TILE_PX) + 0.5) * TILE_PX;
           if (this.prizes.some((q) => Math.abs(q.x - x) < 90)) continue;
           if (high(x) && (Math.random() < 0.75 || this.prizes.some((q) => high(q.x)))) continue;
           break;
@@ -852,11 +858,26 @@ export class BattleSim {
     }
   }
 
+  /**
+   * Somewhere near one of the heroes (the arena is four screens wide: things turn up where people
+   * are, not off in an empty corner), within `span` tiles either side, clear of the walls (world px).
+   */
+  private nearSomeone(span: number, margin = 2) {
+    const heroes = [...this.players.values()].filter((p) => p.respawn <= 0);
+    const T = TILE_PX;
+    const lo = margin * T;
+    const hi = this.map.widthPx - margin * T;
+    if (!heroes.length) return lo + Math.random() * (hi - lo);
+    const p = heroes[Math.floor(Math.random() * heroes.length)];
+    return Math.max(lo, Math.min(hi, p.x + (Math.random() * 2 - 1) * span * T));
+  }
+
   // ── bad guys ──
 
   /** Room for one more? Up to three at once, at most one of them big. */
   private enemyBudget(): EnemyKind | null {
-    if (this.enemies.length >= 2) return null;
+    // (the arena's four screens wide: a few more about, so there's some near everyone)
+    if (this.enemies.length >= Math.min(4, 1 + this.players.size)) return null;
     const hasBig = this.enemies.some((e) => e.kind === 'big');
     const r = Math.random();
     if (!hasBig && r < 0.32) return 'big';
@@ -872,14 +893,21 @@ export class BattleSim {
     let x: number;
     let y: number;
     if (chute) {
-      // floats down somewhere over the arena
-      x = (3 + Math.random() * (this.map.w - 6)) * T;
+      // floats down somewhere near someone
+      x = this.nearSomeone(ARENA_SECTION * 0.4, 3);
       y = -20;
     } else {
-      // walks in from one side, on the raised ends of the floor
-      const left = Math.random() < 0.5;
-      x = left ? 1.5 * T : this.map.widthPx - 1.5 * T;
-      y = (this.map.h - 3) * T;
+      // walks in on the floor from just off someone's screen (or from an end of the arena, if that's nearer)
+      const heroes = [...this.players.values()].filter((p) => p.respawn <= 0);
+      const h = heroes[Math.floor(Math.random() * heroes.length)];
+      const side = Math.random() < 0.5 ? -1 : 1;
+      x = h ? h.x + side * ARENA_SECTION * 0.6 * T : side < 0 ? 1.5 * T : this.map.widthPx - 1.5 * T;
+      x = Math.max(1.5 * T, Math.min(this.map.widthPx - 1.5 * T, x));
+      // (standing on whatever's under it: the floor, or a rise)
+      let ty = 0;
+      const tx = Math.floor(x / T);
+      while (ty < this.map.h && !this.map.solid(tx, ty)) ty++;
+      y = ty * T;
     }
     // 1 in 3 (not the big ones) carry a weapon: Puff Balls a blaster, chainsaw or ball and chain
     // (small ones just the blaster); Plops any of the three. Armed ones take one more hit.
@@ -889,7 +917,10 @@ export class BattleSim {
       weapon = opts[Math.floor(Math.random() * opts.length)];
     }
     const hp = (kind === 'big' ? 5 : kind === 'medium' ? 2 : 1) + (weapon ? 1 : 0);
-    const dir: 1 | -1 = x < this.map.widthPx / 2 ? 1 : -1;
+    // (heading towards the nearest hero)
+    let near: BPlayer | null = null;
+    for (const p of this.players.values()) if (p.respawn <= 0 && (!near || Math.abs(p.x - x) < Math.abs(near.x - x))) near = p;
+    const dir: 1 | -1 = near ? (near.x >= x ? 1 : -1) : x < this.map.widthPx / 2 ? 1 : -1;
     this.enemies.push({ id: this.nextThing++, kind, race, weapon, x, y, vx: 0, vy: 0, dir, hp, onGround: !chute, armed: !!weapon, chute, fireCd: 1.5 + Math.random(), jumpCd: 1, hop: 1, hurtT: 0 });
     ev.push({ k: 'espawn', kind, x, chute });
   }
@@ -1060,7 +1091,7 @@ export class BattleSim {
       // now and then a shower of two or three
       const n = Math.random() < 0.3 ? 2 + Math.floor(Math.random() * 2) : 1;
       for (let i = 0; i < n; i++) {
-        const x = (2 + Math.random() * (this.map.w - 4)) * TILE_PX;
+        const x = this.nearSomeone(ARENA_SECTION * 0.45);
         // (rocks only: no more anvils)
         this.hazards.push({ id: this.nextThing++, kind: 'rock', big: Math.random() < 1 / 3, x, y: -40, vx: 0, vy: 0, warn: 1.1 + i * 0.35, rolling: 0 });
       }

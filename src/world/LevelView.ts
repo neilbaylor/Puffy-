@@ -29,6 +29,61 @@ function localTop(outline: Pt[], x0: number, x1: number) {
 }
 
 /**
+ * A level's pieces of one kind of terrain (outline + bounds), worked out once and kept (see
+ * LevelView.pieces). The loading screen works them out as a step of its own.
+ */
+export function levelPieces(d: LevelData, kind: TerrainKind): { outline: Pt[]; x0: number; y0: number; x1: number; y1: number }[] {
+  const cell = (x: number, y: number): Cell => d.cells[y]?.[x] ?? null;
+  const ck = `${d.name}|${kind}|${d.width}x${d.height}`;
+  const have = PIECES.get(ck);
+  if (have) return have;
+  const out: { outline: Pt[]; x0: number; y0: number; x1: number; y1: number }[] = [];
+  const seen = new Set<string>();
+  for (let y = 0; y < d.height; y++)
+    for (let x = 0; x < d.width; x++) {
+      if (cell(x, y) !== kind || seen.has(`${x},${y}`)) continue;
+      // flood fill one piece
+      const cells = new Set<string>();
+      const stack: Pt[] = [[x, y]];
+      while (stack.length) {
+        const [cx, cy] = stack.pop()!;
+        const k = `${cx},${cy}`;
+        if (seen.has(k) || cell(cx, cy) !== kind) continue;
+        seen.add(k);
+        cells.add(k);
+        stack.push([cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]);
+      }
+      // extend pieces past the level edges so no outline shows at the screen bottom/sides
+      for (const k of [...cells]) {
+        const [cx, cy] = k.split(',').map(Number);
+        if (cy === d.height - 1) for (let e = 1; e <= 3; e++) cells.add(`${cx},${cy + e}`);
+        if (cx === 0) for (let e = 1; e <= 3; e++) cells.add(`${-e},${cy}`);
+        if (cx === d.width - 1) for (let e = 1; e <= 3; e++) cells.add(`${cx + e},${cy}`);
+      }
+      for (const k of [...cells]) {
+        const [cx, cy] = k.split(',').map(Number);
+        if (cx < 0 && cy === d.height - 1) for (let e = 1; e <= 3; e++) cells.add(`${cx},${cy + e}`);
+        if (cx >= d.width && cy === d.height - 1) for (let e = 1; e <= 3; e++) cells.add(`${cx},${cy + e}`);
+      }
+      const loops = traceCells(cells);
+      const outline = roundPoly(loops[0].map(([px, py]) => [px * TILE, py * TILE] as Pt), kind === 'ground' ? 12 : 7);
+      let x0 = Infinity;
+      let y0 = Infinity;
+      let x1 = -Infinity;
+      let y1 = -Infinity;
+      for (const [px, py] of outline) {
+        x0 = Math.min(x0, px);
+        y0 = Math.min(y0, py);
+        x1 = Math.max(x1, px);
+        y1 = Math.max(y1, py);
+      }
+      out.push({ outline, x0, y0, x1, y1 });
+    }
+  PIECES.set(ck, out);
+  return out;
+}
+
+/**
  * Builds the level: an invisible tilemap for collision, plus the hand-drawn
  * world on top (organic terrain pieces, clouds, boulders, brambles, trees,
  * flowers). Shared by the menu backdrop and the game.
@@ -186,55 +241,8 @@ export class LevelView {
    * shapes never change, so it's done once per level and kept (switching Parts on the start screen,
    * and starting a level, then only have to put the pictures up).
    */
-  private pieces(kind: TerrainKind): { outline: Pt[]; x0: number; y0: number; x1: number; y1: number }[] {
-    const d = this.data;
-    const ck = `${d.name}|${kind}|${d.width}x${d.height}`;
-    const have = PIECES.get(ck);
-    if (have) return have;
-    const out: { outline: Pt[]; x0: number; y0: number; x1: number; y1: number }[] = [];
-    const seen = new Set<string>();
-    for (let y = 0; y < d.height; y++)
-      for (let x = 0; x < d.width; x++) {
-        if (this.cell(x, y) !== kind || seen.has(`${x},${y}`)) continue;
-        // flood fill one piece
-        const cells = new Set<string>();
-        const stack: Pt[] = [[x, y]];
-        while (stack.length) {
-          const [cx, cy] = stack.pop()!;
-          const k = `${cx},${cy}`;
-          if (seen.has(k) || this.cell(cx, cy) !== kind) continue;
-          seen.add(k);
-          cells.add(k);
-          stack.push([cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]);
-        }
-        // extend pieces past the level edges so no outline shows at the screen bottom/sides
-        for (const k of [...cells]) {
-          const [cx, cy] = k.split(',').map(Number);
-          if (cy === d.height - 1) for (let e = 1; e <= 3; e++) cells.add(`${cx},${cy + e}`);
-          if (cx === 0) for (let e = 1; e <= 3; e++) cells.add(`${-e},${cy}`);
-          if (cx === d.width - 1) for (let e = 1; e <= 3; e++) cells.add(`${cx + e},${cy}`);
-        }
-        for (const k of [...cells]) {
-          const [cx, cy] = k.split(',').map(Number);
-          if (cx < 0 && cy === d.height - 1) for (let e = 1; e <= 3; e++) cells.add(`${cx},${cy + e}`);
-          if (cx >= d.width && cy === d.height - 1) for (let e = 1; e <= 3; e++) cells.add(`${cx},${cy + e}`);
-        }
-        const loops = traceCells(cells);
-        const outline = roundPoly(loops[0].map(([px, py]) => [px * TILE, py * TILE] as Pt), kind === 'ground' ? 12 : 7);
-        let x0 = Infinity;
-        let y0 = Infinity;
-        let x1 = -Infinity;
-        let y1 = -Infinity;
-        for (const [px, py] of outline) {
-          x0 = Math.min(x0, px);
-          y0 = Math.min(y0, py);
-          x1 = Math.max(x1, px);
-          y1 = Math.max(y1, py);
-        }
-        out.push({ outline, x0, y0, x1, y1 });
-      }
-    PIECES.set(ck, out);
-    return out;
+  private pieces(kind: TerrainKind) {
+    return levelPieces(this.data, kind);
   }
 
   /** Connected pieces of one kind → one hand-drawn texture each (cached across restarts). */
@@ -252,8 +260,8 @@ export class LevelView {
           const top = Math.max(y0, localTop(outline, cx0 - PAD, cx0 + cw + PAD) - 24);
           // …and it stops a little below the lowest ground anyone can see from nearby:
           // the deep rock underneath is just a plain block of colour (saves lots of memory)
-          const deep = this.deepestSurface(cx0 - 700, cx0 + cw + 700);
-          const cut = Math.min(y1 + PAD, Math.max(top + 200, deep + 300));
+          const deep = this.deepestSurface(cx0 - 500, cx0 + cw + 500);
+          const cut = Math.min(y1 + PAD, Math.max(top + 200, deep + 240));
           const ch = cut - top + PAD;
           const key = `terrain-${d.name}-${kind}-${pieceId}-${ci}`;
           /** Just the picture (the start screen draws a level's in quiet moments, ahead of Play). */

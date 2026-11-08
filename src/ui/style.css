@@ -1908,6 +1908,13 @@ kbd {
   padding-bottom: 4px;
 }
 .bl-head { text-align: center; }
+/* the title's letters hop one after another, like the PUFFY logo's */
+.bl-title span {
+  display: inline-block;
+  transform-origin: 50% 90%;
+  animation: logo-hop 2.2s cubic-bezier(0.3, 0, 0.3, 1) infinite;
+  animation-delay: calc(var(--i) * 0.11s);
+}
 .bl-title {
   margin: 0;
   font-family: var(--display);

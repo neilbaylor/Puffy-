@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
 import { preloadMenuMusic, primeMusic } from '../core/music';
 import { textureSteps } from '../gfx/textures';
-import { latestLevel } from '../level/levels';
+import { latestLevel, levelInfo } from '../level/levels';
+import { buildLevel1 } from '../level/level1';
+import { levelPieces } from '../world/LevelView';
 
 /** Resolves on the next animation frame (or soon after, if frames are paused). */
 const nextFrame = () => new Promise<void>((r) => {
@@ -80,6 +82,16 @@ export class BootScene extends Phaser.Scene {
       await breathe();
     }
     mark('art (incl. frames between steps)');
+    // the level's terrain shapes worked out first, on their own (the slow part of putting the fly-over up)
+    {
+      const data = (levelInfo(level).build ?? buildLevel1)();
+      levelPieces(data, 'ground');
+      await nextFrame();
+      levelPieces(data, 'rock');
+      await nextFrame();
+      slice = performance.now();
+    }
+    mark('terrain shapes');
     // the fly-over behind the start screen
     this.scene.launch('Menu', { silent: true, level });
     await nextFrame();
@@ -94,11 +106,17 @@ export class BootScene extends Phaser.Scene {
     setProgress((++done / total) * PHASE1);
     // (the start screen's song keeps downloading and decoding meanwhile: it's waited for at the end)
     setProgress((++done / total) * PHASE1);
+    // the fly-over isn't drawn while the loading screen covers it (every frame of it was a whole
+    // render for nothing, on slow tablets the biggest part of each frame): it's put back for the
+    // warm-up frames at the end
+    this.scene.setVisible(false, 'Menu');
+    this.scene.pause('Menu');
     slice = performance.now();
-    // Everything else, now, while the loading bar is up (it used to be done after the start
+    // The rest of the art, now, while the loading bar is up (it used to be done after the start
     // screen showed, in quiet moments: on slower tablets that made the first few seconds
-    // sluggish): the rest of the art, then the start screen's own jobs (the Parts next to this
-    // one, this Part's whole ground for its fly-over, its song, its other looks)
+    // sluggish), then what a first tap on the start screen needs (the Parts next to this one,
+    // this Part's song). The rest (this Part's whole ground, its other looks) is left for quiet
+    // moments on the start screen: doing it all here made the loading screen freeze on slow tablets.
     const menu = this.scene.get('Menu') as unknown as { takeQuietJobs?: () => (() => void)[] };
     const rest = [{ name: 'other hero cards', run: () => this.game.events.emit('warm-cards') }, ...later];
     const quiet = menu.takeQuietJobs?.() ?? [];
@@ -118,9 +136,11 @@ export class BootScene extends Phaser.Scene {
       step2();
       await breathe();
     }
-    mark('start screen jobs (other Parts, ground, looks)');
+    mark('start screen jobs (other Parts, song)');
     // and the fly-over run for a moment behind the loading screen (everything's pictures on the
     // graphics chip, and the game's code warmed up), so it's smooth from the first moment
+    this.scene.resume('Menu');
+    this.scene.setVisible(true, 'Menu');
     for (let i = 0; i < 12; i++) await nextFrame();
     mark('warm-up frames');
     // the start screen's song (fetched and decoded alongside all of the above; usually ready by now)
@@ -137,38 +157,8 @@ export class BootScene extends Phaser.Scene {
       boot.classList.add('out');
       setTimeout(() => boot.remove(), 350);
     }
-    await this.drawTheRest([], times);
     this.registry.set('ready', true);
     this.game.events.emit('assets-ready');
     this.scene.stop();
-  }
-
-  /**
-   * The rest of the art (the heroes' game frames, the bad guys, the level's other looks),
-   * a piece at a time while the start screen is up, only in quiet moments (nobody has
-   * touched anything for a little while), so taps stay instant. Pressing Play or Battle
-   * early ('need-assets') draws whatever is left straight away.
-   */
-  private async drawTheRest(later: { name: string; run: () => void }[], times: [string, number][]) {
-    let lastInput = performance.now();
-    const onInput = () => (lastInput = performance.now());
-    window.addEventListener('pointerdown', onInput, true);
-    window.addEventListener('keydown', onInput, true);
-    let hurry = false;
-    const onNeed = () => (hurry = true);
-    this.game.events.on('need-assets', onNeed);
-    const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
-    await wait(400); // (let the fade-in finish first)
-    for (const step of later) {
-      while (!hurry && (performance.now() - lastInput < 900 || document.hidden)) await wait(150);
-      const s0 = performance.now();
-      step.run();
-      times.push([`later: ${step.name}`, Math.round(performance.now() - s0)]);
-      if (hurry) await nextFrame();
-      else await wait(160);
-    }
-    window.removeEventListener('pointerdown', onInput, true);
-    window.removeEventListener('keydown', onInput, true);
-    this.game.events.off('need-assets', onNeed);
   }
 }
