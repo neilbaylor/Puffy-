@@ -21,18 +21,18 @@ The concept screens are in this folder (`wide`, `plan`, `entrance`, `fight`, `fi
   the ending) use close-ups and zooms, like the basketball intro.
 
 ## You
-- **5 hearts, shown over your head** (like Battle mode), up to 6 with pick-ups. No HUD and no nuggies in the ring (just
-  the pause button). A hit costs a heart; **hearts turn up in the ring** often (every 3–5 s) until you have 6. Out of
+- **6 hearts (the most you can have), shown over your head** (like Battle mode). No HUD and no nuggies in the ring (just
+  the pause button). A hit costs a heart; **hearts turn up in the ring** often (every 2–4 s) whenever you're below 6. Out of
   hearts costs a life from the full game.
-- **The folding chair** (folded flat, grey steel) drops into the ring **5 times a match** (about every 10–13 s, sooner as she weakens) ("CHAIR!" on
+- **The folding chair** (folded flat, grey steel) drops into the ring **4 times a match** (about every 10–13 s, sooner as she weakens) ("CHAIR!" on
   the jumbotron). Walk over it to pick it up: the hero bends down and holds it up over their head in
-  both hands (no bazooka). The FIRE button (still red) says CHAIR: press it to swing the chair down onto her (when she's in reach): **2 hits**, it bends
+  both hands (no bazooka). The FIRE button (still red) says CHAIR: press it to swing the chair down onto her (when she's in reach): **3 hits**, it bends
   and it's gone. Leave it and it fades away; get hit twice while holding it and you drop it.
 - **The ropes:**
   - **Run into them and bounce off** fast, like a springboard.
   - **Climb them to the top turnbuckle.** Climbing has to look and feel good (hand over hand, a
     little sway). This is the part not to rush.
-  - **Jump off the top and land on her: that hit counts double** ("TOP ROPE! ×2").
+  - **Jump off the top and land on her: that hit counts triple** ("TOP ROPE! ×3").
   - **Rope physics:** each rope is a springy line. It stretches where you hit it, sags under you as you
     climb, and wobbles back when you let go. Launching off the top shakes all three ropes.
     Each rope is a damped spring that bends at the contact point, so this is not too complex.
@@ -47,7 +47,7 @@ The concept screens are in this folder (`wide`, `plan`, `entrance`, `fight`, `fi
 - **Aggressive, jumping more and higher**: big hops and lunges (her landings rumble the camera
   and the ring, like the Giant Plops), charges, slams, and the Giant Plops' **big lump of poo**
   that lands short of you and rolls on at you.
-- **15 hits to beat her.** **The jumbotron counts down** the hits
+- **12 hits to beat her.** **The jumbotron counts down** the hits
   left ("3 HITS TO GO") and flashes "FROM THE TOP ROPE!" for a dive.
 - No referee: enough hits and she's done.
 

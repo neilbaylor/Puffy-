@@ -1285,18 +1285,35 @@ export class HoopsScene extends Phaser.Scene {
     else if (!nearP) o = p < 0 ? 'short' : 'long';
     else o = 'wide';
 
-    // fire! (from the bazooka, with recoil)
+    // brace: a little crouch, the bazooka tipping up at the hoop…
+    const h = this.hero;
+    const sx = h.scaleX;
+    const sy = h.scaleY;
+    const x0 = h.x;
+    const y0 = h.y;
+    // (a held frame of its own, so the idle hops leave the brace alone)
+    this.heroAnim = { frames: ['idle1'], fps: 1 };
+    await this.tween({ targets: h, rotation: -0.36, scaleX: sx * 1.06, scaleY: sy * 0.92, duration: 260, ease: 'Sine.easeOut' });
+    // …FIRE! (the recoil kicks them back and up off their feet, a squash and stretch, smoke)
     this.heroAnim = { frames: ['shoot'], fps: 1 };
-    this.hero.setRotation(-0.28);
     const ch = characterById(this.hd.charId);
     const mx = hp.x + 62 * ch.scale * hk;
     const my = hp.y - ((ch.muzzleY ?? 18) * 2.6 + 6) * hk;
     sfx.shoot();
-    const flash = this.add.image(mx + 8, my - 4, 'flash').setScale(0.9).setRotation(-0.5).setDepth(11);
-    this.tweens.add({ targets: flash, scale: 1.4, alpha: 0, duration: 140, onComplete: () => flash.destroy() });
-    this.tweens.add({ targets: this.hero, x: this.hero.x - 10, yoyo: true, duration: 90 });
+    this.cameras.main.shake(110, 0.004);
+    const flash = this.add.image(mx + 8, my - 4, 'flash').setScale(1.1).setRotation(-0.5).setDepth(11);
+    this.tweens.add({ targets: flash, scale: 1.8, alpha: 0, duration: 170, onComplete: () => flash.destroy() });
+    this.puffs(mx - 4, my + 2, 5, -0.5, 0.55 * hk);
+    this.puffs(x0 - 6 * hk, y0 - 4, 3, Math.PI, 0.4 * hk, 0xcfc2b2);
+    h.setScale(sx * 0.86, sy * 1.14).setRotation(-0.5);
+    this.tweens.add({ targets: h, x: x0 - 18 * hk, duration: 110, ease: 'Quad.easeOut', yoyo: true, hold: 60 });
+    this.tweens.add({ targets: h, y: y0 - 12 * hk, duration: 130, ease: 'Quad.easeOut', yoyo: true });
+    this.tweens.add({ targets: h, scaleX: sx, scaleY: sy, duration: 320, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: h, rotation: 0, delay: 180, duration: 420, ease: 'Back.easeOut' });
+    // (the follow-through: back to watching the ball)
+    this.time.delayedCall(520, () => this.heroAnim.frames[0] === 'shoot' && (this.heroAnim = { frames: ['idle1'], fps: 1 }));
     await this.shootBall(mx, my, hp.y, o, Math.sign(a) || (Math.random() < 0.5 ? -1 : 1), hk);
-    this.hero.setRotation(0);
+    h.setRotation(0).setScale(sx, sy).setPosition(x0, y0);
     const made = o === 'swish' || o === 'rimIn';
     this.score.you.push(made);
     this.renderScore();
@@ -1344,10 +1361,35 @@ export class HoopsScene extends Phaser.Scene {
       const misses: Outcome[] = ['rimOut', 'rimOut', 'short', 'long', 'wide'];
       o = misses[Math.floor(Math.random() * misses.length)];
     }
-    this.kingAnim = { frames: ['shoot'], fps: 1 };
+    // he fills his cheeks… swells up red in the face, wobbling… then PTOO! out it comes
+    const k = this.king;
+    const kx0 = k.x;
+    this.kingAnim = { frames: ['puff0'], fps: 1 };
+    sfx.drum();
+    await this.wait(280);
+    this.kingAnim = { frames: ['puff1'], fps: 1 };
+    const shiver = this.tweens.add({ targets: k, x: kx0 + 2.5 * kk, duration: 45, yoyo: true, repeat: -1 });
+    await this.wait(420);
+    shiver.stop();
+    k.setX(kx0);
+    this.kingAnim = { frames: ['spit'], fps: 1 };
     sfx.spit();
+    sfx.pop();
+    this.cameras.main.shake(120, 0.005);
     const mouth = { x: kp.x - 18 * kk, y: kp.y - 110 * kk };
+    // a burst at his mouth, a spray of spit, and he lurches back from it
+    const ring = this.add.image(mouth.x - 8 * kk, mouth.y, 'flash').setScale(0.6 * kk).setDepth(11).setTint(0xfff3d6);
+    this.tweens.add({ targets: ring, scale: 1.5 * kk, alpha: 0, duration: 200, onComplete: () => ring.destroy() });
+    this.spray(mouth.x - 10 * kk, mouth.y + 4 * kk, kk);
+    this.puffs(mouth.x - 6 * kk, mouth.y, 3, Math.PI, 0.35 * kk);
+    const ksx = k.scaleX;
+    const ksy = k.scaleY;
+    k.setScale(ksx * 0.9, ksy * 1.1);
+    this.tweens.add({ targets: k, scaleX: ksx, scaleY: ksy, duration: 360, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: k, x: kx0 + 14 * kk, duration: 120, ease: 'Quad.easeOut', yoyo: true, hold: 80 });
+    this.time.delayedCall(560, () => this.kingAnim.frames[0] === 'spit' && (this.kingAnim = { frames: ['idle0'], fps: 1 }));
     await this.shootBall(mouth.x, mouth.y, kp.y, o, Math.random() < 0.5 ? -1 : 1, kk);
+    k.setScale(ksx, ksy).setX(kx0);
     const made = o === 'swish' || o === 'rimIn';
     this.score.king.push(made);
     this.renderScore();
@@ -1368,6 +1410,34 @@ export class HoopsScene extends Phaser.Scene {
     }
     this.heroAnim = { frames: ['idle0', 'idle1'], fps: 2 };
     this.kingAnim = { frames: ['idle0', 'idle1'], fps: 2.5 };
+  }
+
+  /** A few soft puffs of smoke from (x, y), drifting off along `dir` (radians), and fading. */
+  private puffs(x: number, y: number, n: number, dir: number, s: number, tint = 0xffffff) {
+    const R = 2;
+    for (let i = 0; i < 3; i++) if (!this.textures.exists(`fx-smoke${i}`)) addCanvas(this, `fx-smoke${i}`, hires(140, 140, R, (ctx) => drawSmoke(ctx, 140, 11 + i * 7)));
+    for (let i = 0; i < n; i++) {
+      const a = dir + (Math.random() - 0.5) * 1.1;
+      const d = 30 + Math.random() * 40;
+      const img = this.add
+        .image(x, y, `fx-smoke${i % 3}`)
+        .setDepth(10.5)
+        .setTint(tint)
+        .setScale((0.12 + Math.random() * 0.08) * s * 2 / R)
+        .setAlpha(0.9)
+        .setAngle(Math.random() * 360);
+      this.tweens.add({ targets: img, x: x + Math.cos(a) * d * s * 2, y: y + Math.sin(a) * d * s * 2 - 12, scale: img.scale * 2.2, alpha: 0, angle: img.angle + 40, duration: 520 + Math.random() * 260, ease: 'Quad.easeOut', onComplete: () => img.destroy() });
+    }
+  }
+
+  /** The King's PTOO!: a little spray of spit flying off his mouth. */
+  private spray(x: number, y: number, k: number) {
+    for (let i = 0; i < 8; i++) {
+      const a = Math.PI + (Math.random() - 0.5) * 1.3 - 0.3;
+      const v = 160 + Math.random() * 180;
+      const dot = this.add.circle(x, y, (1.6 + Math.random() * 2.2) * k, 0xbfe8ff).setStrokeStyle(1, 0x4fa8e0).setDepth(11);
+      this.tweens.add({ targets: dot, x: x + Math.cos(a) * v * 0.35 * k, y: y + Math.sin(a) * v * 0.35 * k + 30 * k, alpha: 0, duration: 380 + Math.random() * 160, ease: 'Quad.easeOut', onComplete: () => dot.destroy() });
+    }
   }
 
   /** Fly the ball from (x, y) toward the hoop and play out the outcome. */
@@ -1702,8 +1772,10 @@ export class HoopsScene extends Phaser.Scene {
     await this.callout('“HA HA HA HA!”', 'speech', 1600);
     sfx.laugh();
     this.camFocus = { x: 800, y: 450, zoom: 1 };
-    const hadLife = loseLife();
-    const next = hadLife ? 'back to your last checkpoint' : 'no lives left';
+    // (from the Bosses menu: no life lost, and it's straight back to the court)
+    const practice = !!this.hd.result?.practice;
+    const hadLife = practice || loseLife();
+    const next = practice ? 'try again!' : hadLife ? 'back to your last checkpoint' : 'no lives left';
     this.jumboShow({ kind: 'big', text: 'KING WINS', sub: `${this.total('king')} – ${this.total('you')} · ${next}`, color: '#ffd23f', bg: '#5a0b0b' }, 1e9);
     await this.wait(2400);
     fadeOutMusic(500);
@@ -1714,6 +1786,10 @@ export class HoopsScene extends Phaser.Scene {
     }
     this.cameras.main.fadeOut(400, 20, 10, 38);
     await this.wait(450);
+    if (practice) {
+      this.scene.restart(this.hd);
+      return;
+    }
     this.scene.start('Game', { session: this.hd.session, checkpoint: this.hd.checkpoint, retry: true, level: this.hd.level ?? 1 } satisfies GameData);
   }
 }

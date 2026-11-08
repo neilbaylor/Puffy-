@@ -13,6 +13,8 @@ const PAD = 34; // room around each terrain piece for grass blades / roots
 const CHUNK = 800;
 /** Colour of the deep rock under each terrain chunk (sampled once, when the chunk is drawn). */
 const DEEP_FILL = new Map<string, number>();
+/** Each level's terrain pieces (outline + bounds), worked out once (see LevelView.pieces). */
+const PIECES = new Map<string, { outline: Pt[]; x0: number; y0: number; x1: number; y1: number }[]>();
 
 /** Highest point (smallest y) of a closed outline within the column range x0..x1. */
 function localTop(outline: Pt[], x0: number, x1: number) {
@@ -178,11 +180,19 @@ export class LevelView {
     return this.data.cells[y]?.[x] ?? null;
   }
 
-  /** Connected pieces of one kind → one hand-drawn texture each (cached across restarts). */
-  private drawTerrain(kind: TerrainKind) {
+  /**
+   * A level's pieces of one kind of terrain: each one's rounded outline and bounds. Working them out
+   * (a flood fill and trace over the whole level) is the slow part of putting a level up, and the
+   * shapes never change, so it's done once per level and kept (switching Parts on the start screen,
+   * and starting a level, then only have to put the pictures up).
+   */
+  private pieces(kind: TerrainKind): { outline: Pt[]; x0: number; y0: number; x1: number; y1: number }[] {
     const d = this.data;
+    const ck = `${d.name}|${kind}|${d.width}x${d.height}`;
+    const have = PIECES.get(ck);
+    if (have) return have;
+    const out: { outline: Pt[]; x0: number; y0: number; x1: number; y1: number }[] = [];
     const seen = new Set<string>();
-    let piece = 0;
     for (let y = 0; y < d.height; y++)
       for (let x = 0; x < d.width; x++) {
         if (this.cell(x, y) !== kind || seen.has(`${x},${y}`)) continue;
@@ -221,8 +231,18 @@ export class LevelView {
           x1 = Math.max(x1, px);
           y1 = Math.max(y1, py);
         }
+        out.push({ outline, x0, y0, x1, y1 });
+      }
+    PIECES.set(ck, out);
+    return out;
+  }
+
+  /** Connected pieces of one kind → one hand-drawn texture each (cached across restarts). */
+  private drawTerrain(kind: TerrainKind) {
+    const d = this.data;
+    this.pieces(kind).forEach(({ outline, x0, y0, x1, y1 }, pieceId) => {
+      {
         const pal = this.paletteAt((x0 + x1) / 2);
-        const pieceId = piece++;
         // the whole piece is drawn into each chunk (clipped by the chunk's canvas), so the
         // chunks join seamlessly; each one stays small enough for phones and tablets
         for (let cx0 = x0, ci = 0; cx0 < x1; cx0 += CHUNK, ci++) {
@@ -299,6 +319,7 @@ export class LevelView {
           else make();
         }
       }
+    });
   }
 
   private placeClouds() {

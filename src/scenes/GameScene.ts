@@ -75,6 +75,8 @@ export interface ResultState {
   level?: number;
   /** Final free-throw score vs King Puff Ball, e.g. "4 – 2". */
   hoops?: string;
+  /** A boss fought from the Bosses menu (practice: no lives lost, and losing just starts it again). */
+  practice?: boolean;
 }
 
 /** Chance that each aura spot in the level actually has aura this time. */

@@ -43,7 +43,8 @@ const PRIZE_ODDS: [PrizeKind, number][] = [
 ];
 /** Timed powers: 0 none, 1 star (invincible), 2 grow (big & strong), 3 rapid fire, 4 fireballs. */
 export const POWER = { none: 0, star: 1, grow: 2, rapid: 3, fire: 4 } as const;
-const POWER_SECS: Record<number, number> = { 1: 14, 2: 8, 3: 7, 4: 8 };
+/** How long each power lasts (s): the star's invincibility is kept short, it's strong. */
+const POWER_SECS: Record<number, number> = { 1: 8, 2: 8, 3: 7, 4: 8 };
 /** Grabbing ice freezes everyone else this long. */
 export const FREEZE_SECS = 2;
 /** Landing on someone's head: a hit, and you bounce off. */

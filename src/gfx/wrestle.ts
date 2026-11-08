@@ -40,7 +40,7 @@ export const TABLE: [number, number, number] = [-150, -20, 600];
 export const PUDDLE = { x: 1040, w: 100 };
 /** The tunnel out of the stands (top of an aisle), and where the King sits in the front row. */
 export const TUNNEL = { x: 470, top: 222, bottom: 297 };
-export const KING_SEAT = { x: 548, feet: 300 };
+export const KING_SEAT = { x: 520, feet: 300 };
 
 export const STEEL: Fill = { base: '#3b3530', shade: '#1d1915', light: '#6d655c' };
 const PAD: Fill = { base: '#d8243a', shade: '#9c1426', light: '#ff6a7a' };

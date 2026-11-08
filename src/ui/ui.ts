@@ -15,7 +15,14 @@ import { drawNuggie, drawRootBeer } from '../gfx/collectibles';
 import { VERSION } from '../version';
 import { LEVELS, latestLevel, levelInfo, levelName, progress } from '../level/levels';
 import { account } from '../core/account';
-import { testWrestleData } from '../scenes/WrestleScene';
+import { bossData } from '../scenes/WrestleScene';
+
+/** The boss at the end of each level (the Bosses menu lists the ones from levels you've beaten). */
+const BOSSES = [
+  { level: 1, name: 'King Basketball 1', scene: 'Hoops' },
+  { level: 2, name: 'King Basketball 2', scene: 'Hoops' },
+  { level: 3, name: 'Queen Plop Wrestling', scene: 'Wrestle' },
+] as const;
 import { resetLives } from '../core/lives';
 import { bank } from '../core/bank';
 
@@ -484,7 +491,7 @@ export class UI {
         progress.beaten >= 1
           ? `<div class="levels" role="radiogroup" aria-label="Pick a level">${LEVELS.map(
               (l) => `<button class="lvl" data-lvl="${l.id}" ${l.build ? '' : 'disabled'}>${l.button ?? l.part}${l.build ? '' : '<small>coming soon</small>'}</button>`,
-            ).join('')}</div>`
+            ).join('')}<button class="lvl lvl-bosses" data-act="bosses" aria-label="Boss battles">Bosses</button></div>`
           : ''
       }
       <div class="start-tl">
@@ -495,7 +502,6 @@ export class UI {
         <button class="icon-btn fs-btn" data-act="fs" aria-label="Full screen" hidden>⛶</button>
         <button class="icon-btn battle-btn" data-act="battle" aria-label="Online battle with friends">Battle</button>
       </div>
-      <button class="btn btn-small wr-test-btn" data-act="wrestle" aria-label="Go straight to the Queen Plop fight (for testing)">Wrestle (test)</button>
       <p class="version">v${VERSION} · ${this.game.renderer.type === Phaser.WEBGL ? 'WebGL' : 'Canvas'}${this.lowRes()}</p>
       <div class="start-foot">
         <button class="btn btn-big btn-go" data-act="play">Play</button>
@@ -547,7 +553,7 @@ export class UI {
       { mouth: true },
     );
     const syncLevels = () => {
-      el.querySelectorAll<HTMLButtonElement>('.lvl').forEach((b) => b.classList.toggle('picked', Number(b.dataset.lvl) === this.level));
+      el.querySelectorAll<HTMLButtonElement>('.lvl[data-lvl]').forEach((b) => b.classList.toggle('picked', Number(b.dataset.lvl) === this.level));
       const wn = el.querySelector<HTMLElement>('.world-name')!;
       // the planet's name says which world it is ("Puff Ball Planet" is World 1)
       const text = levelName(this.level);
@@ -607,7 +613,7 @@ export class UI {
         });
       });
     };
-    el.querySelectorAll<HTMLButtonElement>('.lvl').forEach((b) =>
+    el.querySelectorAll<HTMLButtonElement>('.lvl[data-lvl]').forEach((b) =>
       b.addEventListener('click', () => {
         if (!levelInfo(Number(b.dataset.lvl)).build) return;
         this.level = Number(b.dataset.lvl);
@@ -645,7 +651,10 @@ export class UI {
       this.battle.open();
     });
     // (temporary, for testing: straight into Queen Plop's ring)
-    el.querySelector('[data-act=wrestle]')?.addEventListener('click', () => this.playWrestle());
+    el.querySelector('[data-act=bosses]')?.addEventListener('click', () => {
+      sfx.select();
+      this.showBosses();
+    });
     el.querySelector('[data-act=account]')!.addEventListener('click', () => {
       sfx.select();
       this.showAccount();
@@ -707,7 +716,7 @@ export class UI {
     const el = u
       ? h(`<div class="screen modal acct">
       <div class="panel results acct-card">
-        <button class="btn btn-alt btn-small acct-out" data-act="out">Sign out</button>
+        <button class="btn btn-alt acct-out" data-act="out">Sign out</button>
         <div class="results-hero"><canvas width="160" height="160"></canvas></div>
         <div class="results-body">
           <p class="eyebrow">Your player</p>
@@ -716,7 +725,7 @@ export class UI {
             <dt>Root beer <i class="rb-ico"></i></dt><dd>${Math.max(u.rootbeer, bank.rootbeer)}</dd>
             <dt>Nuggies eaten <i class="aura-ico"></i></dt><dd>${Math.max(u.nuggies, bank.nuggies)}</dd>
             <dt>Bad guys beaten</dt><dd>${Math.max(u.kills, bank.kills)}</dd>
-            <dt>Current level</dt><dd>${esc(levelName(this.level))}</dd>
+            <dt>Current level</dt><dd>${esc(levelName(latestLevel()))}</dd>
           </dl>
           <div class="row">
             <button class="btn btn-go" data-act="back">Done</button>
@@ -970,12 +979,36 @@ export class UI {
   }
 
   /** (Temporary, for testing) straight into the Queen Plop fight with the picked hero. */
-  private playWrestle() {
+  /** The Bosses menu: fight the boss of any level you've beaten, straight away (as practice). */
+  private showBosses() {
+    const open = BOSSES.filter((b) => progress.beaten >= b.level);
+    const el = h(`<div class="screen modal bosses">
+      <div class="panel boss-panel">
+        <p class="eyebrow">Boss battles</p>
+        <h2>Pick a boss</h2>
+        <div class="boss-list">${open
+          .map((b) => `<button class="btn boss-btn" data-boss="${b.level}"><b>${b.name}</b><small>${esc(levelName(b.level))}</small></button>`)
+          .join('')}</div>
+        <div class="row"><button class="btn btn-alt" data-act="back">Back</button></div>
+      </div>
+    </div>`);
+    el.querySelector('[data-act=back]')!.addEventListener('click', () => {
+      sfx.back();
+      this.showStart();
+    });
+    el.querySelectorAll<HTMLButtonElement>('[data-boss]').forEach((b) => b.addEventListener('click', () => this.playBoss(Number(b.dataset.boss))));
+    this.setScreen(el);
+  }
+
+  /** Straight into a level's boss fight (from the Bosses menu: practice, no lives lost). */
+  private playBoss(level: number) {
     if (!this.game.registry.get('ready')) {
-      this.game.events.once('assets-ready', () => this.playWrestle());
+      this.game.events.once('assets-ready', () => this.playBoss(level));
       this.game.events.emit('need-assets');
       return;
     }
+    const boss = BOSSES.find((b) => b.level === level);
+    if (!boss) return;
     unlockAudio();
     primeMusic();
     preloadHoopsMusic();
@@ -984,12 +1017,41 @@ export class UI {
     sfx.select();
     stopMusic();
     resetLives();
+    this.level = level;
     this.session = { players: [{ slot: 0, characterId: hero.id, inputId: 'solo' }] };
     this.setScreen(null);
     this.game.scene.stop('Menu');
     this.game.scene.stop('Hoops');
+    this.game.scene.stop('Wrestle');
     this.game.scene.stop('Game');
-    this.game.scene.start('Wrestle', testWrestleData(this.session, hero.id));
+    this.game.scene.start(boss.scene, bossData(this.session, hero.id, level));
+  }
+
+  /** You beat a boss from the Bosses menu: fight it again, or back home. */
+  private showBossResults(r: ResultState) {
+    this.touch.hide();
+    playLevelClear();
+    const boss = BOSSES.find((b) => b.level === r.level) ?? BOSSES[0];
+    const el = h(`<div class="screen modal">
+      <div class="panel results">
+        <div class="results-hero"><canvas width="160" height="160"></canvas></div>
+        <div class="results-body">
+          <p class="eyebrow">${boss.name}</p>
+          <h2>${boss.scene === 'Wrestle' ? 'Queen Plop is down!' : 'You beat the King!'}</h2>
+          <dl class="stat-list">
+            ${r.hoops ? `<dt>Final score</dt><dd>${esc(r.hoops)}</dd>` : '<dt>Result</dt><dd>K.O.!</dd>'}
+          </dl>
+          <div class="row">
+            <button class="btn btn-alt" data-act="again">Fight again</button>
+            <button class="btn btn-go" data-act="home">Home screen</button>
+          </div>
+        </div>
+      </div>
+    </div>`);
+    this.liveHero(el.querySelector('canvas')!, characterById(r.charId), () => this.screen === el);
+    el.querySelector('[data-act=again]')!.addEventListener('click', () => this.playBoss(boss.level));
+    el.querySelector('[data-act=home]')!.addEventListener('click', () => this.quitToStart());
+    this.setScreen(el);
   }
 
   private startGame(session: Session, checkpoint = -1) {
@@ -1157,6 +1219,7 @@ export class UI {
   }
 
   private showResults(r: ResultState) {
+    if (r.practice) return this.showBossResults(r);
     this.touch.hide();
     // beating a level unlocks picking where to start
     progress.markBeaten(r.level ?? 1);
