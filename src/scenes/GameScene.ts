@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { DEPTH, GRAVITY, MAX_FALL_SPEED, MIN_VIEW_W, TILE, VIEW_H } from '../config';
-import { PROP_RES, addCanvas, ensureLevelLooks, freeLooksExcept, hires } from '../gfx/textures';
+import { PROP_RES, addCanvas, dropPlops, ensureLook, freeLooksExcept, hires, lookJobs, plopJobs } from '../gfx/textures';
 import { PALETTES } from '../gfx/world';
 import { drawRock } from '../gfx/hazards';
 import { POO, POO_DARK } from '../gfx/plopworld';
@@ -189,6 +189,9 @@ export class GameScene extends Phaser.Scene {
   private lastCheckpoint = -1;
   private ended = false;
   private lastHud = '';
+  /** The level's looks still to draw (one layer per job), and when the next one's due (s). */
+  private lookQueue: (() => void)[] = [];
+  private lookNext = 0;
 
   private view: View = { left: 0, top: 0, width: 800, height: VIEW_H };
   private camX = 0;
@@ -259,7 +262,16 @@ export class GameScene extends Phaser.Scene {
     this.physics.world.setBounds(0, -400, widthPx, heightPx + 800, true, true, false, false);
     // this level's looks (drawn now if the start screen didn't already); the others are freed
     // when nothing else is showing them
-    ensureLevelLooks(this, this.levelId);
+    // (only the look showing now has to be there at once; the others are drawn a layer at a time
+    // once you're playing — the colours only drift into them 20 seconds in)
+    const mix0 = themeMix(themeClock.t, themesFor(this.levelId));
+    ensureLook(this, mix0.a);
+    if (mix0.w > 0) ensureLook(this, mix0.b);
+    this.lookQueue = themesFor(this.levelId).flatMap((l) => lookJobs(this, l));
+    // the Plops only live in Plop Invasion (drawn on the start screen when it's picked; here if not yet)
+    if (this.levelId === 3) for (const job of plopJobs(this)) job();
+    else if (!this.scene.isActive('Menu')) dropPlops(this);
+    this.lookNext = 0;
     if (!this.scene.isActive('Menu') && !this.scene.isActive('Battle')) freeLooksExcept(this, themesFor(this.levelId));
     this.bg = new Background(this, heightPx - VIEW_H);
     this.amb = new Ambience(this, this.levelId, (x, y, max) => {
@@ -379,6 +391,9 @@ export class GameScene extends Phaser.Scene {
           ctx.fill();
         }));
     }
+
+    // (restarting at a checkpoint past where a boulder chase starts: that rock's been and gone)
+    for (const c of this.chases) if (start.x > c.x0) c.started = true;
 
     // ── The hero (single player for now; the code supports more later) ──
     const specs = this.session.players.length ? this.session.players : [{ slot: 0, characterId: 'puffy', inputId: 'solo' }];
@@ -548,6 +563,12 @@ export class GameScene extends Phaser.Scene {
     this.updateParachutes(dt);
 
     themeClock.t += dt;
+    // the level's other looks, a layer every so often (each is a quick job; nothing if already drawn)
+    this.lookNext -= dt;
+    if (this.lookQueue.length && this.lookNext <= 0) {
+      this.lookQueue.shift()!();
+      this.lookNext = 0.35;
+    }
     this.applyTheme();
     this.level.animate(this.time.now / 1000, this.view.left, this.view.left + this.view.width);
     this.bg.update(this.view, dt);
@@ -767,13 +788,17 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /** Grab a nuggie: it flies into the hero's mouth, they munch it, then aura goes up. */
+  /** Grab a nuggie: it counts straight away; it flies into the hero's mouth, they munch it, then the sparkle. */
   private collectAura(p: Player, a: Aura) {
     if (!p.alive || a.taken) return;
     // freshly scattered nuggies can't be grabbed for a split second
     if (this.time.now < a.collectableAt) return;
     const nug = this.add.image(a.x, a.y, 'nuggie').setScale(1 / 3).setDepth(p.view.depth + 1);
     a.vanish();
+    // (the count goes up the moment you touch it, not once it's eaten)
+    this.aura++;
+    bank.addNuggie();
+    run.bestAura = Math.max(run.bestAura, this.aura);
     this.fx.sparkle(a.x, a.y, 5);
     // pop! (it jumps up, bigger) then arcs into the mouth, spinning and shrinking
     this.tweens.add({ targets: nug, scale: 0.5, y: a.y - 10, duration: 90, ease: 'Back.easeOut' });
@@ -1355,15 +1380,12 @@ export class GameScene extends Phaser.Scene {
     p.squash = { x: 0.9, y: 1.14 };
   }
 
-  /** Aura goes up once the munch animation has played. */
+  /** The aura sparkle once the munch animation has played (the count already went up). */
   private settleAura() {
     const now = this.time.now;
     this.pendingAura = this.pendingAura.filter(({ at, p }) => {
       if (now < at) return true;
       if (p.state === 'fainted') return false;
-      this.aura++;
-      bank.addNuggie();
-      run.bestAura = Math.max(run.bestAura, this.aura);
       this.fx.auraSparkle(p.x, p.y - 6, 16);
       this.auraRing(p);
       this.fx.popText(p.x, p.body.top - 18, '+1 AURA', '#6ff0d8', 17);

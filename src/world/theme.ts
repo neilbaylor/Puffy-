@@ -5,8 +5,9 @@ import { PALETTES, seaColor } from '../gfx/world';
  * passing: Puff Ball Planet → Candy clouds → Golden hour → Meadow morning →
  * back again (Part 2 cycles its three mountain looks the same way). Each look
  * holds for 20 seconds, then the next one fades in over 10 seconds. One clock
- * for the whole game: it never resets (not on a restart, not on a new run) and
- * keeps going on the start screen too.
+ * for the whole game: it keeps going through restarts; the start screen shows each
+ * level in its first look, still, and sets the clock back to it (so a game started
+ * from there opens in the look already drawn).
  */
 export const THEMES = ['puff', 'candy', 'golden', 'meadow'] as const;
 /** Part 2's looks: the three mountain moods. */

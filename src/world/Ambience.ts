@@ -8,8 +8,7 @@ import { DEPTH } from '../config';
  *    ice-blue butterflies),
  *  - soft contact shadows under the heroes and bad guys (they shrink and fade
  *    as you jump higher),
- *  - warm sunlight: a glow in the corner of the sky, slow drifting light
- *    shafts, and a gentle vignette.
+ *  - warm sunlight: a glow in the corner of the sky.
  */
 
 interface View {
@@ -243,27 +242,6 @@ function makeTextures(scene: Phaser.Scene) {
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, 128, 128);
   });
-  mk('amb-shaft', 64, 256, (ctx) => {
-    const g = ctx.createLinearGradient(0, 0, 64, 0);
-    g.addColorStop(0, 'rgba(255,250,230,0)');
-    g.addColorStop(0.5, 'rgba(255,250,230,1)');
-    g.addColorStop(1, 'rgba(255,250,230,0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, 64, 256);
-    const v = ctx.createLinearGradient(0, 0, 0, 256);
-    v.addColorStop(0, 'rgba(0,0,0,0)');
-    v.addColorStop(1, 'rgba(0,0,0,1)');
-    ctx.globalCompositeOperation = 'destination-out';
-    ctx.fillStyle = v;
-    ctx.fillRect(0, 0, 64, 256);
-  });
-  mk('amb-vignette', 256, 256, (ctx) => {
-    const g = ctx.createRadialGradient(128, 128, 70, 128, 128, 182);
-    g.addColorStop(0, 'rgba(40,20,60,0)');
-    g.addColorStop(1, 'rgba(40,20,60,1)');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, 256, 256);
-  });
 }
 
 export class Ambience {
@@ -272,8 +250,6 @@ export class Ambience {
   private nextFlock = 2;
   private shadows = new Map<Phaser.GameObjects.GameObject, Phaser.GameObjects.Image>();
   private glow: Phaser.GameObjects.Image;
-  private shafts: Phaser.GameObjects.Image[] = [];
-  private vignette: Phaser.GameObjects.Image;
   private t = 0;
   private readonly arctic: boolean;
   /** Plop Invasion: flies buzzing about instead of butterflies, drab birds. */
@@ -289,9 +265,8 @@ export class Ambience {
     this.arctic = levelId === 2;
     this.stinky = levelId === 3;
     this.glow = scene.add.image(0, 0, 'amb-glow').setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.clouds - 1).setAlpha(0.55);
-    for (let i = 0; i < 3; i++)
-      this.shafts.push(scene.add.image(0, 0, 'amb-shaft').setOrigin(0.5, 0).setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.near + 1).setAlpha(0));
-    this.vignette = scene.add.image(0, 0, 'amb-vignette').setDepth(DEPTH.text - 1).setAlpha(0.16);
+    // (no light shafts or vignette any more: each was a whole extra screenful to draw every frame,
+    // for an effect you could hardly see)
   }
 
   /** Give a character a soft shadow on the ground under it. */
@@ -303,19 +278,9 @@ export class Ambience {
   update(view: View, dt: number, targets: { obj: Phaser.GameObjects.GameObject; x: number; bottom: number; w: number; alive: boolean }[]) {
     this.t += dt;
     const t = this.t;
-    const cx = view.left + view.width / 2;
-    const cy = view.top + view.height / 2;
 
     // ── light ──
     this.glow.setPosition(view.left + view.width * 0.82, view.top + view.height * 0.08).setScale((view.width / 128) * 0.9 * (1 + Math.sin(t * 0.6) * 0.04));
-    this.shafts.forEach((s, i) => {
-      const k = i / 3;
-      s.setPosition(view.left + view.width * (0.55 + k * 0.28) + Math.sin(t * 0.07 + i) * 40, view.top - 30)
-        .setDisplaySize(view.width * (0.12 + 0.05 * Math.sin(t * 0.2 + i * 2)), view.height * 1.25)
-        .setRotation(0.38 + 0.04 * Math.sin(t * 0.11 + i))
-        .setAlpha((this.arctic ? 0.07 : 0.09) * (0.6 + 0.4 * Math.sin(t * 0.17 + i * 1.7)));
-    });
-    this.vignette.setPosition(cx, cy).setDisplaySize(view.width * 1.2, view.height * 1.2);
 
     // ── shadows ──
     for (const [obj, sh] of this.shadows) {

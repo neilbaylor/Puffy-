@@ -97,7 +97,6 @@ export class BattleUI {
     // (the game's art may still be being drawn in the background: finish it first)
     if (!this.host.game.registry.get('ready')) {
       this.host.game.events.once('assets-ready', () => this.open(code));
-      this.host.game.events.emit('need-assets');
       return;
     }
     this.code = code;
@@ -191,8 +190,6 @@ export class BattleUI {
    * code you use is remembered for next time.
    */
   private askCode() {
-    // (typing a code takes a moment: finish drawing the game's art meanwhile)
-    if (!this.host.game.registry.get('ready')) this.host.game.events.emit('need-assets');
     const el = h(`<div class="screen modal battle-code">
       <div class="panel bc-panel">
         <p class="eyebrow">Battle with friends</p>
@@ -251,7 +248,7 @@ export class BattleUI {
       <button class="icon-btn bl-back" aria-label="Back">‹</button>
       <button class="bl-roomtag" aria-label="Room code (change room)">Room <b>${esc(this.code)}</b></button>
       <header class="bl-head">
-        <h1 class="bl-title">Battle!</h1>
+        <h1 class="bl-title" aria-label="Battle!">${[...'Battle!'].map((ch, i) => `<span style="--i:${i}">${ch}</span>`).join('')}</h1>
         <p class="bl-sub">Up to ${MAX_BATTLERS} friends</p>
       </header>
       <div class="bl-preview" hidden><b class="bl-live">● LIVE</b></div>

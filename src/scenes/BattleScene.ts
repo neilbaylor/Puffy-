@@ -14,9 +14,9 @@ import { drawAnvil, drawIceBlock, drawPellet, drawPoo, drawRamp, drawRock } from
 import { W_RES } from '../gfx/weapons';
 import { soloSource } from '../input/devices';
 import type { BattleNet, Snapshot } from '../net/battleNet';
-import { ARENA_RAMPS, buildArena } from '../shared/battle/arena';
+import { ARENA_RAMPS, ARENA_SECTION, buildArena } from '../shared/battle/arena';
 import { SLOT_COLORS, type SnapEnemy, type SnapHazard, type SnapPlayer } from '../shared/battle/protocol';
-import { ArenaMap, BTN, DT, ENEMY_BOX, HEARTS, POWER, PRIZE_LIFE, landingY, sizeOf, stepMove, type BEvent, type BPlayer, type EnemyKind, type PrizeKind, type RocketKind } from '../shared/battle/sim';
+import { ArenaMap, BTN, DT, TILE_PX, ENEMY_BOX, HEARTS, POWER, PRIZE_LIFE, landingY, sizeOf, stepMove, type BEvent, type BPlayer, type EnemyKind, type PrizeKind, type RocketKind } from '../shared/battle/sim';
 import { Background } from '../world/Background';
 import { Fx } from '../world/Fx';
 import { LevelView } from '../world/LevelView';
@@ -226,6 +226,7 @@ export class BattleScene extends Phaser.Scene {
     // warm: built ahead of time during the countdown, not shown (so the start is instant)
     this.sys.setVisible(!data.warm);
     this.preview = null;
+    this.camC = null;
     this.enemyViews.clear();
     this.hazardViews.clear();
     const arena = buildArena();
@@ -336,11 +337,11 @@ export class BattleScene extends Phaser.Scene {
     const H = r ? r.h * k : this.scale.height;
     // (the empty sky above the highest cloud is trimmed off, so the heroes are bigger)
     const SKY = 56;
-    const zoom = Math.min(W / this.map.widthPx, H / (this.map.heightPx - SKY));
+    // (one screen of the arena: it's four screens wide, and the camera follows)
+    const zoom = Math.min(W / (ARENA_SECTION * TILE_PX), H / (this.map.heightPx - SKY));
     this.fitZoom = zoom;
     cam.setZoom(zoom);
-    cam.centerOn(this.map.widthPx / 2, (this.map.heightPx + SKY) / 2);
-    this.camC = null;
+    cam.centerOn(this.camC?.x ?? this.map.widthPx / 2, (this.map.heightPx + SKY) / 2);
   }
 
   /**
@@ -478,25 +479,30 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
-  /** Playing: a little closer in than the whole arena, gently following your hero (most of the arena still in view). */
-  private followCamera(dt: number) {
-    if (this.spectate || this.preview || !this.me) return;
+  /**
+   * Playing: a little closer in than a whole screen, following your hero along the arena. Watching
+   * (just spectating, or the lobby's little window): the screen-wide view, following whoever's winning.
+   */
+  private followCamera(dt: number, players: Map<string, SnapPlayer>) {
+    const watching = this.spectate || !!this.preview || !this.me;
+    let p: { x: number; y: number; respawn: number; kos?: number } | null = null;
+    if (!watching) p = { x: this.me!.x + this.fix.x, y: this.me!.y + this.fix.y, respawn: this.me!.respawn };
+    else for (const q of players.values()) if (q.respawn <= 0 && (!p || q.kos > (p.kos ?? 0))) p = q;
+    if (!p) return;
     const cam = this.cameras.main;
     const SKY = 56;
-    const zoom = this.fitZoom * FOLLOW_ZOOM;
+    const zoom = this.fitZoom * (watching ? 1 : FOLLOW_ZOOM);
     cam.setZoom(zoom);
     const vw = cam.width / zoom;
     const vh = cam.height / zoom;
     const clamp = (v: number, lo: number, hi: number) => (lo > hi ? (lo + hi) / 2 : Math.max(lo, Math.min(hi, v)));
-    const p = this.me;
-    // (only part of the way towards you: the middle of the arena pulls the view back)
-    const mx = this.map.widthPx / 2;
     const my = (this.map.heightPx + SKY) / 2;
-    const tx = clamp(mx + (p.x + this.fix.x - mx) * 0.6, vw / 2, this.map.widthPx - vw / 2);
-    const ty = clamp(my + (p.y + this.fix.y - 40 - my) * 0.5, SKY + vh / 2, this.map.heightPx - vh / 2);
+    const tx = clamp(p.x, vw / 2, this.map.widthPx - vw / 2);
+    const ty = clamp(my + (p.y - 40 - my) * 0.5, SKY + vh / 2, this.map.heightPx - vh / 2);
     if (!this.camC) this.camC = { x: tx, y: ty };
     else if (p.respawn <= 0) {
-      const k = 1 - Math.exp(-dt * 1.4);
+      // (it keeps up with you: the arena's too wide to hang back in the middle)
+      const k = 1 - Math.exp(-dt * (watching ? 1.4 : 3.5));
       this.camC.x += (tx - this.camC.x) * k;
       this.camC.y += (ty - this.camC.y) * k;
     }
@@ -950,7 +956,7 @@ export class BattleScene extends Phaser.Scene {
     const look = themeMix(themeClock.t);
     this.bg.setTheme(look);
     this.level.setTint(mixTint(look));
-    this.followCamera(dt);
+    this.followCamera(dt, cur.players);
     this.placeArrows(cur.players);
     const cam = this.cameras.main;
     const wv = cam.worldView;
@@ -1239,8 +1245,12 @@ export class BattleScene extends Phaser.Scene {
             const col = by ? SLOT_COLORS[by.slot % SLOT_COLORS.length] : '#ffffff';
             this.fx.popText(v.sprite.x, v.sprite.y - 70, 'KO!', col, 30);
             // knocked out by a bad guy or the sky (not a friend): that cost them a point
-            if (!by) this.fx.popText(v.sprite.x, v.sprite.y - 104, '−1', '#ff8a80', 22);
+            if (!by && !e.gift) this.fx.popText(v.sprite.x, v.sprite.y - 104, '−1', '#ff8a80', 22);
           }
+          // (…and with no points to lose, everyone else got one)
+          if (!by && e.gift)
+            for (const [id, o] of this.views)
+              if (id !== e.id && o.sprite.visible) this.fx.popText(o.sprite.x, o.sprite.y - 70, '+1', SLOT_COLORS[o.slot % SLOT_COLORS.length], 24);
           sfx.die();
           if (e.by === myId) sfx.cheer();
           break;
