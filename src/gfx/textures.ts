@@ -511,6 +511,7 @@ const BADDIES_FOR: Record<string, string[]> = {
   1: ['puffball', 'bigpuff', 'giant', 'weapons'],
   2: ['puffball', 'bigpuff', 'giant', 'goat', 'weapons'],
   3: ['goat', 'weapons', 'plops'],
+  4: ['goat', 'weapons', 'plops'],
   battle: ['puffball', 'bigpuff', 'giant', 'weapons'],
 };
 

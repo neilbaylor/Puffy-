@@ -154,7 +154,7 @@ export function primeMusic() {
 export const playLevelClear = () => play('levelClear', true);
 
 /** Each level's own song (Part 1: Level Clear, Part 2: Mountain Climb). */
-const levelTrack = (level: number): Track => (level === 2 ? 'mountain' : level === 3 ? 'plop' : 'levelClear');
+const levelTrack = (level: number): Track => (level === 2 ? 'mountain' : level >= 3 ? 'plop' : 'levelClear');
 
 /** Start a level's song from the top. */
 export const playLevelSong = (level = 1) => play(levelTrack(level), true);

@@ -2,6 +2,7 @@ import type { LevelData } from './builder';
 import { buildLevel1 } from './level1';
 import { buildLevel2 } from './level2';
 import { buildLevel3 } from './level3';
+import { buildLevel4 } from './level4';
 
 export interface LevelInfo {
   /** 1-based level number. */
@@ -36,6 +37,32 @@ export const LEVELS: LevelInfo[] = [
     wrestle: true,
   },
 ];
+
+/**
+ * Work in progress, only on devices switched to it (localStorage puffy.dev = 1, or ?dev in the
+ * address): Plop Invasion · Part 2. Everyone else never sees it.
+ */
+export const DEV = (() => {
+  try {
+    // (opening the game once with ?dev switches this device on for good — the home-screen app too;
+    // ?nodev switches it off again)
+    if (/[?&]nodev\b/.test(location.search)) localStorage.removeItem('puffy.dev');
+    else if (/[?&]dev\b/.test(location.search)) localStorage.setItem('puffy.dev', '1');
+    return localStorage.getItem('puffy.dev') === '1';
+  } catch {
+    return /[?&]dev\b/.test(location.search);
+  }
+})();
+if (DEV)
+  LEVELS.push({
+    id: 4,
+    world: 'World 2',
+    title: 'Plop Invasion',
+    part: 'Part 2',
+    button: 'Part 4',
+    build: buildLevel4,
+    speech: 'Up we go!',
+  });
 
 export const levelInfo = (id: number) => LEVELS.find((l) => l.id === id) ?? LEVELS[0];
 export const levelName = (id: number) => `${levelInfo(id).title} · ${levelInfo(id).part}`;

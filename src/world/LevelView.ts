@@ -11,6 +11,8 @@ import { ONE_WAY_TILES, SOLID_TILES } from '../level/tiles';
 const PAD = 34; // room around each terrain piece for grass blades / roots
 /** Terrain pieces are cut into chunks no wider than this (world px), to stay under mobile texture limits. */
 const CHUNK = 800;
+/** …and no taller than this (tall levels: a cliff wall would otherwise make one picture thousands of px tall). */
+const CHUNK_V = 1024;
 /** Colour of the deep rock under each terrain chunk (sampled once, when the chunk is drawn). */
 const DEEP_FILL = new Map<string, number>();
 /** Each level's terrain pieces (outline + bounds), worked out once (see LevelView.pieces). */
@@ -287,16 +289,23 @@ export class LevelView {
           // the deep rock underneath is just a plain block of colour (saves lots of memory)
           const deep = this.deepestSurface(cx0 - 500, cx0 + cw + 500);
           const cut = Math.min(y1 + PAD, Math.max(top + 200, deep + 240));
-          const ch = cut - top + PAD;
-          const key = `terrain-${d.name}-${kind}-${pieceId}-${ci}`;
+          // (cut into tiles no taller than CHUNK_V: tall levels have cliff walls hundreds of tiles high)
+          for (let cy0 = top, vi = 0; cy0 < cut; cy0 += CHUNK_V, vi++) {
+          const first = vi === 0;
+          const last = cy0 + CHUNK_V >= cut;
+          const cyEnd = last ? cut : cy0 + CHUNK_V;
+          // (the first tile has room above for grass blades; the rest overlap the one above by a pixel)
+          const ty0 = first ? cy0 - PAD : cy0 - 1;
+          const ch = cyEnd - ty0 + (last ? 0 : 1);
+          const key = vi === 0 ? `terrain-${d.name}-${kind}-${pieceId}-${ci}` : `terrain-${d.name}-${kind}-${pieceId}-${ci}-${vi}`;
           /** Just the picture (the start screen draws a level's in quiet moments, ahead of Play). */
           const paint = () => {
           if (!this.scene.textures.exists(key)) {
             const c = hires(cw + PAD * 2, ch, TERRAIN_RES, (ctx) => {
-              ctx.translate(PAD - cx0, PAD - top);
-              drawTerrainPiece(ctx, { kind, outline, pal, seed: Math.round(x0 + y0), floorY: this.heightPx, clip: { x0: cx0 - PAD, x1: cx0 + cw + PAD, y0: top - PAD, y1: cut + PAD } });
+              ctx.translate(PAD - cx0, -ty0);
+              drawTerrainPiece(ctx, { kind, outline, pal, seed: Math.round(x0 + y0), floorY: this.heightPx, clip: { x0: cx0 - PAD, x1: cx0 + cw + PAD, y0: ty0, y1: cyEnd + (last ? PAD : 1) } });
             });
-            if (cut < y1 + PAD) {
+            if (last && cut < y1 + PAD) {
               // the deep rock is the palette's deep soil colour (no pixel read-back: that stalls the GPU);
               // fade the bottom of the chunk into it so the plain block below is seamless
               const hex = kind === 'ground' ? pal.soilDeep : pal.rock.shade;
@@ -323,9 +332,9 @@ export class LevelView {
           this.paints.push({ key, paint });
           const make = () => {
           paint();
-          const fillCol = DEEP_FILL.get(key);
+          const fillCol = last ? DEEP_FILL.get(key) : undefined;
           const chunk = this.scene.add
-            .image(cx0 - PAD, top - PAD, key)
+            .image(cx0 - PAD, ty0, key)
             .setOrigin(0, 0)
             .setScale(1 / TERRAIN_RES)
             .setDepth(DEPTH.tiles);
@@ -334,7 +343,7 @@ export class LevelView {
             this.scenery.push(chunk);
             if (this.tint !== 0xffffff) chunk.setTint(this.tint);
           }
-          if (cut < y1 + PAD && fillCol !== undefined) {
+          if (last && cut < y1 + PAD && fillCol !== undefined) {
             // the deep rock: from just above the cut down to the bottom of the level, with
             // the piece's outline continuing down its sides
             // (all of them in one shape: dozens of separate ones cost more to draw every frame)
@@ -350,6 +359,7 @@ export class LevelView {
           };
           if (this.lazy && (cx0 + cw < this.lazyNear - this.lazySpan[0] || cx0 > this.lazyNear + this.lazySpan[1])) this.pending.push({ x0: cx0, x1: cx0 + cw, make });
           else make();
+          }
         }
       }
     });

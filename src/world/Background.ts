@@ -120,6 +120,8 @@ export class Background {
     private lowestViewTop: number,
     /** Still clouds (drawn once, then they only drift): the start screen. */
     private stillClouds = false,
+    /** A climb (Plop Invasion · Part 2): clouds stream past as you go up, the sky smoggier higher up. */
+    private vertical = false,
   ) {
     this.skyA = scene.add.image(0, 0, bgKey('sky', 'puff')).setOrigin(0, 0).setDepth(DEPTH.sky);
     this.skyB = scene.add.image(0, 0, bgKey('sky', 'puff')).setOrigin(0, 0).setDepth(DEPTH.sky).setVisible(false);
@@ -127,6 +129,8 @@ export class Background {
     // two bands of living clouds: small far ones up high, big slow ones lower down
     this.bands.push(this.makeBand(5, 7, 0.16, 0.08, 0.02, CLOUD_W, [0.75, 1.25], [34, 150], DEPTH.clouds, 1));
     this.bands.push(this.makeBand(9, 4, 0.28, 0.14, 0.2, 1400, [1.3, 1.8], [40, 110], DEPTH.hills - 1, 0.9));
+    // (a climb: nearer clouds spread all the way down the screen, passing quicker as you go up)
+    if (vertical) this.bands.push(this.makeBand(13, 6, 0.22, 0.45, 0, 1100, [0.9, 1.4], [0, 640], DEPTH.clouds, 0.85));
     // dandelion-puff seeds drifting across on the breeze
     const r = rng(77);
     for (let i = 0; i < 14; i++) {
@@ -295,7 +299,13 @@ export class Background {
           // pictures to make and send to the graphics chip)
           c.next = this.stillClouds || LIGHT ? Infinity : this.t + CLOUD_EVERY;
         }
-        const y = c.y + Math.sin(this.t * 0.35 + c.bob) * 5;
+        let y = c.y + Math.sin(this.t * 0.35 + c.bob) * 5;
+        if (this.vertical) {
+          // (a climb: each cloud wraps round as it scrolls down past the bottom of the screen)
+          const period = view.height + 320;
+          const sy = oy + y - view.top + 160;
+          y = (((sy % period) + period) % period) - 160 + view.top - oy;
+        }
         let n = 0;
         for (; x < view.width + 120; x += band.width, n++) {
           if (!c.imgs[n])
@@ -331,6 +341,11 @@ export class Background {
   update(view: View, dt: number) {
     for (const sky of [this.skyA, this.skyB]) sky.setPosition(view.left - 2, view.top - 2).setDisplaySize(view.width + 4, view.height + 4);
     const camUp = this.lowestViewTop - view.top; // how far the camera is above its lowest point
+    if (this.vertical) {
+      // (the higher you climb, the smoggier the sky)
+      const k = Math.max(0, Math.min(1, camUp / Math.max(1, this.lowestViewTop)));
+      this.skyA.setTint(lerpRgb(0xffffff, 0xc89a66, k * 0.55));
+    }
     this.drawClouds(view, camUp, dt);
     this.drawSeeds(view, dt);
     for (const l of this.layers) {
