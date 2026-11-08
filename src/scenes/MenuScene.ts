@@ -49,6 +49,9 @@ export class MenuScene extends Phaser.Scene {
     this.build(data?.level ?? 1);
     // picking a level on the start screen fades the fly-over to that level's world
     const onLevel = (id: number) => {
+      // (light mode: the fly-over stays as it is when another Part is picked — only the title
+      // and the buttons change; no new scenery to put up on an older device)
+      if (LIGHT) return;
       if (id === this.levelId || !levelInfo(id).build) return;
       const cam = this.cameras.main;
       const c = [255, 248, 236];
