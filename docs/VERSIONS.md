@@ -186,3 +186,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.181: Battle: two folding chairs fall into every battle; grab one to swing it (1 heart a hit, breaks after 2 hits).
 - v0.182: Battle chairs held up in both hands (in each player's colour) and swung over the top, like in the Poo Palace.
 - v0.183: Battle lobby squares show each hero at their own size (Big Muscles biggest).
+- v0.184: tablet start screen: Play 14px off the bottom.
