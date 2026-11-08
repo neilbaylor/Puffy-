@@ -158,3 +158,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.153: boss card says Result: Won.
 - v0.154: tablet Play button higher; version label fixed.
 - v0.155: Queen 13 hits; tablet Play 10px off the bottom.
+- v0.156: perf pass (loading, menu taps, gameplay), Queen jumbotron glows, volleyball spike on screen.
