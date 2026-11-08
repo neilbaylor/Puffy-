@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.181)
+## Where things stand (v0.182)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -187,6 +187,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   deferred art + MenuScene's quiet jobs (`takeQuietJobs`) + 24 warm-up frames under the loading bar
   (two-phase bar); the boot screen is the manifest blue with the rainbow PUFFY logo. Results after the last
   level: Play again + Home screen. Account card: Sign out bottom-left.
+- v0.182: Battle chair holders use the Poo Palace carry frames: BattleScene.carryTextureFor(hero, slot) (makeCarrySheet, recoloured per slot like textureFor; keepPixels now keeps char-<id>-carry), built on the 'chair' event; HeroView.chairA = arm angle (-1.75 overhead; swing: wind back to sw0 then down to sw3 over CHAIR_SWING) -> carryFrame; the chair sits at carryHand() like WrestleScene.heroHand. BATTLE_DEMO=chairs: 2nd chair on the floor 100 px ahead. ../simtest/t.ts runs the sim headless (esbuild).
 - v0.181: Battle chairs. sim.ts: BChair, CHAIRS_PER_BATTLE 2 (chairAt: ~25-55 s in and ~45-70 s before the end), random x anywhere; fall, lie CHAIR_LIFE 16 s, grabbed by touch (hands free); holding: canFire false (no rockets) and a FIRE press swings (CHAIR_SWING 0.3 s, reach 64 px x size): hurt() 1 heart (now returns whether it landed) to heroes / hurtEnemy 1; a connecting swing uses 1 of CHAIR_USES 2, then it's gone; dropChairOf on KO / leave. Events chair/chairland/chairgrab/chairswing/chairhit. Snapshot field c: SnapChair[]. BattleScene.renderChairs (wr-chair art, held at shoulder height, wind-up + smash), FIRE button says CHAIR (wrestle-chair event). BATTLE_DEMO=chairs + tchairs.cjs (2 players): 3 -> 2 -> 1 heart, chair gone, no rockets.
 - v0.180: WrestleScene intro: opens cut to (jumbo x, jumbo y + 70, z 1.75, rot 0) and pushes straight in (1.3 s, no rotation swing; was a sweep from the far-left crowd). New beat 6 after her 'Welcome' line: lights to 0.25, lowerThird(hero name, 'The challenger'), camTo(p.x - 12, MAT_Y - 50, 2.45), three hops (body velocity), then back to the turnbuckle (650 ms) for the leap. tqintro.cjs logs the camera path + hero shots (+~3.5 s to the intro).
 - v0.179: level3.ts bigplop at tile 50 gets weapon 'flail' (level 3 now: 3 blasters, 2 chainsaws, 1 ball and chain; tflail.cjs). BG_RES and CLOUD_RES 1.5 -> 1.25 for normal devices (light stays 1). WrestleScene: HITS 13 -> 12, Q_TOUGH 1.05 -> 1 (5% easier), CHAIR_AT_HP [-1, 8, 4]; CHAIRS was already 3 (since v0.141).
