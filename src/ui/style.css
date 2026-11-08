@@ -2542,6 +2542,8 @@ kbd {
 }
 .wr-callout.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 .wr-callout.bad { color: #ff8a80; }
+/* (up out of the way: over the King's head, not on his face) */
+.wr-callout.high { top: 18%; }
 /* a speech bubble over someone's head (placed by the scene; --tail points it at them) */
 .hud.bare .hud-hero { display: none; }
 /* Queen Plop's name card (the King's lower third from basketball, in her pink) */

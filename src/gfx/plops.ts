@@ -313,3 +313,128 @@ export function drawQueen(ctx: Ctx, ox: number, oy: number, f: PlopFrame, st: St
     ST.shape(ctx, ellipsePts(cx + k, py, 2.6, 2.6, 0, 10), PEARL, 3040 + k, { lw: 0.5, plain: true });
   }
 }
+
+/** Queen Plop knocked out: the frame (art units) and where the mat is in it. */
+export const QUEEN_KO_W = 160;
+export const QUEEN_KO_H = 80;
+export const QUEEN_KO_GROUND = 72;
+export const QUEEN_KO_FRAMES = ['ko0', 'ko1', 'ko2', 'ko3'] as const;
+
+/**
+ * Queen Plop, K.O.'d: flat out on the mat on her spread-out cape, swirly dizzy eyes, tongue
+ * lolling, legs in the air, her swirl flopped over with its bow drooping, the tiara knocked off
+ * and her pearls scattered. Four frames (`phase` 0–3): she breathes, the eyes spin, the tongue
+ * and the legs wobble. Facing left like the rest; (ox, oy) is the frame's top-left.
+ */
+export function drawQueenKO(ctx: Ctx, ox: number, oy: number, phase: number, st: Style = STYLES.polished) {
+  const ST = st;
+  const G = oy + QUEEN_KO_GROUND;
+  const cx = ox + QUEEN_KO_W / 2 + 4;
+  const ph = (phase / 4) * Math.PI * 2;
+  const breathe = Math.sin(ph); // −1…1
+  const BODY = BODY0;
+  // her cape, spread flat on the mat under her (lining, then pink, gold beads round the edge)
+  ST.shape(ctx, ellipsePts(cx - 2, G - 3, 70, 7.5, 0, 48), PINK_LINING, 3101, { lw: 1, plain: true });
+  ST.shape(ctx, ellipsePts(cx + 2, G - 4, 62, 6, 0.02, 48), PINK, 3102, { lw: 1, light: [cx - 20, G - 7] });
+  for (let k = -56; k <= 56; k += 12) ST.shape(ctx, ellipsePts(cx + 2 + k, G - 4 + (k * k) / 1600 + 4.5, 1.9, 1.9, 0, 10), SILVER, 3103 + k, { lw: 0.4, plain: true });
+  // the tiara, knocked off and lying on the mat in front of her (tipped over)
+  {
+    const tx = ox + 18;
+    const ty = G - 5;
+    ctx.save();
+    ctx.translate(tx, ty);
+    ctx.rotate(-0.55);
+    ST.shape(ctx, [[-14, 4], [-11, -3], [-7, 1], [-4, -6], [-1, 0], [0, -10], [1, 0], [4, -6], [7, 1], [11, -3], [14, 4], [0, 2.5]], SILVER, 3110, { lw: 0.8, light: [-3, -5] });
+    ST.shape(ctx, ellipsePts(0, -2.5, 2.4, 2.9, 0, 12), RUBY, 3111, { lw: 0.4, plain: true });
+    ctx.restore();
+  }
+  // a few pearls from her necklace, rolled away across the mat
+  for (const [px, py, r] of [[ox + 34, G - 4, 2.4], [ox + 42, G - 2.5, 2.1], [ox + 128, G - 3, 2.4], [ox + 137, G - 1.5, 2], [ox + 146, G - 4, 1.8]] as const)
+    ST.shape(ctx, ellipsePts(px, py, r, r, 0, 10), PEARL, 3120 + px, { lw: 0.5, plain: true });
+  // legs up in the air (behind her), feet curled, wobbling
+  const legWob = Math.sin(ph * 2) * 2.5;
+  for (const [lx, ang, seed] of [[cx + 26, -0.7, 3130], [cx + 36, -0.35, 3131]] as const) {
+    const a = ang + legWob * 0.02 * (seed === 3130 ? 1 : -1);
+    const fx = lx + Math.cos(a) * 26;
+    const fy = G - 12 + Math.sin(a) * 26;
+    ST.shape(ctx, [[lx - 4, G - 12], [lx + 4, G - 10], [fx + 3, fy + 1], [fx + 6, fy - 4], [fx - 1, fy - 6], [fx - 3, fy - 1]], LEG, seed, { lw: 1 });
+  }
+  // arms flopped out flat on the mat either side
+  const flop = (x: number, y: number, ang: number, seed: number) => {
+    const len = 22;
+    const tip: Pt = [x + Math.cos(ang) * len, y + Math.sin(ang) * len];
+    const nx = -Math.sin(ang) * 5.5;
+    const ny = Math.cos(ang) * 5.5;
+    ST.shape(ctx, [[x, y], [x + Math.cos(ang) * len * 0.5 + nx, y + Math.sin(ang) * len * 0.5 + ny], tip, [x + Math.cos(ang) * len * 0.5 - nx, y + Math.sin(ang) * len * 0.5 - ny]], BODY, seed, { lw: 1 });
+  };
+  flop(cx - 40, G - 10, Math.PI + 0.12, 3140);
+  flop(cx + 40, G - 10, -0.12, 3141);
+  // the body, squashed flat: a wide bottom tier, the top tier behind it, breathing
+  const sq = 1 + breathe * 0.05;
+  const topY = G - 27 - breathe * 1.2;
+  // the swirl, flopped over to the front (left), its bow drooping off the end
+  const tipWob = Math.sin(ph) * 1.5;
+  ST.shape(ctx, [[cx - 4, topY - 8], [cx - 14, topY - 17 + tipWob], [cx - 30, topY - 16 + tipWob], [cx - 38, topY - 9 + tipWob], [cx - 31, topY - 10 + tipWob], [cx - 17, topY - 10], [cx + 8, topY - 7]], BODY, 3150, { lw: 1.1, light: [cx - 18, topY - 14] });
+  {
+    const bx = cx - 38;
+    const by = topY - 8 + tipWob;
+    st.line(ctx, [[bx, by + 1], [bx - 2, by + 8], [bx + 1, by + 12]], 3151, 1.5, '#b23272');
+    st.line(ctx, [[bx + 2, by + 1], [bx + 5, by + 8], [bx + 3, by + 12]], 3152, 1.5, '#b23272');
+    ST.shape(ctx, [[bx, by], [bx - 10, by - 2], [bx - 9, by + 6], [bx - 4, by + 7]], PINK, 3153, { lw: 0.7 });
+    ST.shape(ctx, [[bx, by], [bx + 7, by + 5], [bx + 3, by + 9], [bx - 1, by + 6]], PINK, 3154, { lw: 0.7 });
+    ST.shape(ctx, ellipsePts(bx, by + 1, 2.8, 2.8, 0, 10), PINK, 3155, { lw: 0.6 });
+  }
+  ST.shape(ctx, ellipsePts(cx - 2, topY + 2, 28 * sq, 13 / sq, 0, 36), BODY, 3160, { lw: 1.2, light: [cx - 12, topY - 4] });
+  ST.shape(ctx, ellipsePts(cx, G - 12, 44 * sq, 13 / sq, 0, 44), BODY, 3161, { lw: 1.3, light: [cx - 16, G - 18] });
+  // what's left of her pearls, round her middle (a few missing)
+  for (let k = -26; k <= 26; k += 5.2) {
+    if (Math.abs(k - 10.4) < 1 || Math.abs(k + 15.6) < 1) continue;
+    ST.shape(ctx, ellipsePts(cx + k, G - 19 + (k * k) / 150, 2.3, 2.3, 0, 10), PEARL, 3170 + k, { lw: 0.45, plain: true });
+  }
+  // her belt, gone crooked, the gold plate tipped up
+  ST.shape(ctx, [[cx - 40, G - 9], [cx - 14, G - 7], [cx + 14, G - 6], [cx + 40, G - 8], [cx + 39, G - 3], [cx + 14, G - 1], [cx - 14, G - 2], [cx - 39, G - 4]], LEATHER, 3180, { lw: 0.8, plain: true });
+  ctx.save();
+  ctx.translate(cx + 4, G - 5);
+  ctx.rotate(0.22);
+  ST.shape(ctx, ellipsePts(0, 0, 10, 6.5, 0, 22), SILVER, 3181, { lw: 0.9, light: [-3, -3] });
+  ST.shape(ctx, [[-4, 2], [-5, -2], [-2, 0.5], [0, -3], [2, 0.5], [5, -2], [4, 2]], RUBY, 3182, { lw: 0.4, plain: true });
+  ctx.restore();
+  // dizzy eyes: big googly whites with spirals going round
+  const eyes: [number, number, number, number][] = [[cx - 15, topY - 1, 7.5, 8.5], [cx + 5, topY - 2, 7, 8]];
+  eyes.forEach(([ex, ey, rx, ry], i) => {
+    ST.shape(ctx, ellipsePts(ex, ey, rx, ry, 0, 24), EYE, 3190 + i, { lw: 1 });
+    const sp: Pt[] = [];
+    const turn = ph * (i ? -1 : 1);
+    for (let n = 0; n <= 36; n++) {
+      const t = n / 36;
+      const a = turn + t * Math.PI * 4.4;
+      const r = 0.4 + t * (rx - 2.2);
+      sp.push([ex + Math.cos(a) * r, ey + Math.sin(a) * r * (ry / rx)]);
+    }
+    st.line(ctx, sp, 3195 + i, 0.9);
+  });
+  // long lashes, all askew
+  ctx.strokeStyle = ST.ink;
+  ctx.lineWidth = 1.2;
+  ctx.lineCap = 'round';
+  for (const [ex, ey, dir] of [[cx - 15, topY - 9.5, -1], [cx + 5, topY - 10, 1]] as const) {
+    ctx.beginPath();
+    ctx.moveTo(ex + dir * 2, ey);
+    ctx.quadraticCurveTo(ex + dir * 4, ey - 3, ex + dir * 7, ey - 3);
+    ctx.stroke();
+  }
+  // mouth hanging open, tongue lolling out to the side (wobbling)
+  const mx = cx - 6;
+  const my = topY + 9;
+  ST.shape(ctx, ellipsePts(mx, my, 6, 3.6 + breathe * 0.6, 0.15, 20), { base: '#5e1a2a', shade: '#3e1020', light: '#7e2a3a' }, 3200, { lw: 0.8, plain: true });
+  const tw = Math.sin(ph) * 1.6;
+  ST.shape(ctx, [[mx - 4, my + 1], [mx - 9 + tw, my + 7], [mx - 6 + tw, my + 11], [mx - 1 + tw * 0.5, my + 8], [mx + 1, my + 2]], { base: '#ff7d93', shade: '#e0566e', light: '#ffb3c0' }, 3201, { lw: 0.7 });
+  // a little sweat drop, and blush
+  ST.shape(ctx, [[cx + 19, topY - 10], [cx + 22, topY - 4], [cx + 19, topY - 1.5], [cx + 16.5, topY - 4]], { base: '#bfe8ff', shade: '#8cc8ea', light: '#ffffff' }, 3210, { lw: 0.6 });
+  ctx.fillStyle = 'rgba(255,110,150,0.3)';
+  for (const bx of [cx - 22, cx + 15]) {
+    ctx.beginPath();
+    ctx.ellipse(bx, topY + 6, 4.5, 2.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}

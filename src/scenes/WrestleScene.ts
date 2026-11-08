@@ -8,7 +8,7 @@ import { loseLife, lives } from '../core/lives';
 import { bank } from '../core/bank';
 import { ART_RES, CARRY_SWING, CHAR_H, CHAR_W, canvas, carryHand } from '../gfx/draw';
 import { ARENA_H, ARENA_W, CROWD_H, FRONT_H, JUMBO, RIBBON, STAGE_OX, STAGE_OY, drawArena, drawArenaFront, drawCrowd, drawCameraFlash, drawRibbonScreen, drawSpotlight, setArenaStyle, type JumboContent } from '../gfx/hoops';
-import { PLOP_FRAMES, PLOP_H, PLOP_W, drawPlop, drawQueen, type PlopFrame } from '../gfx/plops';
+import { PLOP_FRAMES, PLOP_H, PLOP_W, QUEEN_KO_FRAMES, QUEEN_KO_GROUND, QUEEN_KO_H, QUEEN_KO_W, drawPlop, drawQueen, drawQueenKO, type PlopFrame } from '../gfx/plops';
 import { POOWAVE_H, POOWAVE_W, drawPooWave } from '../gfx/plopworld';
 import { drawPoo } from '../gfx/hazards';
 import { drawPrize } from '../gfx/prizes';
@@ -28,9 +28,9 @@ import type { GameOverState, HudState, ResultState } from './GameScene';
  *
  * The fight is the platformer's own: the same hero, controls, jumps and bazooka (two rockets = a hit),
  * side-on across the mat. The ropes at either end are springy (run into them and you're flung
- * back), and you can climb them to the top turnbuckle and dive off (land on her: two hits); there's
+ * back), and you can climb them to the top turnbuckle and dive off (land on her: three hits); there's
  * no leaving the ring. You have 5 hearts (shown over your head; more turn up in the ring, up to 6), there's
- * a folding chair now and then (FIRE swings it while you hold it: two hits), and she takes 15 hits, counted down on
+ * a folding chair now and then (FIRE swings it while you hold it: three hits), and she takes 12 hits, counted down on
  * the jumbotron.
  */
 export interface WrestleData {
@@ -68,13 +68,13 @@ const QS = 1.3;
 const Q_RES = 4;
 const Q_PAD = 18;
 const Q_TOP = 24;
-const HITS = 15;
-/** Your hearts in the ring: you start with 5, and pick-ups can take you up to 6. */
-const HEARTS_START = 5;
+const HITS = 12;
+/** Your hearts in the ring: you start with all 6, and pick-ups top you back up. */
+const HEARTS_START = 6;
 const HEARTS_MAX = 6;
 /** Folding chairs in a match, and (for each one after the first) how few hits she has left when it comes, at the latest. */
-const CHAIRS = 5;
-const CHAIR_AT_HP = [-1, 12, 9, 6, 3];
+const CHAIRS = 4;
+const CHAIR_AT_HP = [-1, 9, 6, 3];
 /** The poo puddle on the mat (world x): you sink into it, like the level's. */
 const PUD_X0 = WX(PUDDLE.x - PUDDLE.w * 0.78);
 const PUD_X1 = WX(PUDDLE.x + PUDDLE.w * 0.78);
@@ -134,6 +134,8 @@ class Queen {
   chargeV = 0;
   moodNext = 1.5;
   cdBlock = 0;
+  /** Knocked out (the ending has her: her own update leaves her be). */
+  ko = false;
   cdHeave = 5;
   fallVy = 0;
   counterNext = false;
@@ -176,6 +178,7 @@ class Queen {
   }
 
   update(dt: number) {
+    if (this.ko) return;
     const s = this.s;
     const b = this.body;
     const p = s.player;
@@ -188,7 +191,7 @@ class Queen {
     const dx = p.x - this.x;
     const towards: Side = dx < 0 ? -1 : 1;
     const ground = this.onGround;
-    const speed = 108 * this.rage;
+    const speed = 94 * this.rage;
     let frame: PlopFrame | null = null;
 
     switch (this.mode) {
@@ -233,14 +236,14 @@ class Queen {
         const above = p.alive && p.body.velocity.y > 60 && p.bottom < this.top + 6 && Math.abs(dx) < 90 && !s.heroDiving();
         if (ground && above && this.cdBlock <= 0) {
           b.setVelocity(towards * speed * 0.6, -640);
-          this.cdBlock = 1.9 + Math.random();
+          this.cdBlock = 2.3 + Math.random();
           this.hopIn = 0.45;
         } else if (ground && this.hopIn <= 0) {
-          const lunge = Math.abs(dx) < 260 && Math.random() < 0.3;
+          const lunge = Math.abs(dx) < 260 && Math.random() < 0.25;
           const big = !lunge && Math.random() < 0.3;
           b.setVelocityY(lunge ? -600 - Math.random() * 80 : big ? -700 - Math.random() * 60 : -430 - Math.random() * 170);
           if (lunge) b.setVelocityX(towards * speed * 2);
-          this.hopIn = 0.35 + Math.random() * 0.5;
+          this.hopIn = 0.42 + Math.random() * 0.55;
         }
         // from further off: a big lump of poo, hurled at you (where it lands, it rolls on at you)
         if (ground && this.cdHeave <= 0 && Math.abs(dx) > 150 && Math.abs(dx) < 520 && p.alive && Math.abs(p.bottom - MAT_Y) < 50) {
@@ -251,12 +254,12 @@ class Queen {
           sfx.roar();
           break;
         }
-        if (ground && this.cdSlam <= 0 && Math.abs(dx) > 100 && Math.random() < 0.035) {
+        if (ground && this.cdSlam <= 0 && Math.abs(dx) > 100 && Math.random() < 0.03) {
           this.slam(p.x);
           break;
         }
         if (ground && this.cdCharge <= 0 && Math.abs(dx) < 330 && Math.abs(p.bottom - this.bottom) < 40) {
-          this.setMode('windup', 0.4 / this.rage);
+          this.setMode('windup', 0.46 / this.rage);
           this.dir = towards;
           s.fx.popText(this.x, this.top - 14, '!', '#ffd23f', 26);
           sfx.roar();
@@ -270,7 +273,7 @@ class Queen {
         this.spr.setX(this.spr.x + Math.sin(s.time.now / 14) * 0.8);
         if (this.t <= 0) {
           this.setMode('charge', 1.1);
-          this.chargeV = Math.min(520, 380 * this.rage);
+          this.chargeV = Math.min(470, 340 * this.rage);
           sfx.poopa(0.8);
         }
         break;
@@ -280,7 +283,7 @@ class Queen {
         frame = Math.floor(s.time.now / 80) % 2 ? 'run0' : 'run1';
         if (ground && Math.random() < 0.3) s.fx.dust(this.x - this.dir * 20, this.bottom, 1);
         if (this.t <= 0) {
-          this.cdCharge = 1.7 + Math.random() * 1.3;
+          this.cdCharge = 2 + Math.random() * 1.5;
           this.setMode('idle', 0.2);
         }
         break;
@@ -291,7 +294,7 @@ class Queen {
         this.spr.setX(this.spr.x + Math.sin(s.time.now / 12) * 0.7);
         if (this.t <= 0) {
           s.heaveAt(this, p.x);
-          this.cdHeave = 5 + Math.random() * 2.5;
+          this.cdHeave = 5.8 + Math.random() * 2.8;
           this.setMode('idle', 0.25);
         }
         break;
@@ -408,8 +411,8 @@ class Queen {
     if (this.hp > 0) {
       const away = Math.sign(this.x - fromX) || 1;
       this.body.setVelocity(away * 210, -260);
-      this.setMode('hurt', 0.38);
-      this.counterNext = Math.random() < 0.6;
+      this.setMode('hurt', 0.55);
+      this.counterNext = Math.random() < 0.45;
     }
     return true;
   }
@@ -431,7 +434,7 @@ export class WrestleScene extends Phaser.Scene {
   private heartPick: { img: Phaser.GameObjects.Image; t: number; y: number } | null = null;
   private heartIn = 3;
   private heartsG!: Phaser.GameObjects.Graphics;
-  /** The folding chair: falls into the ring now and then; pick it up and hit her with it (two hits). */
+  /** The folding chair: falls into the ring now and then; pick it up and hit her with it (three hits). */
   private chair: {
     img: Phaser.GameObjects.Image;
     shadow: Phaser.GameObjects.Image;
@@ -445,8 +448,8 @@ export class WrestleScene extends Phaser.Scene {
     swing: number;
     cd: number;
     hit: boolean;
-    /** pressed again during a swing: another swing follows */
-    again?: boolean;
+    /** a press waiting for the reload */
+    queued?: boolean;
   } | null = null;
   private chairIn = 8;
   /** Chairs still to come this match (4 in all), and the hits-left mark that brings each one early. */
@@ -690,6 +693,21 @@ export class WrestleScene extends Phaser.Scene {
     };
     sheetOf('wr-queen', (ctx, f) => drawQueen(ctx, Q_PAD, Q_TOP, f));
     sheetOf('wr-king', (ctx, f) => drawPlop(ctx, Q_PAD, Q_TOP, f, STYLES.polished, 'king'));
+    // Queen Plop knocked out (four frames: breathing, eyes spinning)
+    if (!T.exists('wr-queen-ko')) {
+      const R = Q_RES;
+      const fw = Math.round(QUEEN_KO_W * R);
+      const fh = Math.round(QUEEN_KO_H * R);
+      const { c, ctx } = canvas(fw * 2, fh * 2);
+      QUEEN_KO_FRAMES.forEach((_, i) => {
+        ctx.save();
+        ctx.translate((i % 2) * fw, Math.floor(i / 2) * fh);
+        ctx.scale(R, R);
+        drawQueenKO(ctx, 0, 0, i);
+        ctx.restore();
+      });
+      addCanvas(this, 'wr-queen-ko', c, (t) => QUEEN_KO_FRAMES.forEach((f, i) => t.add(f, 0, (i % 2) * fw, Math.floor(i / 2) * fh, fw, fh)));
+    }
     if (!T.exists('camflash')) addCanvas(this, 'camflash', hires(48, 48, 1, (ctx) => drawCameraFlash(ctx, 24)));
     if (!T.exists('spot')) addCanvas(this, 'spot', hires(300, 700, 1, (ctx) => drawSpotlight(ctx, 300, 700)));
     if (!T.exists('softshadow'))
@@ -1137,7 +1155,7 @@ export class WrestleScene extends Phaser.Scene {
     if (!this.fighting || !q.hit(n, fromX)) return false;
     if (how === 'rocket') this.rocketHalf = !this.rocketHalf;
     const big = how === 'dive' || how === 'chair';
-    const words = how === 'dive' ? 'TOP ROPE! ×2' : how === 'chair' ? 'CHAIR SHOT! ×2' : how === 'stomp' ? ['BONK!', 'SPLAT!', 'BOING!'][q.hp % 3] : ['POW!', 'BAM!', 'KABOOM!'][q.hp % 3];
+    const words = how === 'dive' ? 'TOP ROPE! ×3' : how === 'chair' ? 'CHAIR SHOT! ×3' : how === 'stomp' ? ['BONK!', 'SPLAT!', 'BOING!'][q.hp % 3] : ['POW!', 'BAM!', 'KABOOM!'][q.hp % 3];
     this.fx.popText(q.x, q.top - 16, words, big ? '#ffd23f' : '#ffffff', big ? 26 : 20);
     this.fx.stars(q.x, q.top + 10, big ? 10 : 5);
     sfx.stomp();
@@ -1146,8 +1164,8 @@ export class WrestleScene extends Phaser.Scene {
       this.cameras.main.shake(300, 0.014);
       this.shakeRopes(6);
       sfx.cheer();
-      if (how === 'dive') this.flashJumbo({ kind: 'big', text: 'FROM THE TOP ROPE!', sub: `THAT ONE COUNTS DOUBLE · ${q.hp} TO GO`, color: '#ffd23f', bg: '#c8102e' }, 2200);
-      else this.flashJumbo({ kind: 'big', text: 'CHAIR SHOT!', sub: `THAT ONE COUNTS DOUBLE · ${q.hp} TO GO`, color: '#ffd23f', bg: '#3a4652' }, 2200);
+      if (how === 'dive') this.flashJumbo({ kind: 'big', text: 'FROM THE TOP ROPE!', sub: `THAT ONE COUNTS TRIPLE · ${q.hp} TO GO`, color: '#ffd23f', bg: '#c8102e' }, 2200);
+      else this.flashJumbo({ kind: 'big', text: 'CHAIR SHOT!', sub: `THAT ONE COUNTS TRIPLE · ${q.hp} TO GO`, color: '#ffd23f', bg: '#3a4652' }, 2200);
     } else this.flashJumbo({ kind: 'big', text: words.replace(/!.*/, '!'), sub: `${q.hp} TO GO`, color: '#ffd23f', bg: '#5c3118' }, 900);
     if (q.hp <= 0) void this.win();
     return true;
@@ -1239,7 +1257,7 @@ export class WrestleScene extends Phaser.Scene {
     this.drawScreens();
   }
 
-  /** The hero against her: land on her (from the top rope: two hits), or she gets you. */
+  /** The hero against her: land on her (from the top rope: three hits), or she gets you. */
   private contact() {
     const p = this.player;
     const q = this.queen;
@@ -1247,17 +1265,18 @@ export class WrestleScene extends Phaser.Scene {
     const a = p.body;
     const b = q.body;
     // (a dive off the top rope is generous: coming down near her counts)
-    const reach = this.dive ? 22 : 0;
+    // (her head's a little easier to land on than her body is to bump into; a dive, much easier)
+    const reach = this.dive ? 22 : 6;
     if (a.right < b.left - reach || a.left > b.right + reach || a.bottom < b.top - (this.dive ? 10 : 0) || a.top > b.bottom) return;
     // (she's leaping up to meet you: that's a headbutt, not a stomp — except off the top rope)
     const rising = b.velocity.y < -250 && !this.dive;
     // (where you were last frame counts too: on a slow phone you can drop right past her head in one frame)
     const falling = a.velocity.y > 40 || a.bottom > this.prevHeroBottom + 1;
-    const fromAbove = Math.min(a.bottom, this.prevHeroBottom) < b.top + b.height * 0.4;
+    const fromAbove = Math.min(a.bottom, this.prevHeroBottom) < b.top + b.height * 0.5;
     if (!rising && falling && fromAbove) {
       const dive = !!this.dive;
       this.dive = null;
-      this.hitQueen(dive ? 2 : 1, dive ? 'dive' : 'stomp', p.x);
+      this.hitQueen(dive ? 3 : 1, dive ? 'dive' : 'stomp', p.x);
       p.bounce();
       return;
     }
@@ -1293,7 +1312,7 @@ export class WrestleScene extends Phaser.Scene {
       this.heartIn = 2;
       return;
     }
-    this.heartIn = 3 + Math.random() * 2;
+    this.heartIn = 2 + Math.random() * 2;
     const x = this.ringSpot();
     const y = MAT_Y - 30 - Math.random() * 60;
     const img = this.add.image(x, y, 'prize-heart').setScale(0.9 / ART_RES).setDepth(DEPTH.pickups);
@@ -1375,7 +1394,7 @@ export class WrestleScene extends Phaser.Scene {
       const img = this.add.image(x, this.cameras.main.worldView.top - 50, 'wr-chair').setScale(SC).setDepth(DEPTH.pickups);
       const shadow = this.add.image(x, MAT_Y + 2, 'softshadow').setDepth(DEPTH_W.shadows).setDisplaySize(10, 4).setAlpha(0.2);
       this.chair = { img, shadow, state: 'fall', vy: 60, t: 0, bounced: false, a: -1.75, swing: -1, cd: 0, hit: false };
-      this.flashJumbo({ kind: 'big', text: 'CHAIR!', sub: 'GRAB IT: IT COUNTS DOUBLE', color: '#ffd23f', bg: '#3a4652' }, 1800);
+      this.flashJumbo({ kind: 'big', text: 'CHAIR!', sub: 'GRAB IT: IT COUNTS TRIPLE', color: '#ffd23f', bg: '#3a4652' }, 1800);
       this.ribbonMsg = { text: 'CHAIR! CHAIR! CHAIR!', color: '#e2e7ec', bg: '#3a4652', t0: this.clock / 1000 };
       this.excitedUntil = this.clock + 1800;
       sfx.cheer();
@@ -1440,7 +1459,11 @@ export class WrestleScene extends Phaser.Scene {
       c.a = CARRY_SWING.lift + (-1.75 - CARRY_SWING.lift) * (u * u * (3 - 2 * u));
       p.frameOverride = u < 1 ? WrestleScene.carryFrame(c.a) : null;
       if (u >= 1) c.swing = -1;
-    } else if (c.swing < 0 && c.cd <= 0 && this.firePressed && !this.climb) {
+    }
+    // (a press during a swing or the short reload isn't lost: the next swing comes once it's ready)
+    if (this.firePressed && (c.swing >= 0 || c.cd > 0)) c.queued = true;
+    if (c.swing === -1 && c.cd <= 0 && (this.firePressed || c.queued) && !this.climb) {
+      c.queued = false;
       // the CHAIR button: swing it (if she's right there, turn to her)
       c.swing = 0;
       c.hit = false;
@@ -1460,20 +1483,12 @@ export class WrestleScene extends Phaser.Scene {
         c.hit = true;
         if (inReach && toward === p.facing && this.chairHit()) return;
       }
-      // (press again mid-swing and the next one follows straight on)
-      if (this.firePressed && c.hit) c.again = true;
       if (t > UP + DOWN + 0.04) {
+        // (a very short breather before the next swing: not rapid fire)
         c.a = -1.75;
-        if (c.again) {
-          c.again = false;
-          c.swing = 0;
-          c.hit = false;
-          sfx.whoosh();
-        } else {
-          c.swing = -1;
-          c.cd = 0.05;
-          p.frameOverride = null;
-        }
+        c.swing = -1;
+        c.cd = 0.2;
+        p.frameOverride = null;
       }
     }
     // the chair, gripped in both hands, carrying on along the arms
@@ -1501,7 +1516,7 @@ export class WrestleScene extends Phaser.Scene {
     });
   }
 
-  /** WHACK! The chair over her head: two hits, and it's bent out of shape and gone. */
+  /** WHACK! The chair over her head: three hits, and it's bent out of shape and gone. */
   private chairHit() {
     const c = this.chair!;
     const q = this.queen;
@@ -1509,7 +1524,7 @@ export class WrestleScene extends Phaser.Scene {
     // (out of your hands before the hit counts: if it's the knock-out, the ending tidies away any
     // chair still lying about, and this one's busy flying off her head)
     this.chair = null;
-    if (!this.hitQueen(2, 'chair', p.x)) {
+    if (!this.hitQueen(3, 'chair', p.x)) {
       this.chair = c;
       return false;
     }
@@ -1830,6 +1845,8 @@ export class WrestleScene extends Phaser.Scene {
     this.flashbulbs(24, 1900);
     this.ribbonMsg = { text: 'QUEEN PLOP ♛ QUEEN PLOP', color: '#ff9ccf', bg: '#5a1030', t0: this.clock / 1000 };
     await this.camTo(jx, jy + 6, 2.35, 1600, -0.018, 'Sine.easeInOut');
+    // (and stay on it a moment, so it reads)
+    await this.camTo(jx, jy + 4, 2.42, 500, -0.012, 'Sine.easeOut');
 
     // ── 2. a crash zoom out to the ring… lights down, BOOM: a spotlight finds her ──
     if (!this.skipping) {
@@ -1997,6 +2014,8 @@ export class WrestleScene extends Phaser.Scene {
     sfx.whistle();
     sfx.cheer();
     q.setMode('idle', 0.6);
+    // (the intro's over: a skip mustn't carry on cutting short the camera moves in the ending)
+    this.skipping = false;
     this.fighting = true;
     this.emitHud(true);
     this.game.events.emit('wrestle-fight');
@@ -2037,15 +2056,29 @@ export class WrestleScene extends Phaser.Scene {
     this.heartPick?.img.destroy();
     this.heartPick = null;
     await this.wait(500);
-    // flat on the mat, dazed
-    this.tweens.add({ targets: q.spr, scaleY: (QS / Q_RES) * 0.55, scaleX: (QS / Q_RES) * 1.15, duration: 220, ease: 'Quad.easeOut' });
+    // flat out on the mat, dazed: a splat as she lands, then she lies there wobbling, stars going round
+    q.ko = true;
+    q.body.setVelocity(0, 0).setAllowGravity(false);
+    const koY = MAT_Y + 2;
+    q.spr.setTexture('wr-queen-ko', 'ko0').setOrigin(0.5, QUEEN_KO_GROUND / QUEEN_KO_H).setPosition(q.x, koY).setFlipX(false).setTint(0xffffff);
+    q.spr.setScale((QS / Q_RES) * 1.12, (QS / Q_RES) * 0.7);
+    this.tweens.add({ targets: q.spr, scaleX: QS / Q_RES, scaleY: QS / Q_RES, duration: 420, ease: 'Back.easeOut' });
+    let koF = 0;
+    this.time.addEvent({ delay: 210, loop: true, callback: () => q.spr.active && q.spr.setFrame(QUEEN_KO_FRAMES[++koF % 4]) });
+    q.shadow.setPosition(q.x, MAT_Y + 2).setDisplaySize(170, 18).setAlpha(0.5);
     sfx.thud();
-    this.fx.dizzy(q.spr, 9000);
+    this.fx.dust(q.x - 50, MAT_Y, 8);
+    this.fx.dust(q.x + 50, MAT_Y, 8);
+    this.fx.pooSplat(q.x, MAT_Y, 12);
+    this.cameras.main.shake(260, 0.01);
+    this.shakeRopes(6);
+    const stars = { x: q.x - 8, y: koY - 6 } as Phaser.GameObjects.Sprite;
+    this.fx.dizzy(stars, 12000);
     p.finish();
-    this.camFocus = { x: q.x, y: MAT_Y - 75, zoom: 1.5 };
-    await this.wait(900);
-    await this.say('“Nice work… but you’ll never out-wrestle <b>THE KING</b>!”', q.x, q.top - 22, 3200);
-    // the camera pulls right out: who's that in the front row?
+    this.camFocus = { x: q.x, y: MAT_Y - 70, zoom: 1.6 };
+    await this.wait(1200);
+    await this.say('“Nice work… but you’ll never out-wrestle <b>THE KING</b>!”', q.x - 6, MAT_Y - 58, 3500);
+    // the camera pulls right out: who's that in the front row? (the jumbotron's spotted him)
     this.camFocus = { x: WORLD_W / 2, y: WORLD_H * 0.48, zoom: 0.78 };
     this.flashJumbo({ kind: 'big', text: 'THE KING?!', sub: 'HE WAS HERE ALL ALONG', color: '#ffd23f', bg: '#3d1478' }, 1e9);
     this.setDark(0.45, 600);
@@ -2053,17 +2086,33 @@ export class WrestleScene extends Phaser.Scene {
     const ky = WY(KING_SEAT.feet);
     this.king.setVisible(true).setFrame('idle').setFlipX(false);
     this.aimSpot(kx, ky - 6, 0.9, 500);
-    await this.wait(1600);
-    // …zoom in on him
-    this.camFocus = { x: kx - 20, y: ky - 30, zoom: 2.6 };
+    sfx.drum();
+    await this.wait(1300);
+    // up to the jumbotron for a moment…
+    this.camManual = true;
+    const jx = WX(JUMBO.x + (JUMBO.w * JUMBO.s) / 2);
+    const jy = WY(JUMBO.y + (JUMBO.h * JUMBO.s) / 2);
+    await this.camTo(jx, jy + 6, 2.2, 500, 0.012, 'Quad.easeOut');
+    this.excitedUntil = this.clock + 4000;
+    await this.wait(650);
+    // …then a crash zoom right onto him
+    this.king.setFrame('look');
+    await this.camTo(kx - 10, ky - 28, 3.1, 420, -0.04, 'Quad.easeIn');
+    this.cameras.main.flash(160, 255, 240, 255);
+    this.cameras.main.shake(220, 0.008);
+    sfx.thud();
+    sfx.drum();
     this.king.setFrame('grin');
-    await this.wait(1100);
+    void this.camTo(kx - 14, ky - 31, 3.35, 1400, -0.015, 'Sine.easeOut');
+    await this.wait(1300);
     this.king.setFrame('yell1');
     sfx.laugh();
-    this.callout('THE KING!', 'bad', 1300);
+    this.callout('THE KING!', 'bad high', 1300);
+    this.flashJumbo({ kind: 'big', text: 'THE KING!', sub: 'AFTER HIM!', color: '#ffd23f', bg: '#3d1478' }, 1e9);
     await this.wait(900);
-    // and he runs for the exit
+    // and he runs for the exit (the camera pulling back to watch him go)
     const tx = WX(TUNNEL.x);
+    void this.camTo((kx + tx) / 2, ky - 30, 2.3, 900, 0, 'Sine.easeInOut');
     const run = this.time.addEvent({ delay: 90, loop: true, callback: () => this.king.setFrame(this.king.frame.name === 'run0' ? 'run1' : 'run0') });
     this.tweens.add({ targets: this.spot, x: tx, duration: 900 });
     await new Promise<void>((res) => this.tweens.add({ targets: this.king, x: tx, duration: 900, ease: 'Quad.easeIn', onComplete: () => res() }));
