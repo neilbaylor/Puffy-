@@ -174,3 +174,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.169: no song decoding while browsing Parts.
 - v0.170: Part buttons unlock one at a time (in step with bosses).
 - v0.171: smoother start screen (no ground pre-drawing, Parts built ahead in small steps).
+- v0.172: battle lobby lower + bigger squares on tablet/desktop.
