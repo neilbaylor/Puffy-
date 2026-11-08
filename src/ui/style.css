@@ -2533,7 +2533,7 @@ kbd {
 .acct-card { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; row-gap: 0; }
 /* Done: centred across the whole card and a bit wider */
 .acct-card .acct-done-row { grid-column: 1 / -1; justify-content: center; margin-top: 18px; }
-.acct-card .acct-done-row .btn { min-width: clamp(150px, 26vmin, 210px); }
+.acct-card .acct-done-row .btn { min-width: clamp(150px, 26vmin, 210px); padding-top: 9px; padding-bottom: 8px; }
 @media (max-height: 500px) {
   .acct-card .row { margin-top: 18px; }
   .acct-card .results-hero { margin-top: 22px; }
