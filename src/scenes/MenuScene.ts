@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { MIN_VIEW_W, TILE, VIEW_H } from '../config';
 import { bgKey, ensureLook, freeLooksExcept, lookJobs } from '../gfx/textures';
 import { buildLevel1 } from '../level/level1';
-import { LEVELS, levelInfo, levelName, progress } from '../level/levels';
+import { levelInfo, levelName, pickableLevels, progress } from '../level/levels';
 import { Background } from '../world/Background';
 import { LIGHT } from '../core/light';
 import { Ambience } from '../world/Ambience';
@@ -101,10 +101,10 @@ export class MenuScene extends Phaser.Scene {
    */
   private neighbours(id: number) {
     // (light mode: none — only the Part showing is kept, to save memory)
-    if (progress.beaten < 1 || LIGHT) return [];
+    if (LIGHT) return [];
     // (every Part: there are only a few, and with one still look each on the start screen they're
     // light enough to keep; the nearest first)
-    return LEVELS.filter((l) => l.build && l.id !== id && l.id <= progress.beaten + 1)
+    return pickableLevels().filter((l) => l.build && l.id !== id && (progress.beaten >= 1 || l.wip))
       .sort((a, b) => Math.abs(a.id - id) - Math.abs(b.id - id))
       .map((l) => l.id);
   }
@@ -153,7 +153,7 @@ export class MenuScene extends Phaser.Scene {
       }),
       step(() => {
         const lv = level!;
-        const bg = new Background(this, lv.heightPx - VIEW_H, true);
+        const bg = new Background(this, lv.heightPx - VIEW_H, true, !!data.vertical);
         const look0 = themesFor(id)[0];
         ensureLook(this, look0);
         const mix = themeMix(0, themesFor(id));
@@ -371,7 +371,7 @@ export class MenuScene extends Phaser.Scene {
     const loopEnd = x0 + Math.max(level.widthPx * 0.2, 1800);
     level.trimPending(loopEnd + vw + 400);
     // (still clouds on the start screen: re-drawing their shapes is a constant job it doesn't need)
-    const bg = new Background(this, level.heightPx - VIEW_H, true);
+    const bg = new Background(this, level.heightPx - VIEW_H, true, !!data.vertical);
     // (in its own look from the start, even built ahead out of sight)
     const look0 = themesFor(id)[0];
     ensureLook(this, look0);
@@ -409,6 +409,39 @@ export class MenuScene extends Phaser.Scene {
     return jobs;
   }
 
+  /**
+   * A climb (Plop Invasion · Part 2): a slow glide straight up the first climb (the same drone-like
+   * sway), then a soft fade back down to the bottom. (`x` is how far it has risen.)
+   */
+  private climbGlide(dt: number, vw: number, vh: number, zoom: number) {
+    const cam = this.cameras.main;
+    const H = this.level.heightPx;
+    this.t += dt;
+    const t = this.t;
+    this.x += dt * (34 + 8 * Math.sin(t * 0.21));
+    const maxRise = Math.min(H - vh, 2600);
+    if (this.x > maxRise && !this.wrapping) {
+      this.wrapping = true;
+      cam.fadeOut(450, 255, 248, 236);
+      cam.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+        this.x = 0;
+        this.wrapping = false;
+        cam.fadeIn(600, 255, 248, 236);
+      });
+    }
+    const top = H - vh - this.x + 18 * Math.sin(t * 0.17 + 0.7);
+    const left = this.x0 + 40 + 30 * Math.sin(t * 0.11);
+    cam.setZoom(zoom * (1.04 + 0.04 * Math.sin(t * 0.13 + 2)));
+    cam.setRotation(0.012 * Math.sin(t * 0.19) + 0.005 * Math.sin(t * 0.47 + 1.3));
+    cam.centerOn(left + vw / 2, top + vh / 2);
+    const m = themeMix(0, themesFor(this.levelId));
+    this.bg.setTheme(m);
+    this.level.setTint(mixTint(m));
+    this.level.animate(this.time.now / 1000, left, left + vw);
+    this.bg.update({ left: left - 50, top: top - 50, width: vw + 100, height: vh + 100 }, dt);
+    this.amb.update({ left, top, width: vw, height: vh }, dt, []);
+  }
+
   update(_t: number, deltaMs: number) {
     const dt = Math.min(deltaMs / 1000, 1 / 30);
     // one quiet-moment job at a time (straight away, not after the rest of the game's art:
@@ -429,6 +462,7 @@ export class MenuScene extends Phaser.Scene {
     cam.setZoom(zoom);
     const vw = this.scale.width / zoom;
     const vh = this.scale.height / zoom;
+    if (this.level.data.vertical) return this.climbGlide(dt, vw, vh, zoom);
     const maxX = Math.min(this.level.widthPx - vw, this.loopEnd);
     // a slow, slightly unsteady glide: speed breathes, the camera drifts up and down,
     // zooms gently in and out and banks a touch, like a camera drone

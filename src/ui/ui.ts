@@ -18,7 +18,7 @@ import type { GameData, GameOverState, GameScene, HudState, ResultState } from '
 import { TouchControls } from './touchControls';
 import { drawNuggie, drawRootBeer } from '../gfx/collectibles';
 import { VERSION } from '../version';
-import { LEVELS, latestLevel, levelInfo, levelName, progress } from '../level/levels';
+import { LEVELS, canPickLevel, setTester, latestLevel, levelInfo, levelName, pickableLevels, progress } from '../level/levels';
 import { account } from '../core/account';
 import { bossData } from '../scenes/WrestleScene';
 
@@ -259,6 +259,11 @@ export class UI {
     account.onChange(() => {
       const btn = this.screen?.querySelector<HTMLElement>('[data-act=account]');
       if (btn) btn.innerHTML = this.accountLabel();
+      // (a tester signed in or out: the work-in-progress Parts come or go)
+      if (setTester(account.user?.name)) {
+        if (levelInfo(this.level).id !== this.level) this.level = latestLevel();
+        if (this.screen?.classList.contains('start')) this.showStart();
+      }
     });
     void account.restore().then(() => {
       if (progress.beaten !== beatenBefore && this.screen?.classList.contains('start')) {
@@ -508,7 +513,7 @@ export class UI {
     this.touch.hide();
     // the start screen's song (phones only let it start once you've touched the screen)
     playMenuMusic();
-    const el = h(`<div class="screen start${progress.beaten >= 1 ? '' : ' no-levels'}">
+    const el = h(`<div class="screen start${canPickLevel() ? '' : ' no-levels'}">
       <header class="start-head">
         <div class="logo"><span>P</span><span>U</span><span>F</span><span>F</span><span>Y</span></div>
         <p class="world-name" aria-label="${levelName(this.level)}">${waveText(levelName(this.level))}</p>
@@ -516,8 +521,8 @@ export class UI {
       <h2>Pick your player</h2>
       <div class="cards" role="radiogroup" aria-label="Pick your player"></div>
       ${
-        progress.beaten >= 1
-          ? `<div class="levels" role="radiogroup" aria-label="Pick a level">${LEVELS.filter((l) => l.id <= progress.beaten + 1).map(
+        canPickLevel()
+          ? `<div class="levels" role="radiogroup" aria-label="Pick a level">${pickableLevels().map(
               (l) => `<button class="lvl" data-lvl="${l.id}" ${l.build ? '' : 'disabled'}>${l.button ?? l.part}${l.build ? '' : '<small>coming soon</small>'}</button>`,
             ).join('')}<span class="lvl-side"><button class="lvl lvl-bosses" data-act="bosses" aria-label="Boss battles">Bosses</button></span></div>`
           : ''
