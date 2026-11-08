@@ -1297,15 +1297,19 @@ export class HoopsScene extends Phaser.Scene {
     // …FIRE! (the recoil kicks them back and up off their feet, a squash and stretch, smoke)
     this.heroAnim = { frames: ['shoot'], fps: 1 };
     const ch = characterById(this.hd.charId);
-    const mx = hp.x + 62 * ch.scale * hk;
-    const my = hp.y - ((ch.muzzleY ?? 18) * 2.6 + 6) * hk;
+    // (the muzzle, where it is with them tipped back: the flash, the smoke and the ball all come out of it)
+    const tilt = -0.42;
+    const ox = 62 * ch.scale * hk;
+    const oy = -((ch.muzzleY ?? 18) * 2.6 + 6) * hk;
+    const mx = x0 + ox * Math.cos(tilt) - oy * Math.sin(tilt);
+    const my = y0 + ox * Math.sin(tilt) + oy * Math.cos(tilt);
     sfx.shoot();
     this.cameras.main.shake(110, 0.004);
     const flash = this.add.image(mx + 8, my - 4, 'flash').setScale(1.1).setRotation(-0.5).setDepth(11);
     this.tweens.add({ targets: flash, scale: 1.8, alpha: 0, duration: 170, onComplete: () => flash.destroy() });
     this.puffs(mx - 4, my + 2, 5, -0.5, 0.55 * hk);
     this.puffs(x0 - 6 * hk, y0 - 4, 3, Math.PI, 0.4 * hk, 0xcfc2b2);
-    h.setScale(sx * 0.86, sy * 1.14).setRotation(-0.5);
+    h.setScale(sx * 0.86, sy * 1.14).setRotation(tilt);
     this.tweens.add({ targets: h, x: x0 - 18 * hk, duration: 110, ease: 'Quad.easeOut', yoyo: true, hold: 60 });
     this.tweens.add({ targets: h, y: y0 - 12 * hk, duration: 130, ease: 'Quad.easeOut', yoyo: true });
     this.tweens.add({ targets: h, scaleX: sx, scaleY: sy, duration: 320, ease: 'Back.easeOut' });
@@ -1756,7 +1760,7 @@ export class HoopsScene extends Phaser.Scene {
     ev.remove();
     plops.forEach((p) => p.destroy());
     shadows.forEach((s2) => s2.destroy());
-    this.jumboShow({ kind: 'big', text: 'PLOP INVASION', sub: 'World 2 · coming soon…', color: '#ffe0a8', bg: '#4a2716' }, 1e9);
+    this.jumboShow({ kind: 'big', text: 'PLOP INVASION', color: '#ffe0a8', bg: '#4a2716' }, 1e9);
     await this.wait(3000);
   }
 

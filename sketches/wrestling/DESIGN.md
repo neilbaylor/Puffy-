@@ -24,7 +24,7 @@ The concept screens are in this folder (`wide`, `plan`, `entrance`, `fight`, `fi
 - **6 hearts (the most you can have), shown over your head** (like Battle mode). No HUD and no nuggies in the ring (just
   the pause button). A hit costs a heart; **hearts turn up in the ring** often (every 2–4 s) whenever you're below 6. Out of
   hearts costs a life from the full game.
-- **The folding chair** (folded flat, grey steel) drops into the ring **4 times a match** (about every 10–13 s, sooner as she weakens) ("CHAIR!" on
+- **The folding chair** (folded flat, grey steel) drops into the ring **3 times a match** (about every 10–13 s, sooner as she weakens) ("CHAIR!" on
   the jumbotron). Walk over it to pick it up: the hero bends down and holds it up over their head in
   both hands (no bazooka). The FIRE button (still red) says CHAIR: press it to swing the chair down onto her (when she's in reach): **3 hits**, it bends
   and it's gone. Leave it and it fades away; get hit twice while holding it and you drop it.
@@ -47,7 +47,7 @@ The concept screens are in this folder (`wide`, `plan`, `entrance`, `fight`, `fi
 - **Aggressive, jumping more and higher**: big hops and lunges (her landings rumble the camera
   and the ring, like the Giant Plops), charges, slams, and the Giant Plops' **big lump of poo**
   that lands short of you and rolls on at you.
-- **12 hits to beat her.** **The jumbotron counts down** the hits
+- **15 hits to beat her.** **The jumbotron counts down** the hits
   left ("3 HITS TO GO") and flashes "FROM THE TOP ROPE!" for a dive.
 - No referee: enough hits and she's done.
 
