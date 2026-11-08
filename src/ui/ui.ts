@@ -749,9 +749,9 @@ export class UI {
             <dt>Bad guys beaten</dt><dd>${Math.max(u.kills, bank.kills)}</dd>
             <dt>Current level</dt><dd>${esc(levelName(latestLevel()))}</dd>
           </dl>
-          <div class="row">
-            <button class="btn btn-go" data-act="back">Done</button>
-          </div>
+        </div>
+        <div class="row acct-done-row">
+          <button class="btn btn-go" data-act="back">Done</button>
         </div>
       </div>
     </div>`)
