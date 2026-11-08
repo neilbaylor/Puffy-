@@ -157,6 +157,9 @@ export class HoopsScene extends Phaser.Scene {
   private dom!: HTMLElement;
   private meter: null | { phase: 'power' | 'aim'; pos: number; dir: number; speed: number; zone: [number, number]; el: HTMLElement } = null;
   private tapListener = (e: Event) => {
+    // (taps on the pause button or the pause menu aren't shots)
+    const t = e.target as Element | null;
+    if (t?.closest?.('.hud, .screen')) return;
     e.preventDefault();
     this.tapped = true;
   };
@@ -381,7 +384,7 @@ export class HoopsScene extends Phaser.Scene {
       this.dom.remove();
     });
 
-    this.game.events.emit('hoops-start');
+    this.game.events.emit('hoops-start', this);
     this.fitCamera(true);
     void this.run();
   }

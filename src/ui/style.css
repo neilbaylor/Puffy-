@@ -1562,9 +1562,9 @@ html.rotating body {
   background: var(--gold);
 }
 /* the Bosses button: off to the right of the level buttons (they stay centred), past a thin divider */
-.levels { position: relative; }
-.lvl-side { position: absolute; left: 100%; top: 0; bottom: 0; display: flex; align-items: center; padding-left: 30px; }
-.lvl-side::before { content: ''; position: absolute; left: 14px; top: 18%; bottom: 18%; width: 2px; border-radius: 1px; background: rgba(255, 255, 255, 0.55); box-shadow: 0 0 0 0.5px rgba(58, 36, 24, 0.25); }
+/* the Bosses button: after the level buttons and a thin divider, the whole row centred together */
+.lvl-side { position: relative; display: flex; align-items: center; padding-left: 22px; margin-left: 4px; }
+.lvl-side::before { content: ''; position: absolute; left: 9px; top: 18%; bottom: 18%; width: 2px; border-radius: 1px; background: rgba(255, 255, 255, 0.55); box-shadow: 0 0 0 0.5px rgba(58, 36, 24, 0.25); }
 .lvl.lvl-bosses { background: #ffe14d; white-space: nowrap; }
 /* the Bosses menu */
 .boss-panel { align-items: center; text-align: center; min-width: min(100%, 380px); }
@@ -2521,11 +2521,12 @@ kbd {
 .acct-card { position: relative; align-items: flex-start; }
 .acct-card .acct-out { position: absolute; left: 22px; bottom: 28px; }
 /* (the same size as Done, and level with it: on the panel's bottom padding) */
-.acct-card .acct-out { font-size: clamp(18px, 3.4vmin, 24px); padding: 10px 26px 9px; top: 18px; right: 22px; left: auto; bottom: auto; }
-/* (a long name wraps before it reaches Sign out) */
-.acct-card .results-body h2 { padding-right: clamp(130px, 19vmin, 175px); overflow-wrap: anywhere; }
+.acct-card .acct-out { font-size: clamp(14px, 2.4vmin, 18px); padding: 7px 16px 6px; top: 18px; right: 22px; left: auto; bottom: auto; }
+/* (the greeting stays clear of Sign out; a touch smaller than other cards' titles) */
+.acct-card .results-body h2 { padding-right: clamp(92px, 13vmin, 120px); font-size: clamp(22px, 4.4vmin, 32px); overflow-wrap: anywhere; }
 @media (max-height: 500px) {
-  .acct-card .acct-out { top: 12px; right: 18px; padding-left: 16px; padding-right: 16px; }
+  .acct-card .acct-out { top: 12px; right: 18px; padding: 6px 13px 5px; }
+  .acct-card .results-body h2 { font-size: clamp(22px, 6.4vh, 28px); }
 }
 .acct-card .results-hero { margin-top: clamp(22px, 5vmin, 40px); }
 .acct-card .row { justify-content: flex-end; margin-top: 26px; }
@@ -2563,6 +2564,8 @@ kbd {
 .wr-callout.high { top: 18%; }
 /* a speech bubble over someone's head (placed by the scene; --tail points it at them) */
 .hud.bare .hud-hero { display: none; }
+/* (boss fights: just the pause button, top right as in the levels, over the letterbox bars and the scene's own overlay) */
+.hud.bare { justify-content: flex-end; z-index: 30; }
 /* Queen Plop's name card (the King's lower third from basketball, in her pink) */
 .wrestle .wr-l3 { bottom: calc(12vh + 6px); }
 .wrestle .wr-l3 b { background: linear-gradient(90deg, #ff8cc6, #ffd0e8); color: #3a0a22; }
