@@ -37,6 +37,9 @@ let resCap = (() => {
  * stopping), with the browser's message: something to go on when it happens on a device we
  * can't test on.
  */
+// (light mode: the page knows too, for its still titles — see style.css)
+if (LIGHT) document.documentElement.classList.add('light');
+
 function bootTrouble(msg: string) {
   const boot = document.getElementById('boot');
   if (!boot) return;
