@@ -1263,8 +1263,8 @@ export class HoopsScene extends Phaser.Scene {
     const hp = { x: this.hero.x, y: this.hero.y - 4 };
     const n = this.score.you.length;
     // (the shot calls live on the scoreboard, not over the court)
-    this.jumboShow({ kind: 'big', text: 'YOUR SHOT', sub: n >= REGULATION ? 'Sudden death' : `Shot ${n + 1} of ${REGULATION}`, color: '#ffffff', bg: '#3d1478' }, 900);
-    await this.wait(900);
+    this.jumboShow({ kind: 'big', text: 'YOUR SHOT', sub: n >= REGULATION ? 'Sudden death' : `Shot ${n + 1} of ${REGULATION}`, color: '#ffffff', bg: '#3d1478' }, 1500);
+    await this.wait(1500);
     const speed = (1.15 + Math.min(n, REGULATION - 1) * 0.12) * (this.hard ? HARDER.speed : 1); // sudden death doesn't speed up further
     const p = await this.lockMeter('power', speed);
     const a = await this.lockMeter('aim', speed * 1.1);
@@ -1328,14 +1328,14 @@ export class HoopsScene extends Phaser.Scene {
         shout = shouts[Math.floor(Math.random() * shouts.length)];
         this.lastShout = shout;
       }
-      this.jumboShow({ kind: 'big', text: o === 'swish' ? shout : 'BUCKET!', sub: `${this.total('you')} – ${this.total('king')}`, color: '#8fff8a', bg: '#0b5e2a' });
-      await this.wait(1000);
+      this.jumboShow({ kind: 'big', text: o === 'swish' ? shout : 'BUCKET!', sub: `${this.total('you')} – ${this.total('king')}`, color: '#8fff8a', bg: '#0b5e2a' }, 2000);
+      await this.wait(1700); // (the result stays up long enough to read)
     } else {
       this.heroAnim = { frames: ['hurt'], fps: 1 };
       this.kingAnim = { frames: ['laugh0', 'laugh1'], fps: 6 };
       sfx.groan();
-      this.jumboShow({ kind: 'big', text: o === 'rimOut' ? 'RIMMED OUT' : o === 'wide' || o === 'short' ? 'AIR BALL!' : 'BRICK!', color: '#ff8a80', bg: '#5a0b14' }, 1300);
-      await this.wait(1000);
+      this.jumboShow({ kind: 'big', text: o === 'rimOut' ? 'RIMMED OUT' : o === 'wide' || o === 'short' ? 'AIR BALL!' : 'BRICK!', color: '#ff8a80', bg: '#5a0b14' }, 2000);
+      await this.wait(1700); // (the result stays up long enough to read)
     }
     this.heroAnim = { frames: ['idle0', 'idle1'], fps: 2 };
     this.kingAnim = { frames: ['idle0', 'idle1'], fps: 2.5 };
@@ -1350,8 +1350,8 @@ export class HoopsScene extends Phaser.Scene {
     const kk = this.king.scaleY / this.kingScale;
     const kp = { x: this.king.x, y: this.king.y - 6 };
     while (this.crownBusy) await this.wait(100);
-    this.jumboShow({ kind: 'big', text: 'KING’S SHOT', sub: 'King Puff Ball shoots…', color: '#ffd23f', bg: '#4a2a00' }, 900);
-    await this.wait(900);
+    this.jumboShow({ kind: 'big', text: 'KING’S SHOT', sub: 'King Puff Ball shoots…', color: '#ffd23f', bg: '#4a2a00' }, 1500);
+    await this.wait(1500);
     this.kingAnim = { frames: ['idle0', 'idle1'], fps: 5 };
     await this.wait(500);
     const r = Math.random();
@@ -1397,16 +1397,16 @@ export class HoopsScene extends Phaser.Scene {
       this.kingAnim = { frames: ['laugh0', 'laugh1'], fps: 6 };
       this.heroAnim = { frames: ['hurt'], fps: 1 };
       sfx.groan();
-      this.jumboShow({ kind: 'big', text: 'KING SCORES', sub: `${this.total('you')} – ${this.total('king')}`, color: '#ffd23f', bg: '#4a2a00' });
-      await this.wait(1000);
+      this.jumboShow({ kind: 'big', text: 'KING SCORES', sub: `${this.total('you')} – ${this.total('king')}`, color: '#ffd23f', bg: '#4a2a00' }, 2000);
+      await this.wait(1700); // (the result stays up long enough to read)
     } else {
       this.kingAnim = { frames: ['sad'], fps: 1 };
       this.heroAnim = { frames: ['jump', 'idle0'], fps: 5 };
       this.cheer(0.5);
       // he stamps in a huff — sometimes his crown flies off
       if (this.crownState.falls < 2 && Math.random() < 0.4) this.time.delayedCall(250, () => this.crownFall());
-      this.jumboShow({ kind: 'big', text: 'NO GOOD!', sub: 'The King misses', color: '#8fe8ff', bg: '#0b2a5e' }, 1300);
-      await this.wait(1000);
+      this.jumboShow({ kind: 'big', text: 'NO GOOD!', sub: 'The King misses', color: '#8fe8ff', bg: '#0b2a5e' }, 2000);
+      await this.wait(1700); // (the result stays up long enough to read)
     }
     this.heroAnim = { frames: ['idle0', 'idle1'], fps: 2 };
     this.kingAnim = { frames: ['idle0', 'idle1'], fps: 2.5 };

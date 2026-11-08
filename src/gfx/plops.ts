@@ -355,9 +355,9 @@ export function drawQueenKO(ctx: Ctx, ox: number, oy: number, phase: number, st:
   for (const [px, py, r] of [[ox + 34, G - 4, 2.4], [ox + 42, G - 2.5, 2.1], [ox + 128, G - 3, 2.4], [ox + 137, G - 1.5, 2], [ox + 146, G - 4, 1.8]] as const)
     ST.shape(ctx, ellipsePts(px, py, r, r, 0, 10), PEARL, 3120 + px, { lw: 0.5, plain: true });
   // legs up in the air (behind her), feet curled, wobbling
-  const legWob = Math.sin(ph * 2) * 2.5;
-  for (const [lx, ang, seed] of [[cx + 26, -0.7, 3130], [cx + 36, -0.35, 3131]] as const) {
-    const a = ang + legWob * 0.02 * (seed === 3130 ? 1 : -1);
+  // (the legs kick feebly, one then the other)
+  for (const [lx, ang, seed, off] of [[cx + 26, -0.7, 3130, 0], [cx + 36, -0.35, 3131, Math.PI]] as const) {
+    const a = ang + Math.sin(ph + off) * 0.28;
     const fx = lx + Math.cos(a) * 26;
     const fy = G - 12 + Math.sin(a) * 26;
     ST.shape(ctx, [[lx - 4, G - 12], [lx + 4, G - 10], [fx + 3, fy + 1], [fx + 6, fy - 4], [fx - 1, fy - 6], [fx - 3, fy - 1]], LEG, seed, { lw: 1 });
@@ -370,13 +370,14 @@ export function drawQueenKO(ctx: Ctx, ox: number, oy: number, phase: number, st:
     const ny = Math.cos(ang) * 5.5;
     ST.shape(ctx, [[x, y], [x + Math.cos(ang) * len * 0.5 + nx, y + Math.sin(ang) * len * 0.5 + ny], tip, [x + Math.cos(ang) * len * 0.5 - nx, y + Math.sin(ang) * len * 0.5 - ny]], BODY, seed, { lw: 1 });
   };
-  flop(cx - 40, G - 10, Math.PI + 0.12, 3140);
-  flop(cx + 40, G - 10, -0.12, 3141);
+  flop(cx - 40, G - 10, Math.PI + 0.12 + Math.sin(ph) * 0.18, 3140);
+  flop(cx + 40, G - 10, -0.12 - Math.sin(ph + 1.5) * 0.18, 3141);
   // the body, squashed flat: a wide bottom tier, the top tier behind it, breathing
-  const sq = 1 + breathe * 0.05;
-  const topY = G - 27 - breathe * 1.2;
+  // (a big slow breath in and out)
+  const sq = 1 + breathe * 0.1;
+  const topY = G - 27 - breathe * 3.2;
   // the swirl, flopped over to the front (left), its bow drooping off the end
-  const tipWob = Math.sin(ph) * 1.5;
+  const tipWob = Math.sin(ph + 0.8) * 4.5;
   ST.shape(ctx, [[cx - 4, topY - 8], [cx - 14, topY - 17 + tipWob], [cx - 30, topY - 16 + tipWob], [cx - 38, topY - 9 + tipWob], [cx - 31, topY - 10 + tipWob], [cx - 17, topY - 10], [cx + 8, topY - 7]], BODY, 3150, { lw: 1.1, light: [cx - 18, topY - 14] });
   {
     const bx = cx - 38;
@@ -430,7 +431,7 @@ export function drawQueenKO(ctx: Ctx, ox: number, oy: number, phase: number, st:
   const mx = cx - 6;
   const my = topY + 9;
   ST.shape(ctx, ellipsePts(mx, my, 6, 3.6 + breathe * 0.6, 0.15, 20), { base: '#5e1a2a', shade: '#3e1020', light: '#7e2a3a' }, 3200, { lw: 0.8, plain: true });
-  const tw = Math.sin(ph) * 1.6;
+  const tw = Math.sin(ph) * 4.2;
   ST.shape(ctx, [[mx - 4, my + 1], [mx - 9 + tw, my + 7], [mx - 6 + tw, my + 11], [mx - 1 + tw * 0.5, my + 8], [mx + 1, my + 2]], { base: '#ff7d93', shade: '#e0566e', light: '#ffb3c0' }, 3201, { lw: 0.7 });
   // a little sweat drop, and blush
   ST.shape(ctx, [[cx + 19, topY - 10], [cx + 22, topY - 4], [cx + 19, topY - 1.5], [cx + 16.5, topY - 4]], { base: '#bfe8ff', shade: '#8cc8ea', light: '#ffffff' }, 3210, { lw: 0.6 });
