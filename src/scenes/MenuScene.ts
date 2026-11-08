@@ -113,6 +113,14 @@ export class MenuScene extends Phaser.Scene {
     const w = this.createWorld(id, true);
     for (const o of w.objs) (o as unknown as { setVisible?: (v: boolean) => void }).setVisible?.(false);
     this.worlds.set(id, w);
+    // its pictures shown once (invisibly), so they're really on the graphics chip: showing the
+    // Part later doesn't stall on the first frame
+    const keys = new Set<string>();
+    for (const o of w.objs) {
+      const t = (o as unknown as { texture?: Phaser.Textures.Texture }).texture;
+      if (t && t.key !== '__DEFAULT' && t.key !== '__MISSING') keys.add(t.key);
+    }
+    this.warmOnGpu([...keys].map((k) => this.add.image(0, 0, k).setOrigin(0).setScrollFactor(0).setScale(0.05)));
   }
 
   /**
@@ -235,6 +243,7 @@ export class MenuScene extends Phaser.Scene {
       this.worlds.delete(id);
       for (const o of kept.objs) if (o.scene && (o as unknown as { alpha?: number }).alpha !== 0.003) (o as unknown as { setVisible?: (v: boolean) => void }).setVisible?.(true);
       ({ level: this.level, bg: this.bg, amb: this.amb, x0: this.x0, x: this.x, loopEnd: this.loopEnd, top: this.top, lastSurf: this.lastSurf, t: this.t } = kept);
+      this.bg.refreshClouds();
       this.wrapping = false;
       this.quiet = this.planQuiet(id, near, looks);
       return;
@@ -253,12 +262,13 @@ export class MenuScene extends Phaser.Scene {
     // (built ahead, out of sight: a little more of its ground, everything the fly-over would
     // otherwise draw in its first frames — LevelView draws what's within 400 px of the view at once)
     const span = this.firstSpan();
-    const level = new LevelView(this, data, { lazyNear: x0, lazySpan: ahead ? [span[0] + 400, span[1] + 400] : span });
+    const level = new LevelView(this, data, { lazyNear: x0, lazySpan: ahead ? [span[0] + 400, span[1] + 400] : span, ahead: false });
     // loop over about a fifth of the level (at least a good stretch); nothing past it is drawn
     const vw = this.scale.width / Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W);
     const loopEnd = x0 + Math.max(level.widthPx * 0.2, 1800);
     level.trimPending(loopEnd + vw + 400);
-    const bg = new Background(this, level.heightPx - VIEW_H);
+    // (still clouds on the start screen: re-drawing their shapes is a constant job it doesn't need)
+    const bg = new Background(this, level.heightPx - VIEW_H, true);
     // (in its own look from the start, even built ahead out of sight)
     const look0 = themesFor(id)[0];
     ensureLook(this, look0);
@@ -306,9 +316,9 @@ export class MenuScene extends Phaser.Scene {
     // one quiet-moment job at a time (straight away, not after the rest of the game's art:
     // a click on another Part is the very next thing people do)
     const now = performance.now();
-    // (a second after the last tap: someone tapping their way around the start screen is never
-    // kept waiting behind one)
-    if (this.quiet.length && now - this.lastInput > 1000 && now - this.lastQuiet > 200) {
+    // (2.5 s after the last tap: someone tapping their way around the start screen — trying the
+    // Parts — is never kept waiting behind one)
+    if (this.quiet.length && now - this.lastInput > 2500 && now - this.lastQuiet > 250) {
       this.quiet.shift()!();
       this.lastQuiet = performance.now();
     }

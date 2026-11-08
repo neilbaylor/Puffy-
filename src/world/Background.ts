@@ -118,6 +118,8 @@ export class Background {
   constructor(
     private scene: Phaser.Scene,
     private lowestViewTop: number,
+    /** Still clouds (drawn once, then they only drift): the start screen. */
+    private stillClouds = false,
   ) {
     this.skyA = scene.add.image(0, 0, bgKey('sky', 'puff')).setOrigin(0, 0).setDepth(DEPTH.sky);
     this.skyB = scene.add.image(0, 0, bgKey('sky', 'puff')).setOrigin(0, 0).setDepth(DEPTH.sky).setVisible(false);
@@ -289,7 +291,7 @@ export class Background {
         // only while it's on screen (a cloud off to the side keeps its last shape till it's back)
         if (this.t >= c.next && x < view.width + 120) {
           this.paintCloud(c, hi);
-          c.next = this.t + CLOUD_EVERY;
+          c.next = this.stillClouds ? Infinity : this.t + CLOUD_EVERY;
         }
         const y = c.y + Math.sin(this.t * 0.35 + c.bob) * 5;
         let n = 0;
@@ -306,6 +308,11 @@ export class Background {
         for (; n < c.imgs.length; n++) c.imgs[n].setVisible(false);
       }
     }
+  }
+
+  /** Re-draw every cloud on its next showing (their pictures are shared between Backgrounds: after a switch they may be in another look's colours). */
+  refreshClouds() {
+    for (const band of this.bands) for (const c of band.clouds) c.next = -1;
   }
 
   /** Puff seeds floating across the screen on the breeze. */

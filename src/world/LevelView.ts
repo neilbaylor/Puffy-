@@ -101,6 +101,8 @@ export class LevelView {
   private readonly lazy: boolean;
   private readonly lazyNear: number;
   private readonly lazySpan: [number, number];
+  /** Lazy: also draw the terrain coming up, a chunk per frame (the game); off on the start screen, whose slow glide only needs what's about to come into view. */
+  private readonly ahead: boolean;
 
   constructor(
     private scene: Phaser.Scene,
@@ -109,8 +111,9 @@ export class LevelView {
     /** keep: leave other levels' terrain alone (a battle watched while the start screen still shows). */
     /** free: free other levels' terrain (the game; default when not lazy). */
     /** lazySpan: how far before / after `lazyNear` the terrain is drawn straight away (default 900 / 1800). */
-    opts?: { lazyNear?: number; keep?: boolean; free?: boolean; lazySpan?: [number, number] },
+    opts?: { lazyNear?: number; keep?: boolean; free?: boolean; lazySpan?: [number, number]; ahead?: boolean },
   ) {
+    this.ahead = opts?.ahead ?? true;
     this.lazy = opts?.lazyNear !== undefined;
     this.lazyNear = opts?.lazyNear ?? 0;
     this.lazySpan = opts?.lazySpan ?? [900, 1800];
@@ -173,7 +176,7 @@ export class LevelView {
       // (the nearest to the view first, either way: the level's fly-over runs right to left)
       const mid = (left + right) / 2;
       const dist = (p: { x0: number; x1: number }) => Math.max(0, p.x0 - mid, mid - p.x1);
-      const ahead = this.pending.filter((p) => p.x0 < right + 2200 && p.x1 > left - 2200);
+      const ahead = this.ahead ? this.pending.filter((p) => p.x0 < right + 2200 && p.x1 > left - 2200) : [];
       ahead.sort((a, b) => dist(a) - dist(b));
       if (ahead[0]) {
         ahead[0].make();
