@@ -18,7 +18,7 @@ import { HERO_SHEET_M, addCanvas, hires, makeCarrySheet } from '../gfx/textures'
 import { Player } from '../entities/Player';
 import { Rocket } from '../entities/Rocket';
 import { Fx } from '../world/Fx';
-import { stingerReveal, stingerTitle } from '../ui/stinger';
+import { stingerReveal } from '../ui/stinger';
 import { SimpleConfetti } from '../world/SimpleConfetti';
 import { soloSource, sourceById } from '../input/devices';
 import type { GameOverState, HudState, ResultState } from './GameScene';
@@ -30,7 +30,7 @@ import type { GameOverState, HudState, ResultState } from './GameScene';
  * side-on across the mat. The ropes at either end are springy (run into them and you're flung
  * back), and you can climb them to the top turnbuckle and dive off (land on her: three hits); there's
  * no leaving the ring. You have 5 hearts (shown over your head; more turn up in the ring, up to 6), there's
- * a folding chair now and then (FIRE swings it while you hold it: three hits), and she takes 12 hits, counted down on
+ * a folding chair now and then (FIRE swings it while you hold it: three hits), and she takes 15 hits, counted down on
  * the jumbotron.
  */
 export interface WrestleData {
@@ -68,13 +68,13 @@ const QS = 1.3;
 const Q_RES = 4;
 const Q_PAD = 18;
 const Q_TOP = 24;
-const HITS = 12;
+const HITS = 15;
 /** Your hearts in the ring: you start with all 6, and pick-ups top you back up. */
 const HEARTS_START = 6;
 const HEARTS_MAX = 6;
 /** Folding chairs in a match, and (for each one after the first) how few hits she has left when it comes, at the latest. */
-const CHAIRS = 4;
-const CHAIR_AT_HP = [-1, 9, 6, 3];
+const CHAIRS = 3;
+const CHAIR_AT_HP = [-1, 10, 5];
 /** The poo puddle on the mat (world x): you sink into it, like the level's. */
 const PUD_X0 = WX(PUDDLE.x - PUDDLE.w * 0.78);
 const PUD_X1 = WX(PUDDLE.x + PUDDLE.w * 0.78);
@@ -191,7 +191,7 @@ class Queen {
     const dx = p.x - this.x;
     const towards: Side = dx < 0 ? -1 : 1;
     const ground = this.onGround;
-    const speed = 94 * this.rage;
+    const speed = 100 * this.rage;
     let frame: PlopFrame | null = null;
 
     switch (this.mode) {
@@ -236,14 +236,14 @@ class Queen {
         const above = p.alive && p.body.velocity.y > 60 && p.bottom < this.top + 6 && Math.abs(dx) < 90 && !s.heroDiving();
         if (ground && above && this.cdBlock <= 0) {
           b.setVelocity(towards * speed * 0.6, -640);
-          this.cdBlock = 2.3 + Math.random();
+          this.cdBlock = 2.1 + Math.random();
           this.hopIn = 0.45;
         } else if (ground && this.hopIn <= 0) {
           const lunge = Math.abs(dx) < 260 && Math.random() < 0.25;
           const big = !lunge && Math.random() < 0.3;
           b.setVelocityY(lunge ? -600 - Math.random() * 80 : big ? -700 - Math.random() * 60 : -430 - Math.random() * 170);
           if (lunge) b.setVelocityX(towards * speed * 2);
-          this.hopIn = 0.42 + Math.random() * 0.55;
+          this.hopIn = 0.4 + Math.random() * 0.52;
         }
         // from further off: a big lump of poo, hurled at you (where it lands, it rolls on at you)
         if (ground && this.cdHeave <= 0 && Math.abs(dx) > 150 && Math.abs(dx) < 520 && p.alive && Math.abs(p.bottom - MAT_Y) < 50) {
@@ -283,7 +283,7 @@ class Queen {
         frame = Math.floor(s.time.now / 80) % 2 ? 'run0' : 'run1';
         if (ground && Math.random() < 0.3) s.fx.dust(this.x - this.dir * 20, this.bottom, 1);
         if (this.t <= 0) {
-          this.cdCharge = 2 + Math.random() * 1.5;
+          this.cdCharge = 1.85 + Math.random() * 1.4;
           this.setMode('idle', 0.2);
         }
         break;
@@ -294,7 +294,7 @@ class Queen {
         this.spr.setX(this.spr.x + Math.sin(s.time.now / 12) * 0.7);
         if (this.t <= 0) {
           s.heaveAt(this, p.x);
-          this.cdHeave = 5.8 + Math.random() * 2.8;
+          this.cdHeave = 5.4 + Math.random() * 2.6;
           this.setMode('idle', 0.25);
         }
         break;
@@ -411,8 +411,8 @@ class Queen {
     if (this.hp > 0) {
       const away = Math.sign(this.x - fromX) || 1;
       this.body.setVelocity(away * 210, -260);
-      this.setMode('hurt', 0.55);
-      this.counterNext = Math.random() < 0.45;
+      this.setMode('hurt', 0.5);
+      this.counterNext = Math.random() < 0.5;
     }
     return true;
   }
@@ -1810,8 +1810,8 @@ export class WrestleScene extends Phaser.Scene {
     const q = this.queen;
     const p = this.player;
     this.inIntro = true;
-    // (coming from the level, the TV bars are covering the screen: a title on them, then away they go)
-    stingerTitle('<small>Plop Invasion · Part 1</small>THE POO PALACE');
+    // (coming from the level, the TV bars are covering the screen: they sweep away into her entrance — no title
+    // card on them, her name card comes with the spotlight)
     // she's the star tonight: lit, and in front of the dark
     q.spr.setDepth(DEPTH_W.spot + 0.3);
     q.shadow.setDepth(DEPTH_W.spot + 0.2);
@@ -1835,7 +1835,7 @@ export class WrestleScene extends Phaser.Scene {
       this.sweeps.push(img);
     }
     const skip = this.dom.querySelector<HTMLElement>('.wr-skip')!;
-    await this.wait(this.wd.checkpoint === -1 && !this.wd.result?.seconds ? 300 : 1100);
+    await this.wait(this.wd.checkpoint === -1 && !this.wd.result?.seconds ? 300 : 450);
     void stingerReveal();
     skip.hidden = false;
     playHoops();
