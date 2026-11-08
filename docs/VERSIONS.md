@@ -161,3 +161,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.156: perf pass (loading, menu taps, gameplay), Queen jumbotron glows, volleyball spike on screen.
 - v0.157: wide battle map + 0-point rule, instant nuggie count, boss names, home screen one look, loading/perf pass.
 - v0.158: sheets ≤4096 px, canvases released, low-memory 1x, loading errors shown.
+- v0.159: start-screen-only loading; game art at Play behind a loader; kept Part fly-overs; fading subtitle.
