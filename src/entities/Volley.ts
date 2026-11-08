@@ -10,7 +10,9 @@ import { Plop } from './enemies/Plops';
 import type { Player } from './Player';
 
 /** They spot you once you're this close to one of them. */
-const SPOT = 250;
+const SPOT = 330;
+/** How far a spike reaches (any further and they come after you instead). */
+const REACH = 600;
 /** The ball floats (beach volleyball): gravity on it, px/s². */
 const G = 900;
 /** The net's height over the sand (world px). */
@@ -169,14 +171,16 @@ export class VolleyMatch {
         const top = this.ground - 52;
         const bottom = this.ground - 10;
         const through = this.prevY <= bottom && this.ball.y >= top;
-        const reach = Math.abs(rec.x - this.ball.x) < 26 && through && b.velocity.y > 0;
+        const reach = Math.abs(rec.x - this.ball.x) < (this.dangerousMode ? 34 : 26) && through && b.velocity.y > 0;
         if (reach) {
           // (only once the spiker is well on screen, so you see it coming: till then they keep
           // the rally going)
           if (this.state === 'alert' && hero && hero.alive && this.onScreen(rec.x)) this.spike(rec, hero);
           else this.bump(rec);
-        } else if (b.blocked.down && Math.abs(b.velocity.y) < 40) {
-          // it hit the sand: whoever's nearest picks it up and serves again
+        } else if (b.blocked.down && (Math.abs(b.velocity.y) < 40 || this.dangerousMode)) {
+          // it hit the sand: whoever's nearest picks it up and serves again (once they've seen
+          // you it stops dead, rather than bouncing away off the court, and gets picked up for the spike)
+          if (this.dangerousMode) b.setVelocity(b.velocity.x * 0.2, 0);
           this.state = this.state === 'alert' ? 'fetch' : 'rally';
           this.fetchBy(this.nearest(alive, this.ball.x));
         }
@@ -200,9 +204,11 @@ export class VolleyMatch {
         const f = this.receiver && !this.receiver.dead ? this.receiver : this.nearest(alive, this.ball.x);
         this.receiver = f;
         this.landX = this.ball.x;
-        if (Math.abs(f.x - this.ball.x) < 16 && (b.blocked.down || this.ball.y > this.ground - 30)) {
+        // (sand stops a rolling ball quickly: otherwise it can roll away as fast as they walk after it)
+        if (b.blocked.down) b.setVelocityX(b.velocity.x * Math.pow(0.02, dt));
+        if (Math.abs(f.x - this.ball.x) < 20 && (b.blocked.down || this.ball.y > this.ground - 30)) {
           this.state = 'hold';
-          this.timer = 0.55;
+          this.timer = this.dangerousMode ? 0.3 : 0.55;
           this.held = 0;
           b.moves = false;
           b.setVelocity(0, 0);
@@ -220,11 +226,19 @@ export class VolleyMatch {
         this.ball.setPosition(f.x, f.body.top - R - 2);
         this.timer -= dt;
         this.held += dt;
+        // (off screen on the far side: set it over to your side instead, for the spike there)
+        const farSide = hero ? Math.sign(f.x - this.netX) !== Math.sign(hero.x - this.netX) : false;
+        if (this.timer <= 0 && this.dangerousMode && hero && hero.alive && !this.onScreen(f.x) && farSide) {
+          b.moves = true;
+          this.state = 'alert';
+          this.bump(f);
+          break;
+        }
         // (holds it up a little longer, up to 2 s, till it's well on screen: then you see the spike)
-        if (this.timer <= 0 && this.dangerousMode && hero && hero.alive && Math.abs(hero.x - f.x) < 460 && !this.onScreen(f.x) && this.held < 2) this.timer = 0.05;
+        if (this.timer <= 0 && this.dangerousMode && hero && hero.alive && Math.abs(hero.x - f.x) < REACH && !this.onScreen(f.x) && this.held < 2) this.timer = 0.05;
         if (this.timer <= 0) {
           b.moves = true;
-          if (this.dangerousMode && hero && hero.alive && Math.abs(hero.x - f.x) < 460) this.spike(f, hero);
+          if (this.dangerousMode && hero && hero.alive && Math.abs(hero.x - f.x) < REACH) this.spike(f, hero);
           else if (this.dangerousMode) this.charge();
           else {
             this.state = 'rally';
@@ -238,13 +252,17 @@ export class VolleyMatch {
 
   /** Once they've seen you, every touch is a spike at you. */
   private dangerousMode = false;
+  /** They've seen you (they hurry). */
+  get hot() {
+    return this.dangerousMode;
+  }
   /** How long the ball has been held up (before a spike). */
   private held = 0;
 
-  /** Well inside the camera's view (not just peeking in at an edge). */
+  /** Inside the camera's view (not just peeking in at an edge). */
   private onScreen(x: number) {
     const v = this.gs.cameras.main.worldView;
-    return x > v.x + v.width * 0.2 && x < v.right - v.width * 0.2;
+    return x > v.x + v.width * 0.1 && x < v.right - v.width * 0.1;
   }
 
   private nearest(list: VolleyPlop[], x: number) {
@@ -263,10 +281,15 @@ export class VolleyMatch {
     const lo = otherSide > 0 ? this.netX + 30 : this.left + 20;
     const hi = otherSide > 0 ? this.right - 20 : this.netX - 30;
     this.landX = Phaser.Math.Between(Math.round(lo), Math.round(hi));
-    this.launch(this.landX, this.ground - 30, 1.05 + Math.random() * 0.25);
+    // once they've seen you: a quick set, right to the one nearest you on that side (no running
+    // for it, so no misses), and that touch is the spike
+    const hero = this.dangerousMode ? this.gs.nearestPlayer(this.netX, this.ground) : null;
+    const setter = hero && side.length ? this.nearest(side, hero.x) : null;
+    if (setter) this.landX = Phaser.Math.Clamp(setter.x, lo, hi);
+    this.launch(this.landX, this.ground - 30, setter ? 0.85 + Math.random() * 0.1 : 1.05 + Math.random() * 0.25);
     from.bumpAnim();
     sfx.kick(0.4);
-    this.receiver = side.length ? this.nearest(side, this.landX) : this.nearest(this.alive, this.landX);
+    this.receiver = setter ?? (side.length ? this.nearest(side, this.landX) : this.nearest(this.alive, this.landX));
   }
 
   /** A serve: tossed up, then over the net. */
@@ -403,7 +426,9 @@ export class VolleyPlop extends Plop {
     if (this.mode === 'chase') return super.tick(dt);
     this.animT -= dt;
     const tx = this.match.targetFor(this);
-    const vx = tx !== null && Math.abs(tx - this.x) > 4 ? Phaser.Math.Clamp((tx - this.x) * 5, -150, 150) : 0;
+    // (they hurry once they've seen you)
+    const top = this.match.hot ? 240 : 150;
+    const vx = tx !== null && Math.abs(tx - this.x) > 4 ? Phaser.Math.Clamp((tx - this.x) * 5, -top, top) : 0;
     this.body.setVelocityX(vx);
     const ballX = this.match.ball.active ? this.match.ball.x : this.x - 1;
     this.setFlipX(ballX > this.x);
