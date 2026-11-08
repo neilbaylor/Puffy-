@@ -35,6 +35,18 @@ const BODY0: Fill = { base: '#8b5434', shade: '#5f3520', light: '#b98058' };
 const SMALL_BODY: Fill = { base: '#a8743f', shade: '#7a4f26', light: '#d6a46c' };
 const MED_BODY: Fill = { base: '#894a2c', shade: '#5c2f1a', light: '#b77856' };
 const BIG_BODY: Fill = { base: '#5c3a22', shade: '#3a2213', light: '#8c6346' };
+/**
+ * More poo colours for a crowd of Plops (Part 2: the baseball teams, the parachutists, the climbs),
+ * so a bunch of them never look like copies: caramel, reddish, chocolate, olive, golden, plum.
+ */
+export const PLOP_COLOURS: Fill[] = [
+  SMALL_BODY,
+  MED_BODY,
+  BIG_BODY,
+  { base: '#7a7034', shade: '#544c1e', light: '#a8a060' },
+  { base: '#b88a3a', shade: '#86601e', light: '#e2b868' },
+  { base: '#6e3a3e', shade: '#4a2226', light: '#9a6266' },
+];
 const CAPE: Fill = { base: '#d8243a', shade: '#9c1426', light: '#ff6a7a' };
 const LEG: Fill = { base: '#6e3f25', shade: '#4a2716', light: '#9a6440' };
 const EYE: Fill = { base: '#ffffff', shade: '#ece4dc', light: '#ffffff' };

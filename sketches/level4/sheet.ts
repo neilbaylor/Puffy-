@@ -2,6 +2,7 @@ import { CHARACTERS } from '../wt-battle/src/data/characters';
 import { drawHeroChute, drawPlopChute, type ChuteState } from '../wt-battle/src/gfx/skydive';
 import { STYLES, type Pt } from '../wt-battle/src/gfx/handdrawn';
 import { drawNuggie } from '../wt-battle/src/gfx/collectibles';
+import { PLOP_COLOURS } from '../wt-battle/src/gfx/plops';
 import type { Pose } from '../wt-battle/src/gfx/draw';
 
 const ST = STYLES.polished;
@@ -70,7 +71,7 @@ const hero = (id: string) => CHARACTERS.find((c) => c.id === id)!;
   rows.forEach(([t, how, kind, sub], i) => {
     const x = 190 + i * 370;
     const s = (kind === 'small' ? 0.68 : kind === 'large' ? 1.32 : 1) * 2.1;
-    at(ctx, x - 48 * s, 470 - 100 * s, s, () => drawPlopChute(ctx, kind, how, 5 + i));
+    at(ctx, x - 48 * s, 470 - 100 * s, s, () => drawPlopChute(ctx, kind, how, 5 + i, PLOP_COLOURS[(i * 2 + 1) % PLOP_COLOURS.length]));
     label(ctx, t, x, 512, 21);
     label(ctx, sub, x, 538, 15, '#7a5a40');
   });
@@ -100,10 +101,10 @@ const hero = (id: string) => CHARACTERS.find((c) => c.id === id)!;
   // nuggies floating in the air
   for (const [x, y] of [[380, 470], [430, 450], [480, 470], [600, 820]] as Pt[]) at(ctx, x, y, 1.6, () => drawNuggie(ctx, 0, 0, 9));
   // Plops: a slow one below you, a middling one level-ish, a fast one coming down from above
-  at(ctx, 520, 760, 1.6 * 0.68, () => drawPlopChute(ctx, 'small', 'slow', 4));
-  at(ctx, 250, 500, 1.6, () => drawPlopChute(ctx, 'medium', 'mid', 6));
-  at(ctx, 560, 120, 1.6 * 0.68, () => drawPlopChute(ctx, 'small', 'fast', 8));
-  at(ctx, 190, 930, 1.6 * 1.32, () => drawPlopChute(ctx, 'large', 'mid', 9));
+  at(ctx, 520, 760, 1.6 * 0.68, () => drawPlopChute(ctx, 'small', 'slow', 4, PLOP_COLOURS[4]));
+  at(ctx, 250, 500, 1.6, () => drawPlopChute(ctx, 'medium', 'mid', 6, PLOP_COLOURS[3]));
+  at(ctx, 560, 120, 1.6 * 0.68, () => drawPlopChute(ctx, 'small', 'fast', 8, PLOP_COLOURS[5]));
+  at(ctx, 190, 930, 1.6 * 1.32, () => drawPlopChute(ctx, 'large', 'mid', 9, PLOP_COLOURS[2]));
   // the warning for the fast one
   label(ctx, '!', 610, 60, 54, '#ff5a3c');
   // you, steering right, bazooka ready

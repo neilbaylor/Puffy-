@@ -410,23 +410,36 @@ function drawCap(ctx: Ctx, col: Fill, seed: number, helmet = false) {
   ST.shape(ctx, ellipsePts(52, 20, 2, 1.2, 0, 10), col, seed + 3, { lw: 0.5, plain: true });
 }
 
-/** Team colours: the Plops' caps. */
-const CAP = F('#2f5fd6', '#1c3f9e', '#6e96f0');
-const HELMET = F('#c8102e', '#8a0a1f', '#ff5a6e');
+/**
+ * The two teams: the Stink Sox (blue caps: fielding — pitcher, catcher, fielders) and the
+ * Fly Swatters (red caps and batting helmets: the batter, the one on deck, the runner).
+ */
+export const TEAM = {
+  sox: { name: 'STINK SOX', cap: F('#2f5fd6', '#1c3f9e', '#6e96f0') },
+  swatters: { name: 'FLY SWATTERS', cap: F('#c8102e', '#8a0a1f', '#ff5a6e') },
+} as const;
+export type Team = keyof typeof TEAM;
 
-export type BaseballRole = 'pitch-windup' | 'pitch-throw' | 'bat-stance' | 'bat-swing' | 'catcher' | 'fielder' | 'fielder-throw';
+export type BaseballRole = 'pitch-windup' | 'pitch-throw' | 'bat-stance' | 'bat-swing' | 'on-deck' | 'runner' | 'catcher' | 'fielder' | 'fielder-throw';
+/** Which team plays each part. */
+export const ROLE_TEAM: Record<BaseballRole, Team> = {
+  'pitch-windup': 'sox', 'pitch-throw': 'sox', catcher: 'sox', fielder: 'sox', 'fielder-throw': 'sox',
+  'bat-stance': 'swatters', 'bat-swing': 'swatters', 'on-deck': 'swatters', runner: 'swatters',
+};
 
 /**
  * A Plop playing baseball, in its usual 96 × 104 box (facing right; the batter is drawn flipped,
  * facing the pitcher): cap or helmet, a mitt or the bat, the catcher's mask and pads.
  */
-export function drawBaseballPlop(ctx: Ctx, role: BaseballRole, kind: PlopKind = 'medium', seed = 7) {
-  const frame: PlopFrame = role === 'pitch-throw' || role === 'bat-swing' || role === 'fielder-throw' ? 'yell1' : role === 'catcher' ? 'grin' : role === 'pitch-windup' ? 'look' : 'idle';
-  // the bat behind the body in the stance (over the shoulder), in front mid-swing
-  if (role === 'bat-stance') {
+export function drawBaseballPlop(ctx: Ctx, role: BaseballRole, kind: PlopKind = 'medium', seed = 7, body?: Fill) {
+  const frame: PlopFrame = role === 'pitch-throw' || role === 'bat-swing' || role === 'fielder-throw' ? 'yell1' : role === 'catcher' ? 'grin' : role === 'pitch-windup' ? 'look' : role === 'runner' ? 'run0' : role === 'on-deck' ? 'grin' : 'idle';
+  const cap = TEAM[ROLE_TEAM[role]].cap;
+  const helmet = role.startsWith('bat') || role === 'on-deck' || role === 'runner';
+  // the bat behind the body in the stance (over the shoulder; resting on it on deck), in front mid-swing
+  if (role === 'bat-stance' || role === 'on-deck') {
     ctx.save();
     ctx.translate(88, 58);
-    ctx.rotate(-1.95);
+    ctx.rotate(role === 'on-deck' ? -2.5 : -1.95);
     drawBat(ctx, 50, seed);
     ctx.restore();
   }
@@ -436,7 +449,7 @@ export function drawBaseballPlop(ctx: Ctx, role: BaseballRole, kind: PlopKind = 
     ctx.translate(0, 18);
     ctx.scale(1.06, 0.82);
   }
-  drawPlop(ctx, 0, 0, frame, ST, kind);
+  drawPlop(ctx, 0, 0, frame, ST, kind, body);
   if (role === 'catcher') {
     // chest protector and mask
     ST.shape(ctx, [[30, 58], [70, 58], [74, 80], [26, 80]], F('#2f5fd6', '#1c3f9e', '#6e96f0'), seed + 1, { lw: 0.8 });
@@ -456,12 +469,21 @@ export function drawBaseballPlop(ctx: Ctx, role: BaseballRole, kind: PlopKind = 
     ctx.moveTo(36, 45);
     ctx.lineTo(70, 45);
     ctx.stroke();
-    drawCap(ctx, F('#1a1a22', '#0a0a10', '#3a3a48'), seed + 2);
+    drawCap(ctx, cap, seed + 2);
     drawMitt(ctx, 92, 60, 1.25, seed + 3);
     ctx.restore();
     return;
   }
-  drawCap(ctx, role.startsWith('bat') ? HELMET : CAP, seed + 2, role.startsWith('bat'));
+  drawCap(ctx, cap, seed + 2, helmet);
+  if (role === 'runner') {
+    // dust kicked up behind, running hard
+    ctx.fillStyle = '#c99a6a88';
+    for (const [x, y, r] of [[-6, 96, 6], [-14, 92, 4], [-20, 97, 3]] as const) {
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
   if (role === 'bat-swing') {
     // the bat out in front, level, mid-swing, with a whoosh behind it
     ctx.strokeStyle = '#ffffffaa';
