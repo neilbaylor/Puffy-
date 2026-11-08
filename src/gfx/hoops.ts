@@ -12,10 +12,11 @@ const st = () => STYLES.polished;
 
 // ───────────────────────────── King Puff Ball (frame 130 × 150, feet at y 146) ──
 
-export type KingFrame = 'idle0' | 'idle1' | 'shoot' | 'laugh0' | 'laugh1' | 'sad' | 'run0' | 'run1' | 'talk' | 'bend' | 'hold' | 'adjust0' | 'adjust1';
-export const KING_FRAMES: KingFrame[] = ['idle0', 'idle1', 'shoot', 'laugh0', 'laugh1', 'sad', 'run0', 'run1', 'talk', 'bend', 'hold', 'adjust0', 'adjust1'];
+export type KingFrame = 'idle0' | 'idle1' | 'shoot' | 'laugh0' | 'laugh1' | 'sad' | 'run0' | 'run1' | 'talk' | 'bend' | 'hold' | 'adjust0' | 'adjust1' | 'puff0' | 'puff1' | 'spit';
+/** (puff0, puff1, spit: his shot — he fills his cheeks, swells up red-faced, then PTOO! the ball comes out) */
+export const KING_FRAMES: KingFrame[] = ['idle0', 'idle1', 'shoot', 'laugh0', 'laugh1', 'sad', 'run0', 'run1', 'talk', 'bend', 'hold', 'adjust0', 'adjust1', 'puff0', 'puff1', 'spit'];
 /** Lean (radians, about his feet) for the frames where he bends over. */
-const KING_LEAN: Partial<Record<string, number>> = { bend: -0.32, laugh0: 0.13, laugh1: -0.16 };
+const KING_LEAN: Partial<Record<string, number>> = { bend: -0.32, laugh0: 0.13, laugh1: -0.16, puff1: 0.05, spit: 0.14 };
 const leanPt = (f: string, x: number, y: number) => {
   const a = KING_LEAN[f] ?? 0;
   if (!a) return { x, y };
@@ -39,7 +40,9 @@ export const kingCrownAt = (f: string) => {
     const h = kingHandAt('bend');
     return { x: h.x, y: h.y + 4 };
   }
-  return leanPt(f, 66, 48 + (f === 'idle1' || f === 'laugh1' || f === 'run1' || f === 'adjust1' ? -3 : 0));
+  // (puffed up for his shot, his head's a little higher)
+  const up = f === 'puff0' ? 4 : f === 'puff1' ? 8 : 0;
+  return leanPt(f, 66, 48 - up + (f === 'idle1' || f === 'laugh1' || f === 'run1' || f === 'adjust1' ? -3 : 0));
 };
 /** The crown on its own (so it can fall off): 64 × 44, bottom-centre at (32, 40). */
 export function drawKingCrown(ctx: Ctx, cx: number, by: number) {
@@ -83,8 +86,11 @@ export function drawKing(ctx: Ctx, ox: number, oy: number, f: KingFrame, withCro
   const laugh = f.startsWith('laugh');
   const run = f.startsWith('run');
   const bob = f === 'idle1' || f === 'laugh1' || f === 'run1' || f === 'adjust1' ? -3 : 0;
-  const rx = 40;
-  const ry = 38;
+  // filling up for his shot: wider, taller, rounder
+  const puff = f === 'puff0' ? 1 : f === 'puff1' ? 2 : 0;
+  const spit = f === 'spit';
+  const rx = 40 + puff * 3.5;
+  const ry = 38 + puff * 2;
   const cy = ground - 34 - ry + bob;
 
   // legs: thin, curled feet (like the sketch)
@@ -108,6 +114,10 @@ export function drawKing(ctx: Ctx, ox: number, oy: number, f: KingFrame, withCro
   if (f === 'hold') [armA, armB] = [-0.9, Math.PI + 1.38];
   if (f === 'adjust0') [armA, armB] = [-1.15, Math.PI + 1.15];
   if (f === 'adjust1') [armA, armB] = [-1.3, Math.PI + 1.3];
+  // his shot: arms pumped up as he fills his cheeks, then flung back by the PTOO!
+  if (f === 'puff0') [armA, armB] = [-1.2, Math.PI + 1.2];
+  if (f === 'puff1') [armA, armB] = [-1.5, Math.PI + 1.5];
+  if (spit) [armA, armB] = [-2.45, Math.PI + 2.45];
   // when he handles his crown the arms come round in front of him, so you see his hands
   const handsFront = f === 'bend' || f === 'hold' || f === 'adjust0' || f === 'adjust1' || f === 'laugh1';
   const armAFront = f === 'adjust0' || f === 'adjust1' || f === 'laugh1';
@@ -135,6 +145,36 @@ export function drawKing(ctx: Ctx, ox: number, oy: number, f: KingFrame, withCro
     }
     for (const [tx, ty, r] of [[cx - 31, cy - 18, 4.4], [cx - 39, cy - 6, 3.4], [cx + 27, cy - 20, 3.8], [cx + 34, cy - 9, 2.8]] as const)
       S.shape(ctx, [[tx, ty - r * 1.6], [tx + r, ty], [tx, ty + r], [tx - r, ty]], { base: '#8fd8ff', shade: '#4fa8e0', light: '#ffffff' }, 1556 + tx, { lw: 0.6, plain: true });
+  } else if (f === 'puff1') {
+    // straining: eyes screwed shut, red in the face, sweating
+    for (const [ex, d] of [[cx - 16, 1], [cx + 13, -1]] as const) S.line(ctx, [[ex - 9 * d, cy - 19], [ex + 3 * d, cy - 13], [ex - 9 * d, cy - 7]], 1552 + ex, 1.8);
+    ctx.fillStyle = 'rgba(232,70,63,0.35)';
+    for (const bx of [cx - 30, cx + 24]) {
+      ctx.beginPath();
+      ctx.ellipse(bx, cy + 1, 8, 4.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    for (const [tx, ty, r] of [[cx + 36, cy - 26, 3.8], [cx - 41, cy - 20, 3.2]] as const)
+      S.shape(ctx, [[tx, ty - r * 1.7], [tx + r, ty], [tx, ty + r], [tx - r, ty]], { base: '#8fd8ff', shade: '#4fa8e0', light: '#ffffff' }, 1557 + tx, { lw: 0.6, plain: true });
+    S.line(ctx, [[cx - 30, cy - 30], [cx - 14, cy - 26], [cx - 4, cy - 21]], 1570, 1.8);
+    S.line(ctx, [[cx + 2, cy - 23], [cx + 10, cy - 27], [cx + 22, cy - 28]], 1571, 1.5);
+  } else if (f === 'puff0' || spit) {
+    // filling up: eyes narrowed, determined; the PTOO!: eyes popping wide
+    for (const [ex, ey, er, s] of [[cx - 16, cy - 12, 13, 1], [cx + 13, cy - 13, 10, 2]] as const) {
+      const sqY = spit ? 1.12 : 0.55;
+      S.shape(ctx, ellipsePts(ex, ey + (spit ? -1 : 2), er * (spit ? 1.06 : 1), er * sqY, 0, 28), EYE, 1560 + s, { lw: 1.1 });
+      ctx.fillStyle = S.ink;
+      ctx.beginPath();
+      ctx.ellipse(ex - (spit ? er * 0.1 : er * 0.3), ey + (spit ? -1 : 2), er * (spit ? 0.2 : 0.28), er * (spit ? 0.24 : 0.3), 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (spit) {
+      S.line(ctx, [[cx - 30, cy - 30], [cx - 16, cy - 34], [cx - 4, cy - 30]], 1570, 1.6);
+      S.line(ctx, [[cx + 3, cy - 29], [cx + 12, cy - 33], [cx + 22, cy - 29]], 1571, 1.4);
+    } else {
+      S.line(ctx, [[cx - 30, cy - 26], [cx - 14, cy - 20], [cx - 4, cy - 15]], 1570, 1.9);
+      S.line(ctx, [[cx + 2, cy - 17], [cx + 10, cy - 22], [cx + 22, cy - 24]], 1571, 1.6);
+    }
   } else {
     for (const [ex, ey, er, s] of [[cx - 16, cy - 12, 13, 1], [cx + 13, cy - 13, 10, 2]] as const) {
       S.shape(ctx, ellipsePts(ex, ey, er, er * 1.05, 0, 28), EYE, 1560 + s, { lw: 1.1 });
@@ -160,7 +200,20 @@ export function drawKing(ctx: Ctx, ox: number, oy: number, f: KingFrame, withCro
   // mouth: toothy grin / wide open (shoot, laugh) / wobbly (sad)
   const mx = cx - 2;
   const my = cy + 12;
-  if (f === 'shoot' || laugh || f === 'talk') {
+  if (puff) {
+    // cheeks puffed right out round a tight little "o" of a mouth
+    const ck = puff === 2 ? 1.3 : 1;
+    for (const [bx, s] of [[mx - 21, 1], [mx + 18, 2]] as const)
+      S.shape(ctx, ellipsePts(bx, my + 3, 11 * ck, 9 * ck, 0, 24), KING, 1576 + s, { lw: 1.1, light: [bx - 3, my - 2] });
+    S.shape(ctx, ellipsePts(mx - 1, my + 5, 4.5, 4, 0, 16), { base: '#5e1a2a', shade: '#33091a', light: '#8e2f45' }, 1579, { lw: 1, plain: true });
+  } else if (spit) {
+    // PTOO!: a big round O, the cheeks emptied (a couple of lines where they were)
+    const mouth = ellipsePts(mx - 2, my + 3, 15, 16, 0, 36);
+    S.shape(ctx, mouth, { base: '#5e1a2a', shade: '#33091a', light: '#8e2f45' }, 1580, { lw: 1.3 });
+    S.shape(ctx, ellipsePts(mx - 2, my + 13, 8, 4.5, 0, 16), { base: '#e65a73', shade: '#b23a52', light: '#ff9cb0' }, 1599, { lw: 0.7, plain: true });
+    S.line(ctx, [[mx - 26, my - 4], [mx - 30, my + 3]], 1586, 1.1);
+    S.line(ctx, [[mx + 22, my - 4], [mx + 26, my + 3]], 1587, 1.1);
+  } else if (f === 'shoot' || laugh || f === 'talk') {
     const open = f === 'shoot' ? 15 : f === 'talk' ? 11 : f === 'laugh1' ? 12 : 20;
     const mouth = ellipsePts(mx, my + 2, 20, open, 0, 36);
     S.shape(ctx, mouth, { base: '#5e1a2a', shade: '#33091a', light: '#8e2f45' }, 1580, { lw: 1.2 });
