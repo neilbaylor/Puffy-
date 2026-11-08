@@ -122,7 +122,8 @@ export class MenuScene extends Phaser.Scene {
     const objs: Phaser.GameObjects.GameObject[] = [];
     this.building = objs;
     let level: LevelView | null = null;
-    const gone = () => this.worlds.has(id) || id === this.levelId || !this.sys.isActive();
+    // (paused is fine: the loading screen builds them while the start screen waits behind it)
+    const gone = () => this.worlds.has(id) || id === this.levelId || !(this.sys.isActive() || this.sys.isPaused());
     const step = (fn: () => void) => () => {
       if (gone()) return;
       const before = new Set(this.children.list);
@@ -182,6 +183,19 @@ export class MenuScene extends Phaser.Scene {
     ];
   }
   private pendingWorld: { id: number; w: World } | null = null;
+
+  /**
+   * The next step of building the other Parts ahead, for the loading screen to do (behind its bar,
+   * so even the first tap on another Part is instant), or null once they're all built. (Nothing in
+   * light mode, or before a level's been beaten: only one Part to show then.)
+   */
+  nextAheadJob(): (() => void) | null {
+    return this.building && this.quiet.length ? this.quiet.shift()! : null;
+  }
+  /** How many quiet jobs are waiting (for the loading bar's estimate). */
+  get quietLeft() {
+    return this.quiet.length;
+  }
   /** A hidden fly-over still being built in steps (thrown away if the Parts change before it's done). */
   private building: Phaser.GameObjects.GameObject[] | null = null;
 

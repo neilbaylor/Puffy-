@@ -4,6 +4,7 @@ import { textureSteps } from '../gfx/textures';
 import { latestLevel, levelInfo } from '../level/levels';
 import { buildLevel1 } from '../level/level1';
 import { levelPieces } from '../world/LevelView';
+import type { MenuScene } from './MenuScene';
 
 /** Resolves on the next animation frame (or soon after, if frames are paused). */
 const nextFrame = () => new Promise<void>((r) => {
@@ -112,16 +113,17 @@ export class BootScene extends Phaser.Scene {
     this.scene.setVisible(false, 'Menu');
     this.scene.pause('Menu');
     slice = performance.now();
-    // Only what the start screen itself shows is drawn here (the other heroes' card poses too).
+    // Only what the start screen itself shows is drawn here (the other heroes' card poses too),
+    // and the other Parts' fly-overs (so even the first tap on one is instant; not in light mode).
     // The game's own art (the heroes' game frames, the bad guys) is drawn when a game starts,
-    // behind a little loading card; the other Parts' scenery, this Part's song and the rest of its
-    // ground in quiet moments on the start screen. (Doing it all here was too much at once for
-    // older devices: the loading screen crashed half way through.)
+    // behind a little loading card; this Part's song and its other looks in quiet moments on the
+    // start screen. (Doing it all here was too much at once for older devices: the loading screen
+    // crashed half way through.)
     const rest = [{ name: 'other hero cards', run: () => this.game.events.emit('warm-cards') }, ...later];
-    const quiet: (() => void)[] = [];
+    const menu = this.scene.get('Menu') as unknown as MenuScene;
     let k = 0;
-    const n2 = rest.length + quiet.length;
-    const step2 = () => setProgress(PHASE1 + (1 - PHASE1) * (++k / Math.max(1, n2)) * 0.97);
+    const n2 = rest.length + menu.quietLeft;
+    const step2 = () => setProgress(PHASE1 + (1 - PHASE1) * Math.min(1, ++k / Math.max(1, n2)) * 0.97);
     for (const step of rest) {
       const s0 = performance.now();
       step.run();
@@ -130,12 +132,12 @@ export class BootScene extends Phaser.Scene {
       await breathe();
     }
     mark('the rest of the art');
-    for (const job of quiet) {
+    for (let job = menu.nextAheadJob(); job; job = menu.nextAheadJob()) {
       job();
       step2();
       await breathe();
     }
-    mark('start screen jobs (other Parts, song)');
+    mark('the other Parts\' fly-overs');
     // and the fly-over run for a moment behind the loading screen (everything's pictures on the
     // graphics chip, and the game's code warmed up), so it's smooth from the first moment
     this.scene.resume('Menu');
