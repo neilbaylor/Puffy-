@@ -1062,7 +1062,8 @@ export class UI {
     const boss = BOSSES.find((b) => b.level === r.level) ?? BOSSES[0];
     const queen = boss.scene === 'Wrestle';
     const title = won ? (queen ? 'Queen Plop is down!' : 'You beat the King!') : queen ? 'Queen Plop wins!' : 'The King wins!';
-    const result = r.hoops ? `<dt>Final score</dt><dd>${esc(r.hoops)}</dd>` : `<dt>Result</dt><dd>${won ? 'K.O.!' : 'Pinned!'}</dd>`;
+    const result =
+      (won ? '' : '<dt>Result</dt><dd>Lost</dd>') + (r.hoops ? `<dt>Final score</dt><dd>${esc(r.hoops)}</dd>` : won ? '<dt>Result</dt><dd>K.O.!</dd>' : '');
     const el = h(`<div class="screen modal">
       <div class="panel results${won ? '' : ' gameover'}">
         <div class="results-hero"><canvas width="160" height="160"></canvas></div>
