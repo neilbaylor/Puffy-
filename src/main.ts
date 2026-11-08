@@ -160,11 +160,11 @@ function start(refreshMs: number) {
   (window as unknown as { __res: () => unknown }).__res = () => ({ dpr: dpr(), cap: resCap, renderer: game.renderer.type === Phaser.WEBGL ? 'WebGL' : 'Canvas' });
 
   new UI(game);
-  // the graphics chip gave up (out of memory, usually): say so rather than freeze
+  // the graphics chip gave up (out of memory, usually): switch this device to light mode
   game.canvas.addEventListener('webglcontextlost', () => {
-    const note = document.createElement('div');
-    note.className = 'gl-lost';
     if (!LIGHT) {
+      const note = document.createElement('div');
+      note.className = 'gl-lost';
       // the first time: switch this device to light mode (remembered) and start again
       try {
         localStorage.setItem(LIGHT_KEY, '1');
@@ -176,9 +176,7 @@ function start(refreshMs: number) {
       setTimeout(() => location.reload(), 900);
       return;
     }
-    bootTrouble('the graphics ran out of memory (WebGL context lost)');
-    note.textContent = 'The graphics ran out of memory. Close other tabs and apps, then reload the page.';
-    document.body.appendChild(note);
+    // (already in light mode: nothing more to try, and no message — whatever the browser does)
   });
 
   // handy for debugging from the console
