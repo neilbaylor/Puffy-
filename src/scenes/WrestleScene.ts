@@ -1846,7 +1846,8 @@ export class WrestleScene extends Phaser.Scene {
     this.camManual = true;
     const jx = WX(JUMBO.x + (JUMBO.w * JUMBO.s) / 2);
     const jy = WY(JUMBO.y + (JUMBO.h * JUMBO.s) / 2);
-    this.cut(WX(40), WY(165), 1.6, 0.04);
+    // (already facing the jumbotron, a little below it and wider: one straight push in, no swing)
+    this.cut(jx, jy + 70, 1.75, 0);
     this.updateCamera(0, true);
     this.flashJumbo({ kind: 'big', text: 'TONIGHT!', sub: 'TITLE MATCH · LIVE FROM THE POO PALACE', color: '#ffd23f', bg: '#c8102e' }, 1e9);
     // two beams sweeping the crowd from the rafters
@@ -1863,21 +1864,20 @@ export class WrestleScene extends Phaser.Scene {
     playHoops();
     sfx.drum();
 
-    // ── 1. one sweeping move: across the crowd (flashbulbs going off) and up onto the jumbotron ──
+    // ── 1. straight in to the jumbotron (flashbulbs going off in the crowd around it) ──
     this.excitedUntil = this.clock + 6000;
     sfx.cheer();
     this.flashbulbs(24, 1900);
     this.ribbonMsg = { text: 'QUEEN PLOP ♛ QUEEN PLOP', color: '#ff9ccf', bg: '#5a1030', t0: this.clock / 1000 };
-    await this.camTo(jx, jy + 6, 2.35, 1600, -0.018, 'Sine.easeInOut');
-    // (and stay on it a moment, so it reads)
+    await this.camTo(jx, jy + 6, 2.35, 1300, 0, 'Sine.easeOut');
     // (and stay on it, so both its messages read: TONIGHT!… then her title)
-    await this.camTo(jx, jy + 4, 2.46, 1800, -0.012, 'Sine.easeOut');
+    await this.camTo(jx, jy + 4, 2.46, 2100, 0, 'Sine.easeInOut');
     if (!this.skipping) {
       this.jumbo = { kind: 'title' };
       this.jumboUntil = 0;
       sfx.drum();
     }
-    await this.camTo(jx, jy + 3, 2.52, 1900, -0.008, 'Sine.easeInOut');
+    await this.camTo(jx, jy + 3, 2.52, 1900, 0, 'Sine.easeInOut');
 
     // ── 2. a crash zoom out to the ring… lights down, BOOM: a spotlight finds her ──
     if (!this.skipping) {
@@ -1988,6 +1988,23 @@ export class WrestleScene extends Phaser.Scene {
       yell.remove();
     }
     this.dom.querySelector<HTMLElement>('.wr-speech')!.hidden = true;
+
+    // ── 6. lights up, and across the ring to our hero, who hops for joy (as in basketball) ──
+    if (!this.skipping) {
+      this.setDark(0.25, 400);
+      sfx.drum();
+      this.lowerThird(p.char.name.toUpperCase(), 'The challenger');
+      p.facing = 1;
+      await this.camTo(p.x - 12, MAT_Y - 50, 2.45, 850, 0, 'Sine.easeInOut');
+      for (let i = 0; i < 3 && !this.skipping; i++) {
+        if (p.onGround) p.body.setVelocityY(-p.char.jump * 0.55);
+        await this.iwait(380);
+      }
+      if (!this.skipping) await this.iwait(500);
+      this.lowerThird(null);
+      // (and back to her up on the turnbuckle, for the leap)
+      if (!this.skipping) await this.camTo(POST_R - 70, POST_TOP - 70, 1.6, 650, 0, 'Sine.easeInOut');
+    }
 
     // ── 7. she leaps into the ring ──
     this.inIntro = false;
