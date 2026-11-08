@@ -183,3 +183,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.178: other Parts are ready when the home screen appears (not in light mode): the first tap on one is instant.
 - v0.179: a ball-and-chain Plop in level 3; lighter background art; Queen Plop 5% easier with 12 hits.
 - v0.180: Queen Plop's entrance opens straight in on the jumbotron and shows your hero before she leaps in.
+- v0.181: Battle: two folding chairs fall into every battle; grab one to swing it (1 heart a hit, breaks after 2 hits).
