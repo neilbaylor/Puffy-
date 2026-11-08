@@ -84,6 +84,17 @@ export function levelPieces(d: LevelData, kind: TerrainKind): { outline: Pt[]; x
 }
 
 /**
+ * A level's ground pictures not drawn yet, as jobs (drawn ahead, behind a loading card, so its
+ * opening fly-over doesn't have to): a view of the level is made only to work them out.
+ */
+export function groundPaintJobs(scene: Phaser.Scene, data: LevelData): (() => string | null)[] {
+  const before = new Set(scene.children.list);
+  const view = new LevelView(scene, data, { lazyNear: -1e9, lazySpan: [0, 0], ahead: false });
+  for (const o of scene.children.list.filter((c) => !before.has(c))) o.destroy();
+  return view.paintJobs();
+}
+
+/**
  * Builds the level: an invisible tilemap for collision, plus the hand-drawn
  * world on top (organic terrain pieces, clouds, boulders, brambles, trees,
  * flowers). Shared by the menu backdrop and the game.

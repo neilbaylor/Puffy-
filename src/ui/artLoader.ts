@@ -40,6 +40,9 @@ export function loadArt(steps: Step[], label = 'Loading…'): Promise<void> {
         slice = performance.now();
       }
     }
+    // (a couple of frames with everything drawn on show behind the card: the new pictures are on
+    // the graphics chip before the level starts)
+    await nextFrame();
     await nextFrame();
     el.remove();
   };

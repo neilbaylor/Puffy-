@@ -7,7 +7,7 @@ import { LEVELS, levelInfo, levelName, progress } from '../level/levels';
 import { Background } from '../world/Background';
 import { LIGHT } from '../core/light';
 import { Ambience } from '../world/Ambience';
-import { LevelView } from '../world/LevelView';
+import { LevelView, groundPaintJobs } from '../world/LevelView';
 import { mixTint, themeClock, themeMix, themesFor } from '../world/theme';
 
 /** Animated backdrop behind the start screen: a slow fly-over of Puff Ball Planet. */
@@ -172,6 +172,27 @@ export class MenuScene extends Phaser.Scene {
 
   /** The Parts' fly-overs kept hidden (see World). */
   private worlds = new Map<number, World>();
+
+  /**
+   * A level's ground not drawn yet, as steps (for the little loading card before it starts: the
+   * level's opening fly-over sweeps all of it in a few seconds, and drawing pieces during it made
+   * it stutter). The pictures are the same ones the fly-over would draw, kept for the level.
+   */
+  groundJobs(id: number): { name: string; run: () => void }[] {
+    const info = levelInfo(id);
+    if (!info.build) return [];
+    // (another Part than the one showing, e.g. in light mode: a view of it just for its pictures)
+    const jobs = this.levelId === id && this.level ? this.level.paintJobs() : groundPaintJobs(this, info.build());
+    return jobs.map((job, i) => ({
+      name: `ground ${i}`,
+      run: () => {
+        const key = job();
+        if (!key) return;
+        this.painted.push(key);
+        this.warmOnGpu([this.add.image(0, 0, key).setOrigin(0).setScrollFactor(0).setScale(0.05)]);
+      },
+    }));
+  }
 
   /** Put the showing Part's fly-over away (hidden, not thrown away). */
   private stashWorld() {
