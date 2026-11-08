@@ -8,6 +8,7 @@ import { NEUTRAL_FACE, type Face } from '../gfx/face';
 import { BattleUI } from './battleUi';
 import { loadArt } from './artLoader';
 import { LIGHT } from '../core/light';
+import { savedResCap } from '../core/res';
 import { gameArtJobs } from '../gfx/textures';
 import { groundPaintJobs } from '../world/LevelView';
 import { gamepadSources } from '../input/gamepad';
@@ -948,11 +949,7 @@ export class UI {
   /** ' · lower res' on the version label when this device was found slow and draws at a lower resolution. */
   private lowRes() {
     if (LIGHT) return ' · light';
-    try {
-      return Number(localStorage.getItem('puffy.res')) ? ' · lower res' : '';
-    } catch {
-      return '';
-    }
+    return savedResCap() ? ' · lower res' : '';
   }
 
   private play() {

@@ -9,7 +9,7 @@ import { BattleScene } from './scenes/BattleScene';
 import { WrestleScene } from './scenes/WrestleScene';
 import { UI } from './ui/ui';
 import { LIGHT, LIGHT_KEY } from './core/light';
-import { VERSION } from './version';
+import { savedResCap, saveResCap } from './core/res';
 
 installInput();
 
@@ -20,20 +20,14 @@ installInput();
  * vertically; the visible width follows the screen's aspect ratio.
  */
 // Cap the render resolution: full 2x on phones, 1.75x on big tablet screens (keeps Android tablets smooth).
-// A device found to be slow (see watchSpeed) is capped lower still, and remembers it.
-const RES_KEY = 'puffy.res';
-let resCap = (() => {
-  try {
-    // (a lower resolution found earlier holds only for the version it was measured on: each new
-    // version — usually smoother — gets a fresh look)
-    const [cap, ver] = (localStorage.getItem(RES_KEY) ?? '').split('@');
-    if (Number(cap) && ver === VERSION) return Number(cap);
-  } catch {
-    /* private mode */
-  }
-  // light mode (older devices: see core/light) draws at 1x from the start
-  return LIGHT ? 1 : 0;
-})();
+// A device found to be slow in play (see watchSpeed) is capped lower still for gameplay, and remembers
+// it; light mode (older devices: see core/light) draws at 1x everywhere.
+let resCap = LIGHT ? 1 : savedResCap();
+// The start screen always draws at no more than 1.25x: its scenery is soft (a little less sharpness
+// doesn't show; the title and buttons are page elements, always sharp) and it keeps Part switching
+// smooth on every device. Gameplay draws at full sharpness again.
+const HOME_RES = 1.25;
+let home = true;
 
 /**
  * If something goes wrong while loading, say so on the loading screen (instead of it just
@@ -58,8 +52,9 @@ window.addEventListener('error', (e) => bootTrouble(e.message || String(e.error)
 window.addEventListener('unhandledrejection', (e) => bootTrouble(String((e.reason as Error)?.message ?? e.reason)));
 const dpr = () => {
   const big = Math.min(window.innerWidth, window.innerHeight) >= 700;
-  const r = Math.min(window.devicePixelRatio || 1, big ? 1.75 : 2);
-  return resCap ? Math.min(r, resCap) : r;
+  let r = Math.min(window.devicePixelRatio || 1, big ? 1.75 : 2);
+  if (resCap) r = Math.min(r, resCap);
+  return home ? Math.min(r, HOME_RES) : r;
 };
 const size = () => ({ w: Math.max(1, Math.round(window.innerWidth * dpr())), h: Math.max(1, Math.round(window.innerHeight * dpr())) });
 
@@ -123,26 +118,46 @@ function start(refreshMs: number) {
   window.addEventListener('resize', resize);
   window.addEventListener('orientationchange', () => setTimeout(resize, 200));
 
+  // start screen on → its lower resolution; off (Play, a boss, Battle) → gameplay's. (Clicking
+  // Play stops the start screen straight away, before the next scene is built, so the switch costs
+  // nothing extra on screen.)
+  const setHome = (on: boolean) => {
+    if (home === on) return;
+    home = on;
+    resize();
+  };
+  game.events.once(Phaser.Core.Events.READY, () => {
+    const ev = game.scene.getScene('Menu').events;
+    ev.on(Phaser.Scenes.Events.START, () => setHome(true));
+    ev.on(Phaser.Scenes.Events.SHUTDOWN, () => setHome(false));
+  });
+
   /**
-   * Older tablets (an old iPad, say) can't keep up drawing this many pixels. Once
-   * everything is loaded, watch the start screen for a few seconds: if it's running
-   * under ~47 fps, draw at a lower resolution (a little softer, much smoother), and
-   * check again (at most twice). The device remembers it for next time.
+   * Some devices (an old iPad, say) can't keep up drawing gameplay at full sharpness. Watch the
+   * first few seconds of real play: if it's running under ~47 fps, draw gameplay at a lower
+   * resolution (a little softer, much smoother), and check again (at most twice). Remembered for
+   * this version (see core/res).
    */
+  const PLAY = ['Game', 'Hoops', 'Wrestle', 'Battle'];
   const watchSpeed = (rounds: number) => {
     const deltas: number[] = [];
     let since = 0;
     let last = 0;
+    let playing = 0; // when this stretch of play began
     const onStep = () => {
       // (real time between frames: the frame time Phaser reports is smoothed and capped)
       const t = performance.now();
       const delta = last ? t - last : 0;
       last = t;
-      if (!delta || delta > 1000 || document.hidden || !game.scene.isActive('Menu')) return;
-      // (only while the start screen is just showing: frames where it's building another Part's
-      // scenery in the background are slow on purpose, and aren't the device being slow)
-      const menu = game.scene.getScene('Menu') as unknown as { quiet?: unknown[]; building?: unknown };
-      if ((menu.quiet?.length ?? 0) > 0 || menu.building) return;
+      const inPlay = !home && !document.hidden && PLAY.some((k) => game.scene.isActive(k));
+      if (!inPlay) {
+        playing = 0;
+        return;
+      }
+      if (!playing) playing = t;
+      // (skip the first 2 seconds of each stretch: building the scene and its first pictures
+      // are slow on purpose, and aren't the device being slow)
+      if (!delta || delta > 1000 || t - playing < 2000) return;
       deltas.push(delta);
       since += delta;
       // (about 4 seconds' worth, however fast or slow the frames are)
@@ -155,19 +170,15 @@ function start(refreshMs: number) {
       const now = dpr();
       if (median > 21 && !capped30 && now > 1.05 && rounds > 0) {
         resCap = now > 1.4 ? 1.25 : 1;
-        try {
-          localStorage.setItem(RES_KEY, `${resCap}@${VERSION}`);
-        } catch {
-          /* private mode */
-        }
+        saveResCap(resCap);
         resize();
         setTimeout(() => watchSpeed(rounds - 1), 1500);
       }
     };
     game.events.on('step', onStep);
   };
-  game.events.once('assets-ready', () => setTimeout(() => watchSpeed(2), 1000));
-  (window as unknown as { __res: () => unknown }).__res = () => ({ dpr: dpr(), cap: resCap, renderer: game.renderer.type === Phaser.WEBGL ? 'WebGL' : 'Canvas' });
+  if (!LIGHT) watchSpeed(2);
+  (window as unknown as { __res: () => unknown }).__res = () => ({ dpr: dpr(), cap: resCap, home, renderer: game.renderer.type === Phaser.WEBGL ? 'WebGL' : 'Canvas' });
 
   new UI(game);
   // the graphics chip gave up (out of memory, usually): switch this device to light mode
