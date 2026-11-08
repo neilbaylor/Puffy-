@@ -11,12 +11,13 @@ import { canvas } from '../gfx/draw';
 import { STYLES } from '../gfx/handdrawn';
 import { BLASTER, SAW } from '../gfx/weapons';
 import { drawAnvil, drawIceBlock, drawPellet, drawPoo, drawRamp, drawRock } from '../gfx/hazards';
+import { CHAIR_H, CHAIR_W, drawFoldingChair } from '../gfx/wrestle';
 import { W_RES } from '../gfx/weapons';
 import { soloSource } from '../input/devices';
 import type { BattleNet, Snapshot } from '../net/battleNet';
 import { ARENA_RAMPS, ARENA_SECTION, buildArena } from '../shared/battle/arena';
-import { SLOT_COLORS, type SnapEnemy, type SnapHazard, type SnapPlayer } from '../shared/battle/protocol';
-import { ArenaMap, BTN, DT, TILE_PX, ENEMY_BOX, HEARTS, POWER, PRIZE_LIFE, landingY, sizeOf, stepMove, type BEvent, type BPlayer, type EnemyKind, type PrizeKind, type RocketKind } from '../shared/battle/sim';
+import { SLOT_COLORS, type SnapChair, type SnapEnemy, type SnapHazard, type SnapPlayer } from '../shared/battle/protocol';
+import { ArenaMap, BTN, CHAIR_LIFE, CHAIR_SWING, DT, TILE_PX, ENEMY_BOX, HEARTS, POWER, PRIZE_LIFE, landingY, sizeOf, stepMove, type BEvent, type BPlayer, type EnemyKind, type PrizeKind, type RocketKind } from '../shared/battle/sim';
 import { Background } from '../world/Background';
 import { Fx } from '../world/Fx';
 import { LevelView } from '../world/LevelView';
@@ -198,6 +199,10 @@ export class BattleScene extends Phaser.Scene {
   private prizeViews = new Map<number, PrizeView>();
   /** Prizes someone just grabbed (they fly into the grabber; the snapshot may still show them a moment). */
   private grabbed = new Set<number>();
+  /** The folding chairs' pictures, by id. */
+  private chairViews = new Map<number, Phaser.GameObjects.Image>();
+  /** Am I holding a chair (FIRE swings it: the button says so)? */
+  private holdingChair = false;
   private snaps: Snapshot[] = [];
   private me: BPlayer | null = null;
   private pending: [number, number][] = [];
@@ -253,7 +258,76 @@ export class BattleScene extends Phaser.Scene {
     this.level.setTint(mixTint(m));
     this.fitCamera();
     this.scale.on('resize', this.fitCamera, this);
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off('resize', this.fitCamera, this));
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.scale.off('resize', this.fitCamera, this);
+      // (the FIRE button back to normal)
+      if (this.holdingChair) this.game.events.emit('wrestle-chair', false);
+      this.holdingChair = false;
+    });
+  }
+
+  /**
+   * The folding chairs: tumbling down, lying flat on the floor (blinking before they go), or held up
+   * over a hero's head — and swung down in front of them, mid-swing.
+   */
+  private renderChairs(chairs: SnapChair[], dt: number) {
+    const S = 0.55 / ART_RES;
+    const live = new Set<number>();
+    for (const [id, x, y, holder, , swing, age] of chairs) {
+      live.add(id);
+      let img = this.chairViews.get(id);
+      if (!img) {
+        img = this.add.image(x, y, 'wr-chair').setScale(S).setDepth(DEPTH.pickups);
+        this.chairViews.set(id, img);
+      }
+      if (holder) {
+        const v = this.views.get(holder);
+        if (!v || !v.sprite.visible) {
+          img.setVisible(false);
+          continue;
+        }
+        const isMe = holder === this.net.myId && this.me;
+        const facing = (isMe ? this.me!.facing : v.sprite.flipX ? -1 : 1) as 1 | -1;
+        const c = characterById(isMe ? this.me!.hero : this.views.get(holder)?.hero ?? 'puffy');
+        const hh = (c.hitH ?? 34) * v.size;
+        // held by its feet at shoulder height, up and a little forward (clear of the name over the
+        // head); a swing winds it back, then smashes it forward and down in front
+        const u = swing > 0 ? 1 - swing / CHAIR_SWING : -1;
+        const ang = u < 0 ? 0.25 : u < 0.3 ? 0.25 - (u / 0.3) * 1.1 : -0.85 + Math.sin(((u - 0.3) / 0.7) * Math.PI * 0.5) * 2.6;
+        img
+          .setVisible(true)
+          .setOrigin(0.5, 1)
+          .setScale(S * 1.3 * v.size)
+          .setFlipX(facing < 0)
+          .setDepth(DEPTH.players + 0.5)
+          .setAlpha(1)
+          .setPosition(v.sprite.x + facing * 9 * v.size, v.sprite.y - hh * 0.42)
+          .setRotation(facing * ang);
+        continue;
+      }
+      img.setVisible(true).setOrigin(0.5, 0.5).setScale(S).setDepth(DEPTH.pickups).setFlipX(false);
+      if (age < 0) {
+        // tumbling down
+        img.setPosition(x, y - (CHAIR_H * 0.55) / 2).setRotation(img.rotation + dt * 7).setAlpha(1);
+      } else {
+        // lying flat on the floor (blinking for its last 3 s)
+        img
+          .setPosition(x, y - (CHAIR_W * 0.55) / 2 - 1)
+          .setRotation(Math.PI / 2 - 0.04)
+          .setAlpha(age > CHAIR_LIFE - 3 && Math.floor(this.time.now / 110) % 2 ? 0.35 : 1);
+      }
+    }
+    for (const [id, img] of this.chairViews)
+      if (!live.has(id)) {
+        img.destroy();
+        this.chairViews.delete(id);
+      }
+    // (the FIRE button says CHAIR while you've got one)
+    const mine = chairs.some((c) => c[3] === this.net.myId);
+    if (mine !== this.holdingChair) {
+      this.holdingChair = mine;
+      this.game.events.emit('wrestle-chair', mine);
+    }
   }
 
   private makePrizeTextures() {
@@ -263,6 +337,7 @@ export class BattleScene extends Phaser.Scene {
     if (!this.textures.exists('bbomb')) addCanvas(this, 'bbomb', hires(24, 24, R, (ctx) => drawBombBall(ctx, 11, 13, 7)));
     if (!this.textures.exists('brock')) addCanvas(this, 'brock', hires(42, 42, R, (ctx) => drawRock(ctx)));
     if (!this.textures.exists('banvil')) addCanvas(this, 'banvil', hires(42, 40, R, (ctx) => drawAnvil(ctx)));
+    if (!this.textures.exists('wr-chair')) addCanvas(this, 'wr-chair', hires(CHAIR_W + 8, CHAIR_H + 4, R, (ctx) => (ctx.translate(4, 2), drawFoldingChair(ctx))));
     if (!this.textures.exists('bhalo'))
       addCanvas(this, 'bhalo', hires(96, 96, R, (ctx) => {
         // a soft white-gold glow with a brighter ring at its edge
@@ -606,6 +681,12 @@ export class BattleScene extends Phaser.Scene {
     return (i.left ? BTN.left : 0) | (i.right ? BTN.right : 0) | (i.jump ? BTN.jump : 0) | (i.fire && !i.bomb ? BTN.fire : 0) | (i.run ? BTN.run : 0) | (i.bomb ? BTN.bomb : 0);
   }
 
+  /** The chair I'm holding (by the latest snapshot), if any. */
+  private myChair() {
+    const last = this.snaps[this.snaps.length - 1];
+    return last?.chairs.find((c) => c[3] === this.net.myId) ?? null;
+  }
+
   private myRockets() {
     const last = this.snaps[this.snaps.length - 1];
     return last ? last.rockets.filter((r) => r.owner === this.net.myId).length : 0;
@@ -622,7 +703,7 @@ export class BattleScene extends Phaser.Scene {
     if (me.respawn > 0) return;
     const ev: BEvent[] = [];
     const max = characterById(me.hero).maxRockets + (me.power === POWER.rapid ? 3 : 0);
-    const fired = stepMove(me, b, this.map, ev, () => this.myRockets() < max);
+    const fired = stepMove(me, b, this.map, ev, () => !this.myChair() && this.myRockets() < max);
     for (const e of ev) if (e.k === 'jump') this.jumpFx(me.x, me.y, e.air, true);
     if (fired) {
       const c = characterById(me.hero);
@@ -650,7 +731,7 @@ export class BattleScene extends Phaser.Scene {
     const max = characterById(me.hero).maxRockets + (me.power === POWER.rapid ? 3 : 0);
     const mineInFlight = s.rockets.filter((r) => r.owner === me.id).length;
     for (const [, b] of this.pending)
-      if (me.respawn <= 0 && stepMove(me, b, this.map, undefined, () => mineInFlight < max) === 2) me.bombs--;
+      if (me.respawn <= 0 && stepMove(me, b, this.map, undefined, () => !this.myChair() && mineInFlight < max) === 2) me.bombs--;
     if (before && me.respawn <= 0) {
       this.fix.x += before.x - me.x;
       this.fix.y += before.y - me.y;
@@ -666,6 +747,7 @@ export class BattleScene extends Phaser.Scene {
     prizes: [number, PrizeKind, number, number, number][];
     enemies: SnapEnemy[];
     hazards: SnapHazard[];
+    chairs: SnapChair[];
     timeLeft: number;
   } | null {
     const n = this.snaps.length;
@@ -706,7 +788,11 @@ export class BattleScene extends Phaser.Scene {
       const ha = a.hazards.find((h) => h[0] === hb[0]);
       return ha && hb[4] <= 0 ? [hb[0], hb[1], ha[2] + (hb[2] - ha[2]) * k, ha[3] + (hb[3] - ha[3]) * k, hb[4], hb[5]] : hb;
     });
-    return { players, rockets, prizes, enemies, hazards, timeLeft: last.timeLeft };
+    const chairs = b.chairs.map((cb): SnapChair => {
+      const ca = a.chairs.find((c) => c[0] === cb[0]);
+      return ca && !cb[3] && !ca[3] ? [cb[0], ca[1] + (cb[1] - ca[1]) * k, ca[2] + (cb[2] - ca[2]) * k, cb[3], cb[4], cb[5], cb[6]] : cb;
+    });
+    return { players, rockets, prizes, enemies, hazards, chairs, timeLeft: last.timeLeft };
   }
 
   private render(dt: number) {
@@ -843,6 +929,7 @@ export class BattleScene extends Phaser.Scene {
       }
     this.renderEnemies(cur.enemies, dt);
     this.renderHazards(cur.hazards);
+    this.renderChairs(cur.chairs, dt);
     // rockets
     for (const [id, r] of cur.rockets) {
       let img = this.rocketViews.get(id);
@@ -1256,6 +1343,32 @@ export class BattleScene extends Phaser.Scene {
           if (e.by === myId) sfx.cheer();
           break;
         }
+        case 'chair': {
+          // a folding chair's coming in from the crowd: CHAIR!
+          this.fx.popText(e.x, 70, 'CHAIR!', '#e2e7ec', 26);
+          sfx.whoosh();
+          break;
+        }
+        case 'chairland':
+          sfx.clank();
+          this.fx.dust(e.x, e.y, 6);
+          break;
+        case 'chairgrab': {
+          const v = this.views.get(e.id);
+          if (v) this.fx.popText(v.sprite.x, v.sprite.y - 60 * v.size, 'CHAIR!', '#e2e7ec', 18);
+          sfx.clank();
+          break;
+        }
+        case 'chairswing':
+          sfx.whoosh();
+          break;
+        case 'chairhit':
+          sfx.clank();
+          sfx.thud();
+          this.fx.stars(e.x, e.y, 6);
+          this.fx.popText(e.x, e.y - 30, e.broke ? 'CRUNCH!' : 'WHACK!', '#ffd23f', 20);
+          this.cameras.main.shake(120, 0.006);
+          break;
         case 'drop': {
           // a prize is coming: a "!" where it'll come down
           this.fx.popText(e.x, 70, '!', '#ffd23f', 34);
