@@ -807,17 +807,17 @@ export class GameScene extends Phaser.Scene {
     this.physics.world.pause();
     const top = () => s.y - (KING_FEET - 10) * KING_K;
     // a little hop: he's seen you
-    this.tweens.add({ targets: s, y: s.y - 10, duration: 140, yoyo: true, ease: 'Sine.easeOut' });
+    this.tweens.add({ targets: s, y: s.y - 10, duration: 120, yoyo: true, ease: 'Sine.easeOut' });
     // the laugh
-    this.time.delayedCall(420, () => {
+    this.time.delayedCall(350, () => {
       sfx.laugh();
-      this.sayAt(() => [s.x - 6, top() + 10], 'HA HA HA HA!', 1500);
+      this.sayAt(() => [s.x - 6, top() + 10], 'HA HA HA HA!', 1280);
       let n = 0;
-      this.time.addEvent({ delay: 130, repeat: 12, callback: () => s.setFrame(n++ % 2 ? 'yell1' : 'yell0') });
-      this.tweens.add({ targets: s, scaleY: s.scaleY * 1.05, duration: 130, yoyo: true, repeat: 6 });
+      this.time.addEvent({ delay: 110, repeat: 12, callback: () => s.setFrame(n++ % 2 ? 'yell1' : 'yell0') });
+      this.tweens.add({ targets: s, scaleY: s.scaleY * 1.05, duration: 110, yoyo: true, repeat: 6 });
     });
     // the jetpack fires up
-    this.time.delayedCall(2200, () => {
+    this.time.delayedCall(1870, () => {
       s.setFrame('grin');
       k.on = true;
       for (const f of k.flames) f.setVisible(true);
@@ -825,19 +825,19 @@ export class GameScene extends Phaser.Scene {
       this.cameras.main.shake(300, 0.003);
     });
     // up, slowly at first, then whoosh — off the top of the screen
-    this.time.delayedCall(2700, () => {
+    this.time.delayedCall(2300, () => {
       this.tweens.add({
         targets: s,
         y: s.y - 70,
-        duration: 600,
+        duration: 510,
         ease: 'Sine.easeIn',
         onComplete: () => {
           sfx.whoosh();
-          this.tweens.add({ targets: s, y: s.y - 1400, x: s.x + 160, rotation: 0.18, duration: 1300, ease: 'Quad.easeIn' });
+          this.tweens.add({ targets: s, y: s.y - 1400, x: s.x + 160, rotation: 0.18, duration: 1100, ease: 'Quad.easeIn' });
         },
       });
     });
-    this.time.delayedCall(4700, () => {
+    this.time.delayedCall(4000, () => {
       for (const f of k.flames) f.destroy();
       s.destroy();
       this.king = null;
