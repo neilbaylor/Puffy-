@@ -2529,7 +2529,11 @@ kbd {
   .acct-card .results-body h2 { font-size: clamp(22px, 6.4vh, 28px); }
 }
 .acct-card .results-hero { margin-top: clamp(22px, 5vmin, 40px); }
-.acct-card .row { justify-content: flex-end; margin-top: 26px; }
+/* (a grid: the hero and the stats side by side as before, with Done on its own row under both, centred) */
+.acct-card { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; row-gap: 0; }
+/* Done: centred across the whole card and a bit wider */
+.acct-card .acct-done-row { grid-column: 1 / -1; justify-content: center; margin-top: 18px; }
+.acct-card .acct-done-row .btn { min-width: clamp(150px, 26vmin, 210px); }
 @media (max-height: 500px) {
   .acct-card .row { margin-top: 18px; }
   .acct-card .results-hero { margin-top: 22px; }
