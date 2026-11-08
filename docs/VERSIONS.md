@@ -163,3 +163,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.158: sheets ≤4096 px, canvases released, low-memory 1x, loading errors shown.
 - v0.159: start-screen-only loading; game art at Play behind a loader; kept Part fly-overs; fading subtitle.
 - v0.160: light mode (auto on graphics OOM), per-level bad guys, subtitle out of layout.
+- v0.161: Queen Plop 5% tougher.
