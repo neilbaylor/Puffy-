@@ -28,9 +28,9 @@ import type { GameOverState, HudState, ResultState } from './GameScene';
  *
  * The fight is the platformer's own: the same hero, controls, jumps and bazooka (two rockets = a hit),
  * side-on across the mat. The ropes at either end are springy (run into them and you're flung
- * back), and you can climb them to the top turnbuckle and dive off (land on her: three hits); there's
+ * back), and you can climb them to the top turnbuckle and dive off (land on her: two hits); there's
  * no leaving the ring. You have 5 hearts (shown over your head; more turn up in the ring, up to 6), there's
- * a folding chair now and then (FIRE swings it while you hold it: three hits), and she takes 15 hits, counted down on
+ * a folding chair now and then (FIRE swings it while you hold it: two hits), and she takes 15 hits, counted down on
  * the jumbotron.
  */
 export interface WrestleData {
@@ -434,7 +434,7 @@ export class WrestleScene extends Phaser.Scene {
   private heartPick: { img: Phaser.GameObjects.Image; t: number; y: number } | null = null;
   private heartIn = 3;
   private heartsG!: Phaser.GameObjects.Graphics;
-  /** The folding chair: falls into the ring now and then; pick it up and hit her with it (three hits). */
+  /** The folding chair: falls into the ring now and then; pick it up and hit her with it (two hits). */
   private chair: {
     img: Phaser.GameObjects.Image;
     shadow: Phaser.GameObjects.Image;
@@ -1156,7 +1156,7 @@ export class WrestleScene extends Phaser.Scene {
     if (!this.fighting || !q.hit(n, fromX)) return false;
     if (how === 'rocket') this.rocketHalf = !this.rocketHalf;
     const big = how === 'dive' || how === 'chair';
-    const words = how === 'dive' ? 'TOP ROPE! ×3' : how === 'chair' ? 'CHAIR SHOT! ×3' : how === 'stomp' ? ['BONK!', 'SPLAT!', 'BOING!'][q.hp % 3] : ['POW!', 'BAM!', 'KABOOM!'][q.hp % 3];
+    const words = how === 'dive' ? 'TOP ROPE! ×2' : how === 'chair' ? 'CHAIR SHOT! ×2' : how === 'stomp' ? ['BONK!', 'SPLAT!', 'BOING!'][q.hp % 3] : ['POW!', 'BAM!', 'KABOOM!'][q.hp % 3];
     this.fx.popText(q.x, q.top - 16, words, big ? '#ffd23f' : '#ffffff', big ? 26 : 20);
     this.fx.stars(q.x, q.top + 10, big ? 10 : 5);
     sfx.stomp();
@@ -1165,8 +1165,8 @@ export class WrestleScene extends Phaser.Scene {
       this.cameras.main.shake(300, 0.014);
       this.shakeRopes(6);
       sfx.cheer();
-      if (how === 'dive') this.flashJumbo({ kind: 'big', text: 'FROM THE TOP ROPE!', sub: `THAT ONE COUNTS TRIPLE · ${q.hp} TO GO`, color: '#ffd23f', bg: '#c8102e' }, 2200);
-      else this.flashJumbo({ kind: 'big', text: 'CHAIR SHOT!', sub: `THAT ONE COUNTS TRIPLE · ${q.hp} TO GO`, color: '#ffd23f', bg: '#3a4652' }, 2200);
+      if (how === 'dive') this.flashJumbo({ kind: 'big', text: 'FROM THE TOP ROPE!', sub: `THAT ONE COUNTS DOUBLE · ${q.hp} TO GO`, color: '#ffd23f', bg: '#c8102e' }, 2200);
+      else this.flashJumbo({ kind: 'big', text: 'CHAIR SHOT!', sub: `THAT ONE COUNTS DOUBLE · ${q.hp} TO GO`, color: '#ffd23f', bg: '#3a4652' }, 2200);
     } else this.flashJumbo({ kind: 'big', text: words.replace(/!.*/, '!'), sub: `${q.hp} TO GO`, color: '#ffd23f', bg: '#5c3118' }, 900);
     if (q.hp <= 0) void this.win();
     return true;
@@ -1259,7 +1259,7 @@ export class WrestleScene extends Phaser.Scene {
     this.drawScreens();
   }
 
-  /** The hero against her: land on her (from the top rope: three hits), or she gets you. */
+  /** The hero against her: land on her (from the top rope: two hits), or she gets you. */
   private contact() {
     const p = this.player;
     const q = this.queen;
@@ -1278,7 +1278,7 @@ export class WrestleScene extends Phaser.Scene {
     if (!rising && falling && fromAbove) {
       const dive = !!this.dive;
       this.dive = null;
-      this.hitQueen(dive ? 3 : 1, dive ? 'dive' : 'stomp', p.x);
+      this.hitQueen(dive ? 2 : 1, dive ? 'dive' : 'stomp', p.x);
       p.bounce();
       return;
     }
@@ -1396,7 +1396,7 @@ export class WrestleScene extends Phaser.Scene {
       const img = this.add.image(x, this.cameras.main.worldView.top - 50, 'wr-chair').setScale(SC).setDepth(DEPTH.pickups);
       const shadow = this.add.image(x, MAT_Y + 2, 'softshadow').setDepth(DEPTH_W.shadows).setDisplaySize(10, 4).setAlpha(0.2);
       this.chair = { img, shadow, state: 'fall', vy: 60, t: 0, bounced: false, a: -1.75, swing: -1, cd: 0, hit: false };
-      this.flashJumbo({ kind: 'big', text: 'CHAIR!', sub: 'GRAB IT: IT COUNTS TRIPLE', color: '#ffd23f', bg: '#3a4652' }, 1800);
+      this.flashJumbo({ kind: 'big', text: 'CHAIR!', sub: 'GRAB IT: IT COUNTS DOUBLE', color: '#ffd23f', bg: '#3a4652' }, 1800);
       this.ribbonMsg = { text: 'CHAIR! CHAIR! CHAIR!', color: '#e2e7ec', bg: '#3a4652', t0: this.clock / 1000 };
       this.excitedUntil = this.clock + 1800;
       sfx.cheer();
@@ -1518,7 +1518,7 @@ export class WrestleScene extends Phaser.Scene {
     });
   }
 
-  /** WHACK! The chair over her head: three hits, and it's bent out of shape and gone. */
+  /** WHACK! The chair over her head: two hits, and it's bent out of shape and gone. */
   private chairHit() {
     const c = this.chair!;
     const q = this.queen;
@@ -1529,7 +1529,7 @@ export class WrestleScene extends Phaser.Scene {
     // (a chair that connects always counts — even while she's still flashing from your last hit —
     // and then it's spent: one hit per chair)
     q.invulnUntil = 0;
-    if (!this.hitQueen(3, 'chair', p.x)) {
+    if (!this.hitQueen(2, 'chair', p.x)) {
       this.chair = c;
       return false;
     }
@@ -1829,7 +1829,7 @@ export class WrestleScene extends Phaser.Scene {
     const jy = WY(JUMBO.y + (JUMBO.h * JUMBO.s) / 2);
     this.cut(WX(40), WY(165), 1.6, 0.04);
     this.updateCamera(0, true);
-    this.flashJumbo({ kind: 'big', text: 'TONIGHT!', sub: 'TITLE MATCH · LIVE FROM THE POO PALACE', color: '#ffd23f', bg: '#c8102e' }, 2600);
+    this.flashJumbo({ kind: 'big', text: 'TONIGHT!', sub: 'TITLE MATCH · LIVE FROM THE POO PALACE', color: '#ffd23f', bg: '#c8102e' }, 1e9);
     // two beams sweeping the crowd from the rafters
     for (const sx of [WX(160), WX(1120)]) {
       const img = this.add.image(sx, WY(-80), 'spot').setOrigin(0.5, 0).setScale(0.42, 0.92).setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH_W.spot).setAlpha(0.75);
@@ -1851,7 +1851,14 @@ export class WrestleScene extends Phaser.Scene {
     this.ribbonMsg = { text: 'QUEEN PLOP ♛ QUEEN PLOP', color: '#ff9ccf', bg: '#5a1030', t0: this.clock / 1000 };
     await this.camTo(jx, jy + 6, 2.35, 1600, -0.018, 'Sine.easeInOut');
     // (and stay on it a moment, so it reads)
-    await this.camTo(jx, jy + 4, 2.46, 1300, -0.012, 'Sine.easeOut');
+    // (and stay on it, so both its messages read: TONIGHT!… then her title)
+    await this.camTo(jx, jy + 4, 2.46, 1900, -0.012, 'Sine.easeOut');
+    if (!this.skipping) {
+      this.jumbo = { kind: 'title' };
+      this.jumboUntil = 0;
+      sfx.drum();
+    }
+    await this.camTo(jx, jy + 3, 2.52, 2000, -0.008, 'Sine.easeInOut');
 
     // ── 2. a crash zoom out to the ring… lights down, BOOM: a spotlight finds her ──
     if (!this.skipping) {

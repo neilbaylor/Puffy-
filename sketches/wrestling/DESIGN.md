@@ -26,13 +26,13 @@ The concept screens are in this folder (`wide`, `plan`, `entrance`, `fight`, `fi
   hearts costs a life from the full game.
 - **The folding chair** (folded flat, grey steel) drops into the ring **3 times a match** (about every 10–13 s, sooner as she weakens) ("CHAIR!" on
   the jumbotron). Walk over it to pick it up: the hero bends down and holds it up over their head in
-  both hands (no bazooka). The FIRE button (still red) says CHAIR: press it to swing the chair down onto her (when she's in reach): **3 hits**, it bends
+  both hands (no bazooka). The FIRE button (still red) says CHAIR: press it to swing the chair down onto her (when she's in reach): **2 hits**, it bends
   and it's gone. Leave it and it fades away; get hit twice while holding it and you drop it.
 - **The ropes:**
   - **Run into them and bounce off** fast, like a springboard.
   - **Climb them to the top turnbuckle.** Climbing has to look and feel good (hand over hand, a
     little sway). This is the part not to rush.
-  - **Jump off the top and land on her: that hit counts triple** ("TOP ROPE! ×3").
+  - **Jump off the top and land on her: that hit counts double** ("TOP ROPE! ×2").
   - **Rope physics:** each rope is a springy line. It stretches where you hit it, sags under you as you
     climb, and wobbles back when you let go. Launching off the top shakes all three ropes.
     Each rope is a damped spring that bends at the contact point, so this is not too complex.
