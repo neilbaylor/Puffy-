@@ -1293,7 +1293,7 @@ export class WrestleScene extends Phaser.Scene {
       n.t += dt;
       n.img.y = n.y + Math.sin(n.t * 3) * 4;
       n.img.setAlpha(n.t > 7 && Math.floor(n.t * 8) % 2 ? 0.35 : 1);
-      if (p.alive && this.fighting && Math.abs(p.x - n.img.x) < 20 && Math.abs(p.y - n.img.y) < 26) {
+      if (p.alive && this.fighting && Math.abs(p.x - n.img.x) < 22 && Math.abs(p.y - n.img.y) < 28) {
         this.hearts = Math.min(HEARTS_MAX, this.hearts + 1);
         sfx.rootbeer();
         this.fx.auraSparkle(n.img.x, n.img.y, 12);
@@ -1317,8 +1317,8 @@ export class WrestleScene extends Phaser.Scene {
     this.heartIn = 2 + Math.random() * 2;
     const x = this.ringSpot();
     const y = MAT_Y - 30 - Math.random() * 60;
-    const img = this.add.image(x, y, 'prize-heart').setScale(0.9 / ART_RES).setDepth(DEPTH.pickups);
-    this.tweens.add({ targets: img, scale: { from: 0, to: 0.9 / ART_RES }, duration: 300, ease: 'Back.easeOut' });
+    const img = this.add.image(x, y, 'prize-heart').setScale(0.99 / ART_RES).setDepth(DEPTH.pickups);
+    this.tweens.add({ targets: img, scale: { from: 0, to: 0.99 / ART_RES }, duration: 300, ease: 'Back.easeOut' });
     this.fx.auraSparkle(x, y, 6);
     this.heartPick = { img, t: 0, y };
   }
