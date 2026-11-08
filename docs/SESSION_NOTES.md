@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.176)
+## Where things stand (v0.177)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -187,6 +187,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   deferred art + MenuScene's quiet jobs (`takeQuietJobs`) + 24 warm-up frames under the loading bar
   (two-phase bar); the boot screen is the manifest blue with the rainbow PUFFY logo. Results after the last
   level: Play again + Home screen. Account card: Sign out bottom-left.
+- v0.177: (1) pause during the fly-over: .screen.modal z-index 40 (lvl-intro is 30) and setScreen toggles .lvl-intro.held (title + Skip hidden); tpausefly.cjs. (2) MenuScene quiet jobs: run 1.5s after the last tap (was 2.5s); after a job, next at +0 if it took <12ms else +min(250, took*6) (was always 250) — both other Parts ready ~2.9s after load (was ~7.3s); tjobs.cjs. (3) LIGHT: themesFor() = first look only, themeMix(one look) = no fade, Battle default too; clouds never re-shaped (c.next Infinity). tlightplay.cjs: cloud repaints 44-80 -> 0, look jobs 7-12 -> 2 per 12s. (4) railway.json startCommand node server.mjs; server.mjs exits 0 on SIGTERM/SIGINT (npm 'command failed' lines on redeploy).
 - v0.176: Volley.ts spike sooner: SPOT 330 (was 250); onScreen = middle 80% (was 60%); once hot, bump() sets straight to the plop nearest the hero on the far side of the net (0.85-0.95s flight), plops move 240 px/s (was 150), catch range 34 (26), a ball hitting sand stops dead, a far-side off-screen holder sets it over instead of waiting, hold 0.3s (0.55); sand friction in fetch for everyone (a rolling ball used to outpace its fetcher and roll into the poo -> charge, no spike); REACH 600 (460). tspike2.cjs: court visible -> spike 1.5-2s (was 2-5s, sometimes never).
 - v0.175: start-screen level row back to the v0.140 layout: .levels relative, .lvl-side absolute left:100% (Part buttons centred alone, divider + Bosses hang right). trow.cjs: fits down to 568px wide with 3 Parts (6px spare).
 - v0.174: main.ts: start screen always draws at HOME_RES 1.25 (dpr() caps while `home`); Menu scene START/SHUTDOWN events flip it (resize). watchSpeed now measures gameplay only (Game/Hoops/Wrestle/Battle active, not home, skipping the first 2s of each stretch) and caps gameplay. core/res.ts: savedResCap/saveResCap ("<cap>@<VERSION>"); ui lowRes() uses it (v0.173 label parse was broken). thome.cjs checks home/play/home canvas sizes.
