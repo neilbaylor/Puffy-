@@ -1783,13 +1783,18 @@ export class HoopsScene extends Phaser.Scene {
     await this.callout('“HA HA HA HA!”', 'speech', 1600);
     sfx.laugh();
     this.camFocus = { x: 800, y: 450, zoom: 1 };
-    // (from the Bosses menu: no life lost, and it's straight back to the court)
+    // (from the Bosses menu: no life lost, and a card offers another go)
     const practice = !!this.hd.result?.practice;
     const hadLife = practice || loseLife();
-    const next = practice ? 'try again!' : hadLife ? 'back to your last checkpoint' : 'no lives left';
-    this.jumboShow({ kind: 'big', text: 'KING WINS', sub: `${this.total('king')} – ${this.total('you')} · ${next}`, color: '#ffd23f', bg: '#5a0b0b' }, 1e9);
+    const score = `${this.total('king')} – ${this.total('you')}`;
+    const next = practice ? '' : hadLife ? ' · back to your last checkpoint' : ' · no lives left';
+    this.jumboShow({ kind: 'big', text: 'KING WINS', sub: `${score}${next}`, color: '#ffd23f', bg: '#5a0b0b' }, 1e9);
     await this.wait(2400);
     fadeOutMusic(500);
+    if (practice) {
+      this.game.events.emit('boss-lost', { ...this.hd.result!, hoops: `${this.total('you')} – ${this.total('king')}`, level: this.hd.level ?? 1 } satisfies ResultState);
+      return;
+    }
     if (!hadLife) {
       const ch = characterById(this.hd.charId);
       this.game.events.emit('game-over', { charId: ch.id, name: ch.name, checkpoint: this.hd.checkpoint } satisfies GameOverState);
@@ -1797,10 +1802,6 @@ export class HoopsScene extends Phaser.Scene {
     }
     this.cameras.main.fadeOut(400, 20, 10, 38);
     await this.wait(450);
-    if (practice) {
-      this.scene.restart(this.hd);
-      return;
-    }
     this.scene.start('Game', { session: this.hd.session, checkpoint: this.hd.checkpoint, retry: true, level: this.hd.level ?? 1 } satisfies GameData);
   }
 }
