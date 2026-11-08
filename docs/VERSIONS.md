@@ -188,3 +188,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.183: Battle lobby squares show each hero at their own size (Big Muscles biggest).
 - v0.184: tablet start screen: Play 14px off the bottom.
 - v0.185: tall-level engine (climbing camera, background that follows you up) and a rough level 4 climb for testing (dev mode only).
+- v0.186: level 4 open to the testers' accounts (neil, founder); a floor under every climb with cliffs beside it; the Part 4 start screen glides up the climb.
