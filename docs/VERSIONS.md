@@ -156,3 +156,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.151: Bosses-menu boss loss shows a Try again / Home screen card.
 - v0.152: boss loss card says Result: Lost.
 - v0.153: boss card says Result: Won.
+- v0.154: tablet Play button higher; version label fixed.
