@@ -219,7 +219,6 @@ export class UI {
   /** A boss fight's intro is playing (no pause button until it's over). */
   private bossIntro = false;
   private pickRaf = 0;
-  private subtitleTimer = 0;
   private hudFace: FaceLife | null = null;
   private hudIdle = 0;
   /** The online battle screens (made the first time you tap Battle). */
@@ -579,20 +578,25 @@ export class UI {
     );
     const syncLevels = () => {
       el.querySelectorAll<HTMLButtonElement>('.lvl[data-lvl]').forEach((b) => b.classList.toggle('picked', Number(b.dataset.lvl) === this.level));
-      const wn = el.querySelector<HTMLElement>('.world-name')!;
+      const wn = el.querySelector<HTMLElement>('.world-name:not(.wn-old)')!;
       // the planet's name says which world it is ("Puff Ball Planet" is World 1)
       const text = levelName(this.level);
       if (wn.getAttribute('aria-label') === text) return;
       wn.setAttribute('aria-label', text);
-      // the whole line fades out, swaps and fades back in (it used to hop each changed word
-      // away and pop the new letters in one by one, measuring the line as it went: on slower
-      // devices that stuttered, right while the new Part's scenery was being put up)
-      clearTimeout(this.subtitleTimer);
-      wn.classList.add('swap');
-      this.subtitleTimer = window.setTimeout(() => {
-        wn.innerHTML = waveText(text);
-        wn.classList.remove('swap');
-      }, 180);
+      // the old line and the new one cross-fade in the same spot (both sit in a fixed slot, out
+      // of the page's layout: nothing else moves). The old one is a copy that fades away.
+      el.querySelectorAll('.world-name.wn-old').forEach((o) => o.remove());
+      const old = wn.cloneNode(true) as HTMLElement;
+      old.classList.add('wn-old');
+      old.removeAttribute('aria-label');
+      old.setAttribute('aria-hidden', 'true');
+      wn.after(old);
+      old.addEventListener('animationend', (e) => e.target === old && old.remove());
+      window.setTimeout(() => old.remove(), 600);
+      wn.innerHTML = waveText(text);
+      wn.classList.remove('wn-new');
+      void wn.offsetWidth;
+      wn.classList.add('wn-new');
     };
     el.querySelectorAll<HTMLButtonElement>('.lvl[data-lvl]').forEach((b) =>
       b.addEventListener('click', () => {
