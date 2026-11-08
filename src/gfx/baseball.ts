@@ -212,7 +212,8 @@ export function drawBallparkBack(ctx: Ctx, w: number, score: [number, number] = 
   }
   ctx.restore();
   // the outfield wall: padded, dark green, a yellow line along the top, ads on the panels
-  const wallTop = gy - 34;
+  // (tall enough that the ads clear the front edge of the turf, which rises BAND_TOP over the ground line)
+  const wallTop = gy - 52;
   const wallX1 = bx - bw / 2 - 20;
   ST.shape(ctx, [[x0 - 6, gy], [x0 - 6, wallTop], [wallX1, wallTop + 8], [wallX1, gy]], F('#24603a', '#163e26', '#3c8656'), 3130, { lw: 1 });
   ctx.strokeStyle = '#ffd23f';
@@ -242,7 +243,7 @@ export function drawBallparkBack(ctx: Ctx, w: number, score: [number, number] = 
   const sx = x0 + w * 0.22;
   const sw = 200;
   const sy = gy - 170;
-  for (const lx of [sx + 30, sx + sw - 30]) ST.shape(ctx, [[lx - 4, gy - 34], [lx + 4, gy - 34], [lx + 4, sy + 80], [lx - 4, sy + 80]], F('#5a5a62', '#3a3a42', '#8a8a94'), 3160 + lx, { lw: 0.7 });
+  for (const lx of [sx + 30, sx + sw - 30]) ST.shape(ctx, [[lx - 4, wallTop], [lx + 4, wallTop], [lx + 4, sy + 80], [lx - 4, sy + 80]], F('#5a5a62', '#3a3a42', '#8a8a94'), 3160 + lx, { lw: 0.7 });
   ST.shape(ctx, roundRectPts(sx, sy, sw, 92, 8), F('#1c2a22', '#101a14', '#2c3c32'), 3170, { lw: 1.2 });
   ST.shape(ctx, roundRectPts(sx + 30, sy - 22, sw - 60, 26, 6), F('#c8102e', '#8a0a1f', '#ff5a6e'), 3171, { lw: 1 });
   ctx.fillStyle = '#ffe2b0';
