@@ -514,7 +514,7 @@ export class UI {
       <div class="cards" role="radiogroup" aria-label="Pick your player"></div>
       ${
         progress.beaten >= 1
-          ? `<div class="levels" role="radiogroup" aria-label="Pick a level">${LEVELS.map(
+          ? `<div class="levels" role="radiogroup" aria-label="Pick a level">${LEVELS.filter((l) => l.id <= progress.beaten + 1).map(
               (l) => `<button class="lvl" data-lvl="${l.id}" ${l.build ? '' : 'disabled'}>${l.button ?? l.part}${l.build ? '' : '<small>coming soon</small>'}</button>`,
             ).join('')}<span class="lvl-side"><button class="lvl lvl-bosses" data-act="bosses" aria-label="Boss battles">Bosses</button></span></div>`
           : ''
