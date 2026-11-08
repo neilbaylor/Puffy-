@@ -1575,9 +1575,9 @@ html.rotating body {
   background: var(--gold);
 }
 /* the Bosses button: off to the right of the level buttons (they stay centred), past a thin divider */
-/* the Bosses button: after the level buttons and a thin divider, the whole row centred together */
-.lvl-side { position: relative; display: flex; align-items: center; padding-left: 22px; margin-left: 4px; }
-.lvl-side::before { content: ''; position: absolute; left: 9px; top: 18%; bottom: 18%; width: 2px; border-radius: 1px; background: rgba(255, 255, 255, 0.55); box-shadow: 0 0 0 0.5px rgba(58, 36, 24, 0.25); }
+.levels { position: relative; }
+.lvl-side { position: absolute; left: 100%; top: 0; bottom: 0; display: flex; align-items: center; padding-left: 30px; }
+.lvl-side::before { content: ''; position: absolute; left: 14px; top: 18%; bottom: 18%; width: 2px; border-radius: 1px; background: rgba(255, 255, 255, 0.55); box-shadow: 0 0 0 0.5px rgba(58, 36, 24, 0.25); }
 .lvl.lvl-bosses { background: #ffe14d; white-space: nowrap; }
 /* the Bosses menu */
 .boss-panel { align-items: center; text-align: center; min-width: min(100%, 380px); }
