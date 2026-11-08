@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.174)
+## Where things stand (v0.175)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -187,6 +187,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   deferred art + MenuScene's quiet jobs (`takeQuietJobs`) + 24 warm-up frames under the loading bar
   (two-phase bar); the boot screen is the manifest blue with the rainbow PUFFY logo. Results after the last
   level: Play again + Home screen. Account card: Sign out bottom-left.
+- v0.175: start-screen level row back to the v0.140 layout: .levels relative, .lvl-side absolute left:100% (Part buttons centred alone, divider + Bosses hang right). trow.cjs: fits down to 568px wide with 3 Parts (6px spare).
 - v0.174: main.ts: start screen always draws at HOME_RES 1.25 (dpr() caps while `home`); Menu scene START/SHUTDOWN events flip it (resize). watchSpeed now measures gameplay only (Game/Hoops/Wrestle/Battle active, not home, skipping the first 2s of each stretch) and caps gameplay. core/res.ts: savedResCap/saveResCap ("<cap>@<VERSION>"); ui lowRes() uses it (v0.173 label parse was broken). thome.cjs checks home/play/home canvas sizes.
 - v0.173: watchSpeed (main.ts) skips frames while Menu.quiet has jobs or Menu.building is set (background prep made iPhones look slow -> "lower res"); puffy.res stored as "<cap>@<VERSION>" and ignored if the version differs, so each new version re-measures. tres.cjs/tres2.cjs check it.
 - v0.172: battle lobby padding-top clamp(14px,3.5vh,34px) (phone 14px); min-height 501px: --lobw min(100%,1000px) for .bl-slots/.bl-me, bigger slot canvas (19vh, max 160) and text. tlobby.cjs screenshots all 3 sizes.

@@ -177,3 +177,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.172: battle lobby lower + bigger squares on tablet/desktop.
 - v0.173: "lower res" check no longer fooled by start-screen background prep; re-checks on every new version.
 - v0.174: start screen always draws at 1.25x (smoother); gameplay at full sharpness; the slow-device check now watches gameplay.
+- v0.175: Part buttons centred on their own again (divider + Bosses off to the right).
