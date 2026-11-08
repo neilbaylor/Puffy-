@@ -121,7 +121,7 @@ export function buildLevel4(): LevelData {
   // ── DROP 1 (by parachute), the bottom, a short walk right, the ballpark (flat for now) ──
   // the drop: from the plateau's edge down to the floor, x 42..93 (a wall on the far side keeps you
   // out of climb 2 on the way down: you land at the bottom)
-  L.spawn('drop', 42, p1.h, { w: 52, speed: 105, n: 9 });
+  L.spawn('drop', 42, p1.h, { w: 52, speed: 135, n: 11 });
   L.rock(94, 95, 16, p1.h + 6);
   L.ground(42, 133, 4); // (on under climb 2 too)
   L.auraArc(55, 3, 7, 1);
@@ -146,7 +146,7 @@ export function buildLevel4(): LevelData {
 
   // ── DROP 2 (longer, harder: a narrow shaft, more Plops), then CLIMB 3 to the gate ──
   // (the shaft's far wall reaches well above the plateau: no steering over to climb 3 or the gate)
-  L.spawn('drop', 134, p2.h, { w: 14, speed: 118, n: 15, hard: 1 });
+  L.spawn('drop', 134, p2.h, { w: 14, speed: 150, n: 17, hard: 1 });
   L.rock(148, 149, 18, p2.h + 6);
   L.ground(134, W - 1, 10);
   L.puddle(137, 140, 10);

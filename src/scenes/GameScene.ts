@@ -535,12 +535,16 @@ export class GameScene extends Phaser.Scene {
       const r = Math.random();
       const how = r < (d.hard ? 0.4 : 0.3) ? 'fast' : r < 0.68 ? 'mid' : 'slow';
       const kind: EnemyKind = Math.random() < (d.hard ? 0.4 : 0.2) ? 'bigplop' : 'plop';
-      const speed = how === 'fast' ? 250 : how === 'mid' ? d.speed * 0.62 : d.speed * 0.36;
-      // (near you across the shaft; the fast ones from above, the others come up from below)
-      const x = Phaser.Math.Clamp(p.x + (Math.random() * 2 - 1) * 240, d.x0 + 40, d.x1 - 40);
+      const speed = how === 'fast' ? d.speed * 2 : how === 'mid' ? d.speed * 0.62 : d.speed * 0.36;
+      // (close to you, either side — not right under you; the fast ones from above, the others come up from below)
+      const side = Math.random() < 0.5 ? -1 : 1;
+      let x = p.x + side * (70 + Math.random() * 110);
+      if (x < d.x0 + 40 || x > d.x1 - 40) x = p.x - side * (70 + Math.random() * 110);
+      x = Phaser.Math.Clamp(x, d.x0 + 40, d.x1 - 40);
       const y = how === 'fast' ? this.view.top - 90 : viewBottom + 120;
       if (y > d.floor - TILE * 4) continue;
-      const e = createBadGuy(this, kind, x, y);
+      // (every one of them has a blaster: they fire across at you as you pass them)
+      const e = createBadGuy(this, kind, x, y, 'gun');
       this.enemies.push(e);
       this.gEnemies.add(e);
       e.wake();
