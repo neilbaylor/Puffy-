@@ -191,3 +191,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.186: level 4 open to the testers' accounts (neil, founder); a floor under every climb with cliffs beside it; the Part 4 start screen glides up the climb.
 - v0.187: level 4: parachute drops, the Plop King's jetpack opening, new fly-over, Plops stay on their ledges; the Plop Dome boss fight (testers).
 - v0.188: the Plop King without the white band across his face.
+- v0.189: faster parachute drops; every Plop in a drop has a blaster and comes down closer to you.
