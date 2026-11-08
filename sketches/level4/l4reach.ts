@@ -1,6 +1,6 @@
 // can each ledge be reached from the one before it? (the game's jump numbers, the level's tiles)
-import { buildLevel4 } from '../wt-battle/src/level/level4';
-import { CHARACTERS } from '../wt-battle/src/data/characters';
+import { buildLevel4 } from '../../src/level/level4';
+import { CHARACTERS } from '../../src/data/characters';
 const d = buildLevel4();
 const climbs = (globalThis as any).__ledges as { x0: number; x1: number; h: number }[][];
 const T = 32, G = 1600, DT = 1 / 120;

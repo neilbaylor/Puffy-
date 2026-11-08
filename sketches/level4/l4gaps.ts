@@ -1,4 +1,4 @@
-import { buildLevel4, LEDGES } from '../wt-battle/src/level/level4';
+import { buildLevel4, LEDGES } from '../../src/level/level4';
 buildLevel4();
 LEDGES.forEach((list, ci) => {
   let worst = 0;

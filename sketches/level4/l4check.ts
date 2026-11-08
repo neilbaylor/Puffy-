@@ -1,4 +1,4 @@
-import { buildLevel4 } from '../wt-battle/src/level/level4';
+import { buildLevel4 } from '../../src/level/level4';
 const d = buildLevel4();
 // every standable spot (a solid cell with the cell above empty) needs 2 empty cells above it to fit a hero
 let bad = 0;
