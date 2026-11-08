@@ -187,3 +187,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.182: Battle chairs held up in both hands (in each player's colour) and swung over the top, like in the Poo Palace.
 - v0.183: Battle lobby squares show each hero at their own size (Big Muscles biggest).
 - v0.184: tablet start screen: Play 14px off the bottom.
+- v0.185: tall-level engine (climbing camera, background that follows you up) and a rough level 4 climb for testing (dev mode only).
