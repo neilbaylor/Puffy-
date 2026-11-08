@@ -74,6 +74,9 @@ export const PLOP_KINDS: PlopKind[] = ['small', 'medium', 'large', 'king'];
 /** How big each kind is shown in the game (relative). */
 export const PLOP_SCALE: Record<PlopKind, number> = { small: 0.68, medium: 1, large: 1.32, king: 1.5 };
 
+/** The King's extras drawPlop puts on him (the Plop King's own art turns the cape off: he has a robe instead). */
+export const KING_LOOK = { cape: true, sceptre: true };
+
 export function drawPlop(ctx: Ctx, ox: number, oy: number, f: PlopFrame, st: Style, kind: PlopKind | boolean = 'medium', body?: Fill) {
   if (kind === true) kind = 'king';
   if (kind === false) kind = 'medium';
@@ -102,7 +105,7 @@ export function drawPlop(ctx: Ctx, ox: number, oy: number, f: PlopFrame, st: Sty
   leg(ctx, st, cx - 12, botY + 8, ground, stride, liftF, 2002);
 
   // the King's royal cape, behind him
-  if (kind === 'king') {
+  if (kind === 'king' && KING_LOOK.cape) {
     st.shape(ctx, [[cx - 26, botY - 26], [cx + 26, botY - 26], [cx + 38, ground - 6], [cx + 18, ground - 2], [cx, ground - 6], [cx - 18, ground - 2], [cx - 38, ground - 6]], CAPE, 2005, { lw: 1.1, light: [cx - 14, botY - 10] });
     st.line(ctx, [[cx - 30, ground - 6], [cx + 30, ground - 6]], 2006, 2.2, '#ffffff');
   }
@@ -209,7 +212,7 @@ export function drawPlop(ctx: Ctx, ox: number, oy: number, f: PlopFrame, st: Sty
     st.line(ctx, [[cx - 12, botY + 4], [cx - 4, botY + 5], [cx + 6, botY + 4]], 2050, 1.1);
   }
   // the King's sceptre, held up in his right hand: a gold rod with bands, an orb and a cross on top
-  if (kind === 'king') {
+  if (kind === 'king' && KING_LOOK.sceptre) {
     const hx = cx + 30 * sqX + Math.cos(armR) * 18;
     const hy = botY - 4 + Math.sin(armR) * 18;
     const a = -Math.PI / 2 + 0.22; // (leaning out a little)

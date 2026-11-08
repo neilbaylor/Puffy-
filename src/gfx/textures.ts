@@ -8,6 +8,8 @@ import { drawSoccerBall, drawSoccerGoal } from './soccer';
 import { GOAT_FRAMES, GOAT_H, GOAT_W, drawGoat, drawSpit } from './goat';
 import { BLASTER, SAW, W_RES, drawBlaster, drawBullet, drawChainsaw, drawFlailBall } from './weapons';
 import { drawParachute } from './parachute';
+import { drawHeroChuteLayer, drawPlopCanopy, type ChuteState } from './skydive';
+import { JETFLAME_H, JETFLAME_W, KING_H, KING_W, SMOKE_R, drawJetFlame, drawJetSmoke, drawPlopKing, type KingFrame } from './plopking';
 import { drawHockeyNet, drawPuck, drawRinkLines, drawStick } from './hockey';
 import { MOUNTAIN_LOOKS, drawMountainFar, drawMountainMid, drawMountainNear } from './mountain';
 import './plopLooks'; // (registers Plop Invasion's palettes)
@@ -155,6 +157,56 @@ function makeCharacter(scene: Phaser.Scene, ch: (typeof CHARACTERS)[number], fac
   else sheet(scene, `char-${ch.id}-face`, CHAR_W + M * 2, CHAR_H, FACE_FRAMES, (ctx, f) => drawCharacter(ctx, M, 0, ch, 'idle0', faceFromKey(f)));
 }
 
+/**
+ * A hero's parachute for the drops (Plop Invasion · Part 2), in layers round the hero's own sprite:
+ * the canopy states behind them and the harness ('harness') over them. The cell is the hero's,
+ * widened by CHUTE_SIDE either side and raised CHUTE_UP above (the canopy), the hero's box centred
+ * at the bottom: shown with the same scale, origin (0.5, 1) at the same spot as the hero.
+ */
+export const CHUTE_SIDE = 24;
+export const CHUTE_UP = 100;
+export const CHUTE_FRAMES = ['pack', 'burst', 'opening', 'open', 'land', 'harness'] as const;
+export function makeHeroChute(scene: Phaser.Scene, ch: (typeof CHARACTERS)[number]) {
+  const key = `chute-${ch.id}`;
+  if (scene.textures.exists(key)) return key;
+  const ox = HERO_M + CHUTE_SIDE;
+  sheet(scene, key, CHAR_W + ox * 2, CHAR_H + CHUTE_UP, CHUTE_FRAMES, (ctx, f) => {
+    ctx.translate(ox, CHUTE_UP);
+    if (f === 'harness') drawHeroChuteLayer(ctx, ch, 'open', 'front');
+    else drawHeroChuteLayer(ctx, ch, f as ChuteState, 'back');
+  });
+  return key;
+}
+/**
+ * The Plops' parachutes (canopy only: hung over a Plop sprite): the Plop's 96 × 104 box, with
+ * PCHUTE_UP above it for the canopy, down to PCHUTE_DOWN (the clips at the body's sides).
+ */
+export const PCHUTE_UP = 130;
+export const PCHUTE_DOWN = 72;
+export const PCHUTE_RES = 2;
+/** The Plop King's pictures are drawn at this resolution. */
+export const KING_RES = 2;
+/**
+ * The Plop King with his jetpack (level 4's opening: he laughs at you, then blasts off), the
+ * jetpack's flames and its smoke. (`key`, the frames and the look: robe / jetpack / sceptre.)
+ */
+export function makePlopKing(scene: Phaser.Scene, key: string, frames: readonly KingFrame[], look: { robe?: boolean; jet?: boolean; sceptre?: boolean }) {
+  if (scene.textures.exists(key)) return;
+  sheet(scene, key, KING_W, KING_H, frames, (ctx, f) => drawPlopKing(ctx, f, look), KING_RES);
+}
+export function makeJetFx(scene: Phaser.Scene) {
+  if (!scene.textures.exists('jetflame')) sheet(scene, 'jetflame', JETFLAME_W, JETFLAME_H, ['f0', 'f1', 'f2'] as const, (ctx, f) => drawJetFlame(ctx, +f[1]), 2);
+  if (!scene.textures.exists('jetsmoke')) sheet(scene, 'jetsmoke', SMOKE_R * 2, SMOKE_R * 2, ['s0', 's1'] as const, (ctx, f) => drawJetSmoke(ctx, +f[1]), 2);
+}
+
+export function makePlopChutes(scene: Phaser.Scene) {
+  if (scene.textures.exists('pchute')) return;
+  sheet(scene, 'pchute', PLOP_W, PCHUTE_UP + PCHUTE_DOWN, ['slow', 'mid', 'fast', 'popped'] as const, (ctx, f) => {
+    ctx.translate(0, PCHUTE_UP);
+    drawPlopCanopy(ctx, f);
+  }, PCHUTE_RES);
+}
+
 /** Where a hero's sheet puts the hero (frame units): the cell has HERO_M spare either side. */
 export const HERO_SHEET_M = HERO_M;
 
@@ -220,7 +272,7 @@ export const PLOP_PAD = 16;
 export const PLOP_TOP = 22;
 
 /** One size of Plop's frames for the game (`gplop-<kind>`), plus what Plops throw and leave about. */
-function makePlops(scene: Phaser.Scene, kind: PlopKind) {
+export function makePlops(scene: Phaser.Scene, kind: PlopKind) {
   const key = `gplop-${kind}`;
   if (scene.textures.exists(key)) return;
   const st = STYLES[ART_STYLE];
@@ -504,6 +556,8 @@ const BADDIE_KEYS: Record<string, string[]> = {
   goat: ['goat', 'goat-poo', 'spit'],
   weapons: ['w-blaster', 'w-saw', 'w-ball', 'w-bullet'],
   plops: ['gplop-small', 'gplop-medium', 'gplop-large'],
+  chutes: ['pchute'],
+  king: ['pking-jet', 'jetflame', 'jetsmoke'],
 };
 
 /** The bad guys each level has (and a battle): only those are drawn, the others freed. */
@@ -511,7 +565,7 @@ const BADDIES_FOR: Record<string, string[]> = {
   1: ['puffball', 'bigpuff', 'giant', 'weapons'],
   2: ['puffball', 'bigpuff', 'giant', 'goat', 'weapons'],
   3: ['goat', 'weapons', 'plops'],
-  4: ['goat', 'weapons', 'plops'],
+  4: ['goat', 'weapons', 'plops', 'chutes', 'king'],
   battle: ['puffball', 'bigpuff', 'giant', 'weapons'],
 };
 
@@ -532,6 +586,23 @@ export function gameArtJobs(scene: Phaser.Scene, opts: { heroes: readonly string
   const want = opts.level == null ? [] : (BADDIES_FOR[String(opts.level)] ?? BADDIES_FOR[1]);
   for (const b of baddiePieces(scene)) if (want.includes(b.name) && !BADDIE_KEYS[b.name].every((k) => T.exists(k))) out.push(b);
   if (want.includes('plops')) (['small', 'medium', 'large'] as const).forEach((k) => !T.exists(`gplop-${k}`) && out.push({ name: `plops ${k}`, run: () => makePlops(scene, k) }));
+  // (level 4's opening: the Plop King with his jetpack)
+  if (want.includes('king') && !BADDIE_KEYS.king.every((k) => T.exists(k)))
+    out.push({
+      name: 'plop king',
+      run: () => {
+        makePlopKing(scene, 'pking-jet', ['idle', 'yell0', 'yell1', 'grin'], { robe: true, jet: true });
+        makeJetFx(scene);
+      },
+    });
+  // (the parachute drops: the Plops' canopies, and each hero's own)
+  if (want.includes('chutes')) {
+    if (!T.exists('pchute')) out.push({ name: 'plop chutes', run: () => makePlopChutes(scene) });
+    for (const id of new Set(opts.heroes)) {
+      const ch = CHARACTERS.find((c) => c.id === id);
+      if (ch && !T.exists(`chute-${id}`)) out.push({ name: `chute ${id}`, run: () => makeHeroChute(scene, ch) });
+    }
+  }
   return out;
 }
 
@@ -539,5 +610,6 @@ export function gameArtJobs(scene: Phaser.Scene, opts: { heroes: readonly string
 export function dropBaddiesExcept(scene: Phaser.Scene, level: number | 'battle') {
   const want = BADDIES_FOR[String(level)] ?? BADDIES_FOR[1];
   for (const [name, keys] of Object.entries(BADDIE_KEYS)) if (!want.includes(name)) for (const k of keys) if (scene.textures.exists(k)) scene.textures.remove(k);
+  if (!want.includes('chutes')) for (const c of CHARACTERS) if (scene.textures.exists(`chute-${c.id}`)) scene.textures.remove(`chute-${c.id}`);
 }
 

@@ -31,6 +31,11 @@ const GOO_WADE = 65;
 const GOO_HOP = 440;
 const GOO_AIR = 150;
 
+/** Parachute drops: how soon the canopy's fully open once you've stepped off (s), how fast you can steer across under it, how quickly. */
+const CHUTE_OPEN_AT = 0.16;
+const CHUTE_STEER = 165;
+const CHUTE_ACCEL = 460;
+
 const HIT_W = 22;
 const HIT_H = 34;
 /** Character textures are hi-res; this maps them back to world size. */
@@ -90,6 +95,14 @@ export class Player {
   sheet: string | null = null;
   /** A frame that overrides the animation (e.g. swinging the chair), or null. */
   frameOverride: string | null = null;
+  /**
+   * Under a parachute (Plop Invasion · Part 2's drops): a moment's free fall, then the canopy opens
+   * and you drift down at `speed`, steering left and right and firing sideways. null = not.
+   */
+  chute: { t: number; speed: number; lean: number; x0: number; x1: number } | null = null;
+  /** The canopy (behind the hero) and the harness (over them), while under a parachute. */
+  private chuteBack: Phaser.GameObjects.Sprite | null = null;
+  private chuteFront: Phaser.GameObjects.Sprite | null = null;
 
   constructor(
     private scene: PlayerHost,
@@ -160,6 +173,16 @@ export class Player {
     } else if (!this.running) {
       this.stamina = Math.min(1, this.stamina + dt / c.refillSecs);
       if (this.exhausted && this.stamina >= EXHAUSTED_UNTIL) this.exhausted = false;
+    }
+
+    // ── Under a parachute: its own way of moving (and touching down ends it) ──
+    if (this.chute) {
+      // (only the ground ends it: bouncing off a Plop's head on the way down doesn't)
+      if (b.blocked.down || this.state !== 'alive') this.endChute(b.blocked.down);
+      else {
+        this.updateChute(dt, input, dir, controllable);
+        return;
+      }
     }
 
     // ── In a puddle of poo: you wade slowly and sink; every jump pops you up and on ──
@@ -248,7 +271,21 @@ export class Player {
       this.jumping = false;
     }
 
-    // ── Bazooka ──
+    this.bazooka(dt, input, controllable);
+
+    // ── Landing feedback ──
+    if (onGround && !this.wasOnGround) {
+      this.squash = { x: 1.3, y: 0.75 };
+      this.scene.fx.dust(this.x, this.bottom, 4);
+    }
+    this.wasOnGround = onGround;
+    this.prev = input;
+  }
+
+  // ── Bazooka ──
+  private bazooka(dt: number, input: InputState, controllable: boolean) {
+    const c = this.char;
+    const b = this.body;
     this.fireCooldown -= dt;
     if (this.state === 'alive' && controllable && input.fire && this.fireCooldown <= 0 && this.rocketsInFlight < c.maxRockets) {
       this.fireCooldown = c.fireRate;
@@ -259,13 +296,78 @@ export class Player {
       this.squash = { x: 1.12, y: 0.92 };
     }
     this.recoil = Math.max(0, this.recoil - dt);
+  }
 
-    // ── Landing feedback ──
-    if (onGround && !this.wasOnGround) {
-      this.squash = { x: 1.3, y: 0.75 };
-      this.scene.fx.dust(this.x, this.bottom, 4);
+  /**
+   * Step off into a parachute drop: a moment's free fall, then the canopy opens and you float down at
+   * `speed` (px/s), steering only between x0 and x1 (the drop's sides: no drifting over to somewhere else).
+   */
+  startChute(speed: number, x0 = -1e9, x1 = 1e9) {
+    if (this.chute || this.state !== 'alive') return;
+    this.chute = { t: 0, speed, lean: 0, x0, x1 };
+    this.jumping = false;
+    const key = `chute-${this.char.id}`;
+    if (this.scene.textures.exists(key)) {
+      this.chuteBack = this.scene.add.sprite(this.view.x, this.view.y, key, 'pack').setOrigin(0.5, 1).setScale(this.S).setDepth(DEPTH.players - 0.02);
+      this.chuteFront = this.scene.add.sprite(this.view.x, this.view.y, key, 'harness').setOrigin(0.5, 1).setScale(this.S).setDepth(DEPTH.players + 0.02);
     }
-    this.wasOnGround = onGround;
+  }
+
+  /** Down (or fainted): the canopy sags over and collapses (or just blows away), and you're on your feet. */
+  endChute(landed = true) {
+    if (!this.chute) return;
+    this.chute = null;
+    this.body.setAllowGravity(true);
+    const back = this.chuteBack;
+    const front = this.chuteFront;
+    this.chuteBack = this.chuteFront = null;
+    front?.destroy();
+    if (back) {
+      if (landed) {
+        // (gone as you land: it just flops down and fades)
+        back.setFrame('land').setRotation(0);
+        this.scene.tweens.add({ targets: back, alpha: 0, delay: 120, duration: 260, onComplete: () => back.destroy() });
+      } else this.scene.tweens.add({ targets: back, y: back.y - 140, x: back.x + 60, angle: 50, alpha: 0, duration: 1000, ease: 'Sine.easeOut', onComplete: () => back.destroy() });
+    }
+    if (landed) {
+      this.scene.fx.dust(this.x, this.bottom, 6);
+      this.scene.events.emit('chute-landed', this);
+    }
+  }
+
+  private updateChute(dt: number, input: InputState, dir: number, controllable: boolean) {
+    const ch = this.chute!;
+    const b = this.body;
+    ch.t += dt;
+    if (ch.t >= CHUTE_OPEN_AT) {
+      if (ch.t - dt < CHUTE_OPEN_AT) {
+        // the canopy bangs open: a jolt
+        this.squash = { x: 1.18, y: 0.86 };
+        this.scene.fx.airPuff(this.x, this.y - 30);
+        sfx.jump2?.();
+      }
+      // no gravity under it: you slow quickly to the drift speed (a stomp or a knock still bumps you up)
+      b.setAllowGravity(false);
+      b.setVelocityY(approach(b.velocity.y, ch.speed, (b.velocity.y > ch.speed ? 1700 : 520) * dt));
+    }
+    // steering: drift across (a little slower to answer than on foot)
+    let vx = b.velocity.x;
+    if (dir !== 0) {
+      vx = approach(vx, dir * CHUTE_STEER, CHUTE_ACCEL * dt);
+      this.facing = dir as 1 | -1;
+    } else if (controllable) vx = approach(vx, 0, CHUTE_ACCEL * 0.5 * dt);
+    // (kept between the drop's sides)
+    if (b.x < ch.x0 + 4) {
+      b.x = ch.x0 + 4;
+      vx = Math.max(vx, 0);
+    } else if (b.right > ch.x1 - 4) {
+      b.x = ch.x1 - 4 - b.width;
+      vx = Math.min(vx, 0);
+    }
+    b.setVelocityX(vx);
+    ch.lean += (vx / CHUTE_STEER - ch.lean) * Math.min(1, dt * 4);
+    this.bazooka(dt, input, controllable);
+    this.wasOnGround = false;
     this.prev = input;
   }
 
@@ -313,6 +415,18 @@ export class Player {
       else if (this.view.texture.key !== `char-${this.char.id}`) this.view.setTexture(`char-${this.char.id}`, frame);
       else this.view.setFrame(frame);
       this.view.setAlpha(this.invulnerable ? (Math.floor(this.scene.time.now / 70) % 2 ? 0.4 : 1) : 1);
+    }
+    // the parachute's layers go with the hero, tipping into a turn (the rig swings round the shoulders)
+    if (this.chuteBack && this.chute) {
+      const t = this.chute.t;
+      // (it's on as soon as you step off: it just billows open)
+      const f = t < 0.07 ? 'burst' : t < CHUTE_OPEN_AT ? 'opening' : 'open';
+      const lean = this.chute.lean * 0.2 + Math.sin(this.scene.time.now / 520) * 0.03;
+      for (const sp of [this.chuteBack, this.chuteFront!]) {
+        sp.setPosition(this.view.x, this.view.y).setFlipX(this.facing < 0).setRotation(lean).setScale(this.view.scaleX, this.view.scaleY).setAlpha(this.view.alpha);
+      }
+      this.chuteBack.setFrame(f);
+      this.view.setRotation(lean * 0.6);
     }
     this.drawMeter();
   }
@@ -404,6 +518,7 @@ export class Player {
   /** Out of aura and hit (or fell): faint, then the level restarts at the last checkpoint. */
   faint(fell: boolean) {
     if (this.state !== 'alive') return;
+    this.endChute(false);
     this.state = 'fainted';
     this.body.setVelocity(0, 0);
     this.body.enable = false;
@@ -451,6 +566,8 @@ export class Player {
   }
 
   destroy() {
+    this.chuteBack?.destroy();
+    this.chuteFront?.destroy();
     this.hitbox.destroy();
     this.view.destroy();
     this.meter.destroy();

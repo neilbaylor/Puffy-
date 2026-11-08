@@ -415,7 +415,9 @@ export function createBadGuy(gs: GameScene, kind: EnemyKind, x: number, y: numbe
     // 1 in 3 medium Plops are armed (and take three hits); the rest throw poo
     const e = new BigPlop(gs, x, y);
     if (h % 3 === 0) {
-      e.arm((['flail', 'gun', 'saw'] as const)[(h >>> 7) % 3], 'big');
+      // (no ball and chain on a climb: swung at you on a narrow ledge, it's too much)
+      const kinds = gs.level.data.vertical ? (['gun', 'saw'] as const) : (['flail', 'gun', 'saw'] as const);
+      e.arm(kinds[(h >>> 7) % kinds.length], 'big');
       e.hp = 3;
     }
     return e;

@@ -47,8 +47,60 @@ const PAD: Fill = { base: '#d8243a', shade: '#9c1426', light: '#ff6a7a' };
 const PAD_WHITE: Fill = { base: '#f6f3ee', shade: '#cfc8bd', light: '#ffffff' };
 const PAD_BROWN: Fill = { base: '#7a4524', shade: '#4c2a14', light: '#b07a52' };
 const SKIRT: Fill = { base: '#3a1f0e', shade: '#22110a', light: '#5e3418' };
-/** Rope colours, bottom to top. */
+/** Rope colours, bottom to top (the ring's look sets them). */
 export const ROPE_COL = ['#d8243a', '#f6f3ee', '#d8243a'];
+
+/**
+ * A ring's own colours and words: the Poo Palace's (Queen Plop: red and white) or the Plop Dome's
+ * (the Plop King: brown and yellow). setRingLook picks one before the ring is drawn.
+ */
+export interface RingLook {
+  pad: Fill;
+  padMid: Fill;
+  mat: [string, string];
+  matText: string;
+  matTextColor: string;
+  skirt: [string, string];
+  skirtTrim: string;
+  skirtText: string;
+  skirtTextColor: string;
+  skirtTextStroke: string;
+  ropes: [string, string, string];
+  signs: string[];
+}
+export const POO_PALACE_RING: RingLook = {
+  pad: PAD,
+  padMid: PAD_WHITE,
+  mat: ['#f8f5f0', '#d9d2c6'],
+  matText: '♛ QUEEN PLOP ♛',
+  matTextColor: '#c8102e',
+  skirt: ['#e0303f', '#a3172a'],
+  skirtTrim: '#f6f3ee',
+  skirtText: 'POO PALACE',
+  skirtTextColor: '#5c3118',
+  skirtTextStroke: '#fff3d6',
+  ropes: ['#d8243a', '#f6f3ee', '#d8243a'],
+  signs: ['POOPA!', 'GO PUFFY', 'STINKY!', 'QUEEN ♛ PLOP', 'POO PALACE', 'P.U.!'],
+};
+export const PLOP_DOME_RING: RingLook = {
+  pad: { base: '#ffc629', shade: '#d99a12', light: '#ffe48a' },
+  padMid: PAD_BROWN,
+  mat: ['#fff3cf', '#e6d49a'],
+  matText: '♛ THE PLOP KING ♛',
+  matTextColor: '#7a4524',
+  skirt: ['#7a4524', '#4c2a14'],
+  skirtTrim: '#ffd23f',
+  skirtText: 'PLOP DOME',
+  skirtTextColor: '#ffd23f',
+  skirtTextStroke: '#3a1d0c',
+  ropes: ['#ffd23f', '#7a4524', '#ffd23f'],
+  signs: ['POOPA!', 'GO PUFFY', 'ALL HAIL', 'KING ♛ PLOP', 'PLOP DOME', 'P.U.!'],
+};
+let RL: RingLook = POO_PALACE_RING;
+export function setRingLook(l: RingLook) {
+  RL = l;
+  ROPE_COL.splice(0, 3, ...l.ropes);
+}
 
 /** The Poo Palace: the basketball arena, gone brown. */
 export const POO_PALACE: ArenaStyle = {
@@ -82,6 +134,26 @@ export const POO_PALACE: ArenaStyle = {
   logo: '#ffd23f',
   net: [0xfbfbf8],
   layout: { jumboX: 375, bannerX: 1000, upperY0: -46, aislesU: [-40, 340, 1120, 1390], aislesL: [90, 470, 1270], seeds: [6161, 7373], cam: { dx: 0, dy: 0, zoom: 1, rot: 0 } },
+};
+
+/** The Plop Dome: the Plop King's own arena (the Poo Palace's bowl, in his brown and gold). */
+export const PLOP_DOME: ArenaStyle = {
+  ...POO_PALACE,
+  id: 'plopdome-king',
+  shirts: ['#7a4524', '#ffd23f', '#ffd23f', '#8b5434', '#ffc629', '#f4ead8', '#5c3118', '#2a1a10', '#7b3fb8', '#ffd23f', '#a06a48', '#5c3118'],
+  words: ['PLOP', 'DOME'],
+  ads: [
+    { text: 'POOPA COLA', bg: '#7a3f1a', fg: '#ffe2b0' },
+    { text: 'MADE BY HENRY & NEIL', bg: '#ffc629', fg: '#4a1f05' },
+    { text: 'PLOP DOME', bg: '#3a1d0c', fg: '#ffd23f' },
+    { text: 'ALL HAIL THE KING', bg: '#7b3fb8', fg: '#ffd23f' },
+    { text: 'JETPACKS · FLY STINKY', bg: '#ffd23f', fg: '#3a1d0c' },
+  ],
+  jumboTitle: 'THE PLOP KING',
+  jumboSub: 'P L O P   D O M E   ·   T I T L E   M A T C H',
+  banners: [['PLOP', 'DOME'], ['ALL', 'HAIL'], ['KING OF', 'THE PLOPS']],
+  bannerTop: '#5c3118',
+  bannerBottom: '#ffc629',
 };
 
 function splat(ctx: Ctx, x: number, y: number, s: number, r: () => number) {
@@ -209,7 +281,7 @@ function flat(ctx: Ctx, pts: Pt[], top: string, bottom: string, y0: number, y1: 
 function post(ctx: Ctx, x: number, footY: number, h: number, s: number) {
   ST.shape(ctx, roundRectPts(x - 7 * s, footY - h, 14 * s, h, 3 * s), STEEL, Math.round(x), { lw: s });
   // turnbuckle pads at each rope, and a cap on top
-  RING.ropes.forEach((rh, i) => ST.shape(ctx, roundRectPts(x - 11 * s, footY - rh * s - 9 * s, 22 * s, 18 * s, 5 * s), i === 1 ? PAD_WHITE : PAD, Math.round(x) + i, { lw: 0.9 * s }));
+  RING.ropes.forEach((rh, i) => ST.shape(ctx, roundRectPts(x - 11 * s, footY - rh * s - 9 * s, 22 * s, 18 * s, 5 * s), i === 1 ? RL.padMid : RL.pad, Math.round(x) + i, { lw: 0.9 * s }));
   ST.shape(ctx, ellipsePts(x, footY - h, 9 * s, 4 * s, 0, 16), STEEL, Math.round(x) + 9, { lw: 0.8 * s });
 }
 
@@ -234,7 +306,7 @@ export function drawArenaPoo(ctx: Ctx) {
   haze.addColorStop(1, 'rgba(110,70,25,0.16)');
   ctx.fillStyle = haze;
   ctx.fillRect(-160, -90, 1600, 420);
-  const signs = ['POOPA!', 'GO PUFFY', 'STINKY!', 'QUEEN ♛ PLOP', 'POO PALACE', 'P.U.!'];
+  const signs = RL.signs;
   for (let i = 0; i < 9; i++) {
     const x = -60 + i * 160 + r() * 50;
     const y = 175 + r() * 90;
@@ -304,7 +376,7 @@ export function drawRing(ctx: Ctx) {
   const R = RING;
   for (const x of [backX(R.x0), backX(R.x1)]) post(ctx, x, R.backY, R.post * R.back, 0.9);
   const mat: Pt[] = [[backX(R.x0), R.backY], [backX(R.x1), R.backY], [R.x1 + R.apron, R.frontY], [R.x0 - R.apron, R.frontY]];
-  flat(ctx, mat, '#f8f5f0', '#d9d2c6', R.backY, R.frontY);
+  flat(ctx, mat, RL.mat[0], RL.mat[1], R.backY, R.frontY);
   ctx.save();
   ctx.translate(640, (R.backY + R.frontY) / 2 + 4);
   ctx.scale(1, 0.24);
@@ -312,8 +384,8 @@ export function drawRing(ctx: Ctx) {
   ctx.font = `400 92px ${FONT}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#c8102e';
-  ctx.fillText('♛ QUEEN PLOP ♛', 0, 0);
+  ctx.fillStyle = RL.matTextColor;
+  ctx.fillText(RL.matText, 0, 0);
   ctx.restore();
   const r = rng(404);
   for (let i = 0; i < 9; i++) {
@@ -328,8 +400,8 @@ export function drawRing(ctx: Ctx) {
   // the skirt: red, with white trim top and bottom; the show's name in brown
   const sx0 = R.x0 - R.apron;
   const sx1 = R.x1 + R.apron;
-  flat(ctx, [[sx0, R.frontY], [sx1, R.frontY], [sx1, R.skirtY], [sx0, R.skirtY]], '#e0303f', '#a3172a', R.frontY, R.skirtY);
-  ctx.fillStyle = '#f6f3ee';
+  flat(ctx, [[sx0, R.frontY], [sx1, R.frontY], [sx1, R.skirtY], [sx0, R.skirtY]], RL.skirt[0], RL.skirt[1], R.frontY, R.skirtY);
+  ctx.fillStyle = RL.skirtTrim;
   ctx.fillRect(sx0 + 1.5, R.frontY + 1.5, sx1 - sx0 - 3, 9);
   ctx.fillRect(sx0 + 1.5, R.skirtY - 12, sx1 - sx0 - 3, 7);
   ctx.fillStyle = 'rgba(0,0,0,0.14)';
@@ -339,12 +411,12 @@ export function drawRing(ctx: Ctx) {
   ctx.textBaseline = 'middle';
   ctx.lineJoin = 'round';
   ctx.lineWidth = 7;
-  ctx.strokeStyle = '#fff3d6';
-  ctx.strokeText('POO PALACE', 640, (R.frontY + R.skirtY) / 2 + 2);
-  ctx.fillStyle = '#5c3118';
-  ctx.fillText('POO PALACE', 640, (R.frontY + R.skirtY) / 2 + 2);
+  ctx.strokeStyle = RL.skirtTextStroke;
+  ctx.strokeText(RL.skirtText, 640, (R.frontY + R.skirtY) / 2 + 2);
+  ctx.fillStyle = RL.skirtTextColor;
+  ctx.fillText(RL.skirtText, 640, (R.frontY + R.skirtY) / 2 + 2);
   ctx.font = `400 22px ${FONT}`;
-  ctx.fillStyle = '#f6f3ee';
+  ctx.fillStyle = RL.skirtTrim;
   ctx.fillText('♛', 640 - 175, (R.frontY + R.skirtY) / 2);
   ctx.fillText('♛', 640 + 175, (R.frontY + R.skirtY) / 2);
   for (let x = R.x0; x < R.x1; x += 50 + r() * 90) drawDrip(ctx, x, R.frontY + 1, 6 + r() * 22, 5 + r() * 5, r() < 0.6 ? POO : POO_DARK);

@@ -13,8 +13,10 @@ import { POOWAVE_H, POOWAVE_W, drawPooWave } from '../gfx/plopworld';
 import { drawPoo } from '../gfx/hazards';
 import { drawPrize } from '../gfx/prizes';
 import { STYLES } from '../gfx/handdrawn';
-import { CHAIR_H, CHAIR_W, KING_SEAT, POO_PALACE, drawFoldingChair, POST_BOX, PUDDLE, RING, RING_BOX, ROPE_COL, TUNNEL, backX, drawArenaPoo, drawFrontPost, drawRing, drawRingFloor, drawRingside, drawTunnel, drawWrestleJumbo } from '../gfx/wrestle';
-import { HERO_SHEET_M, addCanvas, hires, makeCarrySheet } from '../gfx/textures';
+import { CHAIR_H, CHAIR_W, KING_SEAT, PLOP_DOME, PLOP_DOME_RING, POO_PALACE, POO_PALACE_RING, setRingLook, drawFoldingChair, POST_BOX, PUDDLE, RING, RING_BOX, ROPE_COL, TUNNEL, backX, drawArenaPoo, drawFrontPost, drawRing, drawRingFloor, drawRingside, drawTunnel, drawWrestleJumbo } from '../gfx/wrestle';
+import { HERO_SHEET_M, PCHUTE_DOWN, PCHUTE_RES, PCHUTE_UP, PLOP_PAD, PLOP_RES, PLOP_TOP, addCanvas, hires, makeCarrySheet, makeJetFx, makePlopChutes, makePlops } from '../gfx/textures';
+import { JET_NOZZLES, ROBE_H, ROBE_W, drawPlopKing, drawRobeHeap } from '../gfx/plopking';
+import { BOOM_FRAMES, BOOM_SIZE, drawBoomFrame } from '../gfx/boom';
 import { Player } from '../entities/Player';
 import { Rocket } from '../entities/Rocket';
 import { Fx } from '../world/Fx';
@@ -116,12 +118,30 @@ interface Lob {
   big?: Side;
 }
 
+/** The Plop King's Plops, parachuting into the ring when he flies off (their size, toughness, pace). */
+type MinionKind = 'small' | 'medium' | 'large';
+const MINION: Record<MinionKind, { k: number; w: number; h: number; hp: number; speed: number }> = {
+  small: { k: 0.5, w: 24, h: 32, hp: 1, speed: 82 },
+  medium: { k: 0.78, w: 38, h: 58, hp: 2, speed: 92 },
+  large: { k: 1.05, w: 52, h: 80, hp: 4, speed: 62 },
+};
+interface Minion {
+  spr: Phaser.Physics.Arcade.Sprite;
+  kind: MinionKind;
+  hp: number;
+  chute: Phaser.GameObjects.Image | null;
+  t: number;
+  hopCd: number;
+  hurtUntil: number;
+  dead: boolean;
+}
+
 class Queen {
   readonly spr: Phaser.Physics.Arcade.Sprite;
   readonly body: Phaser.Physics.Arcade.Body;
   readonly shadow: Phaser.GameObjects.Image;
   hp = HITS;
-  mode: 'intro' | 'idle' | 'walk' | 'windup' | 'charge' | 'slam' | 'heave' | 'retreat' | 'hurt' | 'taunt' | 'down' = 'intro';
+  mode: 'intro' | 'idle' | 'walk' | 'windup' | 'charge' | 'slam' | 'heave' | 'retreat' | 'hurt' | 'taunt' | 'down' | 'away' = 'intro';
   t = 0;
   dir: Side = -1;
   facing: Side = -1;
@@ -142,8 +162,8 @@ class Queen {
   fallVy = 0;
   counterNext = false;
 
-  constructor(private s: WrestleScene, x: number, bottom: number) {
-    this.spr = s.physics.add.sprite(x, bottom, 'wr-queen', 'idle').setDepth(DEPTH_W.queen);
+  constructor(private s: WrestleScene, x: number, bottom: number, tex = 'wr-queen') {
+    this.spr = s.physics.add.sprite(x, bottom, tex, 'idle').setDepth(DEPTH_W.queen);
     const fw = PLOP_W + Q_PAD * 2;
     const fh = PLOP_H + Q_TOP;
     this.spr.setOrigin((50 + Q_PAD) / fw, (100 + Q_TOP) / fh).setScale(QS / Q_RES);
@@ -167,7 +187,7 @@ class Queen {
     return this.body.blocked.down || this.body.touching.down;
   }
   get dangerous() {
-    return this.mode !== 'hurt' && this.mode !== 'down' && this.mode !== 'intro';
+    return this.mode !== 'hurt' && this.mode !== 'down' && this.mode !== 'intro' && this.mode !== 'away';
   }
   /** Tougher as she gets hurt. */
   get rage() {
@@ -200,6 +220,11 @@ class Queen {
       case 'intro':
       case 'down':
         b.setVelocityX(0);
+        break;
+      case 'away':
+        // (the Plop King, off on his jetpack: the scene flies him)
+        b.setVelocity(0, 0);
+        frame = 'grin';
         break;
       case 'hurt':
         if (ground) b.setVelocityX(b.velocity.x * 0.86);
@@ -351,7 +376,9 @@ class Queen {
 
     // the ropes stop her too (and she bounces off them when she's charging)
     const hw = b.halfWidth;
-    if (this.x + hw > ROPE_R + 4) {
+    if (this.mode === 'away') {
+      // (flying: nothing to bump into)
+    } else if (this.x + hw > ROPE_R + 4) {
       b.x = ROPE_R + 4 - b.width;
       s.ropeHit(1, this.mode === 'charge' ? 18 : 6);
       if (this.mode === 'charge') {
@@ -389,7 +416,7 @@ class Queen {
     this.spr.setFlipX(this.facing > 0);
     const inv = s.time.now < this.invulnUntil;
     this.spr.setTint(inv && Math.floor(s.time.now / 60) % 2 ? 0xffb0b0 : 0xffffff);
-    this.shadow.setPosition(this.x, MAT_Y + 2).setVisible(this.bottom <= MAT_Y + 4).setAlpha(Phaser.Math.Clamp(0.5 - (MAT_Y - this.bottom) / 300, 0.15, 0.5));
+    this.shadow.setPosition(this.x, MAT_Y + 2).setVisible(this.bottom <= MAT_Y + 4 && this.spr.visible && this.mode !== 'away').setAlpha(Phaser.Math.Clamp(0.5 - (MAT_Y - this.bottom) / 300, 0.15, 0.5));
   }
 
   slam(targetX: number) {
@@ -407,7 +434,7 @@ class Queen {
   /** Hit! Returns whether it counted (she flashes for a moment after each one). */
   hit(n: number, fromX: number) {
     const now = this.s.time.now;
-    if (now < this.invulnUntil || this.hp <= 0 || this.mode === 'intro' || this.mode === 'down') return false;
+    if (now < this.invulnUntil || this.hp <= 0 || this.mode === 'intro' || this.mode === 'down' || this.mode === 'away') return false;
     this.hp = Math.max(0, this.hp - n);
     this.invulnUntil = now + 1100;
     if (this.hp > 0) {
@@ -511,6 +538,26 @@ export class WrestleScene extends Phaser.Scene {
   private king!: Phaser.GameObjects.Sprite;
   private lastHud = '';
   private clock = 0;
+  /** Whose ring this is: Queen Plop's Poo Palace (Part 3) or the Plop King's Plop Dome (Part 4). */
+  private boss: 'queen' | 'king' = 'queen';
+  private get kingFight() {
+    return this.boss === 'king';
+  }
+  /** The boss's name, as the jumbotron and the callouts give it. */
+  private get bossName() {
+    return this.kingFight ? 'THE PLOP KING' : 'QUEEN PLOP';
+  }
+  /** This ring's own picture of something (the Plop Dome's are kept apart from the Poo Palace's). */
+  private tk(key: string) {
+    return this.kingFight ? `${key}-k` : key;
+  }
+  /** The Plop King's jetpack: its flames (under its two nozzles) and the smoke pouring out. */
+  private jet: { on: boolean; flames: Phaser.GameObjects.Sprite[]; smokeT: number } | null = null;
+  /** The Plops he sends in (every 3 hits he flies off and they parachute into the ring). */
+  private minions: Minion[] = [];
+  private gMinions!: Phaser.Physics.Arcade.Group;
+  /** How many times he's flown off so far (1: three small Plops, 2: two medium, 3: two big). */
+  private awayCount = 0;
 
   constructor() {
     super('Wrestle');
@@ -518,6 +565,10 @@ export class WrestleScene extends Phaser.Scene {
 
   init(data: WrestleData) {
     this.wd = data;
+    this.boss = data.level === 4 ? 'king' : 'queen';
+    this.jet = null;
+    this.minions = [];
+    this.awayCount = 0;
     this.rockets = [];
     this.waves = [];
     this.lobs = [];
@@ -546,7 +597,8 @@ export class WrestleScene extends Phaser.Scene {
   }
 
   create() {
-    setArenaStyle(POO_PALACE);
+    setArenaStyle(this.kingFight ? PLOP_DOME : POO_PALACE);
+    setRingLook(this.kingFight ? PLOP_DOME_RING : POO_PALACE_RING);
     this.makeTextures();
     this.physics.world.gravity.y = GRAVITY;
     this.physics.world.setBounds(0, -200, WORLD_W, WORLD_H + 200, true, true, false, false);
@@ -554,23 +606,23 @@ export class WrestleScene extends Phaser.Scene {
 
     // ── the arena (the basketball one, in poo browns), the ring, the floor and steps around it ──
     const AS_ = K / ARENA_RES;
-    this.add.image(0, 0, 'wr-arena').setOrigin(0).setScale(AS_).setDepth(DEPTH_W.arena);
-    this.crowd = this.add.image(0, 0, 'wr-crowd').setOrigin(0).setScale(AS_).setDepth(DEPTH_W.crowd);
-    this.add.image(0, 0, 'wr-front').setOrigin(0).setScale(AS_).setDepth(DEPTH_W.front);
+    this.add.image(0, 0, this.tk('wr-arena')).setOrigin(0).setScale(AS_).setDepth(DEPTH_W.arena);
+    this.crowd = this.add.image(0, 0, this.tk('wr-crowd')).setOrigin(0).setScale(AS_).setDepth(DEPTH_W.crowd);
+    this.add.image(0, 0, this.tk('wr-front')).setOrigin(0).setScale(AS_).setDepth(DEPTH_W.front);
     this.jumboTex = this.textures.exists('wr-jumbo') ? (this.textures.get('wr-jumbo') as Phaser.Textures.CanvasTexture) : this.textures.createCanvas('wr-jumbo', JUMBO.w * 2, JUMBO.h * 2)!;
     // (the screens glow: they're in front of the darkness when the lights go down, like the basketball jumbotron)
     this.add.image(WX(JUMBO.x), WY(JUMBO.y), 'wr-jumbo').setOrigin(0).setScale((JUMBO.s * K) / 2).setDepth(DEPTH_W.dark + 0.05);
     this.ribbonTex = this.textures.exists('wr-ribbon') ? (this.textures.get('wr-ribbon') as Phaser.Textures.CanvasTexture) : this.textures.createCanvas('wr-ribbon', RIBBON.w * 2, RIBBON.h * 2)!;
     this.add.image(WX(RIBBON.x), WY(RIBBON.y), 'wr-ribbon').setOrigin(0).setScale(K / 2).setDepth(DEPTH_W.dark + 0.05);
-    this.add.image(WX(RING_BOX.x), WY(RING_BOX.y), 'wr-ring').setOrigin(0).setScale(K / RES).setDepth(DEPTH_W.ring);
+    this.add.image(WX(RING_BOX.x), WY(RING_BOX.y), this.tk('wr-ring')).setOrigin(0).setScale(K / RES).setDepth(DEPTH_W.ring);
     this.add.image(WX(-160), WY(500), 'wr-ringside').setOrigin(0).setScale(K / 1.5).setDepth(DEPTH_W.ringside);
     for (const x of [RING.x0, RING.x1])
-      this.add.image(WX(x), WY(RING.frontY), 'wr-post').setOrigin(0.5, (POST_BOX.h - 2) / POST_BOX.h).setScale(K / RES).setDepth(DEPTH_W.posts);
+      this.add.image(WX(x), WY(RING.frontY), this.tk('wr-post')).setOrigin(0.5, (POST_BOX.h - 2) / POST_BOX.h).setScale(K / RES).setDepth(DEPTH_W.posts);
     this.ropesBack = this.add.graphics().setDepth(DEPTH_W.backRopes);
     this.ropesFront = this.add.graphics().setDepth(DEPTH_W.frontRopes).setAlpha(0.6);
 
     // the King, watching from the front row (unseen until the end)
-    this.king = this.add.sprite(WX(KING_SEAT.x), WY(KING_SEAT.feet), 'wr-king', 'idle').setOrigin(0.5, (100 + Q_TOP) / (PLOP_H + Q_TOP)).setScale((0.62 * K) / Q_RES * 1.6).setDepth(DEPTH_W.king).setVisible(false);
+    this.king = this.add.sprite(WX(KING_SEAT.x), WY(KING_SEAT.feet), this.kingFight ? 'wr-pking' : 'wr-king', 'idle').setOrigin(0.5, (100 + Q_TOP) / (PLOP_H + Q_TOP)).setScale((0.62 * K) / Q_RES * 1.6).setDepth(DEPTH_W.king).setVisible(false);
 
     // ── what you stand on ──
     this.statics = this.physics.add.staticGroup();
@@ -616,7 +668,14 @@ export class WrestleScene extends Phaser.Scene {
     this.physics.add.collider(this.gRockets, this.statics, (r) => (r as Rocket).explode());
 
     // ── Queen Plop ──
-    this.queen = new Queen(this, POST_R, POST_TOP);
+    this.queen = new Queen(this, POST_R, POST_TOP, this.kingFight ? 'wr-pking' : 'wr-queen');
+    // (the Plop King's Plops, when he sends them in)
+    this.gMinions = this.physics.add.group();
+    this.physics.add.collider(this.gMinions, this.qStatics);
+    this.physics.add.overlap(this.gRockets, this.gMinions, (a, b) => {
+      const r = (a instanceof Rocket ? a : b) as Rocket;
+      if (r.active) r.explode();
+    });
     this.queen.body.setAllowGravity(false);
     this.physics.add.collider(this.queen.spr, this.qStatics);
     // (rockets go off on her: a hit, and it knocks her back)
@@ -648,31 +707,37 @@ export class WrestleScene extends Phaser.Scene {
     this.game.events.emit('wrestle-start', this);
     this.emitHud(true);
     this.updateCamera(0, true);
-    void this.intro();
+    void (this.kingFight ? this.introKing() : this.intro());
   }
 
   // ───────────────────────────────────────────── art ──
 
   private makeTextures() {
     const T = this.textures;
-    if (!T.exists('wr-arena'))
-      addCanvas(this, 'wr-arena', hires(ARENA_W, ARENA_H, ARENA_RES, (ctx) => {
+    // (only one ring's pictures at a time: the other one's go — they're big)
+    for (const k of ['wr-arena', 'wr-crowd', 'wr-crowd2', 'wr-front', 'wr-ring', 'wr-post']) {
+      const other = this.kingFight ? k : `${k}-k`;
+      if (T.exists(other)) T.remove(other);
+    }
+    for (const k of this.kingFight ? ['wr-queen', 'wr-king', 'wr-queen-ko'] : ['wr-pking', 'wr-pking-robe']) if (T.exists(k)) T.remove(k);
+    if (!T.exists(this.tk('wr-arena')))
+      addCanvas(this, this.tk('wr-arena'), hires(ARENA_W, ARENA_H, ARENA_RES, (ctx) => {
         drawArena(ctx);
         drawRingFloor(ctx);
       }), undefined, { release: true });
-    if (!T.exists('wr-crowd')) addCanvas(this, 'wr-crowd', hires(ARENA_W, CROWD_H, ARENA_RES, (ctx) => (drawCrowd(ctx, false), drawTunnel(ctx))), undefined, { release: true });
-    if (!T.exists('wr-crowd2')) addCanvas(this, 'wr-crowd2', hires(ARENA_W, CROWD_H, ARENA_RES, (ctx) => (drawCrowd(ctx, true), drawTunnel(ctx))), undefined, { release: true });
-    if (!T.exists('wr-front'))
-      addCanvas(this, 'wr-front', hires(ARENA_W, FRONT_H, ARENA_RES, (ctx) => {
+    if (!T.exists(this.tk('wr-crowd'))) addCanvas(this, this.tk('wr-crowd'), hires(ARENA_W, CROWD_H, ARENA_RES, (ctx) => (drawCrowd(ctx, false), drawTunnel(ctx))), undefined, { release: true });
+    if (!T.exists(this.tk('wr-crowd2'))) addCanvas(this, this.tk('wr-crowd2'), hires(ARENA_W, CROWD_H, ARENA_RES, (ctx) => (drawCrowd(ctx, true), drawTunnel(ctx))), undefined, { release: true });
+    if (!T.exists(this.tk('wr-front')))
+      addCanvas(this, this.tk('wr-front'), hires(ARENA_W, FRONT_H, ARENA_RES, (ctx) => {
         drawArenaFront(ctx);
         drawArenaPoo(ctx);
       }), undefined, { release: true });
-    if (!T.exists('wr-ring'))
-      addCanvas(this, 'wr-ring', hires(RING_BOX.w, RING_BOX.h, RES, (ctx) => {
+    if (!T.exists(this.tk('wr-ring')))
+      addCanvas(this, this.tk('wr-ring'), hires(RING_BOX.w, RING_BOX.h, RES, (ctx) => {
         ctx.translate(-RING_BOX.x, -RING_BOX.y);
         drawRing(ctx);
       }), undefined, { release: true });
-    if (!T.exists('wr-post')) addCanvas(this, 'wr-post', hires(POST_BOX.w, POST_BOX.h, RES, (ctx) => drawFrontPost(ctx)));
+    if (!T.exists(this.tk('wr-post'))) addCanvas(this, this.tk('wr-post'), hires(POST_BOX.w, POST_BOX.h, RES, (ctx) => drawFrontPost(ctx)));
     if (!T.exists('wr-ringside'))
       addCanvas(this, 'wr-ringside', hires(1600, 230, 1.5, (ctx) => {
         ctx.translate(160, -500);
@@ -694,10 +759,35 @@ export class WrestleScene extends Phaser.Scene {
       });
       addCanvas(this, key, c, (t) => PLOP_FRAMES.forEach((f, i) => t.add(f, 0, (i % COLS) * fw, Math.floor(i / COLS) * fh, fw, fh)), { release: true });
     };
-    sheetOf('wr-queen', (ctx, f) => drawQueen(ctx, Q_PAD, Q_TOP, f));
-    sheetOf('wr-king', (ctx, f) => drawPlop(ctx, Q_PAD, Q_TOP, f, STYLES.polished, 'king'));
+    if (this.kingFight) {
+      // the Plop King: in his robe (walking in), and stripped for the fight with his jetpack on his back
+      // (his own art has the Plop drawn 25, 34 into its box: moved to where the Queen's sheet has it)
+      sheetOf('wr-pking', (ctx, f) => (ctx.translate(Q_PAD - 25, Q_TOP - 34), drawPlopKing(ctx, f, { jet: true })));
+      sheetOf('wr-pking-robe', (ctx, f) => (ctx.translate(Q_PAD - 25, Q_TOP - 34), drawPlopKing(ctx, f, { robe: true })));
+      if (!T.exists('wr-robe')) addCanvas(this, 'wr-robe', hires(ROBE_W, ROBE_H, 2, (ctx) => drawRobeHeap(ctx)));
+      makeJetFx(this);
+      makePlopChutes(this);
+      for (const k of ['small', 'medium', 'large'] as const) makePlops(this, k);
+      if (!T.exists('wr-boom')) {
+        const R = 1.2;
+        const fw = Math.round(BOOM_SIZE * R);
+        const COLS = 4;
+        const { c, ctx } = canvas(fw * COLS, fw * Math.ceil(BOOM_FRAMES.length / COLS));
+        BOOM_FRAMES.forEach((_, i) => {
+          ctx.save();
+          ctx.translate((i % COLS) * fw, Math.floor(i / COLS) * fw);
+          ctx.scale(R, R);
+          drawBoomFrame(ctx, i);
+          ctx.restore();
+        });
+        addCanvas(this, 'wr-boom', c, (t) => BOOM_FRAMES.forEach((f, i) => t.add(f, 0, (i % COLS) * fw, Math.floor(i / COLS) * fw, fw, fw)), { release: true });
+      }
+    } else {
+      sheetOf('wr-queen', (ctx, f) => drawQueen(ctx, Q_PAD, Q_TOP, f));
+      sheetOf('wr-king', (ctx, f) => drawPlop(ctx, Q_PAD, Q_TOP, f, STYLES.polished, 'king'));
+    }
     // Queen Plop knocked out (four frames: breathing, eyes spinning)
-    if (!T.exists('wr-queen-ko')) {
+    if (!this.kingFight && !T.exists('wr-queen-ko')) {
       const R = Q_RES;
       const fw = Math.round(QUEEN_KO_W * R);
       const fh = Math.round(QUEEN_KO_H * R);
@@ -777,6 +867,13 @@ export class WrestleScene extends Phaser.Scene {
     const dx = Math.max(qb.left - x, 0, x - qb.right);
     const dy = Math.max(qb.top - y, 0, y - qb.bottom);
     if (dx * dx + dy * dy < r * r * 0.6) this.hitQueen(1, 'rocket', x);
+    for (const m of this.minions) {
+      if (m.dead) continue;
+      const mb = m.spr.body as Phaser.Physics.Arcade.Body;
+      const mx = Math.max(mb.left - x, 0, x - mb.right);
+      const my = Math.max(mb.top - y, 0, y - mb.bottom);
+      if (mx * mx + my * my < r * r * 0.7) this.hitMinion(m, 1);
+    }
   }
 
   onPlayerFainted(_p: Player) {
@@ -1178,7 +1275,9 @@ export class WrestleScene extends Phaser.Scene {
       else if (how === 'dive') this.flashJumbo({ kind: 'big', text: 'FROM THE TOP ROPE!', sub: `THAT ONE COUNTS DOUBLE · ${q.hp} TO GO`, color: '#ffd23f', bg: '#c8102e' }, 2200);
       else this.flashJumbo({ kind: 'big', text: 'CHAIR SHOT!', sub: `THAT ONE COUNTS DOUBLE · ${q.hp} TO GO`, color: '#ffd23f', bg: '#3a4652' }, 2200);
     } else this.flashJumbo({ kind: 'big', text: words.replace(/!.*/, '!'), sub: `${q.hp} TO GO`, color: '#ffd23f', bg: '#5c3118' }, 900);
-    if (q.hp <= 0) void this.win();
+    if (q.hp <= 0) void (this.kingFight ? this.winKing() : this.win());
+    // the Plop King: every 3 hits he's off on his jetpack, and his Plops parachute in
+    else if (this.kingFight && Math.floor((HITS - q.hp) / 3) > this.awayCount) void this.kingAway();
     return true;
   }
 
@@ -1248,6 +1347,9 @@ export class WrestleScene extends Phaser.Scene {
       if (r.active && (r.x < -20 || r.x > WORLD_W + 20)) r.fizzle();
     }
     this.updateHazards(dt);
+    this.updateMinions(dt);
+    this.updateJet(dt);
+    this.updateFlood(dt);
     this.updateHearts(dt);
     this.updateChair(dt);
     this.updateRopes(dt);
@@ -1259,7 +1361,7 @@ export class WrestleScene extends Phaser.Scene {
     if (this.fighting) this.emitHud();
     // the crowd on its feet for the big moments
     const excited = this.clock < this.excitedUntil && Math.floor(this.clock / 170) % 3 !== 2;
-    const want = excited ? 'wr-crowd2' : 'wr-crowd';
+    const want = this.tk(excited ? 'wr-crowd2' : 'wr-crowd');
     if (this.crowd.texture.key !== want) this.crowd.setTexture(want);
     if (this.jumbo.kind === 'big' && this.jumboUntil && this.clock > this.jumboUntil) {
       this.jumboUntil = 0;
@@ -1273,7 +1375,7 @@ export class WrestleScene extends Phaser.Scene {
   private contact() {
     const p = this.player;
     const q = this.queen;
-    if (!p.alive || q.hp <= 0) return;
+    if (!p.alive || q.hp <= 0 || q.mode === 'away') return;
     const a = p.body;
     const b = q.body;
     // (a dive off the top rope is generous: coming down near her counts)
@@ -1644,7 +1746,7 @@ export class WrestleScene extends Phaser.Scene {
 
   private countJumbo(): JumboContent {
     const n = this.queen?.hp ?? HITS;
-    return { kind: 'big', text: `${n} HIT${n === 1 ? '' : 'S'} TO GO`, sub: n <= 2 ? 'SHE’S ALMOST DONE!' : 'QUEEN PLOP vs ' + characterById(this.wd.charId).name.toUpperCase(), color: '#ffd23f', bg: '#3a1d0c' };
+    return { kind: 'big', text: `${n} HIT${n === 1 ? '' : 'S'} TO GO`, sub: n <= 2 ? (this.kingFight ? 'HE’S ALMOST DONE!' : 'SHE’S ALMOST DONE!') : `${this.bossName} vs ` + characterById(this.wd.charId).name.toUpperCase(), color: '#ffd23f', bg: '#3a1d0c' };
   }
 
   private flashJumbo(c: JumboContent, ms: number) {
@@ -1657,8 +1759,8 @@ export class WrestleScene extends Phaser.Scene {
     const ctx = this.jumboTex.getContext();
     ctx.setTransform(2, 0, 0, 2, 0, 0);
     drawWrestleJumbo(ctx, this.jumbo, t, [
-      ['POO PALACE', '#ffd23f'],
-      [`QUEEN PLOP vs ${characterById(this.wd.charId).name.toUpperCase()}`, '#ffffff'],
+      [this.kingFight ? 'PLOP DOME' : 'POO PALACE', '#ffd23f'],
+      [`${this.bossName} vs ${characterById(this.wd.charId).name.toUpperCase()}`, '#ffffff'],
       ['TITLE MATCH', '#7fe7ff'],
       ['POOPA COLA', '#ffffff'],
     ]);
@@ -2173,6 +2275,583 @@ export class WrestleScene extends Phaser.Scene {
     await this.wait(600);
     fadeOutMusic(500);
     const res: ResultState = { ...this.wd.result, aura: this.wd.result?.aura ?? 0, lives: lives.left, level: this.wd.level ?? 3, hoops: undefined };
+    this.game.events.emit('level-complete', res);
+  }
+
+  // ───────────────────────────────────────────── the Plop King ──
+
+  /** Where his jetpack's nozzles are (world), from his sprite (the King's own art box → the ring's). */
+  private nozzles(): [number, number][] {
+    const spr = this.queen.spr;
+    const s = Math.abs(spr.scaleY) * Q_RES;
+    const flip = spr.flipX ? -1 : 1;
+    return JET_NOZZLES.map(([nx, ny]) => {
+      const qx = nx - 25 + Q_PAD;
+      const qy = ny - 34 + Q_TOP;
+      return [spr.x + (qx - (50 + Q_PAD)) * s * flip, spr.y + (qy - (100 + Q_TOP)) * s];
+    });
+  }
+
+  /** His jetpack: on (flames, smoke, a roar) or off. */
+  private setJet(on: boolean) {
+    if (!this.jet) this.jet = { on: false, flames: JET_NOZZLES.map(() => this.add.sprite(0, 0, 'jetflame', 'f0').setOrigin(0.5, 0).setVisible(false)), smokeT: 0 };
+    if (on && !this.jet.on) sfx.whoosh();
+    this.jet.on = on;
+    for (const f of this.jet.flames) f.setVisible(on);
+    this.updateJet(0);
+  }
+
+  private updateJet(dt: number) {
+    const j = this.jet;
+    if (!j?.on) return;
+    const spr = this.queen.spr;
+    const s = Math.abs(spr.scaleY) * Q_RES;
+    this.nozzles().forEach(([x, y], i) => {
+      const f = j.flames[i];
+      f.setPosition(x, y).setScale(s / 2).setDepth(spr.depth - 0.02).setFrame(`f${(Math.floor(this.clock / 60) + i) % 3}`).setVisible(spr.visible);
+    });
+    j.smokeT -= dt;
+    if (j.smokeT > 0 || !spr.visible) return;
+    j.smokeT = 0.05;
+    for (const f of j.flames) {
+      const puff = this.add
+        .image(f.x + (Math.random() - 0.5) * 6, f.y + 30 * s, 'jetsmoke', Math.random() < 0.5 ? 's0' : 's1')
+        .setScale(s * 0.18)
+        .setAlpha(0.8)
+        .setDepth(spr.depth - 0.03)
+        .setRotation(Math.random() * 6);
+      this.tweens.add({
+        targets: puff,
+        scale: s * (0.6 + Math.random() * 0.35),
+        alpha: 0,
+        x: puff.x + (Math.random() - 0.5) * 40,
+        y: puff.y + 20 + Math.random() * 26,
+        duration: 800 + Math.random() * 400,
+        ease: 'Sine.easeOut',
+        onComplete: () => puff.destroy(),
+      });
+    }
+  }
+
+  private tweenP(cfg: Phaser.Types.Tweens.TweenBuilderConfig) {
+    return new Promise<void>((res) => this.tweens.add({ ...cfg, onComplete: () => res() }));
+  }
+
+  /**
+   * The Plop King's entrance: the jumbotron again, then the first cut is to him, far off at the top of
+   * an aisle, and in close as he comes down it — sceptre up, purple robe, his name under him, looking
+   * pleased with himself. He stops, drops the robe (a jetpack on his back underneath), "You'll never
+   * beat me in my dome!", then the challenger, and he jets over the ropes into the ring.
+   */
+  private async introKing() {
+    const q = this.queen;
+    const p = this.player;
+    const S = QS / Q_RES;
+    this.inIntro = true;
+    q.spr.setDepth(DEPTH_W.spot + 0.3);
+    q.shadow.setDepth(DEPTH_W.spot + 0.2).setAlpha(0);
+    // (he starts at the top of the aisle, out of the tunnel: small, far away)
+    const fx = WX(TUNNEL.x);
+    const fy = WY(TUNNEL.bottom);
+    const ex = WX(600);
+    const ey = GROUND_Y;
+    q.spr.setTexture('wr-pking-robe', 'idle').setPosition(fx, fy).setScale(S * 0.42).setAlpha(1).setFlipX(true);
+    q.facing = 1;
+    this.dark.fillAlpha = 0.72;
+    this.camManual = true;
+    const jx = WX(JUMBO.x + (JUMBO.w * JUMBO.s) / 2);
+    const jy = WY(JUMBO.y + (JUMBO.h * JUMBO.s) / 2);
+    this.cut(jx, jy + 70, 1.75, 0);
+    this.updateCamera(0, true);
+    this.flashJumbo({ kind: 'big', text: 'TONIGHT!', sub: 'TITLE MATCH · LIVE FROM THE PLOP DOME', color: '#ffd23f', bg: '#3d1478' }, 1e9);
+    for (const sx of [WX(160), WX(1120)]) {
+      const img = this.add.image(sx, WY(-80), 'spot').setOrigin(0.5, 0).setScale(0.42, 0.92).setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH_W.spot).setAlpha(0.75);
+      img.rotation = sx < WORLD_W / 2 ? -0.7 : 0.7;
+      this.tweens.add({ targets: img, rotation: sx < WORLD_W / 2 ? 0.5 : -0.5, duration: 1700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      this.sweeps.push(img);
+    }
+    const skip = this.dom.querySelector<HTMLElement>('.wr-skip')!;
+    await this.wait(this.wd.checkpoint === -1 && !this.wd.result?.seconds ? 300 : 450);
+    void stingerReveal();
+    skip.hidden = false;
+    playHoops();
+    sfx.drum();
+
+    // ── 1. straight in to the jumbotron ──
+    this.excitedUntil = this.clock + 6000;
+    sfx.cheer();
+    this.flashbulbs(24, 1900);
+    this.ribbonMsg = { text: 'THE PLOP KING ♛ THE PLOP KING', color: '#ffd23f', bg: '#3d1478', t0: this.clock / 1000 };
+    await this.camTo(jx, jy + 6, 2.35, 1300, 0, 'Sine.easeOut');
+    await this.camTo(jx, jy + 4, 2.46, 1700, 0, 'Sine.easeInOut');
+    if (!this.skipping) {
+      this.jumbo = { kind: 'title' };
+      this.jumboUntil = 0;
+      sfx.drum();
+    }
+    await this.camTo(jx, jy + 3, 2.52, 1500, 0, 'Sine.easeInOut');
+
+    // ── 2. cut to him, far off at the top of the aisle… and in close as he comes down it ──
+    if (!this.skipping) {
+      this.setDark(0.62, 250);
+      this.cut((fx + ex) / 2, (fy + ey) / 2 - 50, 0.9, 0);
+      this.aimSpot(fx, fy, 0.9, 120);
+      sfx.thud();
+      sfx.cheer();
+      this.flashbulbs(16, 1200);
+      this.lowerThird('THE PLOP KING', 'Ruler of the Plops · champion of the Plop Dome');
+    }
+    {
+      const ms = 3000;
+      await this.glide(ms, (u) => {
+        const x = fx + (ex - fx) * u;
+        const y = fy + (ey - fy) * u;
+        // (nearer, bigger)
+        const k = 0.42 + 0.58 * u;
+        const ph = u * (ms / 1000) * 3.4;
+        q.spr.setPosition(x, y - Math.abs(Math.sin(ph * Math.PI)) * 3 * k).setScale(S * k);
+        // (a cocky strut: a grin at the crowd, a look round)
+        q.spr.setFrame(u > 0.3 && u < 0.45 ? 'grin' : u > 0.62 && u < 0.72 ? 'look' : (['walk0', 'walk1', 'walk2', 'walk3'] as const)[Math.floor(ph * 2) % 4]);
+        this.spot.setPosition(x, y + 10).setScale(0.55 * k, (y + 60) / 700);
+        // the camera closing in on him as he comes
+        this.camX = x - 6;
+        this.camY = y - 62 * k - 10;
+        this.camZ = 0.9 + (2.05 - 0.9) * Math.min(1, u * 1.25);
+      }, 'Linear');
+    }
+
+    // ── 3. he stops… and drops the robe: a jetpack on his back underneath ──
+    if (!this.skipping) {
+      q.spr.setFrame('grin');
+      await this.iwait(450);
+    }
+    this.lowerThird(null);
+    const robe = this.add.image(ex + 4, ey + 2, 'wr-robe').setOrigin(0.5, 1).setDepth(q.spr.depth - 0.05);
+    q.spr.setTexture('wr-pking', 'yell1').setPosition(ex, ey).setScale(S);
+    if (!this.skipping) {
+      robe.setScale(QS / 2, (QS / 2) * 2.6);
+      this.tweens.add({ targets: robe, scaleY: QS / 2, duration: 420, ease: 'Bounce.easeOut' });
+      sfx.whoosh();
+      sfx.cheer();
+      this.flashbulbs(18, 900);
+      this.excitedUntil = this.clock + 3500;
+      this.pyro(ex - 50, ey);
+      this.pyro(ex + 50, ey);
+      this.flashJumbo({ kind: 'big', text: 'THE PLOP KING!', sub: 'KING OF THE PLOPS', color: '#ffd23f', bg: '#3d1478' }, 1e9);
+      await this.iwait(500);
+      const yell = this.time.addEvent({ delay: 140, loop: true, callback: () => q.spr.setFrame(q.spr.frame.name === 'yell0' ? 'yell1' : 'yell0') });
+      await Promise.race([this.say('“You’ll never beat me in my <b>dome</b>!”', ex, ey - 118, 2300), this.iwait(2300)]);
+      yell.remove();
+    } else robe.setScale(QS / 2);
+    this.dom.querySelector<HTMLElement>('.wr-speech')!.hidden = true;
+
+    // ── 4. the challenger (as against the Queen) ──
+    if (!this.skipping) {
+      this.setDark(0.25, 400);
+      sfx.drum();
+      this.lowerThird(p.char.name.toUpperCase(), 'The challenger');
+      p.facing = 1;
+      await this.camTo(p.x - 12, MAT_Y - 50, 2.45, 850, 0, 'Sine.easeInOut');
+      for (let i = 0; i < 3 && !this.skipping; i++) {
+        if (p.onGround) p.body.setVelocityY(-p.char.jump * 0.55);
+        await this.iwait(380);
+      }
+      if (!this.skipping) await this.iwait(500);
+      this.lowerThird(null);
+      if (!this.skipping) await this.camTo(ex + 40, ey - 90, 1.5, 650, 0, 'Sine.easeInOut');
+    }
+
+    // ── 5. he jets over the ropes into the ring ──
+    this.inIntro = false;
+    this.lowerThird(null);
+    skip.hidden = true;
+    this.tweens.killTweensOf(this.spot);
+    for (const img of this.sweeps) {
+      this.tweens.killTweensOf(img);
+      this.tweens.add({ targets: img, alpha: 0, duration: 400, onComplete: () => img.destroy() });
+    }
+    this.sweeps = [];
+    this.tweens.add({ targets: this.spot, alpha: 0, duration: 300 });
+    this.setDark(0, 500);
+    this.camManual = false;
+    p.view.setAlpha(1);
+    q.spr.setTexture('wr-pking', 'grin').setScale(S).setPosition(ex, ey).setFlipX(false).setAlpha(1);
+    q.facing = -1;
+    const landX = WX(820);
+    this.camFocus = { x: (ex + landX) / 2, y: MAT_Y - 100, zoom: 1.15 };
+    this.setJet(true);
+    await new Promise<void>((res) =>
+      this.tweens.addCounter({
+        from: 0,
+        to: 1,
+        duration: 1100,
+        ease: 'Sine.easeInOut',
+        onUpdate: (tw) => {
+          const u = tw.getValue() ?? 0;
+          q.spr.setPosition(ex + (landX - ex) * u, ey + (MAT_Y - ey) * u - Math.sin(Math.PI * u) * 170);
+        },
+        onComplete: () => res(),
+      }),
+    );
+    this.setJet(false);
+    q.spr.setDepth(DEPTH_W.queen);
+    q.shadow.setDepth(DEPTH_W.shadows).setAlpha(0.45);
+    q.body.setAllowGravity(true);
+    q.body.reset(landX, MAT_Y - q.body.halfHeight - 2);
+    this.camFocus = null;
+    this.cameras.main.shake(240, 0.01);
+    sfx.thud();
+    this.shakeRopes(6);
+    this.fx.dust(landX, MAT_Y, 12);
+    this.callout('FIGHT!', 'go', 1000);
+    this.jumbo = this.countJumbo();
+    this.jumboUntil = 0;
+    sfx.whistle();
+    sfx.cheer();
+    q.setMode('idle', 0.6);
+    this.skipping = false;
+    this.fighting = true;
+    this.emitHud(true);
+    this.game.events.emit('wrestle-fight');
+  }
+
+  /** Every 3 hits: he blasts off out of sight on his jetpack, and his Plops parachute into the ring. */
+  private async kingAway() {
+    const q = this.queen;
+    this.awayCount++;
+    const n = this.awayCount;
+    q.setMode('away');
+    q.body.setAllowGravity(false).setVelocity(0, 0);
+    this.callout('HE’S FLYING OFF!', 'bad', 1400);
+    this.fx.popText(q.x, q.top - 18, 'GET HIM, MY PLOPS!', '#ffd23f', 18);
+    this.flashJumbo({ kind: 'big', text: 'BLAST OFF!', sub: 'HERE COME HIS PLOPS', color: '#ffd23f', bg: '#3d1478' }, 2600);
+    this.excitedUntil = this.clock + 2500;
+    sfx.laugh();
+    this.setJet(true);
+    await this.tweenP({ targets: q.spr, y: q.spr.y - 40, duration: 450, ease: 'Sine.easeIn' });
+    if (this.ended) return;
+    await this.tweenP({ targets: q.spr, y: -260, duration: 900, ease: 'Quad.easeIn' });
+    if (this.ended) return;
+    this.setJet(false);
+    q.spr.setVisible(false);
+    q.shadow.setVisible(false);
+    // three small ones, then two medium, then two big ones
+    const kinds: MinionKind[] = n === 1 ? ['small', 'small', 'small'] : n === 2 ? ['medium', 'medium'] : ['large', 'large'];
+    const xs = kinds.length === 3 ? [WX(420), WX(660), WX(900)] : [WX(500), WX(840)];
+    kinds.forEach((k, i) =>
+      this.time.delayedCall(i * 500, () => {
+        if (this.ended) return;
+        // (not right on top of you)
+        let x = xs[i];
+        if (Math.abs(x - this.player.x) < 70) x += x < WORLD_W / 2 ? 90 : -90;
+        this.spawnMinion(k, x);
+      }),
+    );
+  }
+
+  /** His Plops are all done: back he comes, down out of the sky on his jetpack. */
+  private async kingReturn() {
+    const q = this.queen;
+    const p = this.player;
+    const x = Phaser.Math.Clamp(p.x < WORLD_W / 2 ? p.x + 260 : p.x - 260, ROPE_L + 60, ROPE_R - 60);
+    q.facing = p.x < x ? -1 : 1;
+    q.spr.setVisible(true).setFlipX(q.facing > 0).setPosition(x, -200).setFrame('grin');
+    this.setJet(true);
+    this.callout('HE’S BACK!', 'bad', 1200);
+    await this.tweenP({ targets: q.spr, y: MAT_Y - 70, duration: 1100, ease: 'Sine.easeOut' });
+    if (this.ended) return;
+    await this.tweenP({ targets: q.spr, y: MAT_Y, duration: 320, ease: 'Quad.easeIn' });
+    if (this.ended) return;
+    this.setJet(false);
+    q.shadow.setVisible(true);
+    q.body.setAllowGravity(true);
+    q.body.reset(x, MAT_Y - q.body.halfHeight - 2);
+    this.cameras.main.shake(200, 0.008);
+    sfx.thud();
+    this.shakeRopes(4);
+    this.fx.dust(x, MAT_Y, 10);
+    q.invulnUntil = 0;
+    q.setMode('idle', 0.7);
+  }
+
+  /** One of his Plops, coming down into the ring by parachute. */
+  private spawnMinion(kind: MinionKind, x: number) {
+    const M = MINION[kind];
+    const s = M.k / PLOP_RES;
+    const spr = this.physics.add.sprite(x, -80, `gplop-${kind}`, 'idle');
+    this.gMinions.add(spr);
+    spr.setScale(s).setOrigin(0.5, (52 + PLOP_TOP) / (PLOP_H + PLOP_TOP)).setDepth(DEPTH_W.queen - 0.5);
+    const b = spr.body as Phaser.Physics.Arcade.Body;
+    const bw = M.w / s;
+    const bh = M.h / s;
+    b.setSize(bw, bh, false).setOffset((50 + PLOP_PAD) * PLOP_RES - bw / 2, (100 + PLOP_TOP) * PLOP_RES - bh);
+    b.setAllowGravity(true);
+    b.setMaxVelocityY(kind === 'large' ? 90 : 120);
+    const chute = this.add
+      .image(x, -80, 'pchute', kind === 'large' ? 'slow' : 'mid')
+      .setOrigin(0.5, (PCHUTE_UP + 52) / (PCHUTE_UP + PCHUTE_DOWN))
+      .setScale(M.k / PCHUTE_RES)
+      .setDepth(spr.depth - 0.1);
+    this.minions.push({ spr, kind, hp: M.hp, chute, t: Math.random() * 6, hopCd: 1 + Math.random(), hurtUntil: 0, dead: false });
+  }
+
+  private updateMinions(dt: number) {
+    if (!this.minions.length) return;
+    const p = this.player;
+    const now = this.time.now;
+    for (const m of this.minions) {
+      if (m.dead) continue;
+      const M = MINION[m.kind];
+      const spr = m.spr;
+      const b = spr.body as Phaser.Physics.Arcade.Body;
+      m.t += dt;
+      if (m.chute) {
+        // floating down, swaying
+        const sway = Math.sin(m.t * 2.2);
+        b.setVelocityX(sway * 18);
+        spr.setRotation(sway * 0.08).setFrame(Math.floor(m.t * 3) % 2 ? 'yell0' : 'grin');
+        m.chute.setPosition(spr.x, spr.y).setRotation(sway * 0.12);
+        if (b.blocked.down || b.touching.down) {
+          const c = m.chute;
+          m.chute = null;
+          spr.setRotation(0);
+          b.setMaxVelocityY(900);
+          sfx.bump();
+          this.fx.dust(spr.x, b.bottom, 4);
+          this.tweens.add({ targets: c, y: c.y - 60, x: c.x + 30, angle: 40, alpha: 0, duration: 900, ease: 'Sine.easeOut', onComplete: () => c.destroy() });
+        }
+        continue;
+      }
+      // at you, hopping now and then (they stay in the ring)
+      const dx = p.x - spr.x;
+      const dir = Math.sign(dx) || 1;
+      const ground = b.blocked.down || b.touching.down;
+      if (ground) {
+        b.setVelocityX(Math.abs(dx) > 10 ? dir * M.speed : 0);
+        m.hopCd -= dt;
+        if (m.hopCd <= 0) {
+          b.setVelocityY(m.kind === 'large' ? -360 : -420);
+          m.hopCd = 1.4 + Math.random() * 1.6;
+        }
+      }
+      const hw = b.halfWidth;
+      if (b.center.x + hw > ROPE_R) {
+        b.x = ROPE_R - b.width;
+        b.setVelocityX(Math.min(0, b.velocity.x));
+      } else if (b.center.x - hw < ROPE_L) {
+        b.x = ROPE_L;
+        b.setVelocityX(Math.max(0, b.velocity.x));
+      }
+      spr.setFlipX(dir > 0);
+      spr.setFrame(!ground ? 'run1' : Math.abs(b.velocity.x) > 10 ? (['walk0', 'walk1', 'walk2', 'walk3'] as const)[Math.floor(m.t * 7) % 4] : 'idle');
+      spr.setTint(now < m.hurtUntil && Math.floor(now / 60) % 2 ? 0xffb0b0 : 0xffffff);
+      // you and it: land on it, or it gets you
+      if (!p.alive || !this.fighting) continue;
+      const a = p.body;
+      if (a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom) continue;
+      const falling = a.velocity.y > 40 || a.bottom > this.prevHeroBottom + 1;
+      const fromAbove = Math.min(a.bottom, this.prevHeroBottom) < b.top + b.height * 0.5;
+      if (falling && fromAbove) {
+        this.hitMinion(m, this.dive ? 2 : 1);
+        this.dive = null;
+        p.bounce();
+      } else this.hurtPlayer(spr.x);
+    }
+    this.minions = this.minions.filter((m) => !m.dead);
+    // all of them done (and he's still up there): back he comes
+    const q = this.queen;
+    if (!this.minions.length && q.mode === 'away' && !this.ended && !q.spr.visible) void this.kingReturn();
+  }
+
+  private hitMinion(m: Minion, n: number) {
+    const now = this.time.now;
+    if (m.dead || now < m.hurtUntil) return;
+    m.hp -= n;
+    m.hurtUntil = now + 350;
+    const spr = m.spr;
+    sfx.stomp();
+    if (m.hp > 0) {
+      this.fx.popText(spr.x, spr.y - 40, 'BONK!', '#ffffff', 16);
+      (spr.body as Phaser.Physics.Arcade.Body).setVelocityY(-220);
+      return;
+    }
+    m.dead = true;
+    sfx.pop();
+    this.fx.pooSplat(spr.x, spr.y, 12);
+    this.fx.stars(spr.x, spr.y - 10, 6);
+    this.fx.popText(spr.x, spr.y - 40, 'SPLAT!', '#ffd23f', 18);
+    if (m.chute) {
+      const c = m.chute;
+      c.setFrame('popped');
+      this.tweens.add({ targets: c, y: c.y + 120, alpha: 0, duration: 600, onComplete: () => c.destroy() });
+    }
+    (spr.body as Phaser.Physics.Arcade.Body).enable = false;
+    this.tweens.add({ targets: spr, scaleY: spr.scaleY * 0.3, alpha: 0, duration: 260, onComplete: () => spr.destroy() });
+  }
+
+  /** The water coming up through the building at the end (null: none). */
+  private flood: { g: Phaser.GameObjects.Graphics; y: number; t: number } | null = null;
+  private updateFlood(dt: number) {
+    const f = this.flood;
+    if (!f) return;
+    f.t += dt;
+    const g = f.g;
+    g.clear();
+    const x0 = -60;
+    const x1 = WORLD_W + 60;
+    const top = (x: number) => f.y + Math.sin(x / 38 + f.t * 2.4) * 4 + Math.sin(x / 17 - f.t * 3.1) * 2;
+    g.fillStyle(0x2f7fb0, 0.78);
+    g.beginPath();
+    g.moveTo(x0, WORLD_H + 80);
+    for (let x = x0; x <= x1; x += 12) g.lineTo(x, top(x));
+    g.lineTo(x1, WORLD_H + 80);
+    g.closePath();
+    g.fillPath();
+    g.lineStyle(3, 0xbfe8ff, 0.9);
+    g.beginPath();
+    for (let x = x0; x <= x1; x += 12) (x === x0 ? g.moveTo(x, top(x)) : g.lineTo(x, top(x)));
+    g.strokePath();
+  }
+
+  /** He blows up (like King Puff Ball did): a white flash, the big BOOM, shockwaves, confetti everywhere. */
+  private burstKing(cx: number, cy: number) {
+    const cam = this.cameras.main;
+    const q = this.queen;
+    sfx.explode();
+    sfx.drum();
+    cam.flash(300, 255, 250, 235);
+    cam.shake(700, 0.022);
+    q.spr.setVisible(false);
+    q.shadow.setVisible(false);
+    this.setJet(false);
+    const FT = 70;
+    const boom = this.add.image(cx, cy, 'wr-boom', 'b0').setDepth(DEPTH_W.spot + 1).setScale(0.6);
+    for (let i = 1; i < 8; i++) this.time.delayedCall(i * FT, () => boom.active && boom.setFrame(BOOM_FRAMES[i]));
+    this.tweens.add({ targets: boom, scale: 0.9, duration: 8 * FT + 160, ease: 'Sine.easeOut' });
+    this.tweens.add({ targets: boom, alpha: 0, delay: 8 * FT - 40, duration: 260, onComplete: () => boom.destroy() });
+    for (const [delay, col, w] of [[0, 0xffffff, 10], [90, 0xffd23f, 6], [180, 0x7b3fb8, 4]] as const) {
+      const ring = this.add.graphics().setDepth(DEPTH_W.spot + 0.9).setBlendMode(Phaser.BlendModes.ADD);
+      const st = { r: 14, a: 1 };
+      this.tweens.add({
+        targets: st,
+        r: 520,
+        a: 0,
+        delay,
+        duration: 900,
+        ease: 'Cubic.easeOut',
+        onUpdate: () => {
+          ring.clear();
+          ring.lineStyle(w * st.a + 1, col, st.a).strokeEllipse(cx, cy, st.r * 2, st.r * 1.3);
+        },
+        onComplete: () => ring.destroy(),
+      });
+    }
+    this.fx.explosion(cx, cy, 90);
+    this.confetti.burst(cx, cy, 520, { power: 1900, spread: Math.PI, scale: 0.75 });
+    this.time.delayedCall(90, () => this.confetti.burst(cx, cy, 260, { power: 2400, spread: Math.PI, scale: 0.6 }));
+    for (let i = 0; i < 8; i++)
+      this.time.delayedCall(240 + i * (130 + Math.random() * 150), () => {
+        const px = cx + (Math.random() - 0.5) * 520;
+        const py = cy - 60 - Math.random() * 160;
+        sfx.pop();
+        this.fx.explosion(px, py, 30 + Math.random() * 30);
+        this.confetti.burst(px, py, 60, { power: 700, spread: Math.PI, scale: 0.5 });
+      });
+  }
+
+  /**
+   * The Plop King's last hit: he staggers a few steps… and EXPLODES. Then the jumbotron: the
+   * building's flooding, please evacuate — and the water comes up through the arena. In on the hero:
+   * "Oh no, that must be King Bob!"
+   */
+  private async winKing() {
+    if (this.ended) return;
+    this.ended = true;
+    this.game.events.emit('boss-cutscene');
+    this.fighting = false;
+    const q = this.queen;
+    const p = this.player;
+    for (const r of this.rockets) r.fizzle();
+    for (const w of this.waves) w.img.destroy();
+    this.waves = [];
+    for (const l of this.lobs) l.img.destroy();
+    this.lobs = [];
+    for (const m of this.minions) {
+      m.chute?.destroy();
+      m.spr.destroy();
+    }
+    this.minions = [];
+    if (this.chair) {
+      this.chair.img.destroy();
+      this.chair.shadow.destroy();
+      this.chair = null;
+    }
+    p.sheet = null;
+    p.frameOverride = null;
+    this.game.events.emit('wrestle-chair', false);
+    this.heartPick?.img.destroy();
+    this.heartPick = null;
+    q.setMode('down');
+    q.body.setVelocity(0, -200);
+    q.spr.setFrame('hurt');
+    sfx.stomp();
+    sfx.cheer();
+    this.cameras.main.flash(250, 255, 245, 220);
+    this.cameras.main.shake(400, 0.016);
+    this.shakeRopes(9);
+    this.excitedUntil = this.clock + 6000;
+    this.flashJumbo({ kind: 'big', text: 'K.O.!', sub: 'NEW CHAMPION', color: '#ffd23f', bg: '#2a6a1a' }, 1e9);
+    this.callout('K.O.!', 'go', 1400);
+    await this.wait(700);
+    p.finish();
+    // a few wobbly steps, going redder and swelling up…
+    q.ko = true;
+    q.body.setVelocity(0, 0).setAllowGravity(false);
+    const S = QS / Q_RES;
+    const x0 = q.spr.x;
+    const dir = x0 < WORLD_W / 2 ? 1 : -1;
+    q.spr.setFlipX(dir > 0).setY(MAT_Y);
+    this.camFocus = { x: x0, y: MAT_Y - 80, zoom: 1.7 };
+    this.fx.popText(x0, q.top - 20, 'urrgh…', '#ffd23f', 18);
+    sfx.groan();
+    await this.glide(1700, (u) => {
+      const x = x0 + dir * 70 * u;
+      const step = Math.floor(u * 8);
+      q.spr.setX(x).setFrame(step % 2 ? 'hurt' : (['walk0', 'walk2'] as const)[(step >> 1) % 2]);
+      const swell = 1 + 0.28 * u * u + Math.sin(u * 40) * 0.02 * u;
+      q.spr.setScale(S * swell, S * swell);
+      q.spr.setRotation(Math.sin(u * 22) * 0.08 * u);
+      const r = 255;
+      const gb = Math.round(255 - 150 * u);
+      q.spr.setTint((r << 16) | (gb << 8) | gb);
+      q.shadow.setX(x);
+      if (this.camFocus) this.camFocus.x = x;
+    }, 'Linear');
+    await this.wait(150);
+    this.burstKing(q.spr.x, q.spr.y - 60);
+    await this.wait(2600);
+
+    // ── the jumbotron: the building's flooding ──
+    this.camManual = true;
+    const jx = WX(JUMBO.x + (JUMBO.w * JUMBO.s) / 2);
+    const jy = WY(JUMBO.y + (JUMBO.h * JUMBO.s) / 2);
+    await this.camTo(jx, jy + 6, 2.2, 800, 0.01, 'Sine.easeInOut');
+    this.flashJumbo({ kind: 'big', text: 'FLOODING!', sub: 'THE BUILDING IS FLOODING · PLEASE EVACUATE', color: '#7fe7ff', bg: '#0a3a6a' }, 1e9);
+    this.ribbonMsg = { text: 'PLEASE EVACUATE ⚠ PLEASE EVACUATE', color: '#7fe7ff', bg: '#0a3a6a', t0: this.clock / 1000 };
+    for (let i = 0; i < 3; i++) this.time.delayedCall(i * 650, () => sfx.whistle());
+    await this.wait(2200);
+    // …and out wide: the water coming up through the arena
+    void this.camTo(WORLD_W / 2, WORLD_H * 0.52, 0.8, 1500, 0, 'Sine.easeInOut');
+    this.flood = { g: this.add.graphics().setDepth(DEPTH_W.ringside + 0.5), y: WORLD_H + 40, t: 0 };
+    sfx.swish();
+    await this.tweenP({ targets: this.flood, y: MAT_Y + 26, duration: 4200, ease: 'Sine.easeOut' });
+
+    // ── in on the hero ──
+    await this.camTo(p.x, p.body.top - 20, 2.3, 900, 0, 'Sine.easeInOut');
+    p.facing = (p.x < WORLD_W / 2 ? 1 : -1) as Side;
+    await this.say('“Oh no, that must be <b>King Bob</b>!”', p.x, p.body.top - 6, 3200);
+    fadeOutMusic(500);
+    const res: ResultState = { ...this.wd.result, aura: this.wd.result?.aura ?? 0, lives: lives.left, level: this.wd.level ?? 4, hoops: undefined };
     this.game.events.emit('level-complete', res);
   }
 }

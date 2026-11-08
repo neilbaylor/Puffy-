@@ -301,6 +301,102 @@ export function drawHeroChute(ctx: Ctx, ch: CharacterDef, pose: Pose, state: Chu
 }
 
 /**
+ * The game's version of a hero's parachute, in two layers so the hero's own animated sprite goes
+ * between them: 'back' the canopy and its lines (or the pack, or the canopy collapsing on landing),
+ * 'front' the harness. In the hero's 56 × 56 box (feet at y = 54), facing right, no lean (the game
+ * tips the layers itself).
+ */
+export function drawHeroChuteLayer(ctx: Ctx, ch: CharacterDef, state: ChuteState, layer: 'back' | 'front', seed = 5) {
+  const look = HERO_CANOPY[ch.id] ?? HERO_CANOPY.puffy;
+  const h = HARNESS[ch.id] ?? HARNESS.puffy;
+  if (layer === 'front') {
+    drawHarness(ctx, ch.id, seed + 50);
+    return;
+  }
+  const midX = (h.l[0] + h.r[0]) / 2;
+  const sh = Math.min(h.l[1], h.r[1]);
+  const open = state === 'burst' ? 0.25 : state === 'opening' ? 0.7 : state === 'land' ? 0.55 : 1;
+  if (state === 'pack') {
+    const bx = midX - 2;
+    const by = sh - 18;
+    ST.line(ctx, [h.l, [bx, by + 8]], seed, 0.6, '#5a4636');
+    ST.line(ctx, [h.r, [bx + 3, by + 8]], seed + 1, 0.6, '#5a4636');
+    ST.shape(ctx, [[bx - 5, by - 6], [bx + 7, by - 7], [bx + 8, by + 9], [bx - 4, by + 9]], look.a, seed + 2, { lw: 0.8 });
+    ST.line(ctx, [[bx + 1, by - 6], [bx + 3, by - 22]], seed + 3, 0.5, '#5a4636');
+    drawCanopy(ctx, bx + 3, by - 38, 13, 13, look, 0.9, seed + 4);
+  } else if (state === 'land') {
+    ctx.save();
+    ctx.translate(midX - 16, 52);
+    ctx.rotate(-1.2);
+    drawCanopy(ctx, 0, -46, 34, 28, look, 0.45, seed);
+    ctx.restore();
+    ST.line(ctx, [h.l, [midX - 18, sh + 6], [midX - 30, 40]], seed + 7, 0.6, '#5a4636');
+    ST.line(ctx, [h.r, [midX - 8, sh + 2], [midX - 26, 30]], seed + 8, 0.6, '#5a4636');
+  } else {
+    const W = 60;
+    const H = 46;
+    const top = sh - 34 - H * (0.55 + 0.45 * open);
+    const hem = drawCanopy(ctx, midX, top, W, H, look, open, seed);
+    drawLines(ctx, hem, h.l, h.r, seed + 20);
+  }
+}
+
+/**
+ * The game's version of a Plop's parachute: just the canopy and its lines (the game hangs it over a
+ * Plop sprite), in the Plop's 96 × 104 box (the lines clip on at the sides of its body, y ≈ 64).
+ */
+export function drawPlopCanopy(ctx: Ctx, how: 'slow' | 'mid' | 'fast' | 'popped', seed = 3) {
+  const cx = 48;
+  const grip: [Pt, Pt] = [[20, 64], [76, 64]];
+  if (how === 'fast') {
+    ctx.save();
+    ctx.lineCap = 'round';
+    const r = rand(seed);
+    for (let i = 0; i < 9; i++) {
+      const x = 6 + r() * 84;
+      ctx.strokeStyle = i % 2 ? '#ffffffb0' : '#3a241840';
+      ctx.lineWidth = 1.2 + r() * 1.6;
+      ctx.beginPath();
+      ctx.moveTo(x, -70 + r() * 30);
+      ctx.lineTo(x, 20 + r() * 40);
+      ctx.stroke();
+    }
+    ctx.restore();
+    const look = PLOP_CANOPY.mid;
+    ST.line(ctx, [[cx + 6, -60], [cx - 8, -84], [cx + 10, -104], [cx - 2, -124]], seed + 5, 1.8, look.trim);
+    ST.line(ctx, [[cx + 12, -58], [cx + 26, -82], [cx + 16, -102]], seed + 6, 1.4, '#c9a46a');
+    const hem = drawCanopy(ctx, cx + 4, -78, 54, 72, look, 0.06, seed + 3);
+    drawLines(ctx, hem, grip[0], grip[1], seed + 20);
+  } else if (how === 'popped') {
+    const look = PLOP_CANOPY.mid;
+    ST.line(ctx, [grip[0], [cx - 22, 40], [cx - 30, 18]], seed + 1, 0.45, '#5a4636');
+    ST.line(ctx, [grip[1], [cx + 20, 44], [cx + 28, 20]], seed + 2, 0.45, '#5a4636');
+    const rag = (x: number, y: number, w: number, f: Fill, sd: number, tilt: number) => {
+      const pts: Pt[] = [];
+      for (let k = 0; k <= 8; k++) {
+        const a = Math.PI + (k / 8) * Math.PI;
+        const jag = k % 2 ? 0.55 : 1;
+        pts.push([x + Math.cos(a + tilt) * w * jag, y + Math.sin(a + tilt) * w * 0.7 * jag]);
+      }
+      pts.push([x + w * 0.5, y + w * 0.3], [x, y + w * 0.12], [x - w * 0.5, y + w * 0.35]);
+      ST.shape(ctx, pts, f, sd, { lw: 0.7 });
+    };
+    rag(cx - 30, 16, 13, look.a, seed + 4, -0.4);
+    rag(cx + 28, 18, 12, look.b, seed + 5, 0.5);
+    rag(cx + 4, 12, 10, look.a, seed + 6, 0.1);
+    starBurst(ctx, cx, -8, 18, seed + 7);
+  } else {
+    const look = PLOP_CANOPY[how];
+    const W = how === 'slow' ? 58 : 46;
+    const H = how === 'slow' ? 46 : 38;
+    const top = how === 'slow' ? -64 : -48;
+    const hem = drawCanopy(ctx, cx, top, W, H, look, 1, seed);
+    drawLines(ctx, hem, grip[0], grip[1], seed + 20);
+    if (how === 'slow') flies(ctx, cx, top + H * 0.4, W, seed + 30);
+  }
+}
+
+/**
  * A Plop coming down by parachute (in its 96 × 104 box, feet at y ≈ 100):
  *  - 'slow': a big patched dome, a fly or two, a happy grin (taking its time)
  *  - 'mid':  an olive patched canopy, yelling POOPA

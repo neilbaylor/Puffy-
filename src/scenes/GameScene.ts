@@ -11,6 +11,8 @@ import { sfx } from '../core/sfx';
 import type { Enemy } from '../entities/enemies/Enemy';
 import { bank } from '../core/bank';
 import { createBadGuy } from '../entities/enemies/Plops';
+import { KING_RES, PCHUTE_DOWN, PCHUTE_RES, PCHUTE_UP, PLOP_RES } from '../gfx/textures';
+import { JET_NOZZLES, KING_FEET, KING_H, KING_MID } from '../gfx/plopking';
 import type { WeaponKind } from '../entities/enemies/Weapons';
 import { Aura, Checkpoint, Goal, RootBeer } from '../entities/Pickups';
 import { Player } from '../entities/Player';
@@ -126,6 +128,8 @@ function introGlide(u: number) {
 
 /** Camera roll for the mountain climb (radians; the view leans so the ground rises to the right). */
 const UPHILL_TILT = -0.06;
+/** The Plop King's size in a level (world px per art unit: half again a medium Plop). */
+const KING_K = 1.1;
 
 export class GameScene extends Phaser.Scene {
   session!: Session;
@@ -141,6 +145,18 @@ export class GameScene extends Phaser.Scene {
   /** Bad guys waiting to drop in by parachute (they fall when you get near), and the ones in the air. */
   private paraWaiting: { kind: EnemyKind; x: number; y: number }[] = [];
   private paras: { e: Enemy; chute: Phaser.GameObjects.Image; t: number }[] = [];
+  /**
+   * Parachute drops (Plop Invasion · Part 2): step off the edge over one and your parachute opens;
+   * on the way down Plops float by on theirs at different speeds. `floor`: where you land (px).
+   */
+  private chuteDrops: { x0: number; x1: number; top: number; floor: number; speed: number; n: number; hard: boolean; t: number; next: number; left: number }[] = [];
+  /** Level 4's opening: where the Plop King stands (he laughs at you, then blasts off by jetpack), and him. */
+  private kingAt: { x: number; y: number } | null = null;
+  private king: { spr: Phaser.GameObjects.Sprite; flames: Phaser.GameObjects.Sprite[]; on: boolean; smokeT: number } | null = null;
+  /** A little scene playing (the game waits): the world still moves, nobody acts. */
+  private cutscene = false;
+  /** The Plops coming down with you in a drop (their canopies hung over them). */
+  private dropPlops: { e: Enemy; img: Phaser.GameObjects.Image; how: 'slow' | 'mid' | 'fast'; t: number }[] = [];
   private enemies: Enemy[] = [];
   private rockets: Rocket[] = [];
   private auras: Aura[] = [];
@@ -225,6 +241,11 @@ export class GameScene extends Phaser.Scene {
     this.volleys = [];
     this.paraWaiting = [];
     this.paras = [];
+    this.kingAt = null;
+    this.king = null;
+    this.cutscene = false;
+    this.chuteDrops = [];
+    this.dropPlops = [];
     this.enemies = [];
     this.rockets = [];
     this.auras = [];
@@ -321,6 +342,9 @@ export class GameScene extends Phaser.Scene {
           this.checkpoints.push(cp);
           break;
         }
+        case 'king':
+          this.kingAt = { x: cx, y: surface(s.y) };
+          break;
         case 'goal':
           this.goal = new Goal(this, cx, surface(s.y));
           break;
@@ -332,6 +356,14 @@ export class GameScene extends Phaser.Scene {
         case 'para':
           this.paraWaiting.push({ kind: (s.opts?.kind as EnemyKind) ?? 'puffball', x: cx, y: s.y * TILE });
           break;
+        case 'drop': {
+          const x0 = s.x * TILE;
+          const x1 = (s.x + Number(s.opts?.w ?? 10)) * TILE;
+          // (the floor: the first ground below the middle of the drop)
+          const floor = this.groundUnder((x0 + x1) / 2, s.y * TILE + TILE * 2) ?? this.level.heightPx;
+          this.chuteDrops.push({ x0, x1, top: s.y * TILE, floor, speed: Number(s.opts?.speed ?? 110), n: Number(s.opts?.n ?? 8), hard: !!s.opts?.hard, t: 0, next: 0, left: 0 });
+          break;
+        }
         case 'puddle': {
           const x0 = s.x * TILE;
           const x1 = (s.x + Number(s.opts?.w ?? 4)) * TILE;
@@ -429,15 +461,15 @@ export class GameScene extends Phaser.Scene {
       });
     this.physics.add.overlap(this.gPlayers, this.gAuras, (h, a) => this.collectAura(this.playerOf(h), a as Aura));
     this.physics.add.overlap(this.gPlayers, this.gRootbeer, (h, r) => this.collectRootbeer(this.playerOf(h), r as RootBeer));
-    for (const cp of this.checkpoints)
-      this.physics.add.overlap(this.gPlayers, cp.zone, () => {
-        if (cp.reached) return;
-        cp.activate();
-        this.lastCheckpoint = Math.max(this.lastCheckpoint, cp.index);
-        sfx.checkpoint();
-        this.fx.auraSparkle(cp.x, cp.y - 60, 16);
-        this.fx.popText(cp.x, cp.y - 112, 'CHECKPOINT', '#3ddc84', 16);
-      });
+    for (const cp of this.checkpoints) this.physics.add.overlap(this.gPlayers, cp.zone, () => this.reachCheckpoint(cp));
+    // (touching down from a parachute drop counts as reaching the checkpoint at its bottom, wherever you land)
+    this.events.off('chute-landed');
+    this.events.on('chute-landed', (p: Player) => {
+      const d = this.chuteDrops.find((d) => p.x > d.x0 - TILE && p.x < d.x1 + TILE);
+      if (!d) return;
+      const cp = this.checkpoints.find((c) => c.x >= d.x0 && c.x <= d.x1 + TILE * 2 && c.y > d.top + TILE * 4);
+      if (cp) this.reachCheckpoint(cp);
+    });
     if (this.goal) this.physics.add.overlap(this.gPlayers, this.goal.zone, (h) => this.reachGoal(this.playerOf(h)));
 
     // ── Camera ──
@@ -457,6 +489,97 @@ export class GameScene extends Phaser.Scene {
   private addAura(a: Aura) {
     this.auras.push(a);
     this.gAuras.add(a);
+  }
+
+  private reachCheckpoint(cp: Checkpoint) {
+    if (cp.reached) return;
+    cp.activate();
+    this.lastCheckpoint = Math.max(this.lastCheckpoint, cp.index);
+    sfx.checkpoint();
+    this.fx.auraSparkle(cp.x, cp.y - 60, 16);
+    this.fx.popText(cp.x, cp.y - 112, 'CHECKPOINT', '#3ddc84', 16);
+  }
+
+  /**
+   * Parachute drops: step off the edge over one and the parachute opens (Player.startChute); while
+   * you float down, Plops come by on theirs — slow and middling ones you overtake (they come up from
+   * below), fast ones dropping past you from above. Shoot them (or land on them) and they're gone.
+   */
+  private updateDrops(dt: number) {
+    if (!this.chuteDrops.length) return;
+    const viewBottom = this.view.top + this.view.height;
+    for (const p of this.players) {
+      if (!p.alive || p.chute || p.onGround || p.body.velocity.y <= 0) continue;
+      const d = this.chuteDrops.find((d) => p.x > d.x0 && p.x < d.x1 && p.body.top > d.top + 6 && p.bottom < d.floor - TILE * 6);
+      if (!d) continue;
+      p.startChute(d.speed, d.x0, d.x1);
+      // the Plops for this drop: spaced through the time it takes (a little uneven)
+      const secs = (d.floor - p.bottom) / d.speed;
+      d.left = d.n;
+      d.t = 0;
+      d.next = 1.2;
+      (d as { gap?: number }).gap = Math.max(0.8, (secs - 3) / Math.max(1, d.n));
+    }
+    for (const d of this.chuteDrops) {
+      if (d.left <= 0) continue;
+      const p = this.players.find((q) => q.chute && q.x > d.x0 - TILE && q.x < d.x1 + TILE);
+      if (!p) {
+        d.left = 0;
+        continue;
+      }
+      d.t += dt;
+      // (none in the last few seconds: you land in peace)
+      if (d.t < d.next || p.bottom > d.floor - d.speed * 3) continue;
+      d.left--;
+      d.next = d.t + ((d as { gap?: number }).gap ?? 2) * (0.6 + Math.random() * 0.8);
+      const r = Math.random();
+      const how = r < (d.hard ? 0.4 : 0.3) ? 'fast' : r < 0.68 ? 'mid' : 'slow';
+      const kind: EnemyKind = Math.random() < (d.hard ? 0.4 : 0.2) ? 'bigplop' : 'plop';
+      const speed = how === 'fast' ? 250 : how === 'mid' ? d.speed * 0.62 : d.speed * 0.36;
+      // (near you across the shaft; the fast ones from above, the others come up from below)
+      const x = Phaser.Math.Clamp(p.x + (Math.random() * 2 - 1) * 240, d.x0 + 40, d.x1 - 40);
+      const y = how === 'fast' ? this.view.top - 90 : viewBottom + 120;
+      if (y > d.floor - TILE * 4) continue;
+      const e = createBadGuy(this, kind, x, y);
+      this.enemies.push(e);
+      this.gEnemies.add(e);
+      e.wake();
+      e.body.setMaxVelocityY(speed);
+      if (how !== 'fast') e.body.setVelocityY(speed);
+      const img = this.add
+        .image(e.x, e.y, 'pchute', how)
+        .setOrigin(0.5, (PCHUTE_UP + 52) / (PCHUTE_UP + PCHUTE_DOWN))
+        .setScale((e.scaleX * PLOP_RES) / PCHUTE_RES)
+        .setDepth(e.depth - 0.5);
+      this.dropPlops.push({ e, img, how, t: Math.random() * 6 });
+    }
+    // float them down; passed by (well off screen) and they're gone
+    this.dropPlops = this.dropPlops.filter((q) => {
+      q.t += dt;
+      const e = q.e;
+      if (!e.active || e.dead) {
+        // popped: the canopy in rags, falling away
+        q.img.setFrame('popped');
+        this.tweens.add({ targets: q.img, y: q.img.y + 160, alpha: 0, angle: (Math.random() - 0.5) * 60, duration: 700, onComplete: () => q.img.destroy() });
+        return false;
+      }
+      if (e.body.blocked.down) {
+        e.body.setMaxVelocityY(MAX_FALL_SPEED);
+        e.setRotation(0);
+        this.tweens.add({ targets: q.img, y: q.img.y - 60, x: q.img.x + 30, angle: 40, alpha: 0, duration: 900, ease: 'Sine.easeOut', onComplete: () => q.img.destroy() });
+        return false;
+      }
+      if (e.y < this.view.top - 500 || e.y > viewBottom + 700) {
+        e.destroy();
+        q.img.destroy();
+        return false;
+      }
+      const sway = Math.sin(q.t * (q.how === 'fast' ? 9 : 2.2));
+      e.body.setVelocityX(sway * (q.how === 'fast' ? 10 : 22));
+      e.setRotation(sway * 0.08);
+      q.img.setPosition(e.x, e.y).setRotation(sway * (q.how === 'fast' ? 0.05 : 0.12));
+      return true;
+    });
   }
 
   /** Drop bad guys in by parachute as you approach, and float them down. */
@@ -522,6 +645,7 @@ export class GameScene extends Phaser.Scene {
   update(_time: number, deltaMs: number) {
     const dt = Math.min(deltaMs / 1000, 1 / 30);
     if (this.intro) return this.updateIntro(dt);
+    if (this.cutscene) return this.updateCutscene(dt);
 
     this.updatePuddles(dt);
     this.updateDrips(dt);
@@ -546,8 +670,10 @@ export class GameScene extends Phaser.Scene {
     const wakeR = this.view.left + this.view.width + 48;
     const wakeL = this.view.left - 48;
     this.enemies = this.enemies.filter((e) => e.active);
+    // (a climb: the ones far above or below you sleep till you get near their height)
+    const vertical = !!this.level.data.vertical;
     for (const e of this.enemies) {
-      if (!e.awake && !e.dead && e.body.left < wakeR && e.body.right > wakeL) e.wake();
+      if (!e.awake && !e.dead && e.body.left < wakeR && e.body.right > wakeL && (!vertical || (e.body.bottom > this.view.top - 160 && e.body.top < this.view.top + this.view.height + 160))) e.wake();
       e.update(dt);
     }
 
@@ -566,6 +692,7 @@ export class GameScene extends Phaser.Scene {
     for (const h of this.hockey) h.update(dt);
     for (const v of this.volleys) v.update(dt);
     this.updateParachutes(dt);
+    this.updateDrops(dt);
 
     themeClock.t += dt;
     // the level's other looks, a layer every so often (each is a quick job; nothing if already drawn)
@@ -614,10 +741,18 @@ export class GameScene extends Phaser.Scene {
     // (a climb starts from where the gate is, up at the top)
     const gate = this.level.data.vertical ? this.level.data.spawns.find((sp) => sp.type === 'goal') : undefined;
     this.intro = { u: 0, x0: gate ? gate.x * TILE : widthPx - 300, x1: startX, phase: 'fly' };
+    // (the Plop King's waiting at the bottom: the fly-over ends on him and you)
+    if (this.kingAt && this.textures.exists('pking-jet')) {
+      const k = this.kingAt;
+      const spr = this.add.sprite(k.x, k.y, 'pking-jet', 'idle').setOrigin(0.5, KING_FEET / KING_H).setScale(KING_K / KING_RES).setDepth(DEPTH.players - 0.1);
+      const flames = JET_NOZZLES.map(() => this.add.sprite(0, 0, 'jetflame', 'f0').setOrigin(0.5, 0).setScale(KING_K / 2).setDepth(DEPTH.players - 0.12).setVisible(false));
+      this.king = { spr, flames, on: false, smokeT: 0 };
+      this.placeKingJets();
+    }
     this.introU = 0;
     const info = levelInfo(this.levelId);
     this.game.events.emit('level-intro', { world: info.world, title: info.title, part: info.part });
-    const tw = this.tweens.add({ targets: this.intro, u: 1, duration: 6400, ease: 'Linear', onComplete: () => this.endIntro() });
+    const tw = this.tweens.add({ targets: this.intro, u: 1, duration: this.level.data.flyPath ? 9000 : 6400, ease: 'Linear', onComplete: () => this.endIntro() });
     // skipping just fast-forwards the same flight (still lands smoothly)
     this.introSkip = () => tw.setTimeScale(5);
     this.game.events.once('skip-intro', this.introSkip);
@@ -638,7 +773,114 @@ export class GameScene extends Phaser.Scene {
     for (const p of this.players) p.spawnProtection();
     this.game.events.emit('level-intro-end');
     const line = levelInfo(this.levelId).speech;
-    if (line && this.players[0]) this.time.delayedCall(350, () => this.say(this.players[0], line));
+    const speak = () => {
+      if (line && this.players[0]) this.time.delayedCall(350, () => this.say(this.players[0], line));
+    };
+    if (this.king) this.kingBlastsOff(speak);
+    else speak();
+  }
+
+  /** The jetpack's flames, under its nozzles (wherever the King is). */
+  private placeKingJets() {
+    const k = this.king;
+    if (!k) return;
+    const s = k.spr;
+    const sx = s.flipX ? -1 : 1;
+    JET_NOZZLES.forEach(([nx, ny], i) => {
+      const f = k.flames[i];
+      f.setPosition(s.x + (nx - KING_MID[0]) * KING_K * sx, s.y + (ny - KING_FEET) * KING_K).setRotation(s.rotation);
+    });
+  }
+
+  /**
+   * Level 4's opening: the Plop King, standing at the foot of the climb, has a good laugh at you,
+   * then fires up his jetpack (flames, smoke) and blasts off up out of sight. Then you're off.
+   */
+  private kingBlastsOff(then: () => void) {
+    const k = this.king!;
+    const s = k.spr;
+    this.cutscene = true;
+    this.physics.world.pause();
+    const top = () => s.y - (KING_FEET - 10) * KING_K;
+    // a little hop: he's seen you
+    this.tweens.add({ targets: s, y: s.y - 10, duration: 140, yoyo: true, ease: 'Sine.easeOut' });
+    // the laugh
+    this.time.delayedCall(420, () => {
+      sfx.laugh();
+      this.sayAt(() => [s.x - 6, top() + 10], 'HA HA HA HA!', 1500);
+      let n = 0;
+      this.time.addEvent({ delay: 130, repeat: 12, callback: () => s.setFrame(n++ % 2 ? 'yell1' : 'yell0') });
+      this.tweens.add({ targets: s, scaleY: s.scaleY * 1.05, duration: 130, yoyo: true, repeat: 6 });
+    });
+    // the jetpack fires up
+    this.time.delayedCall(2200, () => {
+      s.setFrame('grin');
+      k.on = true;
+      for (const f of k.flames) f.setVisible(true);
+      sfx.whoosh();
+      this.cameras.main.shake(300, 0.003);
+    });
+    // up, slowly at first, then whoosh — off the top of the screen
+    this.time.delayedCall(2700, () => {
+      this.tweens.add({
+        targets: s,
+        y: s.y - 70,
+        duration: 600,
+        ease: 'Sine.easeIn',
+        onComplete: () => {
+          sfx.whoosh();
+          this.tweens.add({ targets: s, y: s.y - 1400, x: s.x + 160, rotation: 0.18, duration: 1300, ease: 'Quad.easeIn' });
+        },
+      });
+    });
+    this.time.delayedCall(4700, () => {
+      for (const f of k.flames) f.destroy();
+      s.destroy();
+      this.king = null;
+      this.cutscene = false;
+      this.physics.world.resume();
+      then();
+    });
+  }
+
+  /** While a little scene plays: the jetpack's flames flicker and smoke pours out of it. */
+  private updateCutscene(dt: number) {
+    const k = this.king;
+    if (k) {
+      this.placeKingJets();
+      if (k.on) {
+        k.flames.forEach((f, i) => f.setFrame(`f${(Math.floor(this.time.now / 60) + i) % 3}`));
+        k.smokeT -= dt;
+        if (k.smokeT <= 0) {
+          k.smokeT = 0.045;
+          for (const f of k.flames) {
+            const puff = this.add
+              .image(f.x + (Math.random() - 0.5) * 8, f.y + 18, 'jetsmoke', Math.random() < 0.5 ? 's0' : 's1')
+              .setScale(0.35)
+              .setAlpha(0.85)
+              .setDepth(DEPTH.players - 0.15)
+              .setRotation(Math.random() * 6);
+            this.tweens.add({
+              targets: puff,
+              scale: 1.3 + Math.random() * 0.6,
+              alpha: 0,
+              x: puff.x + (Math.random() - 0.5) * 50,
+              y: puff.y + 26 + Math.random() * 30,
+              rotation: puff.rotation + (Math.random() - 0.5),
+              duration: 900 + Math.random() * 500,
+              ease: 'Sine.easeOut',
+              onComplete: () => puff.destroy(),
+            });
+          }
+        }
+      }
+    }
+    for (const p of this.players) p.sync(dt);
+    themeClock.t += dt;
+    this.applyTheme();
+    this.level.animate(this.time.now / 1000, this.view.left, this.view.left + this.view.width);
+    this.bg.update(this.view, dt);
+    this.updateAmbience(dt);
   }
 
   private updateIntro(dt: number) {
@@ -691,15 +933,34 @@ export class GameScene extends Phaser.Scene {
     const heroTop = clampTop(p ? p.bottom - vh * 0.62 : heightPx - vh);
     const land = smooth(0.62, 1, u);
     let top = this.introTop + (heroTop - this.introTop) * land - lift;
-    // a climb: from the top of the level (the gate) straight down to the hero at the bottom
-    if (this.level.data.vertical) top = clampTop(heroTop * introGlide(u)) - lift * 0.4;
+    // a climb: along its fly path (from the gate, over the top and down: more down than across),
+    // landing on the hero at the bottom
+    let cx = x;
+    const path = this.level.data.flyPath;
+    if (this.level.data.vertical && path?.length) {
+      const pts: [number, number][] = path.map(([tx, h]) => [tx * TILE, heightPx - h * TILE]);
+      pts.push([endX, heroTop + (this.scale.height / base) / 2]);
+      // (time on each leg by its length, sideways counting for less: it sweeps across, lingers going down)
+      const len = pts.slice(1).map((q, i) => Math.hypot((q[0] - pts[i][0]) * 0.6, q[1] - pts[i][1]));
+      const total = len.reduce((a, b) => a + b, 0) || 1;
+      let g = introGlide(u) * total;
+      let i = 0;
+      while (i < len.length - 1 && g > len[i]) g -= len[i++];
+      const t = Phaser.Math.Clamp(g / (len[i] || 1), 0, 1);
+      const P = (k: number) => pts[Phaser.Math.Clamp(k, 0, pts.length - 1)];
+      const cr = (a: number, b: number, c: number, d: number) => 0.5 * (2 * b + (c - a) * t + (2 * a - 5 * b + 4 * c - d) * t * t + (3 * b - a - 3 * c + d) * t * t * t);
+      const px = cr(P(i - 1)[0], P(i)[0], P(i + 1)[0], P(i + 2)[0]);
+      const py = cr(P(i - 1)[1], P(i)[1], P(i + 1)[1], P(i + 2)[1]);
+      cx = Phaser.Math.Clamp(px, vw / 2, Math.max(vw / 2, widthPx - vw / 2));
+      top = clampTop(py - vh / 2) - lift * 0.4;
+    } else if (this.level.data.vertical) top = clampTop(heroTop * introGlide(u)) - lift * 0.4;
     cam.setZoom(zoom);
     cam.setRotation(rot + this.uphill * smooth(0.35, 1, u));
-    cam.centerOn(x, top + vh / 2);
-    this.camX = x;
+    cam.centerOn(cx, top + vh / 2);
+    this.camX = cx;
     this.camTop = top;
     // the background is drawn a bit oversize so the tilt never shows an edge
-    this.view = { left: x - vw / 2 - 60, top: top - 60, width: vw + 120, height: vh + 120 };
+    this.view = { left: cx - vw / 2 - 60, top: top - 60, width: vw + 120, height: vh + 120 };
     for (const pl of this.players) pl.sync(dt);
     themeClock.t += dt;
     this.applyTheme();
@@ -757,7 +1018,9 @@ export class GameScene extends Phaser.Scene {
         feet = this.ledgeFeet;
         // falling fast (a drop): you near the top, so what's coming up from below shows in time
         const vy = Math.max(...tracked.map((p) => p.body.velocity.y));
-        this.fallK += ((vy > 420 ? 1 : 0) - this.fallK) * (snap ? 1 : 1 - Math.exp(-dt * 2));
+        // (and under a parachute: you float near the top, the ground and the Plops below in view)
+        const chuting = tracked.some((p) => p.chute);
+        this.fallK += ((vy > 420 || chuting ? 1 : 0) - this.fallK) * (snap ? 1 : 1 - Math.exp(-dt * 2));
         tTop = feet - vh * (0.66 - 0.32 * this.fallK);
       }
       // (the run goes downhill: the jump at the bottom is ahead and below you, so you stay
@@ -1351,7 +1614,13 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** A speech bubble over a hero's head for a few seconds. */
-  private say(p: Player, text: string) {
+  private say(p: Player, text: string, ms = 3900) {
+    p.squash = { x: 0.8, y: 1.25 };
+    this.sayAt(() => [p.x, p.body.top], text, ms);
+  }
+
+  /** A speech bubble over someone (where: their middle x and the top of their head, each frame). */
+  private sayAt(where: () => [number, number], text: string, ms = 3900) {
     const t = this.add
       .text(0, 0, text, { fontFamily: 'Nunito, sans-serif', fontSize: '12px', fontStyle: '900', color: '#3a2418', align: 'center', wordWrap: { width: 168 } })
       .setOrigin(0.5)
@@ -1363,22 +1632,23 @@ export class GameScene extends Phaser.Scene {
     g.fillTriangle(-9, h / 2 - 2, 7, h / 2 - 2, -8, h / 2 + 13);
     g.fillStyle(0xffffff, 1).fillRoundedRect(-w / 2, -h / 2, w, h, 10);
     g.fillTriangle(-6.5, h / 2 - 3, 4.5, h / 2 - 3, -6.5, h / 2 + 8.5);
-    const c = this.add.container(p.x, p.body.top - 20 - h / 2, [g, t]).setDepth(DEPTH.text + 3).setScale(0.2).setAlpha(0);
+    const [x0, top0] = where();
+    const c = this.add.container(x0, top0 - 20 - h / 2, [g, t]).setDepth(DEPTH.text + 3).setScale(0.2).setAlpha(0);
     const follow = () => {
       if (!c.active) return;
-      const x = Phaser.Math.Clamp(p.x + 6, this.view.left + w / 2 + 8, this.view.left + this.view.width - w / 2 - 8);
-      c.setPosition(x, p.body.top - 22 - h / 2);
+      const [px, top] = where();
+      const x = Phaser.Math.Clamp(px + 6, this.view.left + w / 2 + 8, this.view.left + this.view.width - w / 2 - 8);
+      c.setPosition(x, top - 22 - h / 2);
     };
     follow();
     this.events.on(Phaser.Scenes.Events.POST_UPDATE, follow);
     sfx.bump();
-    p.squash = { x: 0.8, y: 1.25 };
     this.tweens.add({ targets: c, scale: 1, alpha: 1, duration: 260, ease: 'Back.easeOut' });
     this.tweens.add({
       targets: c,
       alpha: 0,
       scale: 0.9,
-      delay: 3900,
+      delay: ms,
       duration: 300,
       onComplete: () => {
         this.events.off(Phaser.Scenes.Events.POST_UPDATE, follow);
