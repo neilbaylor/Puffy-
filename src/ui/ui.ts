@@ -484,6 +484,8 @@ export class UI {
     this.screen?.remove();
     this.screen = el;
     if (el) this.root.appendChild(el);
+    // (paused during the level's flyover: its title card and Skip button step aside till you're back)
+    this.introEl?.classList.toggle('held', !!el);
   }
 
   private showBanner(html: string, ms: number) {

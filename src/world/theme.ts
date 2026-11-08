@@ -1,4 +1,5 @@
 import { PALETTES, seaColor } from '../gfx/world';
+import { LIGHT } from '../core/light';
 
 /**
  * The look of Puff Ball Planet drifts slowly while you play, like the day
@@ -30,9 +31,11 @@ export interface ThemeMix {
   w: number;
 }
 
-export function themeMix(t: number, themes: readonly ThemeId[] = THEMES): ThemeMix {
+export function themeMix(t: number, themes: readonly ThemeId[] = LIGHT ? THEMES.slice(0, 1) : THEMES): ThemeMix {
   const period = HOLD + BLEND;
   const n = themes.length;
+  // (one look: no fading at all)
+  if (n === 1) return { a: themes[0], b: themes[0], w: 0 };
   const tt = ((t % (period * n)) + period * n) % (period * n);
   const i = Math.floor(tt / period);
   const local = tt - i * period;
@@ -41,7 +44,10 @@ export function themeMix(t: number, themes: readonly ThemeId[] = THEMES): ThemeM
 }
 
 /** The looks a level cycles through. */
-export const themesFor = (level: number): readonly ThemeId[] => (level === 2 ? MOUNTAIN_THEMES : level === 3 ? PLOP_THEMES : THEMES);
+const allThemesFor = (level: number): readonly ThemeId[] => (level === 2 ? MOUNTAIN_THEMES : level === 3 ? PLOP_THEMES : THEMES);
+/** A level's looks, in order. (Light mode: just its first — no other looks to draw and hold, and
+ * never two whole backgrounds showing at once while one fades into the next.) */
+export const themesFor = (level: number): readonly ThemeId[] => (LIGHT ? allThemesFor(level).slice(0, 1) : allThemesFor(level));
 
 /** A soft colour grade for the foreground (terrain, trees, flowers) in each look. */
 const TINT: Record<ThemeId, number> = {

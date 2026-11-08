@@ -91,7 +91,7 @@ export class MenuScene extends Phaser.Scene {
   /** Ground pictures drawn ahead in quiet moments (a whole level's, for its fly-over). */
   private painted: string[] = [];
   private lastInput = 0;
-  private lastQuiet = 0;
+  private nextQuiet = 0;
 
   /**
    * The levels next to this one in the Part picker (it shows every built level once you've beaten
@@ -400,11 +400,15 @@ export class MenuScene extends Phaser.Scene {
     // one quiet-moment job at a time (straight away, not after the rest of the game's art:
     // a click on another Part is the very next thing people do)
     const now = performance.now();
-    // (2.5 s after the last tap: someone tapping their way around the start screen — trying the
-    // Parts — is never kept waiting behind one)
-    if (this.quiet.length && now - this.lastInput > 2500 && now - this.lastQuiet > 250) {
+    // (1.5 s after the last tap: someone tapping their way around the start screen is rarely kept
+    // waiting behind one, and the other Parts still get ready while they look at each one)
+    if (this.quiet.length && now - this.lastInput > 1500 && now >= this.nextQuiet) {
       this.quiet.shift()!();
-      this.lastQuiet = performance.now();
+      const took = performance.now() - now;
+      // (a quick one: the next one straight after, on the next frame; a bigger one leaves the
+      // frames after it free, the bigger the longer — about half the steps are quick, so the other
+      // Parts are ready sooner)
+      this.nextQuiet = performance.now() + (took < 12 ? 0 : Math.min(250, took * 6));
     }
     const cam = this.cameras.main;
     const zoom = Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W);

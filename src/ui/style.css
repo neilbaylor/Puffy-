@@ -1638,6 +1638,10 @@ html.rotating body {
 .lvl-intro.on .li-title { transform: translate(-50%, -50%) scale(1); opacity: 1; }
 .lvl-intro.off .li-title { opacity: 0; transition: opacity 0.25s; }
 .lvl-intro.off .li-bar { height: 0; }
+/* (a menu over the flyover, e.g. paused when the app went to the background: menus sit above it,
+   and its title card and Skip button hide till you're back) */
+.screen.modal { z-index: 40; }
+.lvl-intro.held .li-title, .lvl-intro.held .li-skip { visibility: hidden; }
 .li-title small {
   display: block;
   font: 900 clamp(12px, 2.6vmin, 18px) / 1 var(--body);
