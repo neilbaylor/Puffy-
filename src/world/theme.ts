@@ -44,7 +44,7 @@ export function themeMix(t: number, themes: readonly ThemeId[] = LIGHT ? THEMES.
 }
 
 /** The looks a level cycles through. */
-const allThemesFor = (level: number): readonly ThemeId[] => (level === 2 ? MOUNTAIN_THEMES : level === 3 ? PLOP_THEMES : THEMES);
+const allThemesFor = (level: number): readonly ThemeId[] => (level === 2 ? MOUNTAIN_THEMES : level >= 3 ? PLOP_THEMES : THEMES);
 /** A level's looks, in order. (Light mode: just its first — no other looks to draw and hold, and
  * never two whole backgrounds showing at once while one fades into the next.) */
 export const themesFor = (level: number): readonly ThemeId[] => (LIGHT ? allThemesFor(level).slice(0, 1) : allThemesFor(level));

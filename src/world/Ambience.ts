@@ -263,7 +263,7 @@ export class Ambience {
   ) {
     makeTextures(scene);
     this.arctic = levelId === 2;
-    this.stinky = levelId === 3;
+    this.stinky = levelId >= 3;
     this.glow = scene.add.image(0, 0, 'amb-glow').setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.clouds - 1).setAlpha(0.55);
     // (no light shafts or vignette any more: each was a whole extra screenful to draw every frame,
     // for an effect you could hardly see)

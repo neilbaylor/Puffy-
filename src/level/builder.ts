@@ -27,6 +27,8 @@ export interface LevelData {
   wide?: { x0: number; x1: number; zoom: number }[];
   /** The terrain palette everywhere else (default: Puff Ball Planet; Plop Invasion: 'poo'). */
   pal?: string;
+  /** Mostly climbing up (Plop Invasion · Part 2): the camera and the background follow you up. */
+  vertical?: boolean;
   width: number;
   height: number;
   tiles: number[][];
@@ -41,6 +43,8 @@ export class LevelBuilder {
   readonly wides: { x0: number; x1: number; zoom: number }[] = [];
   /** The level's terrain palette (where no zone says otherwise). */
   pal?: string;
+  /** Mostly climbing up (see LevelData.vertical). */
+  vertical = false;
 
   /** Columns x0..x1 use terrain palette `pal` (by piece centre). */
   zone(x0: number, x1: number, pal: string) {
@@ -181,6 +185,7 @@ export class LevelBuilder {
       zones: this.zones.length ? this.zones : undefined,
       wide: this.wides.length ? this.wides : undefined,
       pal: this.pal,
+      vertical: this.vertical || undefined,
       width: this.width,
       height: this.height,
       tiles: this.cells.map((row) => row.map((c) => (c ? idx[c] : T.EMPTY))),

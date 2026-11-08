@@ -139,7 +139,7 @@ export class GameScene extends Phaser.Scene {
   private hockey: HockeyMatch[] = [];
   private volleys: VolleyMatch[] = [];
   /** Bad guys waiting to drop in by parachute (they fall when you get near), and the ones in the air. */
-  private paraWaiting: { kind: EnemyKind; x: number }[] = [];
+  private paraWaiting: { kind: EnemyKind; x: number; y: number }[] = [];
   private paras: { e: Enemy; chute: Phaser.GameObjects.Image; t: number }[] = [];
   private enemies: Enemy[] = [];
   private rockets: Rocket[] = [];
@@ -204,6 +204,8 @@ export class GameScene extends Phaser.Scene {
 
   init(data: GameData) {
     this.data0 = data;
+    this.ledgeFeet = null;
+    this.fallK = 0;
     this.session = data.session;
     this.startCheckpoint = data.checkpoint ?? -1;
     this.lastCheckpoint = this.startCheckpoint;
@@ -274,7 +276,7 @@ export class GameScene extends Phaser.Scene {
     if (!this.scene.isActive('Battle')) dropBaddiesExcept(this, this.levelId);
     this.lookNext = 0;
     if (!this.scene.isActive('Menu') && !this.scene.isActive('Battle')) freeLooksExcept(this, themesFor(this.levelId));
-    this.bg = new Background(this, heightPx - VIEW_H);
+    this.bg = new Background(this, heightPx - VIEW_H, false, !!data.vertical);
     this.amb = new Ambience(this, this.levelId, (x, y, max) => {
       for (let d = 0; d <= max; d += 6) if (this.level.isSolidAt(x, y + d)) return Math.floor((y + d) / TILE) * TILE;
       return null;
@@ -328,7 +330,7 @@ export class GameScene extends Phaser.Scene {
           this.hockey.push(new HockeyMatch(this, cx, surface(s.y), Number(s.opts?.w ?? 16), String(s.opts?.team ?? 'pppb')));
           break;
         case 'para':
-          this.paraWaiting.push({ kind: (s.opts?.kind as EnemyKind) ?? 'puffball', x: cx });
+          this.paraWaiting.push({ kind: (s.opts?.kind as EnemyKind) ?? 'puffball', x: cx, y: s.y * TILE });
           break;
         case 'puddle': {
           const x0 = s.x * TILE;
@@ -462,6 +464,8 @@ export class GameScene extends Phaser.Scene {
     const right = this.view.left + this.view.width;
     this.paraWaiting = this.paraWaiting.filter((w) => {
       if (right < w.x - 60) return true;
+      // (a climb: not till you've come up to its height — while the whole screen is still below it, it waits)
+      if (this.level.data.vertical && this.view.top > w.y) return true;
       const e = createBadGuy(this, w.kind, w.x, this.view.top - 70);
       this.enemies.push(e);
       this.gEnemies.add(e);
@@ -607,7 +611,9 @@ export class GameScene extends Phaser.Scene {
   private startIntro(startX: number) {
     const { widthPx } = this.level;
     this.physics.world.pause();
-    this.intro = { u: 0, x0: widthPx - 300, x1: startX, phase: 'fly' };
+    // (a climb starts from where the gate is, up at the top)
+    const gate = this.level.data.vertical ? this.level.data.spawns.find((sp) => sp.type === 'goal') : undefined;
+    this.intro = { u: 0, x0: gate ? gate.x * TILE : widthPx - 300, x1: startX, phase: 'fly' };
     this.introU = 0;
     const info = levelInfo(this.levelId);
     this.game.events.emit('level-intro', { world: info.world, title: info.title, part: info.part });
@@ -684,7 +690,9 @@ export class GameScene extends Phaser.Scene {
     const p = this.players[0];
     const heroTop = clampTop(p ? p.bottom - vh * 0.62 : heightPx - vh);
     const land = smooth(0.62, 1, u);
-    const top = this.introTop + (heroTop - this.introTop) * land - lift;
+    let top = this.introTop + (heroTop - this.introTop) * land - lift;
+    // a climb: from the top of the level (the gate) straight down to the hero at the bottom
+    if (this.level.data.vertical) top = clampTop(heroTop * introGlide(u)) - lift * 0.4;
     cam.setZoom(zoom);
     cam.setRotation(rot + this.uphill * smooth(0.35, 1, u));
     cam.centerOn(x, top + vh / 2);
@@ -737,8 +745,21 @@ export class GameScene extends Phaser.Scene {
       this.lookAhead += (lookTarget - this.lookAhead) * (snap ? 1 : 1 - Math.exp(-dt * 2.5));
       const tx = (minX + maxX) / 2 + this.lookAhead;
       // keep the hero's feet ~62% down the screen: above the touch controls
-      const feet = sumBottom / tracked.length;
+      let feet = sumBottom / tracked.length;
       let tTop = feet - vh * 0.62;
+      if (this.level.data.vertical) {
+        // a climb: mid-jump the camera holds the height of the ledge you jumped from (no bobbing up
+        // and down on every hop); it moves up once you land higher, and follows you down if you
+        // drop below it. A bit more of what's above you shows (where you're heading).
+        const grounded = tracked.some((p) => p.body.blocked.down);
+        if (grounded || this.ledgeFeet === null || feet > this.ledgeFeet || snap) this.ledgeFeet = feet;
+        else if (feet < this.ledgeFeet - vh * 0.3) this.ledgeFeet = feet + vh * 0.3;
+        feet = this.ledgeFeet;
+        // falling fast (a drop): you near the top, so what's coming up from below shows in time
+        const vy = Math.max(...tracked.map((p) => p.body.velocity.y));
+        this.fallK += ((vy > 420 ? 1 : 0) - this.fallK) * (snap ? 1 : 1 - Math.exp(-dt * 2));
+        tTop = feet - vh * (0.66 - 0.32 * this.fallK);
+      }
       // (the run goes downhill: the jump at the bottom is ahead and below you, so you stay
       // well up the screen; the rock's top is shown if there's room)
       if (R) tTop = Math.max(Math.min(feet - vh * 0.55, R.y - R.r - 30), feet - vh * 0.66);
@@ -755,6 +776,11 @@ export class GameScene extends Phaser.Scene {
     const m = this.uphill ? Math.abs(this.uphill) * Math.max(vw, vh) * 0.6 : 0;
     this.view = { left: left - m, top: top - m, width: vw + m * 2, height: vh + m * 2 };
   }
+
+  /** A climb (vertical levels): the height of the ledge you last stood on (see updateCamera). */
+  private ledgeFeet: number | null = null;
+  /** 0..1: how much the camera is framing a fall (you near the top of the screen). */
+  private fallK = 0;
 
   /** Part 2 is a climb: the whole view leans uphill a touch, so it always feels like going up. */
   private get uphill() {
