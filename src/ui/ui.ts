@@ -9,6 +9,7 @@ import { BattleUI } from './battleUi';
 import { loadArt } from './artLoader';
 import { LIGHT } from '../core/light';
 import { gameArtJobs } from '../gfx/textures';
+import { groundPaintJobs } from '../world/LevelView';
 import { gamepadSources } from '../input/gamepad';
 import { isKeyDown } from '../input/keyboard';
 import { isTouchDevice, onInputModeChange, usingTouch } from '../input/touch';
@@ -1057,8 +1058,21 @@ export class UI {
 
   /** The game's own art for these heroes (and a level's bad guys), drawn first behind a little loading card if it isn't yet. */
   private gameArt(heroes: string[], level: number | null) {
-    const scene = this.game.scene.getScene('Menu');
-    return loadArt(gameArtJobs(scene, { heroes, level }));
+    const scene = this.game.scene.getScene('Menu') as unknown as Phaser.Scene & { groundJobs?: (id: number) => { name: string; run: () => void }[] };
+    // (and the level's ground, for its opening fly-over, if the start screen hasn't drawn it yet)
+    let ground: { name: string; run: () => void }[] = [];
+    const build = level !== null ? levelInfo(level).build : undefined;
+    // (straight on from a results card over a boss's arena: no ground on show there, so the last
+    // level's is let go first — memory stays flat — and the arena's scene works the pictures out)
+    const host = ['Hoops', 'Wrestle'].map((k) => this.game.scene.getScene(k)).find((sc) => sc?.sys.isActive());
+    if (level !== null && this.game.scene.isActive('Menu')) ground = scene.groundJobs?.(level) ?? [];
+    else if (build && host) {
+      const data = build();
+      for (const k of this.game.textures.getTextureKeys())
+        if ((k.startsWith('terrain-') && !k.startsWith(`terrain-${data.name}-`)) || (k.startsWith('tree-') && !k.startsWith(`tree-${data.name}-`))) this.game.textures.remove(k);
+      ground = groundPaintJobs(host, data).map((job, i) => ({ name: `ground ${i}`, run: () => void job() }));
+    }
+    return loadArt([...gameArtJobs(scene, { heroes, level }), ...ground]);
   }
 
   private starting = false;
