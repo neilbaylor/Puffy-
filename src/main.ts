@@ -22,11 +22,35 @@ installInput();
 const RES_KEY = 'puffy.res';
 let resCap = (() => {
   try {
-    return Number(localStorage.getItem(RES_KEY)) || 0;
+    const saved = Number(localStorage.getItem(RES_KEY)) || 0;
+    if (saved) return saved;
   } catch {
-    return 0;
+    /* private mode */
   }
+  // a low-memory device (2 GB or less, where the browser says) draws at 1x from the start:
+  // a full-size high-DPI screen is a lot of extra memory on those
+  const mem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
+  return mem !== undefined && mem <= 2 ? 1 : 0;
 })();
+
+/**
+ * If something goes wrong while loading, say so on the loading screen (instead of it just
+ * stopping), with the browser's message: something to go on when it happens on a device we
+ * can't test on.
+ */
+function bootTrouble(msg: string) {
+  const boot = document.getElementById('boot');
+  if (!boot) return;
+  let el = boot.querySelector<HTMLElement>('.boot-error');
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'boot-error';
+    boot.querySelector('.boot-in')?.appendChild(el);
+  }
+  el.textContent = `Oops, loading hit a problem: ${msg}`.slice(0, 300);
+}
+window.addEventListener('error', (e) => bootTrouble(e.message || String(e.error)));
+window.addEventListener('unhandledrejection', (e) => bootTrouble(String((e.reason as Error)?.message ?? e.reason)));
 const dpr = () => {
   const big = Math.min(window.innerWidth, window.innerHeight) >= 700;
   const r = Math.min(window.devicePixelRatio || 1, big ? 1.75 : 2);
@@ -137,6 +161,14 @@ function start(refreshMs: number) {
   (window as unknown as { __res: () => unknown }).__res = () => ({ dpr: dpr(), cap: resCap, renderer: game.renderer.type === Phaser.WEBGL ? 'WebGL' : 'Canvas' });
 
   new UI(game);
+  // the graphics chip gave up (out of memory, usually): say so rather than freeze
+  game.canvas.addEventListener('webglcontextlost', () => {
+    bootTrouble('the graphics ran out of memory (WebGL context lost)');
+    const note = document.createElement('div');
+    note.className = 'gl-lost';
+    note.textContent = 'The graphics ran out of memory. Close other tabs and reload the page.';
+    document.body.appendChild(note);
+  });
 
   // handy for debugging from the console
   (window as unknown as { game: Phaser.Game; refreshHz: number }).game = game;

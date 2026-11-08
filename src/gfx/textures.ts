@@ -85,6 +85,25 @@ export function hires(w: number, h: number, res: number, fn: (ctx: Ctx) => void)
   return c;
 }
 
+/**
+ * Older graphics chips (many older Android tablets and laptops) can't hold a picture wider or taller
+ * than 4096 px: one that is fails to load, and on some it crashes the page. Every frame sheet is
+ * laid out within that.
+ */
+export const MAX_TEX = 4096;
+
+/** Where n frames (fw × fh each, a transparent gutter between them) go in a sheet no wider than MAX_TEX. */
+export function frameGrid(n: number, fw: number, fh: number, gap = 4) {
+  const px = fw + gap;
+  const py = fh + gap;
+  const cols = Math.max(1, Math.min(n, Math.floor(MAX_TEX / px)));
+  const rows = Math.ceil(n / cols);
+  return { w: cols * px, h: rows === 1 ? fh : rows * py, x: (i: number) => (i % cols) * px, y: (i: number) => Math.floor(i / cols) * py };
+}
+
+/** The heroes' own sheets are read back (recoloured for the other players in a battle); everything else lets its pixels go once uploaded. */
+const keepPixels = (key: string) => /^char-[a-z]+(-face)?$/.test(key);
+
 /** A frame sheet: each frame is drawn in world units w × h at `res`. */
 function sheet<F extends string>(
   scene: Phaser.Scene,
@@ -99,19 +118,19 @@ function sheet<F extends string>(
   // so nothing from one frame (a bazooka tip, a fist) ever shows up in the next
   const fw = Math.round(w * res);
   const fh = Math.round(h * res);
-  const pitch = fw + 4;
-  const { c, ctx } = canvas(pitch * frames.length, fh);
+  const g = frameGrid(frames.length, fw, fh);
+  const { c, ctx } = canvas(g.w, g.h);
   frames.forEach((f, i) => {
     ctx.save();
     ctx.beginPath();
-    ctx.rect(i * pitch, 0, fw, fh);
+    ctx.rect(g.x(i), g.y(i), fw, fh);
     ctx.clip();
-    ctx.translate(i * pitch, 0);
+    ctx.translate(g.x(i), g.y(i));
     ctx.scale(res, res);
     draw(ctx, f);
     ctx.restore();
   });
-  addCanvas(scene, key, c, (t) => frames.forEach((f, i) => t.add(f, 0, i * pitch, 0, fw, fh)));
+  addCanvas(scene, key, c, (t) => frames.forEach((f, i) => t.add(f, 0, g.x(i), g.y(i), fw, fh)), { release: !keepPixels(key) });
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -215,17 +234,17 @@ function makePlops(scene: Phaser.Scene, kind: PlopKind) {
   if (scene.textures.exists(key)) return;
   const st = STYLES[ART_STYLE];
   const fw = Math.round((PLOP_W + PLOP_PAD * 2) * PLOP_RES);
-  const pw = fw + 4;
   const fh = Math.round((PLOP_H + PLOP_TOP) * PLOP_RES);
-  const { c, ctx } = canvas(pw * PLOP_FRAMES.length, fh);
+  const g = frameGrid(PLOP_FRAMES.length, fw, fh);
+  const { c, ctx } = canvas(g.w, g.h);
   PLOP_FRAMES.forEach((f, i) => {
     ctx.save();
-    ctx.translate(i * pw, 0);
+    ctx.translate(g.x(i), g.y(i));
     ctx.scale(PLOP_RES, PLOP_RES);
     drawPlop(ctx, PLOP_PAD, PLOP_TOP, f, st, kind);
     ctx.restore();
   });
-  addCanvas(scene, key, c, (t) => PLOP_FRAMES.forEach((f, i) => t.add(f, 0, i * pw, 0, fw, fh)));
+  addCanvas(scene, key, c, (t) => PLOP_FRAMES.forEach((f, i) => t.add(f, 0, g.x(i), g.y(i), fw, fh)), { release: true });
   if (!scene.textures.exists('poo')) {
     addCanvas(scene, 'poo', hires(26, 24, ART_RES, (ctx2) => drawPoo(ctx2, 13, 22, 1)));
     sheet(scene, 'poowave', POOWAVE_W, POOWAVE_H, ['w0', 'w1', 'w2', 'w3'] as const, (ctx2, f) => drawPooWave(ctx2, +f[1]), 3);
