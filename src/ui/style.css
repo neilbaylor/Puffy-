@@ -1949,8 +1949,11 @@ kbd {
   color: var(--ink);
   transition: opacity 0.2s;
 }
-.bl-slot canvas,
-.bl-wait { width: clamp(56px, 14vh, 100px); height: clamp(56px, 14vh, 100px); }
+/* (the hero's picture a bit taller than wide, so each stands at their own size — Big Muscles the
+   biggest, like on the start screen; an empty square's "?" keeps the squares the same height) */
+.bl-slots { --cw: clamp(56px, 14vh, 100px); }
+.bl-slot canvas { width: var(--cw); height: calc(var(--cw) * 1.25); }
+.bl-wait { width: var(--cw); height: var(--cw); margin: calc(var(--cw) * 0.125) 0; }
 .bl-wait {
   display: grid;
   place-items: center;
@@ -2669,8 +2672,7 @@ html.light .start .logo span { transform: rotate(-2deg); }
   .battle-lobby { --lobw: min(100%, 1000px); }
   .bl-slots, .bl-me { width: var(--lobw); }
   .bl-slot { padding: 14px 8px 12px; gap: 4px; border-radius: 20px; }
-  .bl-slot canvas,
-  .bl-wait { width: clamp(80px, 19vh, 160px); height: clamp(80px, 19vh, 160px); }
+  .bl-slots { --cw: clamp(80px, 19vh, 160px); }
   .bl-wait { font-size: clamp(34px, 8vh, 64px); }
   .bl-slot b { font-size: clamp(18px, 3.4vh, 27px); }
   .bl-slot small { font-size: clamp(11px, 1.7vh, 14px); }
