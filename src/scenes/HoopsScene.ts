@@ -1164,7 +1164,8 @@ export class HoopsScene extends Phaser.Scene {
       await this.iwait(1700);
       this.kingAnim = { frames: ['laugh0', 'laugh1'], fps: 7 };
       sfx.laugh();
-      await this.iwait(800);
+      // (a moment longer on him, his name up)
+      await this.iwait(1300);
       this.lowerThird(null);
       this.kingAnim = { frames: ['idle0', 'idle1'], fps: 2.5 };
     }
@@ -1184,7 +1185,7 @@ export class HoopsScene extends Phaser.Scene {
       this.heroAnim = { frames: ['jump', 'idle0'], fps: 4 };
       this.tweens.add({ targets: this.heroHop, h: 24, duration: 170, yoyo: true, repeat: 2, ease: 'Quad.easeOut', onComplete: () => (this.heroHop.h = 0) });
       await this.glide(hp.x, hp.y - 90, 2.1, 900);
-      await this.iwait(900);
+      await this.iwait(1400);
     }
     // back to the game: everything in its final state (also after a skip)
     this.inIntro = false;
