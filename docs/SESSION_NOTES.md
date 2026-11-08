@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.164)
+## Where things stand (v0.165)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -187,6 +187,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   deferred art + MenuScene's quiet jobs (`takeQuietJobs`) + 24 warm-up frames under the loading bar
   (two-phase bar); the boot screen is the manifest blue with the rainbow PUFFY logo. Results after the last
   level: Play again + Home screen. Account card: Sign out bottom-left.
+- v0.165: subtitle cross-fade fix: the cloned old line drops .wn-new before getting .wn-old (wn-new's animation rule was overriding the fade-out); 0.35 s.
 - v0.164: LIGHT: MenuScene ignores 'menu-level' (the fly-over stays on the Part it opened with).
 - v0.163: subtitle cross-fade: syncLevels clones the old .world-name as .wn-old (fades out, removed on animationend / 600 ms), new gets .wn-new (fades in). Both absolute in the fixed slot. Medium tablet doesn't pick light mode (user prefers full mode there).
 - v0.162: Menu switching on a mid Android tablet still slow. LevelView option ahead:false (menu: no chunk-per-frame painting ahead); prewarmed Worlds warmOnGpu their textures; Background(stillClouds) + refreshClouds() on switch; quiet jobs after 2.5 s idle. Old tablet now falls back to Canvas (user OK with that for now).
