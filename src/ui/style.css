@@ -365,6 +365,11 @@ html:has(body.booting) body { background: #5fc4ff; }
 /* a small, even margin under Play (it used to be nudged past the padding and
    could hang off the bottom of tablets) */
 .start { padding-bottom: calc(max(4px, clamp(10px, 2vmin, 18px) - 10px) + var(--safe-b)); }
+/* tablets and bigger: Play sits a little higher off the bottom edge (the cards give up the room) */
+@media (min-height: 501px) {
+  .start { padding-bottom: calc(clamp(14px, 2.6vh, 26px) + var(--safe-b)); }
+  .start:not(.no-levels) .start-foot { margin-top: 4px; }
+}
 /* a bit more room under the subtitle: the cards (and everything under them) sit 10px lower */
 .start .cards { margin-top: 10px; }
 .keys-hint {
