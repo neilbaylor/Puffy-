@@ -436,6 +436,8 @@ export class UI {
     game.events.on('wrestle-chair', (on: boolean) => this.touch.setChair(on));
     game.events.on('level-complete', (r: ResultState) => this.showResults(r));
     game.events.on('game-over', (g: GameOverState) => this.showGameOver(g));
+    // lost a boss fought from the Bosses menu: a card, not a straight restart
+    game.events.on('boss-lost', (r: ResultState) => this.showBossResults(r, false));
 
     window.addEventListener('keydown', (e) => {
       if ((e.code === 'Escape' || e.code === 'KeyP') && this.gameScene && !this.screen && !this.bossIntro) this.pause();
@@ -1048,23 +1050,31 @@ export class UI {
     this.game.scene.start(boss.scene, bossData(this.session, hero.id, level));
   }
 
-  /** You beat a boss from the Bosses menu: fight it again, or back home. */
-  private showBossResults(r: ResultState) {
+  /** You beat (or lost to) a boss from the Bosses menu: fight it again, or back home. */
+  private showBossResults(r: ResultState, won = true) {
     this.touch.hide();
-    playLevelClear();
+    if (won) playLevelClear();
+    else {
+      this.hud.hidden = true;
+      fadeOutMusic(800);
+      sfx.groan();
+    }
     const boss = BOSSES.find((b) => b.level === r.level) ?? BOSSES[0];
+    const queen = boss.scene === 'Wrestle';
+    const title = won ? (queen ? 'Queen Plop is down!' : 'You beat the King!') : queen ? 'Queen Plop wins!' : 'The King wins!';
+    const result = r.hoops ? `<dt>Final score</dt><dd>${esc(r.hoops)}</dd>` : `<dt>Result</dt><dd>${won ? 'K.O.!' : 'Pinned!'}</dd>`;
     const el = h(`<div class="screen modal">
-      <div class="panel results">
+      <div class="panel results${won ? '' : ' gameover'}">
         <div class="results-hero"><canvas width="160" height="160"></canvas></div>
         <div class="results-body">
           <p class="eyebrow">${boss.name}</p>
-          <h2>${boss.scene === 'Wrestle' ? 'Queen Plop is down!' : 'You beat the King!'}</h2>
+          <h2>${title}</h2>
           <dl class="stat-list">
-            ${r.hoops ? `<dt>Final score</dt><dd>${esc(r.hoops)}</dd>` : '<dt>Result</dt><dd>K.O.!</dd>'}
+            ${result}
           </dl>
           <div class="row">
-            <button class="btn btn-alt" data-act="again">Play again</button>
-            <button class="btn btn-go" data-act="home">Home screen</button>
+            <button class="btn ${won ? 'btn-alt' : 'btn-go'}" data-act="again">${won ? 'Play again' : 'Try again'}</button>
+            <button class="btn ${won ? 'btn-go' : 'btn-alt'}" data-act="home">Home screen</button>
           </div>
         </div>
       </div>

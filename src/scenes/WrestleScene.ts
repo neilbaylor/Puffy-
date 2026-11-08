@@ -787,11 +787,17 @@ export class WrestleScene extends Phaser.Scene {
       this.callout('HA HA HA!', 'bad', 1500);
       sfx.laugh();
     });
-    // (from the Bosses menu: no life lost, the match just starts again)
-    const hadLife = this.wd.result?.practice || loseLife();
+    // (from the Bosses menu: no life lost, and a card offers another go)
+    const practice = !!this.wd.result?.practice;
+    const hadLife = practice || loseLife();
     this.emitHud(true);
+    if (practice) this.game.events.emit('boss-cutscene');
     this.time.delayedCall(2300, () => {
       fadeOutMusic(500);
+      if (practice) {
+        this.game.events.emit('boss-lost', this.wd.result);
+        return;
+      }
       if (!hadLife) {
         const ch = characterById(this.wd.charId);
         this.game.events.emit('game-over', { charId: ch.id, name: ch.name, checkpoint: this.wd.checkpoint } satisfies GameOverState);
