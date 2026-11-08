@@ -9,6 +9,7 @@ import { BattleScene } from './scenes/BattleScene';
 import { WrestleScene } from './scenes/WrestleScene';
 import { UI } from './ui/ui';
 import { LIGHT, LIGHT_KEY } from './core/light';
+import { VERSION } from './version';
 
 installInput();
 
@@ -23,8 +24,10 @@ installInput();
 const RES_KEY = 'puffy.res';
 let resCap = (() => {
   try {
-    const saved = Number(localStorage.getItem(RES_KEY)) || 0;
-    if (saved) return saved;
+    // (a lower resolution found earlier holds only for the version it was measured on: each new
+    // version — usually smoother — gets a fresh look)
+    const [cap, ver] = (localStorage.getItem(RES_KEY) ?? '').split('@');
+    if (Number(cap) && ver === VERSION) return Number(cap);
   } catch {
     /* private mode */
   }
@@ -136,6 +139,10 @@ function start(refreshMs: number) {
       const delta = last ? t - last : 0;
       last = t;
       if (!delta || delta > 1000 || document.hidden || !game.scene.isActive('Menu')) return;
+      // (only while the start screen is just showing: frames where it's building another Part's
+      // scenery in the background are slow on purpose, and aren't the device being slow)
+      const menu = game.scene.getScene('Menu') as unknown as { quiet?: unknown[]; building?: unknown };
+      if ((menu.quiet?.length ?? 0) > 0 || menu.building) return;
       deltas.push(delta);
       since += delta;
       // (about 4 seconds' worth, however fast or slow the frames are)
@@ -149,7 +156,7 @@ function start(refreshMs: number) {
       if (median > 21 && !capped30 && now > 1.05 && rounds > 0) {
         resCap = now > 1.4 ? 1.25 : 1;
         try {
-          localStorage.setItem(RES_KEY, String(resCap));
+          localStorage.setItem(RES_KEY, `${resCap}@${VERSION}`);
         } catch {
           /* private mode */
         }
