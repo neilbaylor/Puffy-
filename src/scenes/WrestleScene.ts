@@ -69,6 +69,8 @@ const Q_RES = 4;
 const Q_PAD = 18;
 const Q_TOP = 24;
 const HITS = 13;
+/** How tough she is overall: faster and quicker to attack again (1.05 = 5% harder than v0.160). */
+const Q_TOUGH = 1.05;
 /** Your hearts in the ring: you start with all 6, and pick-ups top you back up. */
 const HEARTS_START = 6;
 const HEARTS_MAX = 6;
@@ -169,7 +171,7 @@ class Queen {
   }
   /** Tougher as she gets hurt. */
   get rage() {
-    return 1 + ((HITS - this.hp) / HITS) * 0.8;
+    return (1 + ((HITS - this.hp) / HITS) * 0.8) * Q_TOUGH;
   }
 
   setMode(m: Queen['mode'], t = 0) {
@@ -236,7 +238,7 @@ class Queen {
         const above = p.alive && p.body.velocity.y > 60 && p.bottom < this.top + 6 && Math.abs(dx) < 90 && !s.heroDiving();
         if (ground && above && this.cdBlock <= 0) {
           b.setVelocity(towards * speed * 0.6, -640);
-          this.cdBlock = 2.1 + Math.random();
+          this.cdBlock = (2.1 + Math.random()) / Q_TOUGH;
           this.hopIn = 0.45;
         } else if (ground && this.hopIn <= 0) {
           const lunge = Math.abs(dx) < 260 && Math.random() < 0.25;
@@ -283,7 +285,7 @@ class Queen {
         frame = Math.floor(s.time.now / 80) % 2 ? 'run0' : 'run1';
         if (ground && Math.random() < 0.3) s.fx.dust(this.x - this.dir * 20, this.bottom, 1);
         if (this.t <= 0) {
-          this.cdCharge = 1.85 + Math.random() * 1.4;
+          this.cdCharge = (1.85 + Math.random() * 1.4) / Q_TOUGH;
           this.setMode('idle', 0.2);
         }
         break;
@@ -294,7 +296,7 @@ class Queen {
         this.spr.setX(this.spr.x + Math.sin(s.time.now / 12) * 0.7);
         if (this.t <= 0) {
           s.heaveAt(this, p.x);
-          this.cdHeave = 5.4 + Math.random() * 2.6;
+          this.cdHeave = (5.4 + Math.random() * 2.6) / Q_TOUGH;
           this.setMode('idle', 0.25);
         }
         break;
