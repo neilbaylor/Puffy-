@@ -222,6 +222,7 @@ html:has(body.booting) body { background: #5fc4ff; }
   38% { transform: translateY(0) rotate(-1deg) scale(1.14, 0.88); }
   48% { transform: translateY(-0.05em) rotate(2deg) scale(0.97, 1.04); }
 }
+:root { --wn: clamp(13px, 2.8vmin, 20px); }
 .world-name {
   margin: 0;
   display: flex;
@@ -230,7 +231,7 @@ html:has(body.booting) body { background: #5fc4ff; }
   align-items: baseline;
   column-gap: 0.55em;
   font-family: var(--display);
-  font-size: clamp(13px, 2.8vmin, 20px);
+  font-size: var(--wn);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: #fff;
@@ -421,7 +422,7 @@ html:has(body.booting) body { background: #5fc4ff; }
   .start.no-levels .cards { margin-top: calc(clamp(14px, 7.5vh, 36px) + 8px); }
   .start.no-levels .start-foot { margin-top: clamp(18px, 9vh, 44px); }
   .logo { font-size: clamp(30px, 11vh, 52px); }
-  .world-name { font-size: clamp(11px, 3.6vh, 16px); }
+  :root { --wn: clamp(11px, 3.6vh, 16px); }
   /* shorter cards: the heroes are drawn smaller so everything fits under the title */
   .cards { flex: 0 1 auto; width: min(100%, 760px); }
   .card { padding: 4px 8px 8px; border-radius: 16px; box-shadow: 0 4px 0 var(--ink); }
@@ -2630,5 +2631,18 @@ kbd {
 .tbtn[hidden] { display: none !important; }
 
 /* the start screen's subtitle swaps by fading the whole line out and back in */
-.start .world-name { transition: opacity 0.17s ease; }
+/* the subtitle sits in a fixed slot under the logo, out of the page's layout (position absolute,
+   one line, its own layout box): its length changes with the Part, and a re-layout of the
+   whole start screen on every switch is what made switching stutter */
+.start .start-head { position: relative; padding-bottom: calc(var(--wn) * 1.3 + 2px); }
+.start .world-name {
+  position: absolute;
+  left: -50vw;
+  right: -50vw;
+  bottom: 0;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  contain: layout style;
+  transition: opacity 0.17s ease;
+}
 .start .world-name.swap { opacity: 0; }

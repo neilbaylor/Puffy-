@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { DEPTH, GRAVITY, MAX_FALL_SPEED, MIN_VIEW_W, TILE, VIEW_H } from '../config';
-import { PROP_RES, addCanvas, dropPlops, ensureLook, freeLooksExcept, hires, lookJobs, plopJobs } from '../gfx/textures';
+import { PROP_RES, addCanvas, dropBaddiesExcept, ensureLook, freeLooksExcept, gameArtJobs, hires, lookJobs } from '../gfx/textures';
 import { PALETTES } from '../gfx/world';
 import { drawRock } from '../gfx/hazards';
 import { POO, POO_DARK } from '../gfx/plopworld';
@@ -268,9 +268,10 @@ export class GameScene extends Phaser.Scene {
     ensureLook(this, mix0.a);
     if (mix0.w > 0) ensureLook(this, mix0.b);
     this.lookQueue = themesFor(this.levelId).flatMap((l) => lookJobs(this, l));
-    // the Plops only live in Plop Invasion (drawn on the start screen when it's picked; here if not yet)
-    if (this.levelId === 3) for (const job of plopJobs(this)) job();
-    else if (!this.scene.isActive('Menu')) dropPlops(this);
+    // this level's bad guys (drawn behind the loading card before the level started; here if not
+    // yet, e.g. a restart); the other levels' are freed
+    for (const job of gameArtJobs(this, { heroes: this.session.players.map((p) => p.characterId), level: this.levelId })) job.run();
+    if (!this.scene.isActive('Battle')) dropBaddiesExcept(this, this.levelId);
     this.lookNext = 0;
     if (!this.scene.isActive('Menu') && !this.scene.isActive('Battle')) freeLooksExcept(this, themesFor(this.levelId));
     this.bg = new Background(this, heightPx - VIEW_H);

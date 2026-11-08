@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { DEPTH, TILE } from '../config';
 import { rng } from '../gfx/draw';
 import type { Pt } from '../gfx/handdrawn';
-import { PROP_RES, addCanvas, hires } from '../gfx/textures';
+import { PROP_RES, TERRAIN_RES, addCanvas, hires } from '../gfx/textures';
 import { DEFAULT_PALETTE, PALETTES, drawCloudPlatform, drawPuffTree, drawTerrainPiece, roundPoly, traceCells, type TerrainKind, type WorldPalette } from '../gfx/world';
 import { drawPine } from '../gfx/mountain';
 import type { Cell, LevelData } from '../level/builder';
@@ -267,7 +267,7 @@ export class LevelView {
           /** Just the picture (the start screen draws a level's in quiet moments, ahead of Play). */
           const paint = () => {
           if (!this.scene.textures.exists(key)) {
-            const c = hires(cw + PAD * 2, ch, PROP_RES, (ctx) => {
+            const c = hires(cw + PAD * 2, ch, TERRAIN_RES, (ctx) => {
               ctx.translate(PAD - cx0, PAD - top);
               drawTerrainPiece(ctx, { kind, outline, pal, seed: Math.round(x0 + y0), floorY: this.heightPx, clip: { x0: cx0 - PAD, x1: cx0 + cw + PAD, y0: top - PAD, y1: cut + PAD } });
             });
@@ -278,7 +278,7 @@ export class LevelView {
               const fillCol = Phaser.Display.Color.HexStringToColor(hex).color;
               DEEP_FILL.set(key, fillCol);
               const cctx = c.getContext('2d')!;
-              const fadeH = Math.round(90 * PROP_RES);
+              const fadeH = Math.round(90 * TERRAIN_RES);
               const g2 = cctx.createLinearGradient(0, c.height - fadeH, 0, c.height);
               g2.addColorStop(0, hex + '00');
               g2.addColorStop(0.75, hex + 'ff');
@@ -302,7 +302,7 @@ export class LevelView {
           const chunk = this.scene.add
             .image(cx0 - PAD, top - PAD, key)
             .setOrigin(0, 0)
-            .setScale(1 / PROP_RES)
+            .setScale(1 / TERRAIN_RES)
             .setDepth(DEPTH.tiles);
           // (drawn later, in lazy mode: it joins the colour grade too)
           if (this.scenery) {

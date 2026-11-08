@@ -8,6 +8,7 @@ import { HoopsScene } from './scenes/HoopsScene';
 import { BattleScene } from './scenes/BattleScene';
 import { WrestleScene } from './scenes/WrestleScene';
 import { UI } from './ui/ui';
+import { LIGHT, LIGHT_KEY } from './core/light';
 
 installInput();
 
@@ -27,10 +28,8 @@ let resCap = (() => {
   } catch {
     /* private mode */
   }
-  // a low-memory device (2 GB or less, where the browser says) draws at 1x from the start:
-  // a full-size high-DPI screen is a lot of extra memory on those
-  const mem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
-  return mem !== undefined && mem <= 2 ? 1 : 0;
+  // light mode (older devices: see core/light) draws at 1x from the start
+  return LIGHT ? 1 : 0;
 })();
 
 /**
@@ -163,10 +162,22 @@ function start(refreshMs: number) {
   new UI(game);
   // the graphics chip gave up (out of memory, usually): say so rather than freeze
   game.canvas.addEventListener('webglcontextlost', () => {
-    bootTrouble('the graphics ran out of memory (WebGL context lost)');
     const note = document.createElement('div');
     note.className = 'gl-lost';
-    note.textContent = 'The graphics ran out of memory. Close other tabs and reload the page.';
+    if (!LIGHT) {
+      // the first time: switch this device to light mode (remembered) and start again
+      try {
+        localStorage.setItem(LIGHT_KEY, '1');
+      } catch {
+        /* private mode */
+      }
+      note.textContent = 'Switching to light mode for this device…';
+      document.body.appendChild(note);
+      setTimeout(() => location.reload(), 900);
+      return;
+    }
+    bootTrouble('the graphics ran out of memory (WebGL context lost)');
+    note.textContent = 'The graphics ran out of memory. Close other tabs and apps, then reload the page.';
     document.body.appendChild(note);
   });
 
