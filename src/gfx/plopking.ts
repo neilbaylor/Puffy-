@@ -79,13 +79,6 @@ export function drawPlopKing(ctx: Ctx, f: KingFrame, opts: { robe?: boolean; jet
   } finally {
     Object.assign(KING_LOOK, was);
   }
-  // the robe's ermine collar round his neck (where his two tiers meet), a gold clasp in front
-  if (opts.robe) {
-    const y = botY - 22;
-    st.shape(ctx, [[cx - 30, y - 2], [cx - 14, y - 6], [cx + 14, y - 6], [cx + 30, y - 2], [cx + 26, y + 6], [cx, y + 3], [cx - 26, y + 6]], ERMINE, 4220, { lw: 0.9, light: [cx - 8, y - 3] });
-    for (const k of [-20, -8, 6, 18]) st.shape(ctx, ellipsePts(cx + k, y + 0.5, 1.2, 1.8, 0, 8), F('#2a1a12', '#140a06', '#4a3428'), 4221 + k, { lw: 0.3, plain: true });
-    st.shape(ctx, ellipsePts(cx, y + 2, 4.2, 4.2, 0, 14), GOLD, 4225, { lw: 0.7, light: [cx - 1.5, y] });
-  }
 }
 
 /** A jetpack flame (pointing down from a nozzle at (x, y)): three lengths to flicker between. */
