@@ -147,3 +147,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.142: one hit per chair (a connecting chair always counts, then breaks)
 - v0.143: chair/dive worth 2; longer jumbotron holds in the Queen intro
 - v0.144: Queen fight hearts 10% bigger
+- v0.145: longer King/hero name shots in the basketball intro; Sign out top right
