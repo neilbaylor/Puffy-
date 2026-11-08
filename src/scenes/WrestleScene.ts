@@ -690,7 +690,7 @@ export class WrestleScene extends Phaser.Scene {
         draw(ctx, f);
         ctx.restore();
       });
-      addCanvas(this, key, c, (t) => PLOP_FRAMES.forEach((f, i) => t.add(f, 0, (i % COLS) * fw, Math.floor(i / COLS) * fh, fw, fh)));
+      addCanvas(this, key, c, (t) => PLOP_FRAMES.forEach((f, i) => t.add(f, 0, (i % COLS) * fw, Math.floor(i / COLS) * fh, fw, fh)), { release: true });
     };
     sheetOf('wr-queen', (ctx, f) => drawQueen(ctx, Q_PAD, Q_TOP, f));
     sheetOf('wr-king', (ctx, f) => drawPlop(ctx, Q_PAD, Q_TOP, f, STYLES.polished, 'king'));
@@ -707,7 +707,7 @@ export class WrestleScene extends Phaser.Scene {
         drawQueenKO(ctx, 0, 0, i);
         ctx.restore();
       });
-      addCanvas(this, 'wr-queen-ko', c, (t) => QUEEN_KO_FRAMES.forEach((f, i) => t.add(f, 0, (i % 2) * fw, Math.floor(i / 2) * fh, fw, fh)));
+      addCanvas(this, 'wr-queen-ko', c, (t) => QUEEN_KO_FRAMES.forEach((f, i) => t.add(f, 0, (i % 2) * fw, Math.floor(i / 2) * fh, fw, fh)), { release: true });
     }
     if (!T.exists('camflash')) addCanvas(this, 'camflash', hires(48, 48, 1, (ctx) => drawCameraFlash(ctx, 24)));
     if (!T.exists('spot')) addCanvas(this, 'spot', hires(300, 700, 1, (ctx) => drawSpotlight(ctx, 300, 700)));

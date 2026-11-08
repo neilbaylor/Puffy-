@@ -42,7 +42,7 @@ import {
   type JumboContent,
 } from '../gfx/hoops';
 import { stingerReveal, stingerTitle } from '../ui/stinger';
-import { addCanvas, hires } from '../gfx/textures';
+import { addCanvas, frameGrid, hires } from '../gfx/textures';
 import { BOOM_FRAMES, BOOM_SIZE, drawBoomFrame } from '../gfx/boom';
 import { drawEmber, drawFireball, drawFluffChunk, drawSmoke } from '../gfx/blast';
 import { gamepadSources } from '../input/gamepad';
@@ -236,30 +236,38 @@ export class HoopsScene extends Phaser.Scene {
     setArenaStyle(this.style);
     if (!this.textures.exists(this.k('arena'))) addCanvas(this, this.k('arena'), hires(ARENA_W, ARENA_H, ARENA_RES, (ctx) => drawArena(ctx)), undefined, { release: true });
     if (!this.textures.exists('king')) {
-      const { c, ctx } = canvas(Math.ceil(KING_W * KING_FRAMES.length * KING_RES), Math.ceil(KING_H * KING_RES));
-      ctx.scale(KING_RES, KING_RES);
+      const fw = Math.ceil(KING_W * KING_RES);
+      const fh = Math.ceil(KING_H * KING_RES);
+      const g = frameGrid(KING_FRAMES.length, fw, fh);
+      const { c, ctx } = canvas(g.w, g.h);
       KING_FRAMES.forEach((f, i) => {
         ctx.save();
-        ctx.translate(i * KING_W, 0);
+        ctx.beginPath();
+        ctx.rect(g.x(i), g.y(i), fw, fh);
+        ctx.clip();
+        ctx.translate(g.x(i), g.y(i));
+        ctx.scale(KING_RES, KING_RES);
         drawKing(ctx, 0, 0, f, false);
         ctx.restore();
       });
-      addCanvas(this, 'king', c, (t) => KING_FRAMES.forEach((f, i) => t.add(f, 0, Math.round(i * KING_W * KING_RES), 0, Math.round(KING_W * KING_RES), Math.round(KING_H * KING_RES))));
+      addCanvas(this, 'king', c, (t) => KING_FRAMES.forEach((f, i) => t.add(f, 0, g.x(i), g.y(i), fw, fh)), { release: true });
     }
     for (const kind of PLOP_KINDS) {
       const key = `plop-${kind}`;
       if (!this.textures.exists(key)) {
         const R = 2.5;
-        const pw = Math.round(PLOP_W * R) + 4;
-        const { c, ctx } = canvas(pw * PLOP_FRAMES.length, Math.round(PLOP_H * R));
+        const fw = Math.round(PLOP_W * R);
+        const fh = Math.round(PLOP_H * R);
+        const g = frameGrid(PLOP_FRAMES.length, fw, fh);
+        const { c, ctx } = canvas(g.w, g.h);
         PLOP_FRAMES.forEach((f, i) => {
           ctx.save();
-          ctx.translate(i * pw, 0);
+          ctx.translate(g.x(i), g.y(i));
           ctx.scale(R, R);
           drawPlop(ctx, 0, 0, f, STYLES.polished, kind);
           ctx.restore();
         });
-        addCanvas(this, key, c, (t) => PLOP_FRAMES.forEach((f, i) => t.add(f, 0, i * pw, 0, Math.round(PLOP_W * R), Math.round(PLOP_H * R))));
+        addCanvas(this, key, c, (t) => PLOP_FRAMES.forEach((f, i) => t.add(f, 0, g.x(i), g.y(i), fw, fh)), { release: true });
       }
     }
     if (!this.textures.exists('kingcrown')) addCanvas(this, 'kingcrown', hires(64, 44, KING_RES, (ctx) => drawKingCrown(ctx, 32, 40)));

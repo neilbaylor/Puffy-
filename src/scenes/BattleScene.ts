@@ -4,7 +4,7 @@ import { sfx } from '../core/sfx';
 import { characterById } from '../data/characters';
 import { ART_RES, WALK_FRAMES } from '../gfx/draw';
 import { recolorForSlot } from '../gfx/recolor';
-import { addCanvas, ensureLevelLooks, hires } from '../gfx/textures';
+import { addCanvas, ensureLevelLooks, frameGrid, hires } from '../gfx/textures';
 import { PRIZE_COLOR, drawBombBall, drawChute, drawFireball, drawPrize } from '../gfx/prizes';
 import { PLOP_FRAMES, PLOP_H, PLOP_W, drawPlop, type PlopKind } from '../gfx/plops';
 import { canvas } from '../gfx/draw';
@@ -286,16 +286,17 @@ export class BattleScene extends Phaser.Scene {
       if (this.textures.exists(key)) continue;
       // (a margin each side: the leaf arms reach past the art's own frame)
       const fw = Math.round((PLOP_W + PLOP_PAD * 2) * PLOP_RES);
-      const pw = fw + 4;
-      const { c, ctx } = canvas(pw * PLOP_FRAMES.length, Math.round((PLOP_H + PLOP_TOP) * PLOP_RES));
+      const fh = Math.round((PLOP_H + PLOP_TOP) * PLOP_RES);
+      const g = frameGrid(PLOP_FRAMES.length, fw, fh);
+      const { c, ctx } = canvas(g.w, g.h);
       PLOP_FRAMES.forEach((f, i) => {
         ctx.save();
-        ctx.translate(i * pw, 0);
+        ctx.translate(g.x(i), g.y(i));
         ctx.scale(PLOP_RES, PLOP_RES);
         drawPlop(ctx, PLOP_PAD, PLOP_TOP, f, STYLES.polished, kind);
         ctx.restore();
       });
-      addCanvas(this, key, c, (t) => PLOP_FRAMES.forEach((f, i) => t.add(f, 0, i * pw, 0, fw, Math.round((PLOP_H + PLOP_TOP) * PLOP_RES))));
+      addCanvas(this, key, c, (t) => PLOP_FRAMES.forEach((f, i) => t.add(f, 0, g.x(i), g.y(i), fw, fh)), { release: true });
     }
     if (!this.textures.exists('bpellet')) addCanvas(this, 'bpellet', hires(16, 16, R, (ctx) => drawPellet(ctx)));
   }
