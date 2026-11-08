@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.179)
+## Where things stand (v0.180)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -187,6 +187,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   deferred art + MenuScene's quiet jobs (`takeQuietJobs`) + 24 warm-up frames under the loading bar
   (two-phase bar); the boot screen is the manifest blue with the rainbow PUFFY logo. Results after the last
   level: Play again + Home screen. Account card: Sign out bottom-left.
+- v0.180: WrestleScene intro: opens cut to (jumbo x, jumbo y + 70, z 1.75, rot 0) and pushes straight in (1.3 s, no rotation swing; was a sweep from the far-left crowd). New beat 6 after her 'Welcome' line: lights to 0.25, lowerThird(hero name, 'The challenger'), camTo(p.x - 12, MAT_Y - 50, 2.45), three hops (body velocity), then back to the turnbuckle (650 ms) for the leap. tqintro.cjs logs the camera path + hero shots (+~3.5 s to the intro).
 - v0.179: level3.ts bigplop at tile 50 gets weapon 'flail' (level 3 now: 3 blasters, 2 chainsaws, 1 ball and chain; tflail.cjs). BG_RES and CLOUD_RES 1.5 -> 1.25 for normal devices (light stays 1). WrestleScene: HITS 13 -> 12, Q_TOUGH 1.05 -> 1 (5% easier), CHAIR_AT_HP [-1, 8, 4]; CHAIRS was already 3 (since v0.141).
 - v0.178: BootScene drains MenuScene.nextAheadJob() (quiet jobs while `building` is set = the other Parts' prewarm) behind the loading bar, with the Menu paused (prewarm's gone() now accepts a paused scene; GPU warm-up happens in the 8 warm-up frames). LIGHT / nothing beaten: no jobs, no change. Load +~0.45s in swiftshader (3.4 -> 3.8s); tfirst2.cjs: taps right after load build nothing (createWorld 0); tboot2.cjs [light].
 - v0.177: (1) pause during the fly-over: .screen.modal z-index 40 (lvl-intro is 30) and setScreen toggles .lvl-intro.held (title + Skip hidden); tpausefly.cjs. (2) MenuScene quiet jobs: run 1.5s after the last tap (was 2.5s); after a job, next at +0 if it took <12ms else +min(250, took*6) (was always 250) — both other Parts ready ~2.9s after load (was ~7.3s); tjobs.cjs. (3) LIGHT: themesFor() = first look only, themeMix(one look) = no fade, Battle default too; clouds never re-shaped (c.next Infinity). tlightplay.cjs: cloud repaints 44-80 -> 0, look jobs 7-12 -> 2 per 12s. (4) railway.json startCommand node server.mjs; server.mjs exits 0 on SIGTERM/SIGINT (npm 'command failed' lines on redeploy).
