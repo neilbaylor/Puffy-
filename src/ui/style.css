@@ -79,6 +79,9 @@ body {
 }
 .boot-in { display: flex; flex-direction: column; align-items: center; max-width: 100%; }
 #boot .boot-error { margin-top: 14px; max-width: min(520px, 90vw); font: 700 14px/1.3 var(--body); color: #fff; background: #b0412f; border-radius: 10px; padding: 8px 12px; white-space: normal; text-align: center; }
+.art-loader { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: rgba(20, 12, 30, 0.35); }
+.art-loader .al-card { background: var(--paper); border: 3px solid var(--ink); border-radius: 18px; box-shadow: 0 5px 0 var(--ink); padding: 16px 26px 20px; display: flex; flex-direction: column; align-items: center; }
+.art-loader p { margin: 0 0 12px; font: 400 clamp(20px, 4vmin, 28px)/1 var(--display); color: var(--ink); }
 .gl-lost { position: fixed; inset: auto 12px 12px 12px; z-index: 100; font: 700 15px/1.3 var(--body); color: #fff; background: #b0412f; border-radius: 12px; padding: 10px 14px; text-align: center; }
 #boot p { margin: 0 0 14px; -webkit-text-stroke: 6px var(--ink); paint-order: stroke fill; text-align: center; white-space: nowrap; }
 #boot.out { opacity: 0; pointer-events: none; }
@@ -1757,23 +1760,8 @@ kbd {
   from { opacity: 0; transform: translateX(-50%) translateY(30px); }
 }
 
-/* the subtitle swapping to a new level / world name: just the part that changed —
-   its old letters hop away, the new ones pop in */
+/* (the subtitle's parts are plain groups: the whole line fades on a level switch, see .world-name.swap) */
 .world-name .seg { display: contents; }
-.world-name .swap-out i {
-  animation: wn-out 0.24s ease-in forwards;
-  animation-delay: calc(var(--j) * 0.012s);
-}
-@keyframes wn-out {
-  to { transform: translateY(-0.7em) rotate(-12deg) scale(0.5); opacity: 0; }
-}
-.world-name .swap-in i {
-  animation: wn-in 0.55s cubic-bezier(0.2, 1.6, 0.4, 1) both, wn-wave 2.6s ease-in-out infinite;
-  animation-delay: calc(var(--j) * 0.045s), calc(0.7s + var(--i) * 0.06s);
-}
-@keyframes wn-in {
-  from { transform: translateY(0.9em) rotate(14deg) scale(0.2); opacity: 0; }
-}
 
 /* the picked hero's name waves like the subtitle (the others sit still) */
 .card-name .w { display: inline-block; white-space: nowrap; }
@@ -2640,3 +2628,7 @@ kbd {
 }
 .wr-skip[hidden] { display: none; }
 .tbtn[hidden] { display: none !important; }
+
+/* the start screen's subtitle swaps by fading the whole line out and back in */
+.start .world-name { transition: opacity 0.17s ease; }
+.start .world-name.swap { opacity: 0; }

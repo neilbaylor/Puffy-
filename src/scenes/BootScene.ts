@@ -112,14 +112,13 @@ export class BootScene extends Phaser.Scene {
     this.scene.setVisible(false, 'Menu');
     this.scene.pause('Menu');
     slice = performance.now();
-    // The rest of the art, now, while the loading bar is up (it used to be done after the start
-    // screen showed, in quiet moments: on slower tablets that made the first few seconds
-    // sluggish), then what a first tap on the start screen needs (the Parts next to this one,
-    // this Part's song). The rest (this Part's whole ground, its other looks) is left for quiet
-    // moments on the start screen: doing it all here made the loading screen freeze on slow tablets.
-    const menu = this.scene.get('Menu') as unknown as { takeQuietJobs?: () => (() => void)[] };
+    // Only what the start screen itself shows is drawn here (the other heroes' card poses too).
+    // The game's own art (the heroes' game frames, the bad guys) is drawn when a game starts,
+    // behind a little loading card; the other Parts' scenery, this Part's song and the rest of its
+    // ground in quiet moments on the start screen. (Doing it all here was too much at once for
+    // older devices: the loading screen crashed half way through.)
     const rest = [{ name: 'other hero cards', run: () => this.game.events.emit('warm-cards') }, ...later];
-    const quiet = menu.takeQuietJobs?.() ?? [];
+    const quiet: (() => void)[] = [];
     let k = 0;
     const n2 = rest.length + quiet.length;
     const step2 = () => setProgress(PHASE1 + (1 - PHASE1) * (++k / Math.max(1, n2)) * 0.97);
@@ -141,10 +140,10 @@ export class BootScene extends Phaser.Scene {
     // graphics chip, and the game's code warmed up), so it's smooth from the first moment
     this.scene.resume('Menu');
     this.scene.setVisible(true, 'Menu');
-    for (let i = 0; i < 12; i++) await nextFrame();
+    for (let i = 0; i < 8; i++) await nextFrame();
     mark('warm-up frames');
     // the start screen's song (fetched and decoded alongside all of the above; usually ready by now)
-    await Promise.race([song, new Promise((r) => setTimeout(r, 1500))]);
+    await Promise.race([song, new Promise((r) => setTimeout(r, 800))]);
     mark('song decode (waiting)');
     setProgress(1);
     // the start screen's song: browsers that allow it (e.g. the game installed as an app on
