@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.141)
+## Where things stand (v0.142)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -187,6 +187,8 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   deferred art + MenuScene's quiet jobs (`takeQuietJobs`) + 24 warm-up frames under the loading bar
   (two-phase bar); the boot screen is the manifest blue with the rainbow PUFFY logo. Results after the last
   level: Play again + Home screen. Account card: Sign out bottom-left.
+- v0.142: `chairHit` clears her invulnerability first, so a connecting chair always counts and is spent
+  (before, a swing during her post-hit flash didn't count and you kept the chair). Test: t120.
 - v0.141: Queen HITS 15, CHAIRS 3 (CHAIR_AT_HP [–,10,5]), a touch harder (speed 100, hurt 0.5 s, cd tweaks).
   WrestleScene no longer puts a title on the stinger bars (the level → Queen transition showed
   "Plop Invasion · Part 1"); Hoops' Part 2 ending jumbotron just says PLOP INVASION. Hoops hero shot:

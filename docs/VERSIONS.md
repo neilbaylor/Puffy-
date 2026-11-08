@@ -144,3 +144,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.139: basketball shot animations (hero recoil, King puff + PTOO)
 - v0.140: Bosses button/modal polish, Play again replays the boss, longer jumbotron + cutscene holds, livelier K.O.
 - v0.141: Queen 15 hits, 3 chairs, a touch harder; no stinger title / coming soon; bazooka-tip shot origin
+- v0.142: one hit per chair (a connecting chair always counts, then breaks)
