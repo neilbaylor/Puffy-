@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.168)
+## Where things stand (v0.169)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -187,6 +187,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   deferred art + MenuScene's quiet jobs (`takeQuietJobs`) + 24 warm-up frames under the loading bar
   (two-phase bar); the boot screen is the manifest blue with the rainbow PUFFY logo. Results after the last
   level: Play again + Home screen. Account card: Sign out bottom-left.
+- v0.169: MenuScene.planQuiet no longer preloads the Part's song; ui.startGame calls preloadLevelMusic(level) as the loading card opens. tsw4.cjs profiles a switch (real pointerdown).
 - v0.168: LIGHT adds html.light; CSS stops .start logo/subtitle/card-name animations; syncLevels skips the cross-fade in light mode.
 - v0.167: webglcontextlost in light mode shows nothing (user: let it crash); not in light mode it still switches to light + reloads. bootTrouble kept for other loading errors.
 - v0.166: slight stutter in the level's opening fly-over on a mid tablet = ground chunks painted mid-flight on a quick Play. ui.gameArt adds ground jobs to the loader: MenuScene.groundJobs(id) (its own LevelView's paintJobs + warmOnGpu, or groundPaintJobs() for another Part) or, from a results card over Hoops/Wrestle, frees old terrain/tree textures then groundPaintJobs(host). artLoader waits 2 frames at the end. tfly.cjs / tnext.cjs / tcard.cjs measure it.

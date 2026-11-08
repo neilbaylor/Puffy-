@@ -171,3 +171,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.166: level ground drawn behind the loading card (smooth opening fly-over).
 - v0.167: no out-of-memory messages.
 - v0.168: light mode still titles on the start screen.
+- v0.169: no song decoding while browsing Parts.
