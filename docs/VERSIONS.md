@@ -151,3 +151,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.146: pause in boss fights, centred Bosses row, top-rope chair x3, smaller Sign out, intro trims
 - v0.147: pause button only during boss fights proper (not intros/endings); smaller Sign out
 - v0.148: player card Done centred and wider
+- v0.149: Sign out back to the v0.146 size
