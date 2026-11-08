@@ -181,3 +181,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.176: volleyball spike comes sooner (and always) once the Plops see you.
 - v0.177: pause menu works during the fly-over; other Parts ready sooner on the start screen; lighter light mode (one look per level, still clouds); cleaner deploy logs.
 - v0.178: other Parts are ready when the home screen appears (not in light mode): the first tap on one is instant.
+- v0.179: a ball-and-chain Plop in level 3; lighter background art; Queen Plop 5% easier with 12 hits.
