@@ -69,12 +69,15 @@ export type SnapHazard = [number, 'rock' | 'anvil', number, number, number, numb
 /** A prize in the arena: [id, kind, x, y (bottom), seconds it has been there]. */
 export type SnapPrize = [number, PrizeKind, number, number, number];
 
+/** A folding chair: [id, x, y (bottom), who's holding it ('' nobody), hits left, seconds of swing left, seconds lying there (-1 falling)]. */
+export type SnapChair = [number, number, number, string, number, number, number];
+
 // ── server → game ──
 export type ServerMsg =
   | { t: 'welcome'; id: string }
   | { t: 'full' }
   | { t: 'room'; room: RoomState }
-  | { t: 'snap'; k: number; tl: number; p: PackedPlayer[]; r: SnapRocket[]; z: SnapPrize[]; n: SnapEnemy[]; h: SnapHazard[]; e: BEvent[] }
+  | { t: 'snap'; k: number; tl: number; p: PackedPlayer[]; r: SnapRocket[]; z: SnapPrize[]; n: SnapEnemy[]; h: SnapHazard[]; c?: SnapChair[]; e: BEvent[] }
   | { t: 'pong'; c: number };
 
 // ── compact player encoding (a snapshot goes out 30 times a second) ──

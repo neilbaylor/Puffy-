@@ -12,7 +12,7 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import { CHARACTERS } from '../src/data/characters';
 import { buildArena } from '../src/shared/battle/arena';
 import { BattleSim, DT, TICK_HZ } from '../src/shared/battle/sim';
-import { MAX_BATTLERS, WEAPON_CODE, packPlayer, type ClientMsg, type Phase, type RoomPlayer, type RoomState, type ServerMsg, type SnapEnemy, type SnapHazard, type SnapPrize } from '../src/shared/battle/protocol';
+import { MAX_BATTLERS, WEAPON_CODE, packPlayer, type ClientMsg, type Phase, type RoomPlayer, type RoomState, type ServerMsg, type SnapChair, type SnapEnemy, type SnapHazard, type SnapPrize } from '../src/shared/battle/protocol';
 
 /** (BATTLE_COUNTDOWN lengthens it, for taking screenshots) */
 /** Once two or more friends are in, the next battle counts down from this on its own. */
@@ -55,6 +55,24 @@ const cleanName = (n: unknown, slot: number) => {
 const MAX_WATCHERS = 8;
 
 function demo(sim: BattleSim) {
+  if (process.env.BATTLE_DEMO === 'chairs') {
+    // (a test: the second hero right next to the first, a chair at the first one's feet, one more
+    // lying a little way off; nothing else coming)
+    const d = sim as unknown as { enemyIn: number; hazardIn: number; dropIn: number; chairAt: number[]; chairs: BattleSim['chairs'] };
+    d.enemyIn = d.hazardIn = d.dropIn = 1e9;
+    d.chairAt = [];
+    const [a, c] = [...sim.players.values()];
+    if (a && c) {
+      c.x = a.x + 46 * a.facing;
+      c.y = a.y;
+      a.invuln = c.invuln = 0;
+    }
+    if (a) {
+      d.chairs.push({ id: 801, x: a.x, y: a.y, vy: 0, landed: true, age: 0, holder: null, uses: 2, swing: 0 });
+      d.chairs.push({ id: 802, x: a.x - 200 * a.facing, y: -40, vy: 120, landed: false, age: 0, holder: null, uses: 2, swing: 0 });
+    }
+    return;
+  }
   const s = sim as unknown as { spawnEnemy: (ev: unknown[]) => void; enemies: { race: string; weapon: string | null; kind: string; hp: number; armed: boolean; x: number; chute: boolean; y: number; onGround: boolean }[]; enemyIn: number; grant: (p: unknown, k: string, ev: unknown[]) => void };
   s.enemyIn = 1e9;
   const looks: [string, string | null, string, number][] = [['plop', 'saw', 'medium', 600], ['plop', 'flail', 'medium', 820], ['plop', null, 'small', 700], ['puff', 'gun', 'small', 900]];
@@ -325,7 +343,8 @@ class Room {
           e.weapon === 'flail' ? Math.round(sim.flailBall(e).a * 100) / 100 : 0,
         ]);
         const hazards = sim.hazards.map((z): SnapHazard => [z.id, z.kind, r1(z.x), r1(z.y), r1(z.warn), (z.big ? 1 : 0) | (z.rolling > 0 ? 2 : 0)]);
-        this.broadcast({ t: 'snap', k: sim.tick, tl: r1(sim.timeLeft), p: players, r: rockets, z: prizes, n: enemies, h: hazards, e: events });
+        const chairs = sim.chairs.map((c): SnapChair => [c.id, r1(c.x), r1(c.y), c.holder ?? '', c.uses, Math.round(c.swing * 100) / 100, c.holder || !c.landed ? -1 : r1(c.age)]);
+        this.broadcast({ t: 'snap', k: sim.tick, tl: r1(sim.timeLeft), p: players, r: rockets, z: prizes, n: enemies, h: hazards, c: chairs, e: events });
         const anyone = [...this.clients.values()].some((c) => c.playing && c.ws);
         if (sim.over || !anyone) this.endBattle();
         break;

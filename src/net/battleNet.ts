@@ -4,7 +4,7 @@
  * snapshots, sends your buttons every tick, and reconnects if the phone drops
  * the connection (same place in the room for 30 s).
  */
-import { unpackPlayer, type ClientMsg, type RoomState, type ServerMsg, type SnapEnemy, type SnapHazard, type SnapPlayer, type SnapPrize, type SnapRocket } from '../shared/battle/protocol';
+import { unpackPlayer, type ClientMsg, type RoomState, type ServerMsg, type SnapChair, type SnapEnemy, type SnapHazard, type SnapPlayer, type SnapPrize, type SnapRocket } from '../shared/battle/protocol';
 import type { BEvent } from '../shared/battle/sim';
 
 export interface Snapshot {
@@ -15,6 +15,7 @@ export interface Snapshot {
   prizes: SnapPrize[];
   enemies: SnapEnemy[];
   hazards: SnapHazard[];
+  chairs: SnapChair[];
   events: BEvent[];
   /** When it arrived (performance.now()). */
   at: number;
@@ -111,7 +112,7 @@ export class BattleNet {
           this.onRoom(m.room);
           return;
         case 'snap':
-          this.inbox.push({ tick: m.k, timeLeft: m.tl, players: m.p.map(unpackPlayer), rockets: m.r, prizes: m.z ?? [], enemies: m.n ?? [], hazards: m.h ?? [], events: m.e, at: performance.now() });
+          this.inbox.push({ tick: m.k, timeLeft: m.tl, players: m.p.map(unpackPlayer), rockets: m.r, prizes: m.z ?? [], enemies: m.n ?? [], hazards: m.h ?? [], chairs: m.c ?? [], events: m.e, at: performance.now() });
           if (this.inbox.length > 60) this.inbox.splice(0, this.inbox.length - 60);
           return;
         case 'pong': {

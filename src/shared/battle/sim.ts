@@ -55,6 +55,15 @@ const BOMBS_PER_PRIZE = 3;
 const MAX_PRIZES = 2;
 /** Once it has landed, a prize waits this long (blinking at the end), then it's gone. */
 export const PRIZE_LIFE = 7;
+/** Folding chairs: this many fall into each battle (at random times and places). Grab one, and FIRE
+ * swings it instead of shooting: each hit takes 1 heart, and it's done after this many hits. */
+export const CHAIRS_PER_BATTLE = 2;
+export const CHAIR_USES = 2;
+/** A chair lying about unclaimed goes after this long (s). */
+export const CHAIR_LIFE = 16;
+/** A swing: how long it takes (s), and how far in front of you it reaches (px, at normal size). */
+export const CHAIR_SWING = 0.3;
+const CHAIR_REACH = 64;
 
 /** Bad guys' collision boxes [w, h] (feet at y), matching their art in the levels. */
 export const ENEMY_BOX: Record<EnemyKind, [number, number]> = { small: [22, 30], medium: [36, 68], big: [104, 176] };
@@ -174,6 +183,23 @@ export interface BPrize {
   age: number;
 }
 
+export interface BChair {
+  id: number;
+  x: number;
+  /** The bottom of it (where it lies). */
+  y: number;
+  vy: number;
+  landed: boolean;
+  /** Seconds since it landed (or was dropped). */
+  age: number;
+  /** Who's holding it (null: falling or lying about). */
+  holder: string | null;
+  /** Hits left in it. */
+  uses: number;
+  /** > 0: mid-swing (seconds left). */
+  swing: number;
+}
+
 export type BEvent =
   | { k: 'fire'; id: string; x: number; y: number; dir: 1 | -1; bomb?: boolean }
   | { k: 'jump'; id: string; air: boolean }
@@ -191,7 +217,12 @@ export type BEvent =
   | { k: 'throw'; x: number; y: number; kind: 'poo' | 'saw' }
   | { k: 'stomp'; id: string; on: string | number; x: number; y: number }
   | { k: 'freeze'; by: string }
-  | { k: 'crash'; kind: 'rock' | 'anvil'; x: number; y: number; big?: boolean; roll?: boolean };
+  | { k: 'crash'; kind: 'rock' | 'anvil'; x: number; y: number; big?: boolean; roll?: boolean }
+  | { k: 'chair'; x: number }
+  | { k: 'chairland'; x: number; y: number }
+  | { k: 'chairgrab'; id: string }
+  | { k: 'chairswing'; id: string }
+  | { k: 'chairhit'; id: string; x: number; y: number; broke: boolean };
 
 const charOf = (hero: string): CharacterDef => CHARACTERS.find((c) => c.id === hero) ?? CHARACTERS[0];
 /** How big this hero is right now ("grow" makes you bigger). */
@@ -471,7 +502,11 @@ export class BattleSim {
   prizes: BPrize[] = [];
   enemies: BEnemy[] = [];
   hazards: BHazard[] = [];
+  chairs: BChair[] = [];
   tick = 0;
+  /** When the chairs fall (seconds left on the clock): one in each half or so, at random. */
+  private chairAt: number[] = [MATCH_SECS - 25 - Math.random() * 30, MATCH_SECS * 0.45 - Math.random() * 25].slice(0, CHAIRS_PER_BATTLE);
+  private nextChair = 1;
   timeLeft = MATCH_SECS;
   private nextRocket = 1;
   private nextPrize = 1;
@@ -493,7 +528,24 @@ export class BattleSim {
   }
 
   remove(id: string) {
+    this.dropChairOf(id);
     this.players.delete(id);
+  }
+
+  /** The chair this hero is holding, if any. */
+  chairOf(id: string) {
+    return this.chairs.find((c) => c.holder === id) ?? null;
+  }
+
+  /** They let go of it (knocked out, or gone): it falls where they were, hits and all. */
+  private dropChairOf(id: string) {
+    const c = this.chairOf(id);
+    if (!c) return;
+    c.holder = null;
+    c.landed = false;
+    c.vy = -120;
+    c.swing = 0;
+    c.age = 0;
   }
 
   /** Put a hero at a spawn point: the given one, or the one farthest from everyone else. */
@@ -551,7 +603,12 @@ export class BattleSim {
         continue;
       }
       const c = charOf(p.hero);
-      const fire = stepMove(p, inputs.get(p.id) ?? 0, this.map, ev, () => this.rocketsOf(p.id) < this.maxShots(p));
+      const btn = inputs.get(p.id) ?? 0;
+      // holding a chair: FIRE swings it (no rockets)
+      const chair = this.chairOf(p.id);
+      const swingPress = !!chair && (btn & BTN.fire) !== 0 && !(p.prevBtn & BTN.fire) && p.stun <= 0 && p.frozen <= 0;
+      const fire = stepMove(p, btn, this.map, ev, () => !chair && this.rocketsOf(p.id) < this.maxShots(p));
+      if (swingPress && chair && chair.swing <= 0) this.swingChair(p, chair, ev);
       if (fire) {
         const k = sizeOf(p);
         const s = c.scale * k;
@@ -575,6 +632,7 @@ export class BattleSim {
     }
     this.stomps(ev);
     this.stepPrizes(ev);
+    this.stepChairs(ev);
     this.starContacts(ev);
     this.stepEnemies(ev);
     this.stepHazards(ev);
@@ -664,8 +722,8 @@ export class BattleSim {
   }
 
   /** Take hearts off a hero (unless they can't be hurt right now) and knock them back. */
-  private hurt(p: BPlayer, by: string, fromX: number, damage: number, knock: number, ev: BEvent[]) {
-    if (p.respawn > 0 || p.invuln > 0 || p.power === POWER.star) return;
+  private hurt(p: BPlayer, by: string, fromX: number, damage: number, knock: number, ev: BEvent[]): boolean {
+    if (p.respawn > 0 || p.invuln > 0 || p.power === POWER.star) return false;
     p.hp -= damage;
     p.lastHitBy = by;
     const away = Math.sign(p.x - fromX) || 1;
@@ -681,6 +739,7 @@ export class BattleSim {
       p.hp = 0;
       p.respawn = RESPAWN_SECS;
       p.deaths++;
+      this.dropChairOf(p.id);
       const killer = this.players.get(by);
       let gift = false;
       if (killer) killer.kos++;
@@ -693,6 +752,106 @@ export class BattleSim {
       }
       ev.push({ k: 'ko', id: p.id, by, gift });
     }
+    return true;
+  }
+
+  /** Swing the chair: everyone (and every bad guy) just in front gets it — 1 heart each. */
+  private swingChair(p: BPlayer, chair: BChair, ev: BEvent[]) {
+    chair.swing = CHAIR_SWING;
+    ev.push({ k: 'chairswing', id: p.id });
+    const k = sizeOf(p);
+    const reach = CHAIR_REACH * k;
+    const my = p.y - boxH(charOf(p.hero), k) / 2;
+    let hit = false;
+    let hx = p.x + p.facing * reach * 0.6;
+    let hy = my;
+    for (const o of this.players.values()) {
+      if (o === p || o.respawn > 0) continue;
+      const oc = charOf(o.hero);
+      const ok = sizeOf(o);
+      const dx = (o.x - p.x) * p.facing;
+      const oy = o.y - boxH(oc, ok) / 2;
+      if (dx < -8 || dx > reach + boxW(oc, ok) / 2 || Math.abs(oy - my) > 30 * k + boxH(oc, ok) / 2) continue;
+      if (this.hurt(o, p.id, p.x, 1, 1.2, ev)) {
+        hit = true;
+        hx = o.x;
+        hy = oy;
+      }
+    }
+    for (const e of this.enemies) {
+      if (e.hp <= 0) continue;
+      const [w, h] = ENEMY_BOX[e.kind];
+      const dx = (e.x - p.x) * p.facing;
+      if (dx < -8 || dx > reach + w / 2 || Math.abs(e.y - h / 2 - my) > 30 * k + h / 2) continue;
+      this.hurtEnemy(e, 1, ev);
+      hit = true;
+      hx = e.x;
+      hy = e.y - h / 2;
+    }
+    if (!hit) return;
+    chair.uses--;
+    const broke = chair.uses <= 0;
+    ev.push({ k: 'chairhit', id: p.id, x: hx, y: hy, broke });
+    if (broke) this.chairs = this.chairs.filter((c) => c !== chair);
+  }
+
+  /** The chairs: fall in at their times, lie about till someone grabs one, go along with whoever holds it. */
+  private stepChairs(ev: BEvent[]) {
+    if (this.chairAt.length && this.timeLeft <= this.chairAt[0]) {
+      this.chairAt.shift();
+      // anywhere along the arena (not just near someone: worth running for), clear of the walls
+      const x = (Math.floor((2 + Math.random() * (this.map.widthPx / TILE_PX - 4))) + 0.5) * TILE_PX;
+      this.chairs.push({ id: this.nextChair++, x, y: -40, vy: 120, landed: false, age: 0, holder: null, uses: CHAIR_USES, swing: 0 });
+      ev.push({ k: 'chair', x });
+    }
+    for (const ch of this.chairs) {
+      ch.swing = Math.max(0, ch.swing - DT);
+      if (ch.holder) {
+        const p = this.players.get(ch.holder);
+        if (!p || p.respawn > 0) {
+          this.dropChairOf(ch.holder);
+          continue;
+        }
+        ch.x = p.x;
+        ch.y = p.y;
+        continue;
+      }
+      ch.age += DT;
+      if (!ch.landed) {
+        ch.vy = Math.min(MAX_FALL, ch.vy + GRAVITY * 0.7 * DT);
+        const prevY = ch.y;
+        ch.y += ch.vy * DT;
+        const tx = Math.floor(ch.x / TILE_PX);
+        const ty = Math.floor(ch.y / TILE_PX);
+        const ry = this.map.rampLand(ch.x, prevY, ch.y, ch.vy, false);
+        if (ry !== null) {
+          ch.y = ry;
+          ch.landed = true;
+        } else if (ch.vy > 0 && ty >= 0 && (this.map.solid(tx, ty) || (this.map.oneWay(tx, ty) && prevY <= ty * TILE_PX + 0.5))) {
+          ch.y = ty * TILE_PX;
+          ch.landed = true;
+        }
+        if (ch.landed) {
+          ch.age = 0;
+          ch.vy = 0;
+          ev.push({ k: 'chairland', x: ch.x, y: ch.y });
+        }
+        if (ch.y > this.map.heightPx + 60) ch.age = 1e9;
+        continue;
+      }
+      // lying there: the first hero to touch it (with their hands free) picks it up
+      for (const p of this.players.values()) {
+        if (p.respawn > 0 || p.frozen > 0 || this.chairOf(p.id)) continue;
+        const c = charOf(p.hero);
+        const k = sizeOf(p);
+        if (Math.abs(p.x - ch.x) < boxW(c, k) / 2 + 24 && ch.y > p.y - boxH(c, k) - 10 && ch.y - 30 < p.y) {
+          ch.holder = p.id;
+          ev.push({ k: 'chairgrab', id: p.id });
+          break;
+        }
+      }
+    }
+    this.chairs = this.chairs.filter((ch) => ch.holder || ch.age < (ch.landed ? CHAIR_LIFE : 40));
   }
 
   /** Coming down on someone's head (a hero or a bad guy): that's a hit, and you bounce off. */
