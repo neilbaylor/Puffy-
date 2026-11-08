@@ -69,7 +69,7 @@ function demo(sim: BattleSim) {
     }
     if (a) {
       d.chairs.push({ id: 801, x: a.x, y: a.y, vy: 0, landed: true, age: 0, holder: null, uses: 2, swing: 0 });
-      d.chairs.push({ id: 802, x: a.x - 200 * a.facing, y: -40, vy: 120, landed: false, age: 0, holder: null, uses: 2, swing: 0 });
+      d.chairs.push({ id: 802, x: a.x + 100 * a.facing, y: a.y, vy: 0, landed: true, age: 0, holder: null, uses: 2, swing: 0 });
     }
     return;
   }
