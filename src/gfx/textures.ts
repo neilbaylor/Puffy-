@@ -379,42 +379,64 @@ export const BG_LAYERS = {
   near: { w: 1024, h: 150 },
 };
 
-/** Adds 2 transparent rows above/below so vertically wrapping TileSprites don't bleed edge pixels. */
-function padV(src: HTMLCanvasElement) {
-  const { c, ctx } = canvas(src.width, src.height + 4);
-  ctx.drawImage(src, 0, 2);
-  src.width = src.height = 1; // free the scratch canvas right away (Safari is slow to collect them)
+/**
+ * A background layer: like `hires`, with 2 transparent rows above and below so edge pixels never
+ * bleed when it's shown scaled (drawn straight into the padded canvas: copying a finished layer
+ * into a bigger one cost as much as drawing it, on phones).
+ */
+function hiresPadV(w: number, h: number, res: number, fn: (ctx: Ctx) => void) {
+  const { c, ctx } = canvas(Math.ceil(w * res), Math.ceil(h * res) + 4);
+  ctx.translate(0, 2);
+  ctx.scale(res, res);
+  fn(ctx);
   return c;
 }
 
 /** Background textures for one look, keyed `bg-<layer>:<palette id>` (the scenery drifts between looks). */
 export const bgKey = (layer: 'sky' | 'far' | 'clouds' | 'hills' | 'near', theme: string) => `bg-${layer}:${theme}`;
 
-function makeBackgrounds(scene: Phaser.Scene, pal: WorldPalette) {
-  const k = (layer: Parameters<typeof bgKey>[0]) => bgKey(layer, pal.id);
-  addCanvas(scene, k('sky'), hires(4, 512, 1, (ctx) => drawSky(ctx, 4, 512, pal)));
+type BgLayer = 'sky' | 'far' | 'hills' | 'near';
+
+/** One background layer of one look (Part 1/3 looks and Part 2's mountain looks alike). */
+function makeBgLayer(scene: Phaser.Scene, id: string, layer: BgLayer) {
+  const key = bgKey(layer, id);
+  const look = MOUNTAIN_LOOKS.find((l) => l.pal.id === id);
+  const pal = look?.pal ?? PALETTES[id];
+  if (!pal) return;
   const L = BG_LAYERS;
-  addCanvas(scene, k('far'), padV(hires(L.far.w, L.far.h, BG_RES, (ctx) => drawFarLayer(ctx, L.far.w, L.far.h, pal))), undefined, { release: true });
-  addCanvas(scene, k('hills'), padV(hires(L.hills.w, L.hills.h, BG_RES, (ctx) => drawHillsLayer(ctx, L.hills.w, L.hills.h, pal))), undefined, { release: true });
-  addCanvas(scene, k('near'), padV(hires(L.near.w, L.near.h, BG_RES, (ctx) => drawNearLayer(ctx, L.near.w, L.near.h, pal))), undefined, { release: true });
+  const opts = { release: true };
+  if (layer === 'sky') addCanvas(scene, key, hires(4, 512, 1, (ctx) => drawSky(ctx, 4, 512, pal)));
+  else if (layer === 'far')
+    addCanvas(scene, key, hiresPadV(L.far.w, L.far.h, BG_RES, (ctx) => (look ? drawMountainFar(ctx, L.far.w, L.far.h, look) : drawFarLayer(ctx, L.far.w, L.far.h, pal))), undefined, opts);
+  else if (layer === 'hills')
+    addCanvas(scene, key, hiresPadV(L.hills.w, L.hills.h, BG_RES, (ctx) => (look ? drawMountainMid(ctx, L.hills.w, L.hills.h, look) : drawHillsLayer(ctx, L.hills.w, L.hills.h, pal))), undefined, opts);
+  else addCanvas(scene, key, hiresPadV(L.near.w, L.near.h, BG_RES, (ctx) => (look ? drawMountainNear(ctx, L.near.w, L.near.h, look) : drawNearLayer(ctx, L.near.w, L.near.h, pal))), undefined, opts);
+}
+
+const BG_LAYER_IDS: readonly BgLayer[] = ['sky', 'far', 'hills', 'near'];
+
+function makeBackgrounds(scene: Phaser.Scene, pal: WorldPalette) {
+  for (const l of BG_LAYER_IDS) makeBgLayer(scene, pal.id, l);
 }
 
 /** Part 2's backgrounds for one mountain look (same layer sizes as Part 1's). */
 function makeMountainBackgrounds(scene: Phaser.Scene, look: MountainLook) {
-  const k = (layer: Parameters<typeof bgKey>[0]) => bgKey(layer, look.pal.id);
-  addCanvas(scene, k('sky'), hires(4, 512, 1, (ctx) => drawSky(ctx, 4, 512, look.pal)));
-  const L = BG_LAYERS;
-  addCanvas(scene, k('far'), padV(hires(L.far.w, L.far.h, BG_RES, (ctx) => drawMountainFar(ctx, L.far.w, L.far.h, look))), undefined, { release: true });
-  addCanvas(scene, k('hills'), padV(hires(L.hills.w, L.hills.h, BG_RES, (ctx) => drawMountainMid(ctx, L.hills.w, L.hills.h, look))), undefined, { release: true });
-  addCanvas(scene, k('near'), padV(hires(L.near.w, L.near.h, BG_RES, (ctx) => drawMountainNear(ctx, L.near.w, L.near.h, look))), undefined, { release: true });
+  for (const l of BG_LAYER_IDS) makeBgLayer(scene, look.pal.id, l);
 }
 
 /** Make sure a look's background layers exist (built right now if the boot hasn't got to them yet). */
 export function ensureLook(scene: Phaser.Scene, id: string) {
-  if (scene.textures.exists(bgKey('near', id))) return;
-  const look = MOUNTAIN_LOOKS.find((l) => l.pal.id === id);
-  if (look) makeMountainBackgrounds(scene, look);
-  else if (PALETTES[id]) makeBackgrounds(scene, PALETTES[id]);
+  for (const l of BG_LAYER_IDS) if (!scene.textures.exists(bgKey(l, id))) makeBgLayer(scene, id, l);
+}
+
+/**
+ * A look's missing layers as separate little jobs (the start screen draws them between taps:
+ * a layer at a time keeps each pause short, so a tap is never kept waiting long).
+ */
+export function lookJobs(scene: Phaser.Scene, id: string): (() => void)[] {
+  return BG_LAYER_IDS.map((l) => () => {
+    if (!scene.textures.exists(bgKey(l, id))) makeBgLayer(scene, id, l);
+  });
 }
 
 /** All the looks (backgrounds) one level cycles through, drawn now if they aren't already. */

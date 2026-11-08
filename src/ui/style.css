@@ -87,6 +87,8 @@ html:has(body.booting),
 html:has(body.booting) body { background: #5fc4ff; }
 /* the rainbow PUFFY over the loading bar */
 #boot .boot-logo { margin-bottom: clamp(10px, 3vmin, 22px); font-size: clamp(64px, 18vmin, 150px); }
+/* (the letters stand still on the loading screen: the art being drawn made their hop stutter) */
+#boot .boot-logo span { animation: none; transform: rotate(-2deg); }
 /* the loading bar: the game's art being drawn, then everything warmed up. One element, the gold
    part is its background sized by --p (nothing to clip, so it can't poke out of the rounded ends) */
 .boot-bar {

@@ -1060,13 +1060,20 @@ export class GameScene extends Phaser.Scene {
       const w = pd.x1 - pd.x0 + 4;
       // (deeper = darker, in soft bands: that part is drawn once, in puddleBody; here just the
       // wavy surface down to where it starts)
+      // (as a strip of triangles: a filled path is cut into triangles all over again every frame,
+      // which was most of the puddles' cost)
       g.fillStyle(hexOf(POO.base), 1);
-      g.beginPath();
-      g.moveTo(pd.x0 - 2, y + 5);
-      for (const q of pts) g.lineTo(q.x, q.y);
-      g.lineTo(pd.x1 + 2, y + 5);
-      g.closePath();
-      g.fillPath();
+      const yb = y + 5;
+      let px = pd.x0 - 2;
+      let py = yb;
+      for (const q of [...pts, { x: pd.x1 + 2, y: yb }]) {
+        if (q.x > px) {
+          g.fillTriangle(px, py, q.x, q.y, q.x, yb);
+          g.fillTriangle(px, py, q.x, yb, px, yb);
+        }
+        px = q.x;
+        py = q.y;
+      }
       // slow swirls stirring in it
       for (let i = 0; i < Math.max(2, Math.round(w / 60)); i++) {
         const sx = pd.x0 + ((i + 0.5) / Math.max(2, Math.round(w / 60))) * w + Math.sin(pd.t * 0.5 + i * 2) * 8;

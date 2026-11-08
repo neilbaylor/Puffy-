@@ -15,6 +15,13 @@ const nextFrame = () => new Promise<void>((r) => {
   setTimeout(go, 50);
 });
 
+/**
+ * Under the loading screen nothing has to look smooth (only the bar, which moves in steps anyway),
+ * so several small steps share a frame, up to about this much work each (ms): every frame in
+ * between costs a whole render of the fly-over behind the loading screen, for nothing.
+ */
+const BUDGET = 45;
+
 /** Fills the loading bar (0..1). */
 /** (the first part of the loading fills the bar this far; the second part, the rest) */
 const PHASE1 = 0.45;
@@ -58,12 +65,19 @@ export class BootScene extends Phaser.Scene {
     const total = steps.length + 4;
     let done = 0;
     mark('(start)');
+    let slice = performance.now();
+    /** Yield a frame only once this frame's share of the work is used up. */
+    const breathe = async () => {
+      if (performance.now() - slice < BUDGET) return;
+      await nextFrame();
+      slice = performance.now();
+    };
     for (const step of steps) {
       const s0 = performance.now();
       step.run();
       times.push([`draw ${step.name}`, Math.round(performance.now() - s0)]);
       setProgress((++done / total) * PHASE1);
-      await nextFrame();
+      await breathe();
     }
     mark('art (incl. frames between steps)');
     // the fly-over behind the start screen
@@ -78,9 +92,9 @@ export class BootScene extends Phaser.Scene {
     this.game.events.emit('warm-start');
     mark('start screen + hero poses');
     setProgress((++done / total) * PHASE1);
-    await Promise.race([song, new Promise((r) => setTimeout(r, 2500))]);
-    mark('song decode (waiting)');
+    // (the start screen's song keeps downloading and decoding meanwhile: it's waited for at the end)
     setProgress((++done / total) * PHASE1);
+    slice = performance.now();
     // Everything else, now, while the loading bar is up (it used to be done after the start
     // screen showed, in quiet moments: on slower tablets that made the first few seconds
     // sluggish): the rest of the art, then the start screen's own jobs (the Parts next to this
@@ -96,19 +110,22 @@ export class BootScene extends Phaser.Scene {
       step.run();
       times.push([`draw ${step.name}`, Math.round(performance.now() - s0)]);
       step2();
-      await nextFrame();
+      await breathe();
     }
     mark('the rest of the art');
     for (const job of quiet) {
       job();
       step2();
-      await nextFrame();
+      await breathe();
     }
     mark('start screen jobs (other Parts, ground, looks)');
     // and the fly-over run for a moment behind the loading screen (everything's pictures on the
     // graphics chip, and the game's code warmed up), so it's smooth from the first moment
-    for (let i = 0; i < 24; i++) await nextFrame();
+    for (let i = 0; i < 12; i++) await nextFrame();
     mark('warm-up frames');
+    // the start screen's song (fetched and decoded alongside all of the above; usually ready by now)
+    await Promise.race([song, new Promise((r) => setTimeout(r, 1500))]);
+    mark('song decode (waiting)');
     setProgress(1);
     // the start screen's song: browsers that allow it (e.g. the game installed as an app on
     // Android, or a site you play often on a computer) start it now, without a tap; the

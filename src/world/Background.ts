@@ -35,6 +35,11 @@ interface Cloud {
 const CB = { x0: -92, y0: -62, w: 184, h: 80 };
 const CLOUD_RES = 1.5;
 const CLOUD_EVERY = 0.3;
+/** A cloud's outline is worked out at this many angles round it (the sines and cosines once, here). */
+const SIL_N = 60;
+const SIL = new Float32Array(SIL_N * 2);
+const SIL_COS = Float32Array.from({ length: SIL_N }, (_, k) => Math.cos((k / SIL_N) * Math.PI * 2));
+const SIL_SIN = Float32Array.from({ length: SIL_N }, (_, k) => Math.sin((k / SIL_N) * Math.PI * 2));
 
 /** A band of living clouds at one parallax depth. */
 interface CloudBand {
@@ -206,18 +211,20 @@ export class Background {
     return c.lumps.map((l) => [l.x + Math.sin(t * l.w * 0.7 + l.ph) * 9, l.y + Math.cos(t * l.w + l.ph) * 4, l.r * (1 + 0.3 * Math.sin(t * l.w + l.ph * 1.7))] as const);
   }
 
-  /** Outline of a cloud: the union of its puffs, flat-ish underneath. */
-  private silhouette(c: Cloud, lumps: readonly (readonly [number, number, number])[]): Phaser.Math.Vector2[] {
-    const pts: Phaser.Math.Vector2[] = [];
-    for (let k = 0; k < 60; k++) {
-      const a = (k / 60) * Math.PI * 2;
+  /** Outline of a cloud: the union of its puffs, flat-ish underneath (x, y pairs, in one reused array). */
+  private silhouette(c: Cloud, lumps: readonly (readonly [number, number, number])[]): Float32Array {
+    const pts = SIL;
+    for (let k = 0; k < SIL_N; k++) {
+      const ca = SIL_COS[k];
+      const sa = SIL_SIN[k];
       let best = 6;
       for (const [lx, ly, lr] of lumps) {
-        const b = lx * Math.cos(a) + ly * Math.sin(a);
+        const b = lx * ca + ly * sa;
         const disc = b * b - (lx * lx + ly * ly - lr * lr);
         if (disc >= 0) best = Math.max(best, b + Math.sqrt(disc));
       }
-      pts.push(new Phaser.Math.Vector2(Math.cos(a) * best * c.s, Math.min(Math.sin(a) * best, 12) * c.s));
+      pts[k * 2] = ca * best * c.s;
+      pts[k * 2 + 1] = Math.min(sa * best, 12) * c.s;
     }
     return pts;
   }
@@ -238,19 +245,17 @@ export class Background {
     ctx.setTransform(k, 0, 0, k, -CB.x0 * c.s * k, -CB.y0 * c.s * k);
     const lumps = this.lumpsNow(c);
     const pts = this.silhouette(c, lumps);
-    const path = (f: (p: Phaser.Math.Vector2) => [number, number]) => {
+    /** The outline, scaled (sx, sy) and lifted (dy). */
+    const path = (sx: number, sy: number, dy: number) => {
       ctx.beginPath();
-      pts.forEach((p, i) => {
-        const [x, y] = f(p);
-        if (i) ctx.lineTo(x, y);
-        else ctx.moveTo(x, y);
-      });
+      ctx.moveTo(pts[0] * sx, pts[1] * sy + dy);
+      for (let k = 1; k < SIL_N; k++) ctx.lineTo(pts[k * 2] * sx, pts[k * 2 + 1] * sy + dy);
       ctx.closePath();
     };
-    path((p) => [p.x, p.y]);
+    path(1, 1, 0);
     ctx.fillStyle = col(shade);
     ctx.fill();
-    path((p) => [p.x * 0.93, p.y * 0.9 - 3 * c.s]);
+    path(0.93, 0.9, -3 * c.s);
     ctx.fillStyle = col(fill);
     ctx.fill();
     ctx.fillStyle = col(hi, 0.7);
@@ -260,7 +265,7 @@ export class Background {
         ctx.arc((lx - lr * 0.22) * c.s, (ly - lr * 0.3) * c.s, lr * 0.45 * c.s, 0, Math.PI * 2);
         ctx.fill();
       }
-    path((p) => [p.x, p.y]);
+    path(1, 1, 0);
     ctx.lineJoin = 'round';
     ctx.lineWidth = 1.6;
     ctx.strokeStyle = col(ink);
@@ -277,13 +282,14 @@ export class Background {
       const oy = view.top + view.height * band.anchor + camUp * band.fy;
       const scroll = view.left * band.fx + this.cloudScroll * (band.fx / 0.16);
       for (const c of band.clouds) {
-        // a new shape now and then (each cloud on its own beat, so they don't all redraw at once)
-        if (this.t >= c.next) {
+        const base = c.x + this.t * c.drift - scroll;
+        let x = (((base % band.width) + band.width) % band.width) - 120;
+        // a new shape now and then (each cloud on its own beat, so they don't all redraw at once);
+        // only while it's on screen (a cloud off to the side keeps its last shape till it's back)
+        if (this.t >= c.next && x < view.width + 120) {
           this.paintCloud(c, hi);
           c.next = this.t + CLOUD_EVERY;
         }
-        const base = c.x + this.t * c.drift - scroll;
-        let x = (((base % band.width) + band.width) % band.width) - 120;
         const y = c.y + Math.sin(this.t * 0.35 + c.bob) * 5;
         let n = 0;
         for (; x < view.width + 120; x += band.width, n++) {

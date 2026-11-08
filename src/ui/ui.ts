@@ -316,6 +316,7 @@ export class UI {
     let poses: Record<string, HTMLCanvasElement> | null = null;
     let lastPose = '';
     const t0 = performance.now();
+    // (a few times a second is plenty for a two-frame shuffle: not a job on every frame of the game)
     const animatePuffy = () => {
       if (!this.rotate.hidden) {
         poses ??= renderPoseSet(CHARACTERS[0], ['idle0', 'idle1'], rc.width);
@@ -326,9 +327,8 @@ export class UI {
           rctx.drawImage(poses[pose], 0, 0);
         }
       }
-      requestAnimationFrame(animatePuffy);
     };
-    requestAnimationFrame(animatePuffy);
+    setInterval(animatePuffy, 75);
     this.root.appendChild(this.rotate);
     this.selected = Math.max(0, CHARACTERS.findIndex((c) => c.id === store.get('puffy.hero')));
 
