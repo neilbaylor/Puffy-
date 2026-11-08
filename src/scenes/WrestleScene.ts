@@ -1253,7 +1253,8 @@ export class WrestleScene extends Phaser.Scene {
     if (this.crowd.texture.key !== want) this.crowd.setTexture(want);
     if (this.jumbo.kind === 'big' && this.jumboUntil && this.clock > this.jumboUntil) {
       this.jumboUntil = 0;
-      this.jumbo = this.countJumbo();
+      // (before the fight, back to her title: the hits to go only go up once it's on)
+      this.jumbo = this.fighting || this.ended ? this.countJumbo() : { kind: 'title' };
     }
     this.drawScreens();
   }
@@ -1847,7 +1848,7 @@ export class WrestleScene extends Phaser.Scene {
     this.ribbonMsg = { text: 'QUEEN PLOP ♛ QUEEN PLOP', color: '#ff9ccf', bg: '#5a1030', t0: this.clock / 1000 };
     await this.camTo(jx, jy + 6, 2.35, 1600, -0.018, 'Sine.easeInOut');
     // (and stay on it a moment, so it reads)
-    await this.camTo(jx, jy + 4, 2.42, 500, -0.012, 'Sine.easeOut');
+    await this.camTo(jx, jy + 4, 2.46, 1300, -0.012, 'Sine.easeOut');
 
     // ── 2. a crash zoom out to the ring… lights down, BOOM: a spotlight finds her ──
     if (!this.skipping) {
@@ -1979,8 +1980,6 @@ export class WrestleScene extends Phaser.Scene {
     q.spr.setFrame('run1');
     this.tweens.add({ targets: this.spot, alpha: 0, duration: 300 });
     this.setDark(0, 500);
-    this.jumbo = this.countJumbo();
-    this.jumboUntil = 0;
     this.camManual = false;
     p.view.setAlpha(1);
     const landX = WX(820);
@@ -2012,6 +2011,9 @@ export class WrestleScene extends Phaser.Scene {
     this.shakeRopes(6);
     this.fx.dust(landX, MAT_Y, 12);
     this.callout('FIGHT!', 'go', 1000);
+    // (the count of hits to go goes up on the jumbotron now the fight's on)
+    this.jumbo = this.countJumbo();
+    this.jumboUntil = 0;
     sfx.whistle();
     sfx.cheer();
     q.setMode('idle', 0.6);
@@ -2088,14 +2090,14 @@ export class WrestleScene extends Phaser.Scene {
     this.king.setVisible(true).setFrame('idle').setFlipX(false);
     this.aimSpot(kx, ky - 6, 0.9, 500);
     sfx.drum();
-    await this.wait(1300);
+    await this.wait(1700);
     // up to the jumbotron for a moment…
     this.camManual = true;
     const jx = WX(JUMBO.x + (JUMBO.w * JUMBO.s) / 2);
     const jy = WY(JUMBO.y + (JUMBO.h * JUMBO.s) / 2);
     await this.camTo(jx, jy + 6, 2.2, 500, 0.012, 'Quad.easeOut');
     this.excitedUntil = this.clock + 4000;
-    await this.wait(650);
+    await this.wait(950);
     // …then a crash zoom right onto him
     this.king.setFrame('look');
     await this.camTo(kx - 10, ky - 28, 3.1, 420, -0.04, 'Quad.easeIn');
@@ -2104,13 +2106,13 @@ export class WrestleScene extends Phaser.Scene {
     sfx.thud();
     sfx.drum();
     this.king.setFrame('grin');
-    void this.camTo(kx - 14, ky - 31, 3.35, 1400, -0.015, 'Sine.easeOut');
-    await this.wait(1300);
+    void this.camTo(kx - 14, ky - 31, 3.35, 1800, -0.015, 'Sine.easeOut');
+    await this.wait(1700);
     this.king.setFrame('yell1');
     sfx.laugh();
     this.callout('THE KING!', 'bad high', 1300);
     this.flashJumbo({ kind: 'big', text: 'THE KING!', sub: 'AFTER HIM!', color: '#ffd23f', bg: '#3d1478' }, 1e9);
-    await this.wait(900);
+    await this.wait(1200);
     // and he runs for the exit (the camera pulling back to watch him go)
     const tx = WX(TUNNEL.x);
     void this.camTo((kx + tx) / 2, ky - 30, 2.3, 900, 0, 'Sine.easeInOut');

@@ -1561,16 +1561,19 @@ html.rotating body {
 .lvl.picked {
   background: var(--gold);
 }
-/* the Bosses button, after the level buttons: a crown-gold-on-purple one */
-.lvl.lvl-bosses { background: #6b3fb0; color: #fff; -webkit-text-stroke: 4px var(--ink); paint-order: stroke fill; margin-left: 6px; }
+/* the Bosses button: off to the right of the level buttons (they stay centred), past a thin divider */
+.levels { position: relative; }
+.lvl-side { position: absolute; left: 100%; top: 0; bottom: 0; display: flex; align-items: center; padding-left: 30px; }
+.lvl-side::before { content: ''; position: absolute; left: 14px; top: 18%; bottom: 18%; width: 2px; border-radius: 1px; background: rgba(255, 255, 255, 0.55); box-shadow: 0 0 0 0.5px rgba(58, 36, 24, 0.25); }
+.lvl.lvl-bosses { background: #ffe14d; white-space: nowrap; }
 /* the Bosses menu */
 .boss-panel { align-items: center; text-align: center; min-width: min(100%, 380px); }
 .boss-panel h2 { margin: 0; }
-.boss-list { display: grid; gap: 10px; width: 100%; margin: 4px 0 8px; }
+.boss-list { display: grid; gap: 16px; width: 100%; margin: 8px 0 12px; }
 .boss-btn { display: grid; gap: 2px; justify-items: center; }
 .boss-btn small { font: 800 12px/1.2 var(--body); letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.75; }
 @media (max-height: 500px) {
-  .boss-list { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+  .boss-list { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; }
   .boss-btn { padding: 8px 14px 7px; }
 }
 .lvl small {

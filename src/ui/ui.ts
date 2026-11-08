@@ -491,7 +491,7 @@ export class UI {
         progress.beaten >= 1
           ? `<div class="levels" role="radiogroup" aria-label="Pick a level">${LEVELS.map(
               (l) => `<button class="lvl" data-lvl="${l.id}" ${l.build ? '' : 'disabled'}>${l.button ?? l.part}${l.build ? '' : '<small>coming soon</small>'}</button>`,
-            ).join('')}<button class="lvl lvl-bosses" data-act="bosses" aria-label="Boss battles">Bosses</button></div>`
+            ).join('')}<span class="lvl-side"><button class="lvl lvl-bosses" data-act="bosses" aria-label="Boss battles">Bosses</button></span></div>`
           : ''
       }
       <div class="start-tl">
@@ -984,8 +984,7 @@ export class UI {
     const open = BOSSES.filter((b) => progress.beaten >= b.level);
     const el = h(`<div class="screen modal bosses">
       <div class="panel boss-panel">
-        <p class="eyebrow">Boss battles</p>
-        <h2>Pick a boss</h2>
+        <h2>Boss battles</h2>
         <div class="boss-list">${open
           .map((b) => `<button class="btn boss-btn" data-boss="${b.level}"><b>${b.name}</b><small>${esc(levelName(b.level))}</small></button>`)
           .join('')}</div>
@@ -1042,7 +1041,7 @@ export class UI {
             ${r.hoops ? `<dt>Final score</dt><dd>${esc(r.hoops)}</dd>` : '<dt>Result</dt><dd>K.O.!</dd>'}
           </dl>
           <div class="row">
-            <button class="btn btn-alt" data-act="again">Fight again</button>
+            <button class="btn btn-alt" data-act="again">Play again</button>
             <button class="btn btn-go" data-act="home">Home screen</button>
           </div>
         </div>
