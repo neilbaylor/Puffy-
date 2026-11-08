@@ -30,7 +30,7 @@ import type { GameOverState, HudState, ResultState } from './GameScene';
  * side-on across the mat. The ropes at either end are springy (run into them and you're flung
  * back), and you can climb them to the top turnbuckle and dive off (land on her: two hits); there's
  * no leaving the ring. You have 5 hearts (shown over your head; more turn up in the ring, up to 6), there's
- * a folding chair now and then (FIRE swings it while you hold it: two hits), and she takes 15 hits, counted down on
+ * a folding chair now and then (FIRE swings it while you hold it: two hits), and she takes 13 hits, counted down on
  * the jumbotron.
  */
 export interface WrestleData {
@@ -68,13 +68,13 @@ const QS = 1.3;
 const Q_RES = 4;
 const Q_PAD = 18;
 const Q_TOP = 24;
-const HITS = 15;
+const HITS = 13;
 /** Your hearts in the ring: you start with all 6, and pick-ups top you back up. */
 const HEARTS_START = 6;
 const HEARTS_MAX = 6;
 /** Folding chairs in a match, and (for each one after the first) how few hits she has left when it comes, at the latest. */
 const CHAIRS = 3;
-const CHAIR_AT_HP = [-1, 10, 5];
+const CHAIR_AT_HP = [-1, 9, 4];
 /** The poo puddle on the mat (world x): you sink into it, like the level's. */
 const PUD_X0 = WX(PUDDLE.x - PUDDLE.w * 0.78);
 const PUD_X1 = WX(PUDDLE.x + PUDDLE.w * 0.78);

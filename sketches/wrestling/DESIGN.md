@@ -47,7 +47,7 @@ The concept screens are in this folder (`wide`, `plan`, `entrance`, `fight`, `fi
 - **Aggressive, jumping more and higher**: big hops and lunges (her landings rumble the camera
   and the ring, like the Giant Plops), charges, slams, and the Giant Plops' **big lump of poo**
   that lands short of you and rolls on at you.
-- **15 hits to beat her.** **The jumbotron counts down** the hits
+- **13 hits to beat her.** **The jumbotron counts down** the hits
   left ("3 HITS TO GO") and flashes "FROM THE TOP ROPE!" for a dive.
 - No referee: enough hits and she's done.
 
