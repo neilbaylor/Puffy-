@@ -35,11 +35,11 @@ const ROCKET_LIFE = 1.4;
 export type PrizeKind = 'bomb' | 'star' | 'grow' | 'rapid' | 'heart' | 'ice' | 'fire';
 /** How often each kind turns up (out of the total). */
 const PRIZE_ODDS: [PrizeKind, number][] = [
-  ['bomb', 24],
-  ['rapid', 22],
-  ['grow', 20],
-  ['star', 16],
+  ['bomb', 34],
+  ['rapid', 18],
   ['heart', 18],
+  ['grow', 16],
+  ['star', 14],
 ];
 /** Timed powers: 0 none, 1 star (invincible), 2 grow (big & strong), 3 rapid fire, 4 fireballs. */
 export const POWER = { none: 0, star: 1, grow: 2, rapid: 3, fire: 4 } as const;
@@ -52,12 +52,12 @@ const STOMP_BOUNCE = 560;
 /** How much bigger "grow" makes you. */
 export const GROW = 1.8;
 const BOMBS_PER_PRIZE = 3;
-const MAX_PRIZES = 2;
+const MAX_PRIZES = 3;
 /** Once it has landed, a prize waits this long (blinking at the end), then it's gone. */
 export const PRIZE_LIFE = 7;
 /** Folding chairs: this many fall into each battle (at random times and places). Grab one, and FIRE
  * swings it instead of shooting: each hit takes 1 heart, and it's done after this many hits. */
-export const CHAIRS_PER_BATTLE = 2;
+export const CHAIRS_PER_BATTLE = 5;
 export const CHAIR_USES = 2;
 /** A chair lying about unclaimed goes after this long (s). */
 export const CHAIR_LIFE = 24;
@@ -505,7 +505,7 @@ export class BattleSim {
   chairs: BChair[] = [];
   tick = 0;
   /** When the chairs fall (seconds left on the clock): one in each half or so, at random. */
-  private chairAt: number[] = [MATCH_SECS - 25 - Math.random() * 30, MATCH_SECS * 0.45 - Math.random() * 25].slice(0, CHAIRS_PER_BATTLE);
+  private chairAt: number[] = Array.from({ length: CHAIRS_PER_BATTLE }, (_, i) => MATCH_SECS - 14 - i * ((MATCH_SECS - 34) / Math.max(1, CHAIRS_PER_BATTLE - 1)) - Math.random() * 10);
   private nextChair = 1;
   timeLeft = MATCH_SECS;
   private nextRocket = 1;
@@ -801,12 +801,12 @@ export class BattleSim {
     if (this.chairAt.length && this.timeLeft <= this.chairAt[0]) {
       this.chairAt.shift();
       // anywhere along the arena (not just near someone: worth running for), clear of the walls — and
-      // not over a floating island: it comes down to the floor (or a little post), where you can get it
-      let tx = 2;
-      for (let tries = 0; tries < 40; tries++) {
-        tx = Math.floor(2 + Math.random() * (this.map.widthPx / TILE_PX - 4));
+      // only where it comes down on the floor itself (not on an island, a little wall or the rises at the ends)
+      let tx = 3;
+      for (let tries = 0; tries < 60; tries++) {
+        tx = Math.floor(3 + Math.random() * (this.map.widthPx / TILE_PX - 6));
         let high = false;
-        for (let ty = 0; ty < this.map.h - 4; ty++) if (this.map.solid(tx, ty)) high = true;
+        for (let ty = 0; ty < this.map.h - 2; ty++) if (this.map.solid(tx, ty)) high = true;
         if (!high) break;
       }
       const x = (tx + 0.5) * TILE_PX;
@@ -935,7 +935,7 @@ export class BattleSim {
   private stepPrizes(ev: BEvent[]) {
     this.dropIn -= DT;
     if (this.dropIn <= 0) {
-      this.dropIn = 11 + Math.random() * 7; // (fewer than before: they're worth fighting over)
+      this.dropIn = 8 + Math.random() * 5; // (still worth fighting over)
       if (this.prizes.length < MAX_PRIZES) {
         let roll = Math.random() * PRIZE_ODDS.reduce((t, [, w]) => t + w, 0);
         let kind: PrizeKind = 'bomb';
