@@ -532,6 +532,8 @@ export class WrestleScene extends Phaser.Scene {
   private prevHeroBottom = 0;
   private dark!: Phaser.GameObjects.Rectangle;
   private spot!: Phaser.GameObjects.Image;
+  /** The announcers' table (POOPA TV), left of the ring. */
+  private ringside!: Phaser.GameObjects.Image;
   private camFocus: { x: number; y: number; zoom: number } | null = null;
   private camX = WORLD_W / 2;
   private camY = MAT_Y;
@@ -626,7 +628,7 @@ export class WrestleScene extends Phaser.Scene {
     this.ribbonTex = this.textures.exists('wr-ribbon') ? (this.textures.get('wr-ribbon') as Phaser.Textures.CanvasTexture) : this.textures.createCanvas('wr-ribbon', RIBBON.w * 2, RIBBON.h * 2)!;
     this.add.image(WX(RIBBON.x), WY(RIBBON.y), 'wr-ribbon').setOrigin(0).setScale(K / 2).setDepth(DEPTH_W.dark + 0.05);
     this.add.image(WX(RING_BOX.x), WY(RING_BOX.y), this.tk('wr-ring')).setOrigin(0).setScale(K / RES).setDepth(DEPTH_W.ring);
-    this.add.image(WX(-160), WY(500), 'wr-ringside').setOrigin(0).setScale(K / 1.5).setDepth(DEPTH_W.ringside);
+    this.ringside = this.add.image(WX(-160), WY(500), 'wr-ringside').setOrigin(0).setScale(K / 1.5).setDepth(DEPTH_W.ringside);
     for (const x of [RING.x0, RING.x1])
       this.add.image(WX(x), WY(RING.frontY), this.tk('wr-post')).setOrigin(0.5, (POST_BOX.h - 2) / POST_BOX.h).setScale(K / RES).setDepth(DEPTH_W.posts);
     this.ropesBack = this.add.graphics().setDepth(DEPTH_W.backRopes);
@@ -2459,7 +2461,12 @@ export class WrestleScene extends Phaser.Scene {
       const lens = path.slice(1).map((q, i) => Math.hypot(q.x - path[i].x, (q.y - path[i].y) * 1.6) * (0.35 + 0.65 * (q.k + path[i].k) / 2));
       const total = lens.reduce((a, b) => a + b, 0);
       const ms = 5800;
+      // (the announcers' table goes up in front of everything while he walks behind it, darkened to
+      // match the dimmed arena: he's in front of the corner post but behind the table)
+      this.ringside.setDepth(DEPTH_W.spot + 0.4);
       await this.glide(ms, (u) => {
+        const shade = Math.round(255 * (1 - this.dark.fillAlpha));
+        this.ringside.setTint(Phaser.Display.Color.GetColor(shade, shade, shade));
         let d = u * total;
         let i = 0;
         while (i < lens.length - 1 && d > lens[i]) d -= lens[i++];
@@ -2475,8 +2482,8 @@ export class WrestleScene extends Phaser.Scene {
         q.spr.setPosition(x, y - Math.abs(Math.sin(ph * Math.PI)) * 3 * k).setScale(S * k);
         // (facing the way he's going; behind the ring he's behind its ropes and posts, in front once he's round)
         if (Math.abs(b.x - a.x) > 4) q.spr.setFlipX(b.x > a.x);
-        // (down the left side: in front of the ring but behind the announcers' table, until he's past it)
-        q.spr.setDepth(sy <= RING.frontY - 6 ? DEPTH_W.ring - 0.5 : sx < -30 ? DEPTH_W.ring + 0.5 : DEPTH_W.spot + 0.3);
+        // (behind the ring at the back; round the front, in front of it (and its corner post), behind the table)
+        q.spr.setDepth(sy <= RING.frontY - 6 ? DEPTH_W.ring - 0.5 : DEPTH_W.spot + 0.3);
         // (a cocky strut: a grin at the crowd, a look round)
         q.spr.setFrame(u > 0.3 && u < 0.4 ? 'grin' : u > 0.66 && u < 0.74 ? 'look' : (['walk0', 'walk1', 'walk2', 'walk3'] as const)[Math.floor(ph * 2) % 4]);
         this.spot.setPosition(x, y + 10).setScale(0.55 * k, (y + 60) / 700);
@@ -2487,8 +2494,9 @@ export class WrestleScene extends Phaser.Scene {
         this.camZ = 0.9 + (2.05 - 0.9) * z * z;
       }, 'Linear');
     }
-    // (facing the ring, and the challenger in it)
+    // (facing the ring, and the challenger in it; the table back where it was)
     q.spr.setFlipX(true).setDepth(DEPTH_W.spot + 0.3);
+    this.ringside.setDepth(DEPTH_W.ringside).clearTint();
 
     // ── 3. he stops… and drops the robe: a jetpack on his back underneath ──
     if (!this.skipping) {
@@ -2510,7 +2518,7 @@ export class WrestleScene extends Phaser.Scene {
       this.flashJumbo({ kind: 'big', text: 'THE PLOP KING!', sub: 'KING OF THE PLOPS', color: '#ffd23f', bg: '#3d1478' }, 1e9);
       await this.iwait(500);
       const yell = this.time.addEvent({ delay: 140, loop: true, callback: () => q.spr.setFrame(q.spr.frame.name === 'yell0' ? 'yell1' : 'yell0') });
-      await Promise.race([this.say('“You’ll never beat me in my <b>dome</b>!”', ex, ey - 118, 2300), this.iwait(2300)]);
+      await Promise.race([this.say('“You’ll never beat me in my <b>dome</b>!”', ex, ey - 118, 2400), this.iwait(2400)]);
       yell.remove();
     } else robe.setScale(QS / 2);
     this.dom.querySelector<HTMLElement>('.wr-speech')!.hidden = true;
