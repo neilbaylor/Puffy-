@@ -13,7 +13,7 @@ const { chromium } = require('playwright');
   console.log('bosses:', await p.evaluate(() => [...document.querySelectorAll('[data-boss]')].map((b) => b.textContent.trim()).join(' / ')));
   await p.click('[data-boss="4"]');
   await p.waitForFunction(() => window.game.scene.isActive('Wrestle'), null, { timeout: 120000 });
-  const shots = [[2500, 'jumbo'], [6200, 'aisle-far'], [8000, 'aisle-near'], [10000, 'robe'], [11800, 'says'], [15500, 'challenger']];
+  const shots = [[2500, 'jumbo'], [5900, 'aisle-far'], [7200, 'aisle-back'], [8400, 'aisle-side'], [9500, 'aisle-front'], [11200, 'robe'], [13000, 'says']];
   let t = 0;
   for (const [at, name] of shots) { await p.waitForTimeout(at - t); t = at; await p.screenshot({ path: `shots/k4-${name}.png` }); }
   await p.waitForFunction(() => window.game.scene.getScene('Wrestle').fighting, null, { timeout: 60000 });
@@ -27,6 +27,7 @@ const { chromium } = require('playwright');
     if (wave === 1) await p.screenshot({ path: 'shots/k4-blastoff.png' });
     await p.waitForTimeout(2200);
     console.log('wave', wave, JSON.stringify(await S()));
+    if (wave === 3) { const h = await S(); if (h.hp !== 4) console.log('!! expected 4 hits left for the last round, got', h.hp); }
     await p.screenshot({ path: `shots/k4-wave${wave}.png` });
     await p.waitForTimeout(2500);
     console.log('  landed', JSON.stringify(await S()));
@@ -36,10 +37,10 @@ const { chromium } = require('playwright');
     console.log('  back?', JSON.stringify(await S()));
     if (wave === 1) await p.screenshot({ path: 'shots/k4-back.png' });
   }
-  // the last three
-  for (let i = 0; i < 3; i++) await p.evaluate(() => { const s = window.game.scene.getScene('Wrestle'); s.queen.invulnUntil = 0; s.hitQueen(1, 'stomp', s.player.x); });
+  // the last four
+  for (let i = 0; i < 4; i++) await p.evaluate(() => { const s = window.game.scene.getScene('Wrestle'); s.queen.invulnUntil = 0; s.hitQueen(1, 'stomp', s.player.x); });
   console.log('final', JSON.stringify(await S()));
-  const end = [[1600, 'steps'], [2600, 'boom'], [6000, 'jumbo-flood'], [9500, 'flooding'], [13500, 'kingbob']];
+  const end = [[1600, 'steps'], [2600, 'boom'], [6200, 'jumbo-champ'], [7600, 'jumbo-flood'], [9800, 'flooding-a'], [11500, 'flooding'], [15500, 'kingbob']];
   t = 0;
   for (const [at, name] of end) { await p.waitForTimeout(at - t); t = at; await p.screenshot({ path: `shots/k4-${name}.png` }); }
   await p.waitForTimeout(4000);
