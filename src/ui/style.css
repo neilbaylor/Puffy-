@@ -1579,6 +1579,19 @@ html.rotating body {
 .lvl-side { position: absolute; left: 100%; top: 0; bottom: 0; display: flex; align-items: center; padding-left: 30px; }
 .lvl-side::before { content: ''; position: absolute; left: 14px; top: 18%; bottom: 18%; width: 2px; border-radius: 1px; background: rgba(255, 255, 255, 0.55); box-shadow: 0 0 0 0.5px rgba(58, 36, 24, 0.25); }
 .lvl.lvl-bosses { background: #ffe14d; white-space: nowrap; }
+/* narrow phones (iPhone SE and smaller): four Parts and Bosses still fit across */
+@media (max-width: 700px) {
+  .levels { gap: 6px; }
+  .lvl { min-width: 74px; padding: 6px 10px; font-size: clamp(14px, 2.6vmin, 18px); }
+  .lvl-side { padding-left: 20px; }
+  .lvl-side::before { left: 9px; }
+}
+@media (max-width: 600px) {
+  .levels { gap: 5px; }
+  .lvl { min-width: 66px; padding: 5px 8px; }
+  .lvl-side { padding-left: 16px; }
+  .lvl-side::before { left: 7px; }
+}
 /* the Bosses menu */
 .boss-panel { align-items: center; text-align: center; min-width: min(100%, 380px); }
 .boss-panel h2 { margin: 0; }
@@ -1586,8 +1599,12 @@ html.rotating body {
 .boss-btn { display: grid; gap: 2px; justify-items: center; }
 .boss-btn small { font: 800 12px/1.2 var(--body); letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.75; }
 @media (max-height: 500px) {
-  .boss-list { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; }
-  .boss-btn { padding: 8px 14px 7px; }
+  /* (phones: two by two, slimmer, so all four and Back fit without scrolling) */
+  .boss-panel { min-width: min(100%, 560px); padding-top: 12px; padding-bottom: 12px; }
+  .boss-panel h2 { font-size: clamp(20px, 7vh, 28px); }
+  .boss-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 6px 0 10px; }
+  .boss-btn { padding: 7px 10px 6px; font-size: clamp(14px, 4.6vh, 18px); }
+  .boss-btn small { font-size: 10px; }
 }
 .lvl small {
   font: 800 10px/1.2 var(--body);
