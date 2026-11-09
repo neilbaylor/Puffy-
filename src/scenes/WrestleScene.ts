@@ -125,7 +125,7 @@ type MinionKind = 'small' | 'medium' | 'large';
 const MINION: Record<MinionKind, { k: number; w: number; h: number; hp: number; speed: number }> = {
   small: { k: 0.5, w: 24, h: 32, hp: 1, speed: 82 },
   medium: { k: 0.78, w: 38, h: 58, hp: 2, speed: 92 },
-  large: { k: 1.05, w: 52, h: 80, hp: 4, speed: 62 },
+  large: { k: 1.05, w: 52, h: 80, hp: 5, speed: 62 },
 };
 interface Minion {
   spr: Phaser.Physics.Arcade.Sprite;
@@ -2753,24 +2753,19 @@ export class WrestleScene extends Phaser.Scene {
   }
 
   /**
-   * The water coming up through the building at the end (null: none): waterfalls pouring out of the
-   * aisles in the stands, and the water rising — deep blue-green, two layers of waves, a foamy crest,
-   * glints on the surface, bubbles, and his robe and a few bits bobbing about on it.
+   * The water coming up through the building at the end (null: none): deep blue-green, two layers of
+   * waves, a foamy crest, glints on the surface, bubbles, and his robe and a few bits bobbing about on it.
    */
   private flood: {
     g: Phaser.GameObjects.Graphics;
-    falls: Phaser.GameObjects.Graphics;
     y: number;
     t: number;
-    pour: number;
     bubbles: { x: number; y: number; r: number; v: number }[];
     floaters: { img: Phaser.GameObjects.Image; x: number; ph: number; dy: number }[];
   } | null = null;
 
   private startFlood() {
     const g = this.add.graphics().setDepth(DEPTH_W.ringside + 0.5);
-    // (the waterfalls are back in the stands: behind the ring)
-    const falls = this.add.graphics().setDepth(DEPTH_W.front + 0.02);
     const floaters: { img: Phaser.GameObjects.Image; x: number; ph: number; dy: number }[] = [];
     const robe = this.children.list.find((o) => o instanceof Phaser.GameObjects.Image && o.texture.key === 'wr-robe') as Phaser.GameObjects.Image | undefined;
     if (robe) floaters.push({ img: robe.setDepth(DEPTH_W.ringside + 0.55), x: robe.x, ph: 0, dy: 6 });
@@ -2779,8 +2774,7 @@ export class WrestleScene extends Phaser.Scene {
       img.setScale(key === 'wr-poo' ? 2 / ART_RES : (WrestleScene.CHAIR_S / ART_RES) * 0.9).setRotation(key === 'wr-poo' ? 0 : 1.4);
       floaters.push({ img, x: WX(sx), ph: Math.random() * 6, dy: 2 });
     }
-    this.flood = { g, falls, y: WORLD_H + 40, t: 0, pour: 0, bubbles: [], floaters };
-    this.tweens.add({ targets: this.flood, pour: 1, duration: 600 });
+    this.flood = { g, y: WORLD_H + 40, t: 0, bubbles: [], floaters };
   }
 
   private updateFlood(dt: number) {
@@ -2795,31 +2789,6 @@ export class WrestleScene extends Phaser.Scene {
     const wave = (x: number, a: number, b: number, sp: number) => Math.sin(x / a + f.t * sp) * 4 + Math.sin(x / b - f.t * sp * 1.3) * 2.2;
     const back = (x: number) => f.y - 5 + wave(x + 40, 52, 23, 1.7);
     const front = (x: number) => f.y + wave(x, 38, 17, 2.4);
-    // the waterfalls, pouring out of the stands and down into it
-    const fg = f.falls;
-    fg.clear();
-    for (const [sx, sy] of [[90, 165], [470, 300], [1270, 165], [340, 10], [1120, 10]] as const) {
-      const x = WX(sx);
-      const top = WY(sy);
-      const w = 16 * f.pour;
-      if (w < 1 || top > f.y) continue;
-      fg.fillStyle(0x4aa3d4, 0.78).fillRect(x - w / 2, top, w, f.y - top);
-      // (streaks running down it)
-      fg.lineStyle(2, 0xdff4ff, 0.75);
-      for (let k = 0; k < 4; k++) {
-        const lx = x - w / 2 + 3 + (k * (w - 6)) / 3;
-        const off = ((f.t * 260 + k * 37) % 46) - 46;
-        fg.beginPath();
-        for (let yy = top + off; yy < f.y; yy += 46) {
-          fg.moveTo(lx, Math.max(top, yy));
-          fg.lineTo(lx, Math.min(f.y, yy + 20));
-        }
-        fg.strokePath();
-      }
-      // white water where it lands
-      fg.fillStyle(0xffffff, 0.85);
-      for (let k = 0; k < 5; k++) fg.fillCircle(x + Math.sin(f.t * 7 + k * 1.7) * w * 0.8, f.y - 2 + Math.cos(f.t * 9 + k) * 2, 4 + (k % 2) * 3);
-    }
     // the back layer of waves (lighter, further off), then the deep water
     g.fillStyle(0x6cc3e0, 0.7);
     g.beginPath();
