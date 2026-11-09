@@ -2383,14 +2383,16 @@ export class WrestleScene extends Phaser.Scene {
     const S = QS / Q_RES;
     this.inIntro = true;
     q.spr.setDepth(DEPTH_W.spot + 0.3);
-    q.shadow.setDepth(DEPTH_W.spot + 0.2).setAlpha(0);
     // (he starts at the top of the aisle, out of the tunnel: small, far away)
     const fx = WX(TUNNEL.x);
     const fy = WY(TUNNEL.bottom);
+    // (his shadow on the floor under him all the way to the ring: he's standing on something)
+    const shadowAt = (x: number, y: number, k: number) => q.shadow.setPosition(x, y + 1).setDisplaySize(84 * k, 13 * k).setDepth(q.spr.depth - 0.01).setAlpha(0.55).setVisible(true);
     // (where he ends up: on the floor in front of the ring, past the challenger (not in front of them))
     const ex = WX(520);
     const ey = GROUND_Y;
     q.spr.setTexture('wr-pking-robe', 'idle').setPosition(fx, fy).setScale(S * 0.42).setAlpha(1).setFlipX(true);
+    shadowAt(fx, fy, 0.42);
     q.facing = 1;
     this.dark.fillAlpha = 0.72;
     this.camManual = true;
@@ -2487,6 +2489,7 @@ export class WrestleScene extends Phaser.Scene {
         // (a cocky strut: a grin at the crowd, a look round)
         q.spr.setFrame(u > 0.3 && u < 0.4 ? 'grin' : u > 0.66 && u < 0.74 ? 'look' : (['walk0', 'walk1', 'walk2', 'walk3'] as const)[Math.floor(ph * 2) % 4]);
         this.spot.setPosition(x, y + 10).setScale(0.55 * k, (y + 60) / 700);
+        shadowAt(x, y, k);
         // the camera wide at first, closing in on him as he comes round
         const z = Math.min(1, u * 1.15);
         this.camX = WX(300) + (x - 6 - WX(300)) * Math.min(1, u * 2.2);
@@ -2506,6 +2509,7 @@ export class WrestleScene extends Phaser.Scene {
     this.lowerThird(null);
     const robe = this.add.image(ex + 4, ey + 2, 'wr-robe').setOrigin(0.5, 1).setDepth(q.spr.depth - 0.05);
     q.spr.setTexture('wr-pking', 'yell1').setPosition(ex, ey).setScale(S);
+    shadowAt(ex, ey, 1);
     if (!this.skipping) {
       robe.setScale(QS / 2, (QS / 2) * 2.6);
       this.tweens.add({ targets: robe, scaleY: QS / 2, duration: 420, ease: 'Bounce.easeOut' });
@@ -2558,6 +2562,7 @@ export class WrestleScene extends Phaser.Scene {
     const landX = WX(820);
     this.camFocus = { x: (ex + landX) / 2, y: MAT_Y - 100, zoom: 1.15 };
     this.setJet(true);
+    q.shadow.setVisible(false).setDisplaySize(96, 16);
     await new Promise<void>((res) =>
       this.tweens.addCounter({
         from: 0,
