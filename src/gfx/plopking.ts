@@ -138,3 +138,16 @@ export function drawRobeHeap(ctx: Ctx, st: Style = STYLES.polished) {
   for (let x = 16; x < 110; x += 12) st.shape(ctx, [[x - 1.3, g - 6], [x + 1.3, g - 6], [x + 0.6, g - 1.5], [x - 0.6, g - 1.5]], F('#2a1a12', '#140a06', '#4a3428'), 4511 + x, { lw: 0.3, plain: true });
   st.shape(ctx, ellipsePts(70, g - 24, 4, 4, 0, 14), GOLD, 4530, { lw: 0.7, light: [68.5, g - 26] });
 }
+
+/** A rubber duck (bobbing on the flood): yellow, an orange beak, a shine. In a 28 × 24 box, waterline at the bottom. */
+export function drawDuck(ctx: Ctx, st: Style = STYLES.polished) {
+  const Y = F('#ffd23f', '#e8a910', '#fff2a8');
+  st.shape(ctx, [[3, 15], [6, 10], [14, 11], [22, 9], [26, 13], [25, 20], [18, 23], [8, 23], [3, 19]], Y, 4600, { lw: 1, light: [12, 14] });
+  st.shape(ctx, ellipsePts(10, 8, 6, 6, 0, 18), Y, 4601, { lw: 1, light: [8, 6] });
+  st.shape(ctx, [[4, 8.5], [0.5, 9.5], [1, 11.5], [5, 11]], F('#ff8a2a', '#d4520c', '#ffc07a'), 4602, { lw: 0.7 });
+  ctx.fillStyle = '#2a1a12';
+  ctx.beginPath();
+  ctx.arc(9, 6.5, 1.1, 0, Math.PI * 2);
+  ctx.fill();
+  st.line(ctx, [[14, 15], [18, 17], [21, 15]], 4603, 0.8, '#c98a10');
+}

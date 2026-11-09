@@ -14,8 +14,9 @@ import { drawPoo } from '../gfx/hazards';
 import { drawPrize } from '../gfx/prizes';
 import { STYLES } from '../gfx/handdrawn';
 import { CHAIR_H, CHAIR_W, KING_SEAT, PLOP_DOME, PLOP_DOME_RING, POO_PALACE, POO_PALACE_RING, setRingLook, drawFoldingChair, POST_BOX, PUDDLE, RING, RING_BOX, ROPE_COL, TUNNEL, backX, drawArenaPoo, drawFrontPost, drawRing, drawRingFloor, drawRingside, drawTunnel, drawWrestleJumbo } from '../gfx/wrestle';
-import { HERO_SHEET_M, PCHUTE_DOWN, PCHUTE_RES, PCHUTE_UP, PLOP_PAD, PLOP_RES, PLOP_TOP, addCanvas, hires, makeCarrySheet, makeJetFx, makePlopChutes, makePlops } from '../gfx/textures';
-import { JET_NOZZLES, ROBE_H, ROBE_W, drawPlopKing, drawRobeHeap } from '../gfx/plopking';
+import { HERO_SHEET_M, PCHUTE_DOWN, PCHUTE_RES, PCHUTE_UP, PLOP_PAD, PLOP_RES, PLOP_TOP, addCanvas, hires, makeCarrySheet, makeJetFx, makePlopChutes, makePlops, makeWeaponArt } from '../gfx/textures';
+import { BLASTER, SAW, W_RES } from '../gfx/weapons';
+import { JET_NOZZLES, ROBE_H, ROBE_W, drawDuck, drawPlopKing, drawRobeHeap } from '../gfx/plopking';
 import { BOOM_FRAMES, BOOM_SIZE, drawBoomFrame } from '../gfx/boom';
 import { Player } from '../entities/Player';
 import { Rocket } from '../entities/Rocket';
@@ -136,6 +137,8 @@ interface Minion {
   hopCd: number;
   hurtUntil: number;
   dead: boolean;
+  /** A blaster or a chainsaw (the medium and big ones), held out in front. */
+  weapon: { kind: 'gun' | 'saw'; img: Phaser.GameObjects.Image; cd: number; warn: number } | null;
 }
 
 class Queen {
@@ -575,6 +578,7 @@ export class WrestleScene extends Phaser.Scene {
     this.boss = data.level === 4 ? 'king' : 'queen';
     this.jet = null;
     this.minions = [];
+    this.minionShots = [];
     this.awayCount = 0;
     this.rockets = [];
     this.waves = [];
@@ -676,7 +680,8 @@ export class WrestleScene extends Phaser.Scene {
 
     // ── Queen Plop ──
     // (the Plop King: 13 hits, and 5% tougher than the Queen)
-    this.queen = this.kingFight ? new Queen(this, POST_R, POST_TOP, 'wr-pking', KING_HITS, Q_TOUGH * 1.05) : new Queen(this, POST_R, POST_TOP);
+    // (and Queen Plop 5% easier than she was)
+    this.queen = this.kingFight ? new Queen(this, POST_R, POST_TOP, 'wr-pking', KING_HITS, Q_TOUGH * 1.05) : new Queen(this, POST_R, POST_TOP, 'wr-queen', HITS, Q_TOUGH * 0.95);
     // (the Plop King's Plops, when he sends them in)
     this.gMinions = this.physics.add.group();
     this.physics.add.collider(this.gMinions, this.qStatics);
@@ -776,6 +781,8 @@ export class WrestleScene extends Phaser.Scene {
       makeJetFx(this);
       makePlopChutes(this);
       for (const k of ['small', 'medium', 'large'] as const) makePlops(this, k);
+      makeWeaponArt(this);
+      if (!T.exists('wr-duck')) addCanvas(this, 'wr-duck', hires(28, 24, 3, (ctx) => drawDuck(ctx)));
       if (!T.exists('wr-boom')) {
         const R = 1.2;
         const fw = Math.round(BOOM_SIZE * R);
@@ -1357,6 +1364,7 @@ export class WrestleScene extends Phaser.Scene {
     }
     this.updateHazards(dt);
     this.updateMinions(dt);
+    this.updateMinionShots(dt);
     this.updateJet(dt);
     this.updateFlood(dt);
     this.updateHearts(dt);
@@ -2594,7 +2602,8 @@ export class WrestleScene extends Phaser.Scene {
         // (not right on top of you)
         let x = xs[i];
         if (Math.abs(x - this.player.x) < 70) x += x < WORLD_W / 2 ? 90 : -90;
-        this.spawnMinion(k, x);
+        // (the medium and big ones are armed: one with a blaster, one with a chainsaw)
+        this.spawnMinion(k, x, k === 'small' ? null : i % 2 ? 'saw' : 'gun');
       }),
     );
   }
@@ -2625,7 +2634,7 @@ export class WrestleScene extends Phaser.Scene {
   }
 
   /** One of his Plops, coming down into the ring by parachute. */
-  private spawnMinion(kind: MinionKind, x: number) {
+  private spawnMinion(kind: MinionKind, x: number, weapon: 'gun' | 'saw' | null = null) {
     const M = MINION[kind];
     const s = M.k / PLOP_RES;
     const spr = this.physics.add.sprite(x, -80, `gplop-${kind}`, 'idle');
@@ -2642,7 +2651,10 @@ export class WrestleScene extends Phaser.Scene {
       .setOrigin(0.5, (PCHUTE_UP + 52) / (PCHUTE_UP + PCHUTE_DOWN))
       .setScale(M.k / PCHUTE_RES)
       .setDepth(spr.depth - 0.1);
-    this.minions.push({ spr, kind, hp: M.hp, chute, t: Math.random() * 6, hopCd: 1 + Math.random(), hurtUntil: 0, dead: false });
+    const w = weapon
+      ? { kind: weapon, img: this.add.image(x, -80, weapon === 'gun' ? 'w-blaster' : 'w-saw', weapon === 'saw' ? 's0' : undefined).setScale((M.k * (weapon === 'gun' ? 1.05 : 1.1)) / W_RES).setDepth(spr.depth + 0.1), cd: 1.2 + Math.random(), warn: 0 }
+      : null;
+    this.minions.push({ spr, kind, hp: M.hp, chute, t: Math.random() * 6, hopCd: 1 + Math.random(), hurtUntil: 0, dead: false, weapon: w });
   }
 
   private updateMinions(dt: number) {
@@ -2661,6 +2673,7 @@ export class WrestleScene extends Phaser.Scene {
         b.setVelocityX(sway * 18);
         spr.setRotation(sway * 0.08).setFrame(Math.floor(m.t * 3) % 2 ? 'yell0' : 'grin');
         m.chute.setPosition(spr.x, spr.y).setRotation(sway * 0.12);
+        if (m.weapon) this.placeMinionWeapon(m, spr.flipX ? 1 : -1);
         if (b.blocked.down || b.touching.down) {
           const c = m.chute;
           m.chute = null;
@@ -2676,8 +2689,28 @@ export class WrestleScene extends Phaser.Scene {
       const dx = p.x - spr.x;
       const dir = Math.sign(dx) || 1;
       const ground = b.blocked.down || b.touching.down;
-      if (ground) {
-        b.setVelocityX(Math.abs(dx) > 10 ? dir * M.speed : 0);
+      const w = m.weapon;
+      // a blaster: stop, take aim (a shake: your warning), fire a pom-pom across at you
+      const aiming = !!w && w.kind === 'gun' && ground && p.alive && this.fighting && Math.abs(dx) > 50 && Math.abs(dx) < 380 && Math.abs(p.y - spr.y) < 70;
+      if (w?.kind === 'gun') {
+        w.cd -= dt;
+        if (aiming && w.cd <= 0 && w.warn <= 0) {
+          w.warn = 0.45;
+          sfx.bump();
+        }
+        if (w.warn > 0) {
+          w.warn -= dt;
+          if (w.warn <= 0) {
+            if (aiming) this.minionFire(m, dir);
+            w.cd = 1.5 + Math.random() * 0.8;
+          }
+        }
+      }
+      // a chainsaw: revving, and it comes at you faster when you're close
+      const sawing = w?.kind === 'saw' && Math.abs(dx) < 260;
+      if (aiming || (w?.kind === 'gun' && w.warn > 0)) b.setVelocityX(0);
+      else if (ground) {
+        b.setVelocityX(Math.abs(dx) > 10 ? dir * M.speed * (sawing ? 1.55 : 1) : 0);
         m.hopCd -= dt;
         if (m.hopCd <= 0) {
           b.setVelocityY(m.kind === 'large' ? -360 : -420);
@@ -2693,6 +2726,7 @@ export class WrestleScene extends Phaser.Scene {
         b.setVelocityX(Math.max(0, b.velocity.x));
       }
       spr.setFlipX(dir > 0);
+      if (w) this.placeMinionWeapon(m, dir);
       spr.setFrame(!ground ? 'run1' : Math.abs(b.velocity.x) > 10 ? (['walk0', 'walk1', 'walk2', 'walk3'] as const)[Math.floor(m.t * 7) % 4] : 'idle');
       spr.setTint(now < m.hurtUntil && Math.floor(now / 60) % 2 ? 0xffb0b0 : 0xffffff);
       // you and it: land on it, or it gets you
@@ -2711,6 +2745,52 @@ export class WrestleScene extends Phaser.Scene {
     // all of them done (and he's still up there): back he comes
     const q = this.queen;
     if (!this.minions.length && q.mode === 'away' && !this.ended && !q.spr.visible) void this.kingReturn();
+  }
+
+  /** His Plops' pom-poms flying across the ring. */
+  private minionShots: { img: Phaser.GameObjects.Image; vx: number; life: number }[] = [];
+
+  /** A Plop's weapon, in its front hand (the sprite faces left; flipped, it faces right). */
+  private placeMinionWeapon(m: Minion, dir: number) {
+    const w = m.weapon!;
+    const M = MINION[m.kind];
+    const hx = m.spr.x + dir * 31 * (M.k / 0.74);
+    const hy = m.spr.y + 3 * (M.k / 0.74);
+    const shake = w.kind === 'saw' ? Math.sin(this.clock / 22) * 1.2 : w.warn > 0 ? Math.sin(this.clock / 11) * 1.4 : 0;
+    if (w.kind === 'gun') w.img.setOrigin(dir < 0 ? BLASTER.gx / BLASTER.w : 1 - BLASTER.gx / BLASTER.w, BLASTER.gy / BLASTER.h);
+    else w.img.setOrigin(dir < 0 ? SAW.gx / SAW.w : 1 - SAW.gx / SAW.w, SAW.gy / SAW.h).setFrame(Math.floor(this.clock / 60) % 2 ? 's0' : 's1');
+    w.img.setPosition(hx, hy + shake).setFlipX(dir > 0).setDepth(m.spr.depth + 0.1);
+  }
+
+  /** Bang: a pom-pom across the ring at you (jump it, or it's a heart). */
+  private minionFire(m: Minion, dir: number) {
+    const w = m.weapon!;
+    const M = MINION[m.kind];
+    const mx = w.img.x + dir * (BLASTER.gx - BLASTER.muzzleX) * (M.k * 1.05);
+    const my = w.img.y + (BLASTER.muzzleY - BLASTER.gy) * (M.k * 1.05);
+    const img = this.add.image(mx, my, 'w-bullet').setScale(1 / W_RES).setDepth(DEPTH.projectiles);
+    this.minionShots.push({ img, vx: dir * 320, life: 2.2 });
+    sfx.pew();
+    this.fx.muzzle(mx, my, dir as Side, w.img.x);
+  }
+
+  private updateMinionShots(dt: number) {
+    if (!this.minionShots.length) return;
+    const p = this.player;
+    this.minionShots = this.minionShots.filter((sh) => {
+      sh.life -= dt;
+      sh.img.x += sh.vx * dt;
+      sh.img.rotation += dt * 8;
+      const a = p.body;
+      const hit = p.alive && sh.img.x > a.left - 4 && sh.img.x < a.right + 4 && sh.img.y > a.top - 4 && sh.img.y < a.bottom + 4;
+      if (hit) this.hurtPlayer(sh.img.x - sh.vx * 0.05);
+      if (hit || sh.life <= 0 || sh.img.x < ROPE_L - 30 || sh.img.x > ROPE_R + 30) {
+        if (!hit) this.tweens.add({ targets: sh.img, alpha: 0, duration: 150, onComplete: () => sh.img.destroy() });
+        else sh.img.destroy();
+        return false;
+      }
+      return true;
+    });
   }
 
   /** His Plops a chair swing reaches: in front of you (or `either` side), from head height right down to the floor. */
@@ -2740,6 +2820,11 @@ export class WrestleScene extends Phaser.Scene {
     }
     m.dead = true;
     sfx.pop();
+    if (m.weapon) {
+      const wi = m.weapon.img;
+      m.weapon = null;
+      this.tweens.add({ targets: wi, y: wi.y + 30, angle: wi.angle + 90, alpha: 0, duration: 600, ease: 'Quad.easeIn', onComplete: () => wi.destroy() });
+    }
     this.fx.pooSplat(spr.x, spr.y, 12);
     this.fx.stars(spr.x, spr.y - 10, 6);
     this.fx.popText(spr.x, spr.y - 40, 'SPLAT!', '#ffd23f', 18);
@@ -2761,6 +2846,9 @@ export class WrestleScene extends Phaser.Scene {
     y: number;
     t: number;
     bubbles: { x: number; y: number; r: number; v: number }[];
+    /** Spray thrown up off the crest while it's rising. */
+    spray: { x: number; y: number; vx: number; vy: number; life: number }[];
+    lastY: number;
     floaters: { img: Phaser.GameObjects.Image; x: number; ph: number; dy: number }[];
   } | null = null;
 
@@ -2769,12 +2857,13 @@ export class WrestleScene extends Phaser.Scene {
     const floaters: { img: Phaser.GameObjects.Image; x: number; ph: number; dy: number }[] = [];
     const robe = this.children.list.find((o) => o instanceof Phaser.GameObjects.Image && o.texture.key === 'wr-robe') as Phaser.GameObjects.Image | undefined;
     if (robe) floaters.push({ img: robe.setDepth(DEPTH_W.ringside + 0.55), x: robe.x, ph: 0, dy: 6 });
-    for (const [sx, key] of [[260, 'wr-poo'], [700, 'wr-chair-bent'], [980, 'wr-poo'], [1180, 'wr-poo']] as const) {
+    for (const [sx, key] of [[260, 'wr-poo'], [430, 'wr-duck'], [700, 'wr-chair-bent'], [860, 'wr-duck'], [980, 'wr-poo'], [1180, 'wr-poo'], [1300, 'wr-duck']] as const) {
       const img = this.add.image(WX(sx), WORLD_H + 80, key).setDepth(DEPTH_W.ringside + 0.55);
-      img.setScale(key === 'wr-poo' ? 2 / ART_RES : (WrestleScene.CHAIR_S / ART_RES) * 0.9).setRotation(key === 'wr-poo' ? 0 : 1.4);
-      floaters.push({ img, x: WX(sx), ph: Math.random() * 6, dy: 2 });
+      img.setScale(key === 'wr-poo' ? 2 / ART_RES : key === 'wr-duck' ? 0.62 : (WrestleScene.CHAIR_S / ART_RES) * 0.9).setRotation(key === 'wr-chair-bent' ? 1.4 : 0);
+      if (key === 'wr-duck') img.setOrigin(0.5, 0.82).setFlipX(sx > 700);
+      floaters.push({ img, x: WX(sx), ph: Math.random() * 6, dy: key === 'wr-duck' ? 0 : 2 });
     }
-    this.flood = { g, y: WORLD_H + 40, t: 0, bubbles: [], floaters };
+    this.flood = { g, y: WORLD_H + 40, t: 0, bubbles: [], spray: [], lastY: WORLD_H + 40, floaters };
   }
 
   private updateFlood(dt: number) {
@@ -2807,6 +2896,44 @@ export class WrestleScene extends Phaser.Scene {
     // (darker further down)
     const depth = bottom - f.y;
     for (let k = 1; k <= 3; k++) g.fillStyle(0x0d4a78, 0.13).fillRect(x0, f.y + (depth * k) / 4, x1 - x0, bottom);
+    // light shafts slanting down through it (the arena's lights), swaying
+    for (let k = 0; k < 6; k++) {
+      const cx = x0 + ((k + 0.5) / 6) * (x1 - x0) + Math.sin(f.t * 0.6 + k * 1.9) * 40;
+      const w = 26 + (k % 3) * 14;
+      const lean = 70;
+      const top = front(cx);
+      const a = 0.07 + 0.04 * Math.sin(f.t * 1.3 + k);
+      g.fillStyle(0xd8f6ff, a);
+      g.beginPath();
+      g.moveTo(cx - w / 2, top + 4);
+      g.lineTo(cx + w / 2, top + 4);
+      g.lineTo(cx + w / 2 + lean, bottom);
+      g.lineTo(cx - w / 2 + lean, bottom);
+      g.closePath();
+      g.fillPath();
+    }
+    // the arena lights caught in it: a gold shimmer just under the crest
+    g.lineStyle(2, 0xffe08a, 0.45);
+    for (let x = x0; x < x1; x += 30) {
+      const on = Math.sin(x / 40 + f.t * 2.2) > 0.2;
+      if (on) g.lineBetween(x, front(x) + 6, x + 16, front(x + 16) + 6);
+    }
+    // spray thrown up off the crest while it's coming up
+    const rising = f.lastY - f.y;
+    f.lastY = f.y;
+    if (rising > 0.3) for (let k = 0; k < 3; k++) {
+      const sx = x0 + Math.random() * (x1 - x0);
+      f.spray.push({ x: sx, y: front(sx), vx: (Math.random() - 0.5) * 60, vy: -90 - Math.random() * 110, life: 0.7 });
+    }
+    f.spray = f.spray.filter((d) => {
+      d.life -= dt;
+      d.vy += 420 * dt;
+      d.x += d.vx * dt;
+      d.y += d.vy * dt;
+      if (d.life <= 0 || d.y > front(d.x) + 2) return false;
+      g.fillStyle(0xe8f8ff, Math.min(1, d.life * 2)).fillCircle(d.x, d.y, 2.2);
+      return true;
+    });
     // a foamy crest along the top, and glints dancing on it
     g.lineStyle(3, 0xe8f8ff, 0.95);
     g.beginPath();
@@ -2902,8 +3029,11 @@ export class WrestleScene extends Phaser.Scene {
     this.lobs = [];
     for (const m of this.minions) {
       m.chute?.destroy();
+      m.weapon?.img.destroy();
       m.spr.destroy();
     }
+    for (const sh of this.minionShots) sh.img.destroy();
+    this.minionShots = [];
     this.minions = [];
     if (this.chair) {
       this.chair.img.destroy();
