@@ -543,8 +543,8 @@ export class GameScene extends Phaser.Scene {
       x = Phaser.Math.Clamp(x, d.x0 + 40, d.x1 - 40);
       const y = how === 'fast' ? this.view.top - 90 : viewBottom + 120;
       if (y > d.floor - TILE * 4) continue;
-      // (every one of them has a blaster: they fire across at you as you pass them)
-      const e = createBadGuy(this, kind, x, y, 'gun');
+      // (most of them have a blaster: they fire across at you as you pass them)
+      const e = createBadGuy(this, kind, x, y, Math.random() < 0.75 ? 'gun' : undefined);
       this.enemies.push(e);
       this.gEnemies.add(e);
       e.wake();
