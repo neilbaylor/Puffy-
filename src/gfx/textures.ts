@@ -16,6 +16,8 @@ import './plopLooks'; // (registers Plop Invasion's palettes)
 import { POOWAVE_H, POOWAVE_W, drawPooOnGoat, drawPooPile, drawPooWave, drawStink, drawVolleyNetSide, drawVolleyball } from './plopworld';
 import { PLOP_FRAMES, PLOP_H, PLOP_W, drawPlop, type PlopKind } from './plops';
 import { drawPoo } from './hazards';
+import { BB_ALIAS, BB_FIELD_TILES, BB_KEYS, BB_PLAIN, BB_ROSTER, BB_SIZE, PARK, drawBallparkBack, drawBallparkFront, drawBaseball, drawBaseballPlop, drawCappedPlop, drawLineDrive, type BBPlayer, type BaseballRole } from './baseball';
+import { PLOP_COLOURS } from './plops';
 import { FLAME_FRAMES, FLAME_H, FLAME_W, drawDyingFlame, drawFlame, drawScorch } from './flame';
 import { ART_RES, ART_STYLE, CARRY_SWING, CHAR_H, CHAR_W, POSES, canvas, carry, drawCharacter, ellipse, type CarryFrame, type Ctx, type Pose } from './draw';
 import { FACE_FRAMES, faceFromKey } from './face';
@@ -562,6 +564,7 @@ const BADDIE_KEYS: Record<string, string[]> = {
   plops: ['gplop-small', 'gplop-medium', 'gplop-large'],
   chutes: ['pchute'],
   king: ['pking-jet', 'jetflame', 'jetsmoke'],
+  baseball: BB_KEYS,
 };
 
 /** The bad guys each level has (and a battle): only those are drawn, the others freed. */
@@ -569,7 +572,7 @@ const BADDIES_FOR: Record<string, string[]> = {
   1: ['puffball', 'bigpuff', 'giant', 'weapons'],
   2: ['puffball', 'bigpuff', 'giant', 'goat', 'weapons'],
   3: ['goat', 'weapons', 'plops'],
-  4: ['goat', 'weapons', 'plops', 'chutes', 'king'],
+  4: ['goat', 'weapons', 'plops', 'chutes', 'king', 'baseball'],
   battle: ['puffball', 'bigpuff', 'giant', 'weapons'],
 };
 
@@ -599,6 +602,11 @@ export function gameArtJobs(scene: Phaser.Scene, opts: { heroes: readonly string
         makeJetFx(scene);
       },
     });
+  // (Plop Park: the ballpark, and each player in its cap with its own colour)
+  if (want.includes('baseball')) {
+    if (!T.exists('bbpark-front')) out.push({ name: 'ballpark', run: () => makeBallpark(scene) });
+    for (const r of BB_ROSTER) if (!T.exists(r.key)) out.push({ name: `ballplayer ${r.key}`, run: () => makeBallPlayer(scene, r) });
+  }
   // (the parachute drops: the Plops' canopies, and each hero's own)
   if (want.includes('chutes')) {
     if (!T.exists('pchute')) out.push({ name: 'plop chutes', run: () => makePlopChutes(scene) });
@@ -617,3 +625,49 @@ export function dropBaddiesExcept(scene: Phaser.Scene, level: number | 'battle')
   if (!want.includes('chutes')) for (const c of CHARACTERS) if (scene.textures.exists(`chute-${c.id}`)) scene.textures.remove(`chute-${c.id}`);
 }
 
+
+/** Plop Park: the wall, scoreboard, backstop and lights behind; the turf, infield and bases in front; the ball. */
+export function makeBallpark(scene: Phaser.Scene) {
+  const w = BB_FIELD_TILES * TILE;
+  const { END, BACK_UP, FRONT_UP, BAND_BOT } = PARK;
+  const W = w + END * 2;
+  if (!scene.textures.exists('bbpark-back')) addCanvas(scene, 'bbpark-back', hires(W, BACK_UP, 1.5, (ctx) => drawBallparkBack(ctx, w, [3, 2])), undefined, { release: true });
+  if (!scene.textures.exists('bbpark-front')) addCanvas(scene, 'bbpark-front', hires(W, FRONT_UP + BAND_BOT, 2, (ctx) => drawBallparkFront(ctx, w)), undefined, { release: true });
+  if (!scene.textures.exists('bb-ball')) addCanvas(scene, 'bb-ball', hires(14, 14, ART_RES, (ctx) => drawBaseball(ctx, 7, 7, 5.5)));
+  if (!scene.textures.exists('bb-drive')) addCanvas(scene, 'bb-drive', hires(64, 16, ART_RES, (ctx) => drawLineDrive(ctx, 55, 8, 5.5, 1)));
+}
+
+/**
+ * One of Plop Park's players: its plain frames (in its cap) and its poses, in its own colour, mirrored
+ * to face left like every Plop; at a lower resolution than a Plop's own sheet (there are seven of them).
+ */
+export function makeBallPlayer(scene: Phaser.Scene, r: BBPlayer) {
+  if (scene.textures.exists(r.key)) return;
+  const res = BB_SIZE[r.kind].res;
+  const fw = Math.round((PLOP_W + r.padX * 2) * res);
+  const fh = Math.round((PLOP_H + PLOP_TOP) * res);
+  const names: string[] = [...BB_PLAIN, ...r.roles];
+  const { c, ctx } = canvas(fw * names.length, fh);
+  const fill = PLOP_COLOURS[r.body % PLOP_COLOURS.length];
+  names.forEach((n, i) => {
+    ctx.save();
+    ctx.translate(i * fw, 0);
+    ctx.scale(res, res);
+    // (mirrored about the body's middle)
+    ctx.translate(2 * (r.padX + 50), PLOP_TOP);
+    ctx.scale(-1, 1);
+    if ((BB_PLAIN as string[]).includes(n)) drawCappedPlop(ctx, n as (typeof BB_PLAIN)[number], r.kind, r.team, fill, 7 + r.body);
+    else drawBaseballPlop(ctx, n as BaseballRole, r.kind, 7 + r.body, fill);
+    ctx.restore();
+  });
+  addCanvas(
+    scene,
+    r.key,
+    c,
+    (t) => {
+      names.forEach((n, i) => t.add(n, 0, i * fw, 0, fw, fh));
+      for (const [a, to] of Object.entries(BB_ALIAS)) t.add(a, 0, names.indexOf(to) * fw, 0, fw, fh);
+    },
+    { release: true },
+  );
+}
