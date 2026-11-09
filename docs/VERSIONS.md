@@ -211,3 +211,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.206: Level 4: fewer nuggies in the parachute drops (8 each), a few more on climb 2.
 - v0.207: the Plop King's first wave is 5 small Plops.
 - v0.208: the Plop King intro opens on him (about a second) before going up to the jumbotron.
+- v0.209: the Plop King walks behind the POOPA TV table; his speech bubble stays up 0.1 s longer.
