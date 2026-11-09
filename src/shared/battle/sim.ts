@@ -44,7 +44,7 @@ const PRIZE_ODDS: [PrizeKind, number][] = [
 /** Timed powers: 0 none, 1 star (invincible), 2 grow (big & strong), 3 rapid fire, 4 fireballs. */
 export const POWER = { none: 0, star: 1, grow: 2, rapid: 3, fire: 4 } as const;
 /** How long each power lasts (s): the star's invincibility is kept short, it's strong. */
-const POWER_SECS: Record<number, number> = { 1: 8, 2: 8, 3: 7, 4: 8 };
+const POWER_SECS: Record<number, number> = { 1: 8, 2: 12, 3: 7, 4: 8 };
 /** Grabbing ice freezes everyone else this long. */
 export const FREEZE_SECS = 2;
 /** Landing on someone's head: a hit, and you bounce off. */
@@ -512,7 +512,7 @@ export class BattleSim {
   private nextPrize = 1;
   private dropIn = 5;
   private nextThing = 1;
-  private enemyIn = 10;
+  private enemyIn = 12;
   private hazardIn = 5;
 
   constructor(data: LevelData) {
@@ -724,6 +724,8 @@ export class BattleSim {
   /** Take hearts off a hero (unless they can't be hurt right now) and knock them back. */
   private hurt(p: BPlayer, by: string, fromX: number, damage: number, knock: number, ev: BEvent[]): boolean {
     if (p.respawn > 0 || p.invuln > 0 || p.power === POWER.star) return false;
+    // grown: bad guys and things from the sky can't hurt you, only another hero can
+    if (p.power === POWER.grow && !this.players.has(by)) return false;
     p.hp -= damage;
     p.lastHitBy = by;
     const away = Math.sign(p.x - fromX) || 1;
@@ -1043,10 +1045,10 @@ export class BattleSim {
 
   // ── bad guys ──
 
-  /** Room for one more? Up to three at once, at most one of them big. */
+  /** Room for one more? Two at once (three with 3+ players), at most one of them big. */
   private enemyBudget(): EnemyKind | null {
     // (the arena's four screens wide: a few more about, so there's some near everyone)
-    if (this.enemies.length >= Math.min(4, 1 + this.players.size)) return null;
+    if (this.enemies.length >= Math.min(3, Math.max(2, this.players.size))) return null;
     const hasBig = this.enemies.some((e) => e.kind === 'big');
     const r = Math.random();
     if (!hasBig && r < 0.32) return 'big';
@@ -1138,7 +1140,7 @@ export class BattleSim {
   private stepEnemies(ev: BEvent[]) {
     this.enemyIn -= DT;
     if (this.enemyIn <= 0) {
-      this.enemyIn = 9 + Math.random() * 9; // (half as often as before: every 13.5 s on average, was 6.75)
+      this.enemyIn = 13 + Math.random() * 10; // (every 18 s on average, was 13.5)
       this.spawnEnemy(ev);
     }
     const T = TILE_PX;
