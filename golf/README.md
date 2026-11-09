@@ -3,6 +3,41 @@
 A realistic 3D golf game for the browser, phones first. Separate from Puffy; it lives in `golf/` for now
 and can move to its own repo once there is real code.
 
+## Play it
+
+`range-day.html` is the whole game in one file (also published as a claude.ai artifact).
+
+```bash
+cd golf
+npm install
+npm run dev              # http://localhost:5173 (on your LAN too, for phones)
+npm run build:artifact   # rebuild range-day.html
+```
+
+Dev pages: `golfer.html?pose=address|half|top|down|impact|through|finish|stand&view=game|gameclose|face|dtl|close|three&club=0..12&mode=full|punch|pitch|flop`
+to look at the golfer, and `env.html?view=tee|flight|green|top|side` for the range.
+
+## Code map
+
+```
+src/main.ts            game loop: swing input, cameras, flight, result
+src/golfer/profile.ts  who a golfer is (Neil is the first): body, face, outfit, swing tempo
+src/golfer/body.ts     builds the body from a profile: skeleton, skinned hoodie/pants, head, face paint, hair
+src/golfer/rig.ts      posing: spine turn, two-bone IK for arms and legs, head look-at
+src/golfer/golfer.ts   the swing: address set-up per club, keyframes per shot type, club on the swing plane
+src/golfer/club.ts     driver to 60° wedge, and the hands built around the grip
+src/game/ball.ts       ball physics: drag, spin lift, aftertouch, bounce, check-up, roll
+src/game/shot.ts       swing → launch (club data, modes, lies, tempo penalties)
+src/world/range.ts     the range: sky, terrain, grass, trees, greens, flags, signs
+src/ui/hud.ts/.css     HUD (three looks), swing pad, spin ball
+src/game/audio.ts      synthesised sound
+```
+
+## Adding a friend
+
+Copy `NEIL` in `src/golfer/profile.ts`: height, weight, handedness, skin/hair/eye colours, face length,
+hairline, nose, stubble, outfit colours and swing tempo. Next step is a face texture from a photo.
+
 ## Concepts
 
 - `concepts/swing-hud.html`: playable swing pad on a 2D stand-in range, three HUD looks
@@ -11,8 +46,7 @@ and can move to its own repo once there is real code.
 
 ## Tech plan
 
-- **Rendering:** WebGL 2 through [Three.js](https://threejs.org), with its WebGPU renderer where the
-  browser has it (it falls back to WebGL 2 on its own). Three.js gives us PBR materials, shadows, glTF
+- **Rendering:** WebGL 2 through [Three.js](https://threejs.org) (0.186). Three.js gives us PBR materials, shadows, glTF
   characters and skinned animation without writing a renderer.
 - **Language/build:** TypeScript + Vite, same as Puffy.
 - **Ball flight:** our own small physics step (gravity, drag, Magnus lift from spin, bounce and roll on the

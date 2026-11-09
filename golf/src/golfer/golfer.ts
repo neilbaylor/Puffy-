@@ -17,6 +17,8 @@ export interface SwingState {
   topPhi: number;
   /** seconds since the golfer started standing over the ball (breathing, waggle) */
   idleT: number;
+  /** look at this world point instead (e.g. at the camera on the intro screen) */
+  lookAt?: THREE.Vector3;
 }
 
 export const BALL_R = 0.02135;
@@ -241,8 +243,11 @@ export class Golfer {
     p.poleR.copy(this.pelvisBase).add(new THREE.Vector3(-0.35, -0.5, 0.05));
     if (s.phase === 'follow') p.poleR.set(this.pelvisBase.x + 0.6, -0.4, this.pelvisBase.z + 0.6);
     // eyes: on the ball until well after impact, then down the target line
-    const watch = s.phase === 'follow' ? smooth(0.25, 0.75, -phi / Math.abs(PHI_FINISH)) : 0;
+    let watch = s.phase === 'follow' ? smooth(0.25, 0.75, -phi / Math.abs(PHI_FINISH)) : 0;
+    // pre-shot routine: every few seconds over the ball, a look down the range at the target
+    if (s.phase === 'address') { const c = (s.idleT + 1.5) % 6.5; watch = Math.max(watch, 0.8 * smooth(0, 0.45, c) * (1 - smooth(1.5, 2.0, c))); }
     p.look.copy(this.ballC).lerp(new THREE.Vector3(60, 6, -4), watch);
+    if (s.lookAt) p.look.copy(this.char.worldToLocal(s.lookAt.clone()));
     this.rig.apply(p);
     for (let pass = 0; pass < 2; pass++) {
       const miss = this.rig.wristPos.L.clone().sub(p.wristL);

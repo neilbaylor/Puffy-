@@ -36,7 +36,7 @@ export function skeletonFor(p: GolferProfile): Skeleton {
   const wide = 0.94 + 0.06 * (bmi / 22.5); // shoulders/hips scale a little with build
   const j = (x: number, y: number, z: number) => V(x * k * wide, y * k, z * k);
   const sym = (v: THREE.Vector3) => V(-v.x, v.y, v.z);
-  const shoulderL = j(0.2, 1.53, -0.012), elbowL = j(0.238, 1.19, -0.03), wristL = j(0.262, 0.918, 0.0);
+  const shoulderL = j(0.2, 1.522, -0.012), elbowL = j(0.238, 1.19, -0.03), wristL = j(0.262, 0.918, 0.0);
   const hipL = j(0.094, 0.975, 0), kneeL = j(0.1, 0.53, 0.016), ankleL = j(0.104, 0.09, -0.012), toeL = j(0.11, 0.022, 0.17);
   const joint = [
     V(0, 0, 0), j(0, 1.0, 0), j(0, 1.13, -0.006), j(0, 1.3, 0), j(0, 1.575, -0.014), j(0, 1.66, -0.004),
@@ -48,7 +48,7 @@ export function skeletonFor(p: GolferProfile): Skeleton {
     shoulderL, elbowL, wristL, sym(shoulderL), sym(elbowL), sym(wristL),
     kneeL, ankleL, toeL, sym(kneeL), sym(ankleL), sym(toeL),
   ];
-  return { joint, tail, headCenter: j(0, 1.772, 0.014), eye: j(0, 1.79, 0.09) };
+  return { joint, tail, headCenter: j(0, 1.762, 0.016), eye: j(0, 1.78, 0.092) };
 }
 
 // ───────────────────────── loft: rings along a path → skinned tube ─────────────────────────
@@ -193,8 +193,9 @@ function sculpt(x: number, y: number, z: number, L: GolferProfile['look'], out: 
   const front = smooth(0.15, 0.7, z), back = smooth(0.05, -0.6, z);
   // jaw and chin: narrower low down, but keep the angle of the jaw
   const low = smooth(-0.1, -1.0, y);
-  const jawAngle = gauss((y + 0.58) / 0.24) * smooth(0.8, 0.05, z) * 0.26;
-  px *= 1 - 0.27 * low + jawAngle * low;
+  const jawAngle = gauss((y + 0.6) / 0.26) * smooth(0.85, 0.0, z) * 0.32;
+  px *= 1 - 0.22 * low + jawAngle * low;
+  pz += 0.003 * gauss((y + 0.8) / 0.12) * gauss(x / 0.5) * smooth(0.2, 0.7, z); // fuller chin
   pz *= 1 - 0.1 * low * back;
   // chin forward, flat face plane
   pz += 0.006 * gauss((y + 0.86) / 0.13) * gauss(x / 0.35) * front;
@@ -284,9 +285,9 @@ function faceTexture(L: GolferProfile['look']) {
     for (let i = 0; i < 160000; i++) {
       const u = rand(), v = rand(); const az = (u - 0.5) * 2 * Math.PI, el = (v - 0.5) * Math.PI;
       const e = hairElevation(az, L.hairline);
-      const d = el - (e - 0.06);
-      if (d < 0) { if (rand() > Math.max(0, 1 + d / 0.05)) continue; }
-      g.fillStyle = `rgba(${Math.round(hc.r * 255)},${Math.round(hc.g * 255)},${Math.round(hc.b * 255)},${0.3 + rand() * 0.4})`;
+      const d = el - (e + 0.01);
+      if (d < 0) { if (rand() > Math.max(0, 1 + d / 0.035) * 0.8) continue; }
+      g.fillStyle = `rgba(${Math.round(hc.r * 255)},${Math.round(hc.g * 255)},${Math.round(hc.b * 255)},${d < 0 ? 0.35 + rand() * 0.35 : 0.85})`;
       g.fillRect(u * W, (1 - v) * H, 1.5 + rand() * 2, 2 + rand() * 3);
     }
     // lips
@@ -295,33 +296,53 @@ function faceTexture(L: GolferProfile['look']) {
     { const [x0, y0] = P(-0.3, -0.525), [x1] = P(0.3, -0.525), [, yc] = P(0, -0.522); g.strokeStyle = 'rgba(90,45,40,.6)'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(x0, y0 - 2); g.quadraticCurveTo((x0 + x1) / 2, yc + 4, x1, y0 - 2); g.stroke(); }
     // nostrils
     for (const s of [-1, 1]) { const [cx, cy] = P(s * 0.085, -0.335); g.fillStyle = 'rgba(70,35,30,.55)'; g.beginPath(); g.ellipse(cx, cy, 9, 5, s * 0.4, 0, 7); g.fill(); }
-    // eyes
+    // eyes: almond shaped, a little hooded, blue-grey irises
     const ir = new THREE.Color(L.eyes);
+    const almond = (cx: number, cy: number, ew: number, eh: number, s: number) => {
+      // inner corner (toward the nose) a touch lower than the outer corner
+      const inX = cx - s * ew, outX = cx + s * ew;
+      g.beginPath(); g.moveTo(inX, cy + eh * 0.15);
+      g.bezierCurveTo(cx - s * ew * 0.45, cy - eh * 1.15, cx + s * ew * 0.45, cy - eh * 1.2, outX, cy - eh * 0.05);
+      g.bezierCurveTo(cx + s * ew * 0.4, cy + eh * 0.95, cx - s * ew * 0.45, cy + eh * 0.95, inX, cy + eh * 0.15);
+      g.closePath();
+    };
     for (const s of [-1, 1]) {
       const [cx, cy] = P(s * 0.36, 0.055);
-      const ew = 0.125 * scaleX, eh = 0.05 * scaleY;
-      g.save(); g.beginPath(); g.ellipse(cx, cy, ew, eh, 0, 0, 7); g.clip();
-      g.fillStyle = '#efe9e4'; g.fillRect(cx - ew, cy - eh, ew * 2, eh * 2);
-      const irisR = eh * 0.95, ix = cx - s * 2;
-      const gi = g.createRadialGradient(ix, cy, irisR * 0.2, ix, cy, irisR);
-      gi.addColorStop(0, `rgb(${Math.round(ir.r * 200)},${Math.round(ir.g * 200)},${Math.round(ir.b * 200)})`);
-      gi.addColorStop(0.75, `rgb(${Math.round(ir.r * 255)},${Math.round(ir.g * 255)},${Math.round(ir.b * 255)})`);
-      gi.addColorStop(1, 'rgb(40,50,60)');
-      g.fillStyle = gi; g.beginPath(); g.arc(ix, cy + eh * 0.15, irisR, 0, 7); g.fill();
-      g.fillStyle = '#121212'; g.beginPath(); g.arc(ix, cy + eh * 0.15, irisR * 0.38, 0, 7); g.fill();
-      g.fillStyle = 'rgba(255,255,255,.9)'; g.beginPath(); g.arc(ix + irisR * 0.3, cy - irisR * 0.15, irisR * 0.18, 0, 7); g.fill();
-      g.fillStyle = 'rgba(60,40,35,.35)'; g.fillRect(cx - ew, cy - eh, ew * 2, eh * 0.55); // upper lid shadow
+      const ew = 0.118 * scaleX, eh = 0.043 * scaleY;
+      // socket shading and the hooded fold above the lid
+      blush(s * 0.36, 0.1, 0.17, 0.07, 'rgb(120,78,68)', 0.2);
+      g.save(); almond(cx, cy, ew, eh, s); g.clip();
+      g.fillStyle = '#e2d8d1'; g.fillRect(cx - ew, cy - eh * 1.3, ew * 2, eh * 2.6);
+      const irisR = eh * 1.02, ix = cx - s * 1.5, iy = cy + eh * 0.12;
+      const gi = g.createRadialGradient(ix, iy, irisR * 0.15, ix, iy, irisR);
+      gi.addColorStop(0, `rgb(${Math.round(ir.r * 170)},${Math.round(ir.g * 175)},${Math.round(ir.b * 170)})`);
+      gi.addColorStop(0.55, `rgb(${Math.round(ir.r * 255)},${Math.round(ir.g * 255)},${Math.round(ir.b * 255)})`);
+      gi.addColorStop(0.92, `rgb(${Math.round(ir.r * 150)},${Math.round(ir.g * 160)},${Math.round(ir.b * 170)})`);
+      gi.addColorStop(1, 'rgb(38,46,56)');
+      g.fillStyle = gi; g.beginPath(); g.arc(ix, iy, irisR, 0, 7); g.fill();
+      for (let i = 0; i < 40; i++) { const a = rand() * 7; g.strokeStyle = 'rgba(255,255,255,.12)'; g.lineWidth = 1; g.beginPath(); g.moveTo(ix + Math.cos(a) * irisR * 0.4, iy + Math.sin(a) * irisR * 0.4); g.lineTo(ix + Math.cos(a) * irisR * 0.9, iy + Math.sin(a) * irisR * 0.9); g.stroke(); }
+      g.fillStyle = '#0d0d0f'; g.beginPath(); g.arc(ix, iy, irisR * 0.36, 0, 7); g.fill();
+      const lid = g.createLinearGradient(0, cy - eh * 1.2, 0, cy + eh * 0.1);
+      lid.addColorStop(0, 'rgba(50,30,26,.55)'); lid.addColorStop(1, 'rgba(50,30,26,0)');
+      g.fillStyle = lid; g.fillRect(cx - ew, cy - eh * 1.3, ew * 2, eh * 1.5);
+      g.fillStyle = 'rgba(255,255,255,.85)'; g.beginPath(); g.arc(ix + irisR * 0.32, iy - irisR * 0.32, irisR * 0.16, 0, 7); g.fill();
       g.restore();
-      g.strokeStyle = 'rgba(35,22,18,.95)'; g.lineWidth = 6; g.beginPath(); g.ellipse(cx, cy, ew, eh, 0, Math.PI * 1.04, Math.PI * 1.96); g.stroke();
-      g.strokeStyle = 'rgba(70,40,35,.4)'; g.lineWidth = 2.5; g.beginPath(); g.ellipse(cx, cy, ew * 0.95, eh, 0, Math.PI * 0.1, Math.PI * 0.9); g.stroke();
-      g.strokeStyle = 'rgba(120,70,60,.35)'; g.lineWidth = 3; g.beginPath(); g.ellipse(cx, cy - eh * 0.6, ew * 0.95, eh * 1.4, 0, Math.PI * 1.1, Math.PI * 1.9); g.stroke();
-      // brow: many short strokes
+      // lash line on top, softer line below, crease above
+      g.save(); almond(cx, cy, ew, eh, s); g.strokeStyle = 'rgba(40,24,20,.0)'; g.restore();
+      g.strokeStyle = 'rgba(32,20,16,.92)'; g.lineWidth = 5; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(cx - s * ew, cy + eh * 0.15); g.bezierCurveTo(cx - s * ew * 0.45, cy - eh * 1.15, cx + s * ew * 0.45, cy - eh * 1.2, cx + s * ew * 1.04, cy - eh * 0.1); g.stroke();
+      g.strokeStyle = 'rgba(90,55,48,.45)'; g.lineWidth = 2.2;
+      g.beginPath(); g.moveTo(cx + s * ew, cy - eh * 0.05); g.bezierCurveTo(cx + s * ew * 0.4, cy + eh * 0.95, cx - s * ew * 0.45, cy + eh * 0.95, cx - s * ew, cy + eh * 0.15); g.stroke();
+      g.strokeStyle = 'rgba(110,66,56,.38)'; g.lineWidth = 3.5;
+      g.beginPath(); g.moveTo(cx - s * ew * 0.85, cy - eh * 0.9); g.bezierCurveTo(cx - s * ew * 0.3, cy - eh * 1.9, cx + s * ew * 0.5, cy - eh * 1.85, cx + s * ew * 1.1, cy - eh * 0.75); g.stroke();
+      // brow: fairly straight and full, thicker toward the nose
       const bc = new THREE.Color(L.brows);
-      for (let i = 0; i < 260; i++) {
-        const tt = rand(); const bx = s * (0.17 + tt * 0.38), by = 0.225 + 0.035 * Math.sin(tt * Math.PI) - tt * 0.02 + (rand() - 0.5) * 0.045 * (1 - tt * 0.5);
+      for (let i = 0; i < 520; i++) {
+        const tt = rand();
+        const bx = s * (0.15 + tt * 0.4), by = 0.218 + 0.018 * Math.sin(tt * Math.PI * 0.9) - tt * 0.012 + (rand() - 0.5) * 0.05 * (1 - tt * 0.55);
         const [px, py] = P(bx, by);
-        g.strokeStyle = `rgba(${Math.round(bc.r * 255)},${Math.round(bc.g * 255)},${Math.round(bc.b * 255)},${0.45 + rand() * 0.4})`;
-        g.lineWidth = 1.6 + rand(); g.beginPath(); g.moveTo(px, py); g.lineTo(px + s * (6 + rand() * 6), py - 3 - rand() * 3); g.stroke();
+        g.strokeStyle = `rgba(${Math.round(bc.r * 255)},${Math.round(bc.g * 255)},${Math.round(bc.b * 255)},${0.35 + rand() * 0.45})`;
+        g.lineWidth = 1.4 + rand() * 1.2; g.beginPath(); g.moveTo(px, py); g.lineTo(px + s * (5 + rand() * 7), py - 2.5 - rand() * 3 + tt * 2); g.stroke();
       }
     }
   });
@@ -339,6 +360,14 @@ function buildHead(p: GolferProfile, skinMat: THREE.Material): HeadParts {
   const mat = (skinMat as THREE.MeshPhysicalMaterial).clone();
   mat.map = faceTexture(L);
   mat.color.set('#ffffff');
+  mat.roughness = 1;
+  mat.roughnessMap = canvasTex(1024, 512, g => {
+    const W = 1024, H = 512, P = (x: number, y: number) => { const [u, v] = faceUV(x, y); return [u * W, (1 - v) * H]; };
+    g.fillStyle = 'rgb(0,140,0)'; g.fillRect(0, 0, W, H);           // skin ~0.55
+    for (const s of [-1, 1]) { const [cx, cy] = P(s * 0.36, 0.055); g.fillStyle = 'rgb(0,28,0)'; g.beginPath(); g.ellipse(cx, cy, 20, 8, 0, 0, 7); g.fill(); }
+    const [lx, ly] = P(0, -0.525); g.fillStyle = 'rgb(0,95,0)'; g.beginPath(); g.ellipse(lx, ly, 30, 9, 0, 0, 7); g.fill();
+    const [nx, ny] = P(0, -0.2); g.fillStyle = 'rgb(0,115,0)'; g.beginPath(); g.ellipse(nx, ny, 14, 20, 0, 0, 7); g.fill(); // a little shine on the nose
+  }, false);
   const head = new THREE.Mesh(geo, mat);
 
   // hair shell
@@ -350,7 +379,8 @@ function buildHead(p: GolferProfile, skinMat: THREE.Material): HeadParts {
     const e = hairElevation(az, L.hairline);
     const m = smooth(e - 0.08, e + 0.16, el);
     const top = smooth(0.15, 1.0, el), front = smooth(-0.2, 0.6, z);
-    const thick = smooth(0.25, 1, m) * (0.003 + 0.007 * top + 0.003 * front * top) + 0.0006;
+    const tuft = 0.5 + 0.5 * Math.sin(x * 23 + Math.sin(z * 17) * 2) * Math.sin(z * 19 + y * 13 + Math.sin(x * 11));
+    const thick = smooth(0.25, 1, m) * (0.003 + 0.008 * top + 0.004 * front * top + 0.0035 * top * tuft) + 0.0006;
     keep.push(m > 0.001);
     hm.push(m);
     hp.push(pos.getX(i) + nrm.getX(i) * thick, pos.getY(i) + nrm.getY(i) * thick, pos.getZ(i) + nrm.getZ(i) * thick);
@@ -378,7 +408,7 @@ function buildHead(p: GolferProfile, skinMat: THREE.Material): HeadParts {
   hairMat.onBeforeCompile = sh => {
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float hm;\nvarying float vHm;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvHm = hm;');
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vHm;')
-      .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n float hn = fract(sin(dot(floor(vMapUv * vec2(2600.0, 1300.0)), vec2(12.9898, 78.233))) * 43758.5453);\n if (vHm < 0.35 + 0.4 * hn) discard;');
+      .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n float hn = fract(sin(dot(floor(vMapUv * vec2(2600.0, 1300.0)), vec2(12.9898, 78.233))) * 43758.5453);\n if (vHm < 0.42 + 0.2 * hn) discard;');
   };
   hairMat.customProgramCacheKey = () => 'hair-mask';
   const hair = new THREE.Mesh(hg, hairMat);
@@ -453,20 +483,22 @@ export function buildBody(p: GolferProfile): Body {
   const y = (v: number) => v * k;
   // ── hoodie: torso + sleeves + hem/cuff bands ──
   const torsoRings: Ring[] = ([
-    [0.85, 0.19, 0.13, -0.004, [[1, 1]], 0.88],
-    [0.875, 0.19, 0.13, -0.004, [[1, 1]], 0.88],
-    [0.9, 0.186, 0.127, -0.002, [[1, 1]], 1],
-    [0.98, 0.172, 0.118, 0.004, [[1, 0.6], [2, 0.4]], 1],
-    [1.08, 0.168, 0.118, 0.006, [[2, 1]], 1],
+    [0.85, 0.196, 0.134, -0.004, [[1, 1]], 0.88],
+    [0.875, 0.196, 0.134, -0.004, [[1, 1]], 0.88],
+    [0.9, 0.192, 0.13, -0.002, [[1, 1]], 1],
+    [0.98, 0.18, 0.122, 0.004, [[1, 0.7], [2, 0.3]], 1],
+    [1.08, 0.162, 0.116, 0.006, [[2, 1]], 1],
     [1.18, 0.174, 0.124, 0.01, [[2, 0.6], [3, 0.4]], 1],
     [1.28, 0.185, 0.13, 0.014, [[3, 1]], 1],
     [1.38, 0.196, 0.13, 0.012, [[3, 1]], 1],
-    [1.46, 0.205, 0.12, 0.006, [[3, 1]], 1],
-    [1.515, 0.2, 0.106, -0.004, [[3, 1]], 1],
-    [1.552, 0.168, 0.09, -0.01, [[3, 1]], 1],
-    [1.578, 0.1, 0.074, -0.012, [[3, 0.8], [4, 0.2]], 0.96],
-    [1.6, 0.07, 0.066, -0.01, [[3, 0.6], [4, 0.4]], 0.92],
-  ] as [number, number, number, number, [number, number][], number][]).map(([yy, rx, rz, zo, w, shade]) => ({ c: V(0, y(yy), 0), rx: G(rx), rz: G(rz), zo: zo * k, w, shade, p: 2.35 }));
+    [1.45, 0.2, 0.12, 0.006, [[3, 1]], 1],
+    [1.5, 0.2, 0.112, -0.002, [[3, 1]], 1],
+    [1.54, 0.188, 0.1, -0.008, [[3, 1]], 1],
+    [1.568, 0.152, 0.09, -0.012, [[3, 1]], 0.98],
+    [1.592, 0.105, 0.08, -0.012, [[3, 0.8], [4, 0.2]], 0.96],
+    [1.615, 0.082, 0.078, -0.008, [[3, 0.6], [4, 0.4]], 0.92],
+    [1.63, 0.077, 0.074, -0.006, [[3, 0.5], [4, 0.5]], 0.88],
+  ] as [number, number, number, number, [number, number][], number][]).map(([yy, rx, rz, zo, w, shade]) => ({ c: V(0, y(yy), 0), rx: G(rx), rz: G(rz), zo: zo * k, w, shade, p: yy > 1.44 ? 2.0 : 2.35 }));
   const torso = loft(torsoRings, 40, V(0, 0, 1), [false, false]);
   const sleeve = (L: boolean) => {
     const sx = L ? 1 : -1, cl = L ? BONE.clavL : BONE.clavR, up = L ? BONE.upperL : BONE.upperR, fo = L ? BONE.foreL : BONE.foreR;
@@ -474,7 +506,7 @@ export function buildBody(p: GolferProfile): Body {
     const start = V(sx * 0.12 * k, sh.y - 0.015 * k, sh.z);
     const pts = [start, sh, el, wr];
     return loft(limbRings(pts, [cl, up, fo], [
-      { t: 0.0, rx: G(0.046) }, { t: 0.5, rx: G(0.054) }, { t: 1.0, rx: G(0.058), rz: G(0.057) }, { t: 1.2, rx: G(0.055) }, { t: 1.5, rx: G(0.052) },
+      { t: 0.0, rx: G(0.044) }, { t: 0.5, rx: G(0.05) }, { t: 1.0, rx: G(0.055), rz: G(0.056) }, { t: 1.2, rx: G(0.054) }, { t: 1.5, rx: G(0.052) },
       { t: 1.85, rx: G(0.048) }, { t: 2.0, rx: G(0.047) }, { t: 2.15, rx: G(0.046) }, { t: 2.5, rx: G(0.044) }, { t: 2.8, rx: G(0.04) },
       { t: 2.86, rx: G(0.036), shade: 0.9 }, { t: 2.97, rx: G(0.034), shade: 0.9 }, { t: 3.0, rx: G(0.03), shade: 0.9 },
     ].map(s => ({ ...s, t: s.t < 1 ? s.t : s.t })), 0.16, BONE.chest).map((r, i) => i < 2 ? { ...r, w: [[BONE.chest, 0.6], [cl, 0.4]] as [number, number][] } : r), 22, V(0, 0, 1), [false, true]);
@@ -489,16 +521,16 @@ export function buildBody(p: GolferProfile): Body {
   // ── pants: hips + legs ──
   const hips = loft(([
     [0.8, 0.14, 0.092, -0.004, [[1, 1]]],
-    [0.86, 0.158, 0.1, -0.008, [[1, 1]]],
-    [0.94, 0.166, 0.104, -0.008, [[1, 1]]],
+    [0.86, 0.156, 0.1, -0.008, [[1, 1]]],
+    [0.94, 0.16, 0.1, -0.008, [[1, 1]]],
     [0.97, 0.152, 0.098, -0.004, [[1, 1]]],
   ] as [number, number, number, number, [number, number][]][]).map(([yy, rx, rz, zo, w]) => ({ c: V(0, y(yy), 0), rx: G(rx), rz: G(rz), zo: zo * k, w, p: 2.2 })), 36, V(0, 0, 1), [true, true]);
   const leg = (L: boolean) => {
     const th = L ? BONE.thighL : BONE.thighR, sn = L ? BONE.shinL : BONE.shinR;
     const hip = J[th], knee = J[sn], ankle = T[sn];
-    const top = V(hip.x * 0.92, hip.y + 0.07 * k, hip.z);
+    const top = V(hip.x * 0.8, hip.y + 0.01 * k, hip.z);
     return loft(limbRings([top, hip, knee, ankle], [BONE.pelvis, th, sn], [
-      { t: 0.0, rx: G(0.09) }, { t: 0.6, rx: G(0.088) }, { t: 1.0, rx: G(0.086), rz: G(0.088) }, { t: 1.3, rx: G(0.078) }, { t: 1.6, rx: G(0.068) },
+      { t: 0.0, rx: G(0.075) }, { t: 0.6, rx: G(0.084) }, { t: 1.0, rx: G(0.084), rz: G(0.087) }, { t: 1.3, rx: G(0.078) }, { t: 1.6, rx: G(0.068) },
       { t: 1.85, rx: G(0.06) }, { t: 2.0, rx: G(0.058) }, { t: 2.15, rx: G(0.057), zo: -0.004 }, { t: 2.4, rx: G(0.058), zo: -0.008 }, { t: 2.7, rx: G(0.053) },
       { t: 2.92, rx: G(0.052), shade: 0.92 }, { t: 3.0, rx: G(0.053), shade: 0.88 },
     ], 0.2).map((r, i) => i === 0 ? { ...r, w: [[BONE.pelvis, 1]] as [number, number][] } : r), 22, V(0, 0, 1), [false, true]);
@@ -509,10 +541,10 @@ export function buildBody(p: GolferProfile): Body {
   // ── skin: neck + wrists ──
   const skinMat = new THREE.MeshPhysicalMaterial({ color: p.look.skin, roughness: 0.52, sheen: 0.25, sheenColor: new THREE.Color(p.look.skinWarm), sheenRoughness: 0.5, clearcoat: 0.05, clearcoatRoughness: 0.6 });
   const neckGeo = loft([
-    { c: V(0, J[BONE.neck].y - 0.05 * k, J[BONE.neck].z), rx: G(0.068), rz: G(0.064), w: [[BONE.chest, 1]] },
-    { c: V(0, J[BONE.neck].y, J[BONE.neck].z), rx: G(0.062), rz: G(0.06), w: [[BONE.chest, 0.3], [BONE.neck, 0.7]] },
-    { c: V(0, J[BONE.head].y, J[BONE.head].z + 0.004), rx: G(0.059), rz: G(0.058), w: [[BONE.neck, 0.5], [BONE.head, 0.5]] },
-    { c: V(0, J[BONE.head].y + 0.05 * k, J[BONE.head].z + 0.008), rx: G(0.055), rz: G(0.052), w: [[BONE.head, 1]] },
+    { c: V(0, J[BONE.neck].y - 0.05 * k, J[BONE.neck].z), rx: G(0.074), rz: G(0.07), w: [[BONE.chest, 1]] },
+    { c: V(0, J[BONE.neck].y, J[BONE.neck].z), rx: G(0.066), rz: G(0.065), w: [[BONE.chest, 0.3], [BONE.neck, 0.7]] },
+    { c: V(0, J[BONE.head].y, J[BONE.head].z + 0.004), rx: G(0.063), rz: G(0.062), w: [[BONE.neck, 0.5], [BONE.head, 0.5]] },
+    { c: V(0, J[BONE.head].y + 0.05 * k, J[BONE.head].z + 0.008), rx: G(0.058), rz: G(0.055), w: [[BONE.head, 1]] },
   ], 24, V(0, 0, 1), [false, false]);
   const neckMat = skinMat.clone(); neckMat.vertexColors = true;
 
@@ -536,7 +568,7 @@ export function buildBody(p: GolferProfile): Body {
   { const hp2 = hoodGeo.getAttribute('position') as THREE.BufferAttribute; for (let i = 0; i < hp2.count; i++) { const zz = hp2.getZ(i); if (zz < -0.05) { hp2.setZ(i, zz - (-(zz) - 0.05) * 0.6); hp2.setY(i, hp2.getY(i) - (-(zz) - 0.05) * 0.5); } } hoodGeo.computeVertexNormals(); }
   const hoodMat = hoodieMat.clone(); hoodMat.vertexColors = false;
   const hood = new THREE.Mesh(hoodGeo, hoodMat); hood.scale.setScalar(k * girth);
-  attach(BONE.chest, hood, V(0, y(1.565), -0.012 * k));
+  attach(BONE.chest, hood, V(0, y(1.585), -0.014 * k));
   const cordMat = new THREE.MeshStandardMaterial({ color: p.outfit.topTrim, roughness: 0.8 });
   for (const s of [-1, 1]) {
     const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.0035, 0.0035, 0.16, 6), cordMat);

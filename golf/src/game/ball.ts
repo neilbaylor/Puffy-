@@ -17,12 +17,13 @@ export interface Launch {
 
 export type BallPhase = 'teed' | 'flight' | 'bounce' | 'roll' | 'stopped';
 
-const SURF: Record<Surface, { e: number; grip: number; roll: number }> = {
-  tee: { e: 0.3, grip: 0.45, roll: 0.12 },
-  fairway: { e: 0.32, grip: 0.45, roll: 0.11 },
-  rough: { e: 0.18, grip: 0.3, roll: 0.32 },
-  green: { e: 0.28, grip: 0.62, roll: 0.065 },
-  bunker: { e: 0.05, grip: 0.2, roll: 1.2 },
+// e: bounce, mu: friction, pit: speed the turf soaks up per m/s of landing speed, roll: rolling resistance (× g)
+const SURF: Record<Surface, { e: number; mu: number; pit: number; roll: number }> = {
+  tee: { e: 0.3, mu: 0.45, pit: 0.42, roll: 0.2 },
+  fairway: { e: 0.3, mu: 0.45, pit: 0.42, roll: 0.2 },
+  rough: { e: 0.15, mu: 0.35, pit: 0.6, roll: 0.45 },
+  green: { e: 0.25, mu: 0.55, pit: 0.45, roll: 0.065 },
+  bunker: { e: 0.03, mu: 0.6, pit: 0.95, roll: 1.6 },
 };
 
 const _v = new THREE.Vector3(), _f = new THREE.Vector3(), _n = new THREE.Vector3(), _w = new THREE.Vector3();
@@ -56,15 +57,22 @@ export class Ball {
     const back = new THREE.Vector3().crossVectors(dirH, new THREE.Vector3(0, 1, 0)).normalize();
     this.spin.copy(back).multiplyScalar(Math.cos(L.tilt)).addScaledVector(new THREE.Vector3(0, -1, 0), Math.sin(L.tilt)).multiplyScalar(L.spinRpm * RPM);
     this.phase = 'flight'; this.t = 0; this.start.copy(this.pos); this.apex = this.pos.y; this.landing = null; this.bounces = 0;
+    this.after = { top: 0, side: 0, appliedBack: 0, appliedSide: 0 };
   }
 
-  /** add spin while the ball is in the air: back < 0 adds backspin, > 0 topspin; side + bends right */
-  addSpin(top: number, side: number, dt: number) {
-    if (this.phase !== 'flight') return;
+  /** aftertouch from the spin ball: top -1..1 (- = backspin), side -1..1 (+ = bends right). Ramps in. */
+  private after = { top: 0, side: 0, appliedBack: 0, appliedSide: 0 };
+  setAftertouch(top: number, side: number) { this.after.top = top; this.after.side = side; }
+  private applyAftertouch(dt: number) {
+    const A = this.after;
+    const wantBack = (A.top < 0 ? -A.top * 4200 : -A.top * 1100) * RPM, wantSide = -A.side * 750 * RPM; // extra rad/s at full input
+    const rate = 2200 * RPM * dt;
+    const dB = Math.max(-rate, Math.min(rate, wantBack - A.appliedBack)), dS = Math.max(-rate, Math.min(rate, wantSide - A.appliedSide));
+    if (!dB && !dS) return;
     const h = _v.set(this.vel.x, 0, this.vel.z); if (h.lengthSq() < 1e-6) return; h.normalize();
     const back = _w.crossVectors(h, new THREE.Vector3(0, 1, 0)).normalize();
-    this.spin.addScaledVector(back, -top * 900 * dt);   // rad/s per second of full input
-    this.spin.y += -side * 260 * dt;
+    this.spin.addScaledVector(back, dB); this.spin.y += dS;
+    A.appliedBack += dB; A.appliedSide += dS;
   }
 
   ground(x: number, z: number) { return this.range ? this.range.heightAt(x, z) : 0; }
@@ -81,6 +89,7 @@ export class Ball {
     this.t += dt;
     const p = this.pos, v = this.vel;
     if (this.phase === 'flight' || this.phase === 'bounce') {
+      if (this.phase === 'flight') this.applyAftertouch(dt);
       const speed = v.length();
       const w = this.spin.length();
       const S = speed > 0.1 ? (BALL.r * w) / speed : 0;
@@ -133,10 +142,11 @@ export class Ball {
     // spin about the axis that rolls the ball along tDir (positive = topspin)
     const rollAxis = new THREE.Vector3().crossVectors(_n, tDir);
     const wRoll = this.spin.dot(rollAxis);
-    const gripped = (5 / 7) * vtl + (2 / 7) * BALL.r * wRoll;
-    let vt2 = THREE.MathUtils.lerp(vtl * 0.88, gripped, F.grip * Math.min(1, -vn / 6));
-    // soft landings from height bite more; sand kills it
-    if (s === 'bunker') vt2 *= 0.2;
+    // the turf gives under the ball and soaks up speed (steep landings more), then friction grips the spin
+    const vIn = Math.max(0, vtl - F.pit * Math.abs(vn));
+    const J = F.mu * (1 + F.e) * Math.abs(vn);
+    const slip = vIn - BALL.r * wRoll;
+    const vt2 = 3.5 * J >= Math.abs(slip) ? (5 / 7) * vIn + (2 / 7) * BALL.r * wRoll : vIn - Math.sign(slip) * J;
     const vn2 = -vn * F.e * (Math.abs(vn) > 2 ? 1 : 0.5);
     v.copy(tDir).multiplyScalar(vt2).addScaledVector(_n, vn2);
     this.spin.copy(rollAxis).multiplyScalar(vt2 / BALL.r).addScaledVector(_n, this.spin.dot(_n) * 0.5);

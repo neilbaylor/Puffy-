@@ -43,7 +43,9 @@ else { golfer.body.bones.forEach((b, i) => { b.quaternion.identity(); if (i === 
 const cam = new THREE.PerspectiveCamera(q.get('view') === 'close' ? 22 : 40, innerWidth / innerHeight, 0.05, 200);
 const view = q.get('view') ?? 'behind';
 const lx = golfer.lefty ? 1 : -1; // side of the ball the golfer stands on (world x)
-if (view === 'behind') { cam.position.set(0.2, 1.75, 4.2); cam.lookAt(0, 0.9, -2); }
+if (view === 'game') { cam.position.set(-0.85 * lx, 1.62, 5.6); cam.lookAt(0.45 * lx, 0.92, -22); cam.fov = 42; cam.updateProjectionMatrix(); }
+else if (view === 'gameclose') { cam.position.set(-0.2 * lx, 1.5, 3.2); cam.lookAt(0.7 * lx, 1.0, -1); }
+else if (view === 'behind') { cam.position.set(0.2, 1.75, 4.2); cam.lookAt(0, 0.9, -2); }
 else if (view === 'face') { cam.position.set(-lx * 3.6, 1.2, 0); cam.lookAt(lx * 0.6, 0.95, 0); }
 else if (view === 'dtl') { cam.position.set(lx * 0.9, 1.3, 4.5); cam.lookAt(lx * 0.6, 1.0, 0); }
 else if (view === 'close' || view === 'three') {

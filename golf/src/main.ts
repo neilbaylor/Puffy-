@@ -104,7 +104,7 @@ hud.pad.addEventListener('pointermove', e => {
   if (SW.phase === 'back') {
     SW.trailB.push(p);
     if (p[1] > 0) { SW.driftSum += Math.abs(p[0]); SW.driftN++; }
-    if (p[1] > SW.depth) { SW.depth = p[1]; SW.deep = p; }
+    if (p[1] > SW.depth) { if (p[1] > SW.depth + 1.5) G.arrived = null; SW.depth = p[1]; SW.deep = p; }
     G.target = fullBack() * clamp(SW.depth / 80, 0, 1);
     if (SW.depth > 12 && p[1] < SW.depth - 10) {
       SW.phase = 'down'; SW.tTrans = now;
@@ -192,10 +192,11 @@ function snapCamera() { addressCam(camPos, camLook); landingCam = null; }
 function updateCamera(dt: number, now: number) {
   const k = 1 - Math.pow(0.0025, dt);
   if (camMode === 'intro') {
-    const t = now / 1000 * 0.18;
+    // circle slowly in front of the golfer
+    const th = (golfer.lefty ? Math.PI : 0) + 0.6 * Math.sin(now / 1000 * 0.22) + 0.35 * side;
     const head = new THREE.Vector3(); golfer.body.bones[5].getWorldPosition(head);
-    want.set(head.x + Math.cos(t) * 3.2, 1.45 + Math.sin(t * 0.7) * 0.15, head.z + Math.sin(t) * 3.2 * 0.8 + 0.5);
-    wantLook.set(head.x * 0.7, 1.05, head.z);
+    want.set(head.x + Math.cos(th) * 2.7, 1.42 + Math.sin(now / 1000 * 0.15) * 0.08, head.z + Math.sin(th) * 2.7);
+    wantLook.set(head.x * 0.85, 1.22, head.z);
   } else if (camMode === 'address') {
     addressCam(want, wantLook);
   } else if (camMode === 'chase' || camMode === 'landing' || camMode === 'rest') {
@@ -215,7 +216,14 @@ function updateCamera(dt: number, now: number) {
         if (land && b.distanceTo(land) < 70 && since > 1.2) {
           const travel = dir.clone();
           const lateral = new THREE.Vector3(-travel.z, 0, travel.x).multiplyScalar(-side);
+          // a spot past the landing area, off to the side, that isn't parked behind a flag or a yardage board
+          const tries: [number, number][] = [[30, 11], [30, -11], [24, 18], [24, -18], [38, 6], [18, 24]];
           landingCam = land.clone().addScaledVector(travel, 30).addScaledVector(lateral, 11);
+          for (const [fw, lat] of tries) {
+            const c = land.clone().addScaledVector(travel, fw).addScaledVector(lateral, lat);
+            const blocked = range?.targets.some(t => Math.hypot(t.pos.x - c.x, t.pos.z - c.z) < t.radius + 14) ?? false;
+            if (!blocked) { landingCam = c; break; }
+          }
           landingCam.y = Math.max(land.y, range?.heightAt(landingCam.x, landingCam.z) ?? 0) + 6.5;
           camMode = 'landing';
           camPos.copy(landingCam); // cut
@@ -269,9 +277,11 @@ function frame(now: number) {
   // golfer
   G.idleT += dt;
   if (G.phase === 'back') {
-    const speed = fullBack() / tTop();
-    if (G.phi < G.target) G.phi = Math.min(G.target, G.phi + speed * dt);
-    if (G.target - G.phi > 0.04) G.arrived = null; else if (G.arrived === null && SW.depth > 12) G.arrived = now;
+    // the golfer turns at their own tempo, easing into the top
+    const speed = fullBack() / tTop() * 1.25;
+    const gap = G.target - G.phi;
+    if (gap > 0) G.phi = Math.min(G.target, G.phi + speed * dt * (0.3 + 0.7 * smooth(0, 0.5, gap / fullBack())));
+    if (G.target - G.phi > 0.03) G.arrived = null; else if (G.arrived === null && SW.depth > 12) G.arrived = now;
   } else if (G.phase === 'follow') {
     const k = clamp((now - G.followT0) / 820, 0, 1), e = 1 - Math.pow(1 - k, 3);
     G.phi = G.followTo * e;
@@ -281,17 +291,15 @@ function frame(now: number) {
     G.phi = G.topPhi * (1 - smooth(0, 1, k));
     if (k >= 1) { G.returning = false; G.phase = 'address'; G.phi = 0; }
   }
-  golfer.update({ phase: G.phase, phi: G.phi, topPhi: G.phase === 'back' ? Math.max(G.phi, 0.01) : G.topPhi, idleT: G.idleT });
+  golfer.update({ phase: G.phase, phi: G.phi, topPhi: G.phase === 'back' ? Math.max(G.phi, 0.01) : G.topPhi, idleT: G.idleT, lookAt: state === 'intro' ? camera.position : undefined });
 
   // swing pad
   if (SW.active || SW.trailB.length) hud.setPad(SW.active ? SW.last : [0, 0], SW.trailB, SW.trailD, SW.active && SW.phase === 'back' && G.arrived !== null && SW.depth > 12);
 
   // ball
   if (state === 'flight') {
-    if (ball.phase === 'flight' && (Math.abs(hud.spin.x) > 0.01 || Math.abs(hud.spin.y) > 0.01)) {
-      // spin added on the spin ball is applied over the rest of the flight
-      ball.addSpin(hud.spin.y * 0.9, hud.spin.x * 0.9, dt);
-    }
+    // spin set on the spin ball ramps in over the rest of the flight
+    if (ball.phase === 'flight') ball.setAftertouch(hud.spin.y, hud.spin.x);
     const wasFlight = ball.phase === 'flight';
     ball.step(dt);
     tracer.push(ball.pos);
