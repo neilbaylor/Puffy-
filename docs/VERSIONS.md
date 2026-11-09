@@ -217,3 +217,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.212: Level 4's Plop Park: the Plops play baseball at the bottom of the first drop, then hit line drives at you.
 - v0.213: Plop Park has much more poo on it (stains, piles, swirls; drips down the wall and scoreboard).
 - v0.214: Level 4: more room before Plop Park (map wider), parachuting Plops aim both ways, Plops don't shadow you from ledges, no Plop at the gate.
+- v0.215: in the Plop King fight the chair hits his Plops while they're still parachuting in.
