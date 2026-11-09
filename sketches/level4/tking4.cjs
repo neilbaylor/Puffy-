@@ -25,6 +25,7 @@ const { chromium } = require('playwright');
     for (let i = 0; i < 4; i++) await p.evaluate(() => { const s = window.game.scene.getScene('Wrestle'); s.queen.invulnUntil = 0; s.hitQueen(1, 'stomp', s.player.x); });
     await p.waitForTimeout(1200);
     if (wave === 1) await p.screenshot({ path: 'shots/k4-blastoff.png' });
+    if (wave === 1) { await p.waitForTimeout(500); await p.screenshot({ path: 'shots/k4-chutes.png' }); console.log('  depths', JSON.stringify(await p.evaluate(() => { const s = window.game.scene.getScene('Wrestle'); return s.minions.map((m) => [Math.round(m.spr.y), m.spr.depth, !!m.chute]); }))); }
     await p.waitForTimeout(2200);
     console.log('wave', wave, JSON.stringify(await S()));
     if (wave === 3) { const h = await S(); if (h.hp !== 4) console.log('!! expected 4 hits left for the last round, got', h.hp); }
