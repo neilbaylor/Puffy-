@@ -71,6 +71,8 @@ const Q_RES = 4;
 const Q_PAD = 18;
 const Q_TOP = 24;
 const HITS = 12;
+/** The Plop King: 3 + 3 + 3 + 4 (he flies off after each of the first three rounds). */
+const KING_HITS = 13;
 /** How tough she is overall: faster and quicker to attack again (1 = as in v0.160; v0.164-0.178 had her 5% harder). */
 const Q_TOUGH = 1;
 /** Your hearts in the ring: you start with all 6, and pick-ups top you back up. */
@@ -141,6 +143,9 @@ class Queen {
   readonly body: Phaser.Physics.Arcade.Body;
   readonly shadow: Phaser.GameObjects.Image;
   hp = HITS;
+  /** Hits to beat (Queen Plop 12; the Plop King 13: his last round takes 4), and how tough overall. */
+  maxHits = HITS;
+  tough = Q_TOUGH;
   mode: 'intro' | 'idle' | 'walk' | 'windup' | 'charge' | 'slam' | 'heave' | 'retreat' | 'hurt' | 'taunt' | 'down' | 'away' = 'intro';
   t = 0;
   dir: Side = -1;
@@ -162,7 +167,9 @@ class Queen {
   fallVy = 0;
   counterNext = false;
 
-  constructor(private s: WrestleScene, x: number, bottom: number, tex = 'wr-queen') {
+  constructor(private s: WrestleScene, x: number, bottom: number, tex = 'wr-queen', hits = HITS, tough = Q_TOUGH) {
+    this.hp = this.maxHits = hits;
+    this.tough = tough;
     this.spr = s.physics.add.sprite(x, bottom, tex, 'idle').setDepth(DEPTH_W.queen);
     const fw = PLOP_W + Q_PAD * 2;
     const fh = PLOP_H + Q_TOP;
@@ -191,7 +198,7 @@ class Queen {
   }
   /** Tougher as she gets hurt. */
   get rage() {
-    return (1 + ((HITS - this.hp) / HITS) * 0.8) * Q_TOUGH;
+    return (1 + ((this.maxHits - this.hp) / this.maxHits) * 0.8) * this.tough;
   }
 
   setMode(m: Queen['mode'], t = 0) {
@@ -263,7 +270,7 @@ class Queen {
         const above = p.alive && p.body.velocity.y > 60 && p.bottom < this.top + 6 && Math.abs(dx) < 90 && !s.heroDiving();
         if (ground && above && this.cdBlock <= 0) {
           b.setVelocity(towards * speed * 0.6, -640);
-          this.cdBlock = (2.1 + Math.random()) / Q_TOUGH;
+          this.cdBlock = (2.1 + Math.random()) / this.tough;
           this.hopIn = 0.45;
         } else if (ground && this.hopIn <= 0) {
           const lunge = Math.abs(dx) < 260 && Math.random() < 0.25;
@@ -310,7 +317,7 @@ class Queen {
         frame = Math.floor(s.time.now / 80) % 2 ? 'run0' : 'run1';
         if (ground && Math.random() < 0.3) s.fx.dust(this.x - this.dir * 20, this.bottom, 1);
         if (this.t <= 0) {
-          this.cdCharge = (1.85 + Math.random() * 1.4) / Q_TOUGH;
+          this.cdCharge = (1.85 + Math.random() * 1.4) / this.tough;
           this.setMode('idle', 0.2);
         }
         break;
@@ -321,7 +328,7 @@ class Queen {
         this.spr.setX(this.spr.x + Math.sin(s.time.now / 12) * 0.7);
         if (this.t <= 0) {
           s.heaveAt(this, p.x);
-          this.cdHeave = (5.4 + Math.random() * 2.6) / Q_TOUGH;
+          this.cdHeave = (5.4 + Math.random() * 2.6) / this.tough;
           this.setMode('idle', 0.25);
         }
         break;
@@ -668,7 +675,8 @@ export class WrestleScene extends Phaser.Scene {
     this.physics.add.collider(this.gRockets, this.statics, (r) => (r as Rocket).explode());
 
     // ── Queen Plop ──
-    this.queen = new Queen(this, POST_R, POST_TOP, this.kingFight ? 'wr-pking' : 'wr-queen');
+    // (the Plop King: 13 hits, and 5% tougher than the Queen)
+    this.queen = this.kingFight ? new Queen(this, POST_R, POST_TOP, 'wr-pking', KING_HITS, Q_TOUGH * 1.05) : new Queen(this, POST_R, POST_TOP);
     // (the Plop King's Plops, when he sends them in)
     this.gMinions = this.physics.add.group();
     this.physics.add.collider(this.gMinions, this.qStatics);
@@ -1277,7 +1285,8 @@ export class WrestleScene extends Phaser.Scene {
     } else this.flashJumbo({ kind: 'big', text: words.replace(/!.*/, '!'), sub: `${q.hp} TO GO`, color: '#ffd23f', bg: '#5c3118' }, 900);
     if (q.hp <= 0) void (this.kingFight ? this.winKing() : this.win());
     // the Plop King: every 3 hits he's off on his jetpack, and his Plops parachute in
-    else if (this.kingFight && Math.floor((HITS - q.hp) / 3) > this.awayCount) void this.kingAway();
+    // (after 3, 6 and 9 hits; then the last round is 4)
+    else if (this.kingFight && this.awayCount < 3 && Math.floor((q.maxHits - q.hp) / 3) > this.awayCount) void this.kingAway();
     return true;
   }
 
@@ -2368,7 +2377,8 @@ export class WrestleScene extends Phaser.Scene {
     // (he starts at the top of the aisle, out of the tunnel: small, far away)
     const fx = WX(TUNNEL.x);
     const fy = WY(TUNNEL.bottom);
-    const ex = WX(600);
+    // (where he ends up: on the floor in front of the ring, at its left end)
+    const ex = WX(150);
     const ey = GROUND_Y;
     q.spr.setTexture('wr-pking-robe', 'idle').setPosition(fx, fy).setScale(S * 0.42).setAlpha(1).setFlipX(true);
     q.facing = 1;
@@ -2406,10 +2416,20 @@ export class WrestleScene extends Phaser.Scene {
     }
     await this.camTo(jx, jy + 3, 2.52, 1500, 0, 'Sine.easeInOut');
 
-    // ── 2. cut to him, far off at the top of the aisle… and in close as he comes down it ──
+    // ── 2. cut to him, far off at the top of the aisle… and in close as he comes round to the ring ──
+    // (his way round, in stage units: down the aisle, along the floor behind the ring (the back ropes in
+    // front of him), down the left side past the corner post, and along the front to his spot)
+    const path: { x: number; y: number; k: number }[] = [
+      { x: TUNNEL.x, y: TUNNEL.bottom, k: 0.42 },
+      { x: TUNNEL.x - 20, y: 372, k: 0.5 },
+      { x: 30, y: 392, k: 0.56 },
+      { x: -8, y: 420, k: 0.62 },
+      { x: -8, y: RING.groundY - 10, k: 0.96 },
+      { x: 150, y: RING.groundY, k: 1 },
+    ];
     if (!this.skipping) {
-      this.setDark(0.62, 250);
-      this.cut((fx + ex) / 2, (fy + ey) / 2 - 50, 0.9, 0);
+      this.setDark(0.45, 250);
+      this.cut(WX(300), WY(420), 0.9, 0);
       this.aimSpot(fx, fy, 0.9, 120);
       sfx.thud();
       sfx.cheer();
@@ -2417,23 +2437,38 @@ export class WrestleScene extends Phaser.Scene {
       this.lowerThird('THE PLOP KING', 'Ruler of the Plops · champion of the Plop Dome');
     }
     {
-      const ms = 3000;
+      const lens = path.slice(1).map((q, i) => Math.hypot(q.x - path[i].x, (q.y - path[i].y) * 1.6));
+      const total = lens.reduce((a, b) => a + b, 0);
+      const ms = 4200;
       await this.glide(ms, (u) => {
-        const x = fx + (ex - fx) * u;
-        const y = fy + (ey - fy) * u;
-        // (nearer, bigger)
-        const k = 0.42 + 0.58 * u;
+        let d = u * total;
+        let i = 0;
+        while (i < lens.length - 1 && d > lens[i]) d -= lens[i++];
+        const t = Math.min(1, d / lens[i]);
+        const a = path[i];
+        const b = path[i + 1];
+        const sx = a.x + (b.x - a.x) * t;
+        const sy = a.y + (b.y - a.y) * t;
+        const k = a.k + (b.k - a.k) * t;
+        const x = WX(sx);
+        const y = WY(sy);
         const ph = u * (ms / 1000) * 3.4;
         q.spr.setPosition(x, y - Math.abs(Math.sin(ph * Math.PI)) * 3 * k).setScale(S * k);
+        // (facing the way he's going; behind the ring he's behind its ropes and posts, in front once he's round)
+        if (Math.abs(b.x - a.x) > 4) q.spr.setFlipX(b.x > a.x);
+        q.spr.setDepth(sy > RING.frontY - 6 ? DEPTH_W.spot + 0.3 : DEPTH_W.ring - 0.5);
         // (a cocky strut: a grin at the crowd, a look round)
-        q.spr.setFrame(u > 0.3 && u < 0.45 ? 'grin' : u > 0.62 && u < 0.72 ? 'look' : (['walk0', 'walk1', 'walk2', 'walk3'] as const)[Math.floor(ph * 2) % 4]);
+        q.spr.setFrame(u > 0.3 && u < 0.4 ? 'grin' : u > 0.66 && u < 0.74 ? 'look' : (['walk0', 'walk1', 'walk2', 'walk3'] as const)[Math.floor(ph * 2) % 4]);
         this.spot.setPosition(x, y + 10).setScale(0.55 * k, (y + 60) / 700);
-        // the camera closing in on him as he comes
-        this.camX = x - 6;
-        this.camY = y - 62 * k - 10;
-        this.camZ = 0.9 + (2.05 - 0.9) * Math.min(1, u * 1.25);
+        // the camera wide at first, closing in on him as he comes round
+        const z = Math.min(1, u * 1.15);
+        this.camX = WX(300) + (x - 6 - WX(300)) * Math.min(1, u * 2.2);
+        this.camY = WY(420) + (y - 62 * k - 10 - WY(420)) * Math.min(1, u * 2.2);
+        this.camZ = 0.9 + (2.05 - 0.9) * z * z;
       }, 'Linear');
     }
+    // (facing the ring, and the challenger in it)
+    q.spr.setFlipX(true).setDepth(DEPTH_W.spot + 0.3);
 
     // ── 3. he stops… and drops the robe: a jetpack on his back underneath ──
     if (!this.skipping) {
@@ -2717,8 +2752,37 @@ export class WrestleScene extends Phaser.Scene {
     this.tweens.add({ targets: spr, scaleY: spr.scaleY * 0.3, alpha: 0, duration: 260, onComplete: () => spr.destroy() });
   }
 
-  /** The water coming up through the building at the end (null: none). */
-  private flood: { g: Phaser.GameObjects.Graphics; y: number; t: number } | null = null;
+  /**
+   * The water coming up through the building at the end (null: none): waterfalls pouring out of the
+   * aisles in the stands, and the water rising — deep blue-green, two layers of waves, a foamy crest,
+   * glints on the surface, bubbles, and his robe and a few bits bobbing about on it.
+   */
+  private flood: {
+    g: Phaser.GameObjects.Graphics;
+    falls: Phaser.GameObjects.Graphics;
+    y: number;
+    t: number;
+    pour: number;
+    bubbles: { x: number; y: number; r: number; v: number }[];
+    floaters: { img: Phaser.GameObjects.Image; x: number; ph: number; dy: number }[];
+  } | null = null;
+
+  private startFlood() {
+    const g = this.add.graphics().setDepth(DEPTH_W.ringside + 0.5);
+    // (the waterfalls are back in the stands: behind the ring)
+    const falls = this.add.graphics().setDepth(DEPTH_W.front + 0.02);
+    const floaters: { img: Phaser.GameObjects.Image; x: number; ph: number; dy: number }[] = [];
+    const robe = this.children.list.find((o) => o instanceof Phaser.GameObjects.Image && o.texture.key === 'wr-robe') as Phaser.GameObjects.Image | undefined;
+    if (robe) floaters.push({ img: robe.setDepth(DEPTH_W.ringside + 0.55), x: robe.x, ph: 0, dy: 6 });
+    for (const [sx, key] of [[260, 'wr-poo'], [700, 'wr-chair-bent'], [980, 'wr-poo'], [1180, 'wr-poo']] as const) {
+      const img = this.add.image(WX(sx), WORLD_H + 80, key).setDepth(DEPTH_W.ringside + 0.55);
+      img.setScale(key === 'wr-poo' ? 2 / ART_RES : (WrestleScene.CHAIR_S / ART_RES) * 0.9).setRotation(key === 'wr-poo' ? 0 : 1.4);
+      floaters.push({ img, x: WX(sx), ph: Math.random() * 6, dy: 2 });
+    }
+    this.flood = { g, falls, y: WORLD_H + 40, t: 0, pour: 0, bubbles: [], floaters };
+    this.tweens.add({ targets: this.flood, pour: 1, duration: 600 });
+  }
+
   private updateFlood(dt: number) {
     const f = this.flood;
     if (!f) return;
@@ -2727,18 +2791,81 @@ export class WrestleScene extends Phaser.Scene {
     g.clear();
     const x0 = -60;
     const x1 = WORLD_W + 60;
-    const top = (x: number) => f.y + Math.sin(x / 38 + f.t * 2.4) * 4 + Math.sin(x / 17 - f.t * 3.1) * 2;
-    g.fillStyle(0x2f7fb0, 0.78);
+    const bottom = WORLD_H + 80;
+    const wave = (x: number, a: number, b: number, sp: number) => Math.sin(x / a + f.t * sp) * 4 + Math.sin(x / b - f.t * sp * 1.3) * 2.2;
+    const back = (x: number) => f.y - 5 + wave(x + 40, 52, 23, 1.7);
+    const front = (x: number) => f.y + wave(x, 38, 17, 2.4);
+    // the waterfalls, pouring out of the stands and down into it
+    const fg = f.falls;
+    fg.clear();
+    for (const [sx, sy] of [[90, 165], [470, 300], [1270, 165], [340, 10], [1120, 10]] as const) {
+      const x = WX(sx);
+      const top = WY(sy);
+      const w = 16 * f.pour;
+      if (w < 1 || top > f.y) continue;
+      fg.fillStyle(0x4aa3d4, 0.78).fillRect(x - w / 2, top, w, f.y - top);
+      // (streaks running down it)
+      fg.lineStyle(2, 0xdff4ff, 0.75);
+      for (let k = 0; k < 4; k++) {
+        const lx = x - w / 2 + 3 + (k * (w - 6)) / 3;
+        const off = ((f.t * 260 + k * 37) % 46) - 46;
+        fg.beginPath();
+        for (let yy = top + off; yy < f.y; yy += 46) {
+          fg.moveTo(lx, Math.max(top, yy));
+          fg.lineTo(lx, Math.min(f.y, yy + 20));
+        }
+        fg.strokePath();
+      }
+      // white water where it lands
+      fg.fillStyle(0xffffff, 0.85);
+      for (let k = 0; k < 5; k++) fg.fillCircle(x + Math.sin(f.t * 7 + k * 1.7) * w * 0.8, f.y - 2 + Math.cos(f.t * 9 + k) * 2, 4 + (k % 2) * 3);
+    }
+    // the back layer of waves (lighter, further off), then the deep water
+    g.fillStyle(0x6cc3e0, 0.7);
     g.beginPath();
-    g.moveTo(x0, WORLD_H + 80);
-    for (let x = x0; x <= x1; x += 12) g.lineTo(x, top(x));
-    g.lineTo(x1, WORLD_H + 80);
+    g.moveTo(x0, bottom);
+    for (let x = x0; x <= x1; x += 12) g.lineTo(x, back(x));
+    g.lineTo(x1, bottom);
     g.closePath();
     g.fillPath();
-    g.lineStyle(3, 0xbfe8ff, 0.9);
+    g.fillStyle(0x2f86b8, 0.8);
     g.beginPath();
-    for (let x = x0; x <= x1; x += 12) (x === x0 ? g.moveTo(x, top(x)) : g.lineTo(x, top(x)));
+    g.moveTo(x0, bottom);
+    for (let x = x0; x <= x1; x += 12) g.lineTo(x, front(x));
+    g.lineTo(x1, bottom);
+    g.closePath();
+    g.fillPath();
+    // (darker further down)
+    const depth = bottom - f.y;
+    for (let k = 1; k <= 3; k++) g.fillStyle(0x0d4a78, 0.13).fillRect(x0, f.y + (depth * k) / 4, x1 - x0, bottom);
+    // a foamy crest along the top, and glints dancing on it
+    g.lineStyle(3, 0xe8f8ff, 0.95);
+    g.beginPath();
+    for (let x = x0; x <= x1; x += 12) (x === x0 ? g.moveTo(x, front(x)) : g.lineTo(x, front(x)));
     g.strokePath();
+    g.lineStyle(2, 0xffffff, 0.6);
+    for (let k = 0; k < 14; k++) {
+      const gx = ((k * 97 + f.t * 30 * ((k % 3) + 1)) % (x1 - x0)) + x0;
+      const gy = front(gx) + 8 + (k % 4) * 9;
+      const a = 0.35 + 0.35 * Math.sin(f.t * 3 + k);
+      if (gy < bottom) g.lineStyle(2, 0xffffff, a).lineBetween(gx - 7, gy, gx + 7, gy);
+    }
+    // bubbles coming up
+    if (Math.random() < 0.5) f.bubbles.push({ x: x0 + Math.random() * (x1 - x0), y: f.y + 40 + Math.random() * 120, r: 1.5 + Math.random() * 3, v: 30 + Math.random() * 40 });
+    f.bubbles = f.bubbles.filter((b) => {
+      b.y -= b.v * dt;
+      b.x += Math.sin(f.t * 4 + b.r) * 0.3;
+      if (b.y < front(b.x) + 2) return false;
+      g.lineStyle(1.2, 0xdff4ff, 0.8).strokeCircle(b.x, b.y, b.r);
+      return true;
+    });
+    // things bobbing about on it
+    for (const fl of f.floaters) {
+      const fy = front(fl.x) - fl.dy + Math.sin(f.t * 2 + fl.ph) * 2;
+      // (they stay where they are till the water reaches them)
+      if (fl.img.y < fy && fl.img.texture.key === 'wr-robe') continue;
+      fl.img.setPosition(fl.x + Math.sin(f.t * 0.7 + fl.ph) * 6, fy).setRotation(fl.img.texture.key === 'wr-chair-bent' ? 1.4 + Math.sin(f.t * 1.6 + fl.ph) * 0.12 : Math.sin(f.t * 1.6 + fl.ph) * 0.12);
+    }
   }
 
   /** He blows up (like King Puff Ball did): a white flash, the big BOOM, shockwaves, confetti everywhere. */
@@ -2863,14 +2990,22 @@ export class WrestleScene extends Phaser.Scene {
     this.camManual = true;
     const jx = WX(JUMBO.x + (JUMBO.w * JUMBO.s) / 2);
     const jy = WY(JUMBO.y + (JUMBO.h * JUMBO.s) / 2);
+    // (first a moment of celebrating up there — the champion! — then the warning)
+    this.flashJumbo({ kind: 'big', text: 'CHAMPION!', sub: `${p.char.name.toUpperCase()} BEAT THE PLOP KING!`, color: '#ffd23f', bg: '#2a6a1a' }, 1e9);
+    this.ribbonMsg = { text: 'CHAMPION! ★ CHAMPION! ★ CHAMPION!', color: '#ffd23f', bg: '#2a6a1a', t0: this.clock / 1000 };
+    this.excitedUntil = this.clock + 3000;
+    sfx.cheer();
     await this.camTo(jx, jy + 6, 2.2, 800, 0.01, 'Sine.easeInOut');
+    this.confetti.burst(jx - 120, jy + 40, 160, { power: 900, spread: Math.PI * 0.8, angle: -Math.PI / 2, scale: 0.6 });
+    this.confetti.burst(jx + 120, jy + 40, 160, { power: 900, spread: Math.PI * 0.8, angle: -Math.PI / 2, scale: 0.6 });
+    await this.wait(600);
     this.flashJumbo({ kind: 'big', text: 'FLOODING!', sub: 'THE BUILDING IS FLOODING · PLEASE EVACUATE', color: '#7fe7ff', bg: '#0a3a6a' }, 1e9);
     this.ribbonMsg = { text: 'PLEASE EVACUATE ⚠ PLEASE EVACUATE', color: '#7fe7ff', bg: '#0a3a6a', t0: this.clock / 1000 };
     for (let i = 0; i < 3; i++) this.time.delayedCall(i * 650, () => sfx.whistle());
     await this.wait(2200);
     // …and out wide: the water coming up through the arena
     void this.camTo(WORLD_W / 2, WORLD_H * 0.52, 0.8, 1500, 0, 'Sine.easeInOut');
-    this.flood = { g: this.add.graphics().setDepth(DEPTH_W.ringside + 0.5), y: WORLD_H + 40, t: 0 };
+    this.startFlood();
     sfx.swish();
     await this.tweenP({ targets: this.flood, y: MAT_Y + 26, duration: 4200, ease: 'Sine.easeOut' });
 

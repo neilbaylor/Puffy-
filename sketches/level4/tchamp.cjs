@@ -1,0 +1,24 @@
+const { chromium } = require('playwright');
+(async () => {
+  const br = await chromium.launch({ args: ['--use-gl=swiftshader'] });
+  const ctx = await br.newContext({ viewport: { width: 844, height: 390 } });
+  await ctx.addInitScript(() => { if (!sessionStorage.getItem('x')) { sessionStorage.setItem('x', '1'); localStorage.setItem('puffy.beaten', '3'); localStorage.setItem('puffy.dev', '1'); localStorage.setItem('puffy.hero', 'puffy'); } });
+  const p = await ctx.newPage();
+  const errs = []; p.on('pageerror', (e) => errs.push(e.message));
+  await p.goto('http://localhost:8091/');
+  await p.waitForFunction(() => window.game?.registry?.get('ready'), null, { timeout: 300000 });
+  await p.click('[data-act=bosses]'); await p.waitForTimeout(400); await p.click('[data-boss="4"]');
+  await p.waitForFunction(() => window.game.scene.isActive('Wrestle'), null, { timeout: 120000 });
+  await p.waitForTimeout(2000); await p.click('.wr-skip').catch(() => {});
+  await p.waitForFunction(() => window.game.scene.getScene('Wrestle').fighting, null, { timeout: 60000 });
+  await p.evaluate(() => { const s = window.game.scene.getScene('Wrestle'); s.awayCount = 3; s.queen.hp = 1; s.queen.invulnUntil = 0; s.hitQueen(1, 'stomp', s.player.x); });
+  await p.waitForFunction(() => window.game.scene.getScene('Wrestle').jumbo?.text === 'CHAMPION!', null, { timeout: 60000 });
+  const c0 = await p.evaluate(() => window.game.scene.getScene('Wrestle').clock);
+  await p.waitForTimeout(1000);
+  await p.screenshot({ path: 'shots/k4-champ.png' });
+  await p.waitForFunction(() => window.game.scene.getScene('Wrestle').jumbo?.text === 'FLOODING!', null, { timeout: 60000 });
+  const c1 = await p.evaluate(() => window.game.scene.getScene('Wrestle').clock);
+  console.log('CHAMPION! on the jumbotron for', ((c1 - c0) / 1000).toFixed(2), 's (game time)');
+  console.log(errs.join('\n') || 'no errors');
+  await br.close();
+})();
