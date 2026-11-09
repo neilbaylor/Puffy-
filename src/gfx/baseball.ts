@@ -8,7 +8,8 @@
  * outfield wall with ads, a scoreboard, foul poles, the backstop and floodlights.
  * Also the players' gear (caps, mitts, the bat, the catcher's mask) and the ball.
  */
-import type { Ctx } from './draw';
+import { rng, type Ctx } from './draw';
+import { POO, POO_DARK, drawDrip, drawPooPile, drawPooSwirl } from './plopworld';
 import { STYLES, ellipsePts, roundRectPts, type Fill, type Pt } from './handdrawn';
 import { drawPlop, type PlopFrame, type PlopKind } from './plops';
 
@@ -146,15 +147,51 @@ export function drawBallparkFront(ctx: Ctx, w: number) {
   ctx.beginPath();
   ctx.ellipse(ox, oy, 14, 4, 0, 0, Math.PI * 2);
   ctx.stroke();
-  // a poo-stained patch or two (it's still Plop Invasion)
-  ctx.fillStyle = '#5a341855';
-  for (const [x, d, rx] of [[x0 + 120, 0.7, 16], [x0 + 300, 0.3, 11], [mound.x - 260, 0.82, 13]] as const) {
-    const [px, py] = P(x, d);
+  // poo stains all over it (it's still Plop Invasion): blotches, and long skid marks where someone slid
+  const r = rng(4242);
+  for (let i = 0; i < Math.round(w / 34); i++) {
+    const [px, py] = P(x0 + r() * w, 0.08 + r() * 0.86);
+    const rx = 6 + r() * 16;
+    ctx.fillStyle = r() < 0.5 ? '#5a3418a0' : '#7a46268c';
     ctx.beginPath();
-    ctx.ellipse(px, py, rx, rx * 0.3, 0, 0, Math.PI * 2);
+    for (let k = 0; k <= 14; k++) {
+      const a = (k / 14) * Math.PI * 2;
+      const rr = rx * (0.75 + 0.35 * Math.sin(k * 2.3 + i));
+      k ? ctx.lineTo(px + Math.cos(a) * rr, py + Math.sin(a) * rr * 0.3) : ctx.moveTo(px + Math.cos(a) * rr, py + Math.sin(a) * rr * 0.3);
+    }
+    ctx.fill();
+  }
+  for (let i = 0; i < Math.round(w / 160); i++) {
+    const [px, py] = P(x0 + 40 + r() * (w - 80), 0.2 + r() * 0.7);
+    const len = 30 + r() * 40;
+    const g = ctx.createLinearGradient(px, py, px + len, py);
+    g.addColorStop(0, '#5a341800');
+    g.addColorStop(0.7, '#5a341870');
+    g.addColorStop(1, '#5a3418a0');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(px + len / 2, py, len / 2, 2.6, 0, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
+  // poo piles on the field (out in the grass, in foul territory, on the dirt), a big swirl by the
+  // mound, and one right on second base
+  for (let i = 0; i < Math.round(w / 85); i++) {
+    const x = x0 + 20 + r() * (w - 40);
+    if (Math.abs(x - home.x) < 40) continue;
+    const [px, py] = P(x, 0.12 + r() * 0.82);
+    drawPooPile(ctx, px, py + 2, Math.floor(r() * 4));
+  }
+  drawPooSwirl(ctx, mx - 34, my + 6, 16, POO_DARK, 3060);
+  // and a few big ones out in the outfield
+  for (let i = 0; i < Math.round(w / 260); i++) {
+    const [px, py] = P(x0 + 50 + ((w * 0.55) * (i + r() * 0.6)) / Math.max(1, Math.round(w / 260)), 0.25 + r() * 0.6);
+    drawPooSwirl(ctx, px, py + 3, 20 + r() * 8, r() < 0.5 ? POO : POO_DARK, 3070 + i);
+  }
+  {
+    const [sx2, sy2] = P(second.x, second.d);
+    drawPooPile(ctx, sx2 + 2, sy2 + 2, 3);
+  }
   // a white chalk line round the warning track at the far edge
   ctx.strokeStyle = '#3a241855';
   ctx.lineWidth = 1;
@@ -236,6 +273,23 @@ export function drawBallparkBack(ctx: Ctx, w: number, score: [number, number] = 
     ctx.textBaseline = 'middle';
     ctx.fillText(a.text, ax + aw / 2, ay + 10.5);
   }
+  // poo dripping off the top of the wall and splattered on the ads; piles along its foot
+  const r = rng(909);
+  for (let x = x0; x < wallX1 - 6; x += 10 + r() * 26) drawDrip(ctx, x, wallTop + 3 + ((x - x0) / (wallX1 - x0)) * 8, 6 + r() * 18, 3 + r() * 3, r() < 0.5 ? POO : POO_DARK);
+  for (let i = 0; i < n; i++) {
+    const ax = x0 + 8 + ((wallX1 - x0 - 16) * (i + r() * 0.8)) / n;
+    const ay = wallTop + 12 + r() * 10;
+    ctx.fillStyle = r() < 0.5 ? '#5a3418cc' : '#6b3b20bb';
+    ctx.beginPath();
+    for (let k = 0; k <= 12; k++) {
+      const a = (k / 12) * Math.PI * 2;
+      const rr = (k % 2 ? 3 : 6) + r() * 2;
+      k ? ctx.lineTo(ax + Math.cos(a) * rr, ay + Math.sin(a) * rr) : ctx.moveTo(ax + Math.cos(a) * rr, ay + Math.sin(a) * rr);
+    }
+    ctx.fill();
+    drawDrip(ctx, ax, ay + 3, 6 + r() * 10, 2.5, POO_DARK);
+  }
+  for (let x = x0 + 14; x < wallX1 - 10; x += 40 + r() * 70) drawPooPile(ctx, x, gy, Math.floor(r() * 4));
   // the foul pole (left field)
   ST.shape(ctx, [[x0 + 8, gy], [x0 + 12, gy], [x0 + 11, gy - 170], [x0 + 9, gy - 170]], F('#ffd23f', '#d9a514', '#fff0a0'), 3150, { lw: 0.8 });
   ST.shape(ctx, [[x0 + 12, gy - 168], [x0 + 26, gy - 160], [x0 + 26, gy - 120], [x0 + 12, gy - 118]], F('#ffd23f', '#d9a514', '#fff0a0'), 3151, { lw: 0.7, plain: true });
@@ -251,6 +305,7 @@ export function drawBallparkBack(ctx: Ctx, w: number, score: [number, number] = 
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('PLOP PARK', sx + sw / 2, sy - 9);
+  for (const dx of [18, 64, 140, 176]) drawDrip(ctx, sx + dx, sy + 90, 6 + (dx % 7) * 2, 3.5, dx % 2 ? POO : POO_DARK);
   ctx.font = `13px ${FONT}`;
   ctx.textAlign = 'left';
   ctx.fillStyle = '#ffd23f';
