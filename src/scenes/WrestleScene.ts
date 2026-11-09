@@ -104,6 +104,8 @@ const DEPTH_W = {
   posts: DEPTH.players + 1.5,
   dark: DEPTH.players + 3,
   spot: DEPTH.players + 3.5,
+  /** Up in the air over the arena (his Plops on their parachutes, the King on his jetpack): in front of the jumbotron. */
+  air: DEPTH.players + 4.1,
 };
 
 interface Wave {
@@ -2610,6 +2612,7 @@ export class WrestleScene extends Phaser.Scene {
     this.flashJumbo({ kind: 'big', text: 'BLAST OFF!', sub: 'HERE COME HIS PLOPS', color: '#ffd23f', bg: '#3d1478' }, 2600);
     this.excitedUntil = this.clock + 2500;
     sfx.laugh();
+    q.spr.setDepth(DEPTH_W.air + 0.1);
     this.setJet(true);
     await this.tweenP({ targets: q.spr, y: q.spr.y - 40, duration: 450, ease: 'Sine.easeIn' });
     if (this.ended) return;
@@ -2639,7 +2642,7 @@ export class WrestleScene extends Phaser.Scene {
     const p = this.player;
     const x = Phaser.Math.Clamp(p.x < WORLD_W / 2 ? p.x + 260 : p.x - 260, ROPE_L + 60, ROPE_R - 60);
     q.facing = p.x < x ? -1 : 1;
-    q.spr.setVisible(true).setFlipX(q.facing > 0).setPosition(x, -200).setFrame('grin');
+    q.spr.setVisible(true).setFlipX(q.facing > 0).setPosition(x, -200).setFrame('grin').setDepth(DEPTH_W.air + 0.1);
     this.setJet(true);
     this.callout('HE’S BACK!', 'bad', 1200);
     await this.tweenP({ targets: q.spr, y: MAT_Y - 70, duration: 1100, ease: 'Sine.easeOut' });
@@ -2647,6 +2650,7 @@ export class WrestleScene extends Phaser.Scene {
     await this.tweenP({ targets: q.spr, y: MAT_Y, duration: 320, ease: 'Quad.easeIn' });
     if (this.ended) return;
     this.setJet(false);
+    q.spr.setDepth(DEPTH_W.queen);
     q.shadow.setVisible(true);
     q.body.setAllowGravity(true);
     q.body.reset(x, MAT_Y - q.body.halfHeight - 2);
@@ -2664,7 +2668,7 @@ export class WrestleScene extends Phaser.Scene {
     const s = M.k / PLOP_RES;
     const spr = this.physics.add.sprite(x, -80, `gplop-${kind}`, 'idle');
     this.gMinions.add(spr);
-    spr.setScale(s).setOrigin(0.5, (52 + PLOP_TOP) / (PLOP_H + PLOP_TOP)).setDepth(DEPTH_W.queen - 0.5);
+    spr.setScale(s).setOrigin(0.5, (52 + PLOP_TOP) / (PLOP_H + PLOP_TOP)).setDepth(DEPTH_W.air);
     const b = spr.body as Phaser.Physics.Arcade.Body;
     const bw = M.w / s;
     const bh = M.h / s;
@@ -2702,7 +2706,7 @@ export class WrestleScene extends Phaser.Scene {
         if (b.blocked.down || b.touching.down) {
           const c = m.chute;
           m.chute = null;
-          spr.setRotation(0);
+          spr.setRotation(0).setDepth(DEPTH_W.queen - 0.5);
           b.setMaxVelocityY(900);
           sfx.bump();
           this.fx.dust(spr.x, b.bottom, 4);
