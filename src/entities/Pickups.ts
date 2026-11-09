@@ -20,7 +20,10 @@ export class Aura extends Phaser.Physics.Arcade.Image {
   /** Scene time after which it can be picked up. */
   readonly collectableAt: number;
 
-  constructor(scene: Phaser.Scene, x: number, y: number, scattered = false) {
+  /** Scattered while you're under a parachute: it floats down at this speed (px/s) instead of dropping, so you can catch it. */
+  private float = 0;
+
+  constructor(scene: Phaser.Scene, x: number, y: number, scattered = false, float = 0) {
     super(scene, x, y, 'nuggie');
     scene.add.existing(this);
     scene.physics.add.existing(this);
@@ -31,7 +34,14 @@ export class Aura extends Phaser.Physics.Arcade.Image {
     this.baseY = y;
     this.phase = Math.random() * 10;
     this.collectableAt = scattered ? scene.time.now + 450 : 0;
-    if (scattered) {
+    if (scattered && float > 0) {
+      // (a puff of them out round you, then they drift down slower than you, so you sink onto them)
+      this.float = float * 0.6;
+      this.life = 6;
+      this.body.setAllowGravity(false);
+      // (thrown out and down below you, then slowing: you come down onto them)
+      this.body.setVelocity((Math.random() - 0.5) * 260, float + 90 + Math.random() * 110);
+    } else if (scattered) {
       this.life = 2.6;
       this.body.setAllowGravity(true);
       this.body.setBounce(0.6, 0.6);
@@ -45,6 +55,11 @@ export class Aura extends Phaser.Physics.Arcade.Image {
   tick(time: number, dt: number): boolean {
     if (this.taken) return false;
     const t = time / 1000 + this.phase;
+    if (this.float > 0 && this.body) {
+      const v = this.body.velocity;
+      v.x *= Math.exp(-dt * 1.6);
+      v.y += (this.float - v.y) * Math.min(1, dt * 1.6);
+    }
     if (this.life >= 0) {
       this.life -= dt;
       this.setAlpha(this.life < 1 ? (Math.floor(time / 80) % 2 ? 0.3 : 0.9) : 1);
