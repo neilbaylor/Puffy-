@@ -214,3 +214,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.209: the Plop King walks behind the POOPA TV table; his speech bubble stays up 0.1 s longer.
 - v0.210: the Plop King stands in a proper tunnel doorway with a shadow under him (no floating over the crowd).
 - v0.211: parachuting Plops and the jetpacking King no longer go behind the jumbotron.
+- v0.212: Level 4's Plop Park: the Plops play baseball at the bottom of the first drop, then hit line drives at you.
