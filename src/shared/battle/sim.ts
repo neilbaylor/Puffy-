@@ -60,7 +60,7 @@ export const PRIZE_LIFE = 7;
 export const CHAIRS_PER_BATTLE = 2;
 export const CHAIR_USES = 2;
 /** A chair lying about unclaimed goes after this long (s). */
-export const CHAIR_LIFE = 16;
+export const CHAIR_LIFE = 24;
 /** A swing: how long it takes (s), and how far in front of you it reaches (px, at normal size). */
 export const CHAIR_SWING = 0.3;
 const CHAIR_REACH = 64;
@@ -782,7 +782,8 @@ export class BattleSim {
       if (e.hp <= 0) continue;
       const [w, h] = ENEMY_BOX[e.kind];
       const dx = (e.x - p.x) * p.facing;
-      if (dx < -8 || dx > reach + w / 2 || Math.abs(e.y - h / 2 - my) > 30 * k + h / 2) continue;
+      // (bad guys: as far as the chair reaches on screen, and one right up against you counts)
+      if (dx < -18 || dx > reach * 1.35 + w / 2 || Math.abs(e.y - h / 2 - my) > 34 * k + h / 2) continue;
       this.hurtEnemy(e, 1, ev);
       hit = true;
       hx = e.x;
@@ -799,8 +800,16 @@ export class BattleSim {
   private stepChairs(ev: BEvent[]) {
     if (this.chairAt.length && this.timeLeft <= this.chairAt[0]) {
       this.chairAt.shift();
-      // anywhere along the arena (not just near someone: worth running for), clear of the walls
-      const x = (Math.floor((2 + Math.random() * (this.map.widthPx / TILE_PX - 4))) + 0.5) * TILE_PX;
+      // anywhere along the arena (not just near someone: worth running for), clear of the walls — and
+      // not over a floating island: it comes down to the floor (or a little post), where you can get it
+      let tx = 2;
+      for (let tries = 0; tries < 40; tries++) {
+        tx = Math.floor(2 + Math.random() * (this.map.widthPx / TILE_PX - 4));
+        let high = false;
+        for (let ty = 0; ty < this.map.h - 4; ty++) if (this.map.solid(tx, ty)) high = true;
+        if (!high) break;
+      }
+      const x = (tx + 0.5) * TILE_PX;
       this.chairs.push({ id: this.nextChair++, x, y: -40, vy: 120, landed: false, age: 0, holder: null, uses: CHAIR_USES, swing: 0 });
       ev.push({ k: 'chair', x });
     }
@@ -827,7 +836,8 @@ export class BattleSim {
         if (ry !== null) {
           ch.y = ry;
           ch.landed = true;
-        } else if (ch.vy > 0 && ty >= 0 && (this.map.solid(tx, ty) || (this.map.oneWay(tx, ty) && prevY <= ty * TILE_PX + 0.5))) {
+        } else if (ch.vy > 0 && ty >= 0 && this.map.solid(tx, ty)) {
+          // (through the clouds: they'd leave it up out of reach)
           ch.y = ty * TILE_PX;
           ch.landed = true;
         }
