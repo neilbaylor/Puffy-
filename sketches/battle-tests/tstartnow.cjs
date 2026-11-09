@@ -1,0 +1,38 @@
+const { chromium } = require('playwright');
+(async () => {
+  const b = await chromium.launch({ args: ['--use-gl=swiftshader'] });
+  const errs = [];
+  const room = 'sn' + Date.now() % 100000;
+  const mk = async (name, vp, scale = 1) => {
+    const ctx = await b.newContext({ viewport: vp, deviceScaleFactor: scale });
+    const p = await ctx.newPage();
+    p.on('pageerror', (e) => errs.push(name + ' ' + e.message));
+    await p.addInitScript(([n]) => localStorage.setItem('puffy.name', n), [name]);
+    await p.goto('http://localhost:8091/');
+    await p.waitForFunction(() => window.game?.registry?.get('ready'), null, { timeout: 180000 });
+    await p.click('[data-act=battle]'); await p.waitForSelector('.battle-code');
+    await p.fill('.bc-box input', room);
+    await p.click('.battle-code [data-act=go]');
+    await p.waitForSelector('.bl-title', { timeout: 30000 });
+    return p;
+  };
+  const a = await mk('Neil', { width: 844, height: 390 }, 2);
+  const c = await mk('Henry', { width: 1024, height: 768 });
+  await a.waitForSelector('.bl-startnow:not([hidden])', { timeout: 30000 });
+  await a.waitForTimeout(1500);
+  const before = await a.evaluate(() => document.querySelector('.bl-clock-face b').textContent);
+  await a.screenshot({ path: 'shots/startnow-phone.png' });
+  await c.screenshot({ path: 'shots/startnow-tablet.png' });
+  const t0 = Date.now();
+  await a.click('.bl-startnow');
+  await a.waitForTimeout(700);
+  const after = await a.evaluate(() => document.querySelector('.bl-clock-face b').textContent);
+  const afterC = await c.evaluate(() => document.querySelector('.bl-clock-face b').textContent);
+  const btnHidden = await c.evaluate(() => document.querySelector('.bl-startnow').hidden);
+  await Promise.all([a, c].map((p) => p.waitForFunction(() => window.game.scene.isActive('Battle') && window.game.scene.getScene('Battle').me, null, { timeout: 30000 })));
+  console.log('clock before', before, 'after click A', after, 'C', afterC, 'C button hidden', btnHidden, 'battle in', ((Date.now() - t0) / 1000).toFixed(1), 's');
+  await a.waitForTimeout(2000);
+  await a.screenshot({ path: 'shots/startnow-after.png' });
+  console.log(errs.join('\n') || 'no errors');
+  await b.close();
+})();

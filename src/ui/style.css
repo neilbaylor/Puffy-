@@ -2415,6 +2415,14 @@ kbd {
 /* the last seconds: the clock pushes in, lobby rumbling around it */
 .bl-clock.hot { transform: scale(1.12); transition: transform 0.3s cubic-bezier(0.2, 1.6, 0.4, 1); }
 
+/* "Start now", beside the clock: skips to the last few seconds */
+.bl-startnow {
+  font-size: clamp(15px, 3.6vh, 20px);
+  padding: 0.5em 0.9em;
+  white-space: nowrap;
+}
+.bl-startnow[hidden] { display: none; }
+
 /* the start: the lobby (and the start screen picture behind it) slides up and away */
 .bl-curtain {
   position: absolute;
