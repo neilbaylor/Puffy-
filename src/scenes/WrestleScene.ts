@@ -2597,11 +2597,11 @@ export class WrestleScene extends Phaser.Scene {
     this.setJet(false);
     q.spr.setVisible(false);
     q.shadow.setVisible(false);
-    // three small ones, then three medium, then three big ones
-    const kinds: MinionKind[] = n === 1 ? ['small', 'small', 'small'] : n === 2 ? ['medium', 'medium', 'medium'] : ['large', 'large', 'large'];
-    const xs = [WX(420), WX(660), WX(900)];
+    // five small ones, then three medium, then three big ones
+    const kinds: MinionKind[] = n === 1 ? ['small', 'small', 'small', 'small', 'small'] : n === 2 ? ['medium', 'medium', 'medium'] : ['large', 'large', 'large'];
+    const xs = kinds.length === 5 ? [WX(340), WX(520), WX(700), WX(880), WX(1060)] : [WX(420), WX(660), WX(900)];
     kinds.forEach((k, i) =>
-      this.time.delayedCall(i * 500, () => {
+      this.time.delayedCall(i * (kinds.length === 5 ? 380 : 500), () => {
         if (this.ended) return;
         // (not right on top of you)
         let x = xs[i];
