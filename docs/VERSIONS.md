@@ -194,3 +194,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.189: faster parachute drops; every Plop in a drop has a blaster and comes down closer to you.
 - v0.190: the Plop King's opening at the start of level 4 a touch quicker.
 - v0.191: nuggies you lose while parachuting float down with you so you can grab them back.
+- v0.192: fewer Plops in the second parachute drop, most (not all) with blasters; nuggies floating in the drops to grab.
