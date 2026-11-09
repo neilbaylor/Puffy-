@@ -206,3 +206,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.201: Battle map a touch smaller; 5 chairs a battle, always on the floor; prizes more often, mostly bombs (no ice or fire).
 - v0.202: Battle grow lasts 4 s longer and only another hero can hurt you while big; fewer bad guys.
 - v0.203: the Battle arena has four different stretches (meadow, hill, steps, cliffs) instead of one repeated.
+- v0.204: 'Start now' button beside the Battle countdown: skips to the rumble and the curtain.
