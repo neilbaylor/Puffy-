@@ -202,3 +202,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.197: no waterfalls in the Plop Dome flood; the King's big Plops take one more hit.
 - v0.198: Queen Plop 5% easier; the Plop King's medium and big Plops armed; a cooler flood.
 - v0.199: Battle pause button and menu; a 'lost the connection' card instead of a frozen battle; a sturdier battle server.
+- v0.200: Battle chairs come down where you can get them and stay longer; the chair hits bad guys further out.
