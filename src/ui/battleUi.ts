@@ -5,8 +5,8 @@
  */
 import type Phaser from 'phaser';
 import { account } from '../core/account';
-import { sfx } from '../core/sfx';
-import { fadeOutMusic, playBattleMusic, playMenuMusic, preloadBattleMusic } from '../core/music';
+import { isMuted, setMuted, sfx } from '../core/sfx';
+import { fadeOutMusic, playBattleMusic, playMenuMusic, preloadBattleMusic, setMusicMuted } from '../core/music';
 import { MATCH_SECS } from '../shared/battle/sim';
 import { CHARACTERS, characterById } from '../data/characters';
 import { drawHeroCard, drawPortrait } from '../gfx/draw';
@@ -600,15 +600,76 @@ export class BattleUI {
       <div class="bhud-time">2:00</div>
       <div class="bhud-bombs" hidden></div>
       <div class="bhud-chips"></div>
-      <button class="icon-btn bhud-leave" aria-label="Leave the battle">✕</button>
+      <button class="icon-btn bhud-leave" aria-label="Pause">❚❚</button>
+      <div class="bhud-lost" hidden>
+        <div class="panel">
+          <h3>Lost the connection</h3>
+          <p>Reconnecting to the arena…</p>
+          <button class="btn btn-alt" data-act="lost-leave">Leave battle</button>
+        </div>
+      </div>
     </div>`);
-    this.hud.querySelector('.bhud-leave')!.addEventListener('click', () => this.leave());
+    this.hud.querySelector('[data-act=lost-leave]')!.addEventListener('click', () => this.leave());
+    // no news from the arena for a few seconds (the connection dropped, or the server restarted):
+    // say so over the game (instead of a frozen picture), till it's back
+    clearInterval(this.staleT);
+    if (this.net) this.net.lastSnapAt = performance.now();
+    this.staleT = window.setInterval(() => {
+      const lost = this.hud?.querySelector<HTMLElement>('.bhud-lost');
+      if (!lost || !this.net) return;
+      const stale = performance.now() - this.net.lastSnapAt > 3000;
+      if (lost.hidden === stale) {
+        lost.hidden = !stale;
+        this.host.touch(!stale);
+      }
+    }, 500);
+    // (the usual pause button: a battle can't stop for everyone, so it's a menu over the game, which plays on)
+    this.hud.querySelector('.bhud-leave')!.addEventListener('click', () => this.pauseMenu());
     if (curtainUp) this.hud.style.visibility = 'hidden';
     this.host.root.appendChild(this.hud);
     sfx.whistle();
   }
 
+  /** The pause button in a battle: keep playing, sound, or leave (the battle goes on meanwhile). */
+  private pauseMenu() {
+    if (!this.inBattle) return;
+    this.host.touch(false);
+    const el = h(`<div class="screen modal">
+      <div class="panel">
+        <h2>Paused</h2>
+        <p class="bp-note">The battle keeps going!</p>
+        <button class="btn btn-go" data-act="resume">Keep playing</button>
+        <button class="btn btn-alt" data-act="sound">${isMuted() ? 'Sound: off' : 'Sound: on'}</button>
+        <button class="btn" data-act="leave">Leave battle</button>
+      </div>
+    </div>`);
+    const close = () => {
+      window.removeEventListener('keydown', onKey);
+      if (!this.inBattle) return;
+      this.host.setScreen(null);
+      this.host.touch(true);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code === 'Escape' || e.code === 'KeyP') close();
+    };
+    el.querySelector('[data-act=resume]')!.addEventListener('click', close);
+    el.querySelector('[data-act=sound]')!.addEventListener('click', () => {
+      setMuted(!isMuted());
+      setMusicMuted(isMuted());
+      el.querySelector('[data-act=sound]')!.textContent = isMuted() ? 'Sound: off' : 'Sound: on';
+    });
+    el.querySelector('[data-act=leave]')!.addEventListener('click', () => {
+      window.removeEventListener('keydown', onKey);
+      this.leave();
+    });
+    this.host.setScreen(el);
+    setTimeout(() => window.addEventListener('keydown', onKey), 0);
+  }
+
+  private staleT = 0;
+
   private stopBattle() {
+    clearInterval(this.staleT);
     if (!this.inBattle) return;
     this.inBattle = false;
     const g = this.host.game;

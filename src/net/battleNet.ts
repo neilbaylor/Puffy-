@@ -112,6 +112,7 @@ export class BattleNet {
           this.onRoom(m.room);
           return;
         case 'snap':
+          this.lastSnapAt = performance.now();
           this.inbox.push({ tick: m.k, timeLeft: m.tl, players: m.p.map(unpackPlayer), rockets: m.r, prizes: m.z ?? [], enemies: m.n ?? [], hazards: m.h ?? [], chairs: m.c ?? [], events: m.e, at: performance.now() });
           if (this.inbox.length > 60) this.inbox.splice(0, this.inbox.length - 60);
           return;
@@ -127,6 +128,9 @@ export class BattleNet {
     };
     ws.onerror = () => {};
   }
+
+  /** When the last snapshot of the battle came in (performance.now()): none for a while and it's stuck. */
+  lastSnapAt = 0;
 
   /** Connection dropped: try again (quickly at first, then backing off). */
   private lost() {
