@@ -4,6 +4,8 @@
 import type { BEvent, BPlayer, EnemyKind, PrizeKind, RocketKind } from './sim';
 
 export const MAX_BATTLERS = 4;
+/** "Start now" in the countdown skips to this many seconds left: the rumble, 3-2-1, then the curtain. */
+export const START_NOW_SECS = 3.5;
 
 /** Each player slot's colour: 1 the normal orange, 2 purple, 3 red, 4 green. */
 export const SLOT_COLORS = ['#f28a2e', '#9b6bdf', '#e8484a', '#4cc25e'] as const;

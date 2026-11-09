@@ -16,7 +16,7 @@ import { gameArtJobs } from '../gfx/textures';
 import { loadArt } from './artLoader';
 import { BattleNet, battleUrl, type NetStatus } from '../net/battleNet';
 import type { BattleHud } from '../scenes/BattleScene';
-import { MAX_BATTLERS, SLOT_COLORS, SLOT_NAMES, type RoomState } from '../shared/battle/protocol';
+import { MAX_BATTLERS, START_NOW_SECS, SLOT_COLORS, SLOT_NAMES, type RoomState } from '../shared/battle/protocol';
 
 export interface BattleHost {
   root: HTMLElement;
@@ -289,6 +289,7 @@ export class BattleUI {
         <div class="bl-clock" hidden>
           <span class="bl-clock-label">Battle starts in</span>
           <span class="bl-clock-face"><b>15</b></span>
+          <button class="btn btn-go bl-startnow" data-act="startnow">Start now</button>
         </div>
         <p class="bl-waitmsg" hidden>Waiting for players<i>.</i><i>.</i><i>.</i></p>
         <p class="bl-status" hidden></p>
@@ -305,6 +306,12 @@ export class BattleUI {
     </div>`);
     this.lobby = el;
     el.querySelector('.bl-back')!.addEventListener('click', () => this.leave());
+    // (skip the wait: straight to the last few seconds, the rumble and the curtain)
+    el.querySelector('[data-act=startnow]')!.addEventListener('click', (e) => {
+      sfx.select();
+      (e.currentTarget as HTMLElement).hidden = true;
+      this.net?.start();
+    });
     el.querySelector('.bl-roomtag')!.addEventListener('click', () => {
       sfx.select();
       this.changeRoom();
@@ -432,6 +439,7 @@ export class BattleUI {
     const players = r.players.filter((p) => p.connected && p.slot >= 0).length;
     lobby.querySelector<HTMLElement>('.bl-waitmsg')!.hidden = !(r.phase === 'lobby' && players <= 1);
     lobby.querySelector<HTMLElement>('.bl-clock')!.hidden = !counting;
+    this.canStartNow = counting && !spectator;
     if (counting) this.runClock(r.timer, phaseChanged);
     else this.stopClock();
     // (the countdown stopped without a battle: drop the warmed-up arena)
@@ -444,6 +452,8 @@ export class BattleUI {
   private clockTotal = 15;
   private clockRaf = 0;
   private lastSec = -1;
+  /** Players (not people watching) can cut the countdown short. */
+  private canStartNow = false;
 
   private runClock(secsLeft: number, fresh: boolean) {
     const end = performance.now() + secsLeft * 1000;
@@ -459,6 +469,7 @@ export class BattleUI {
       const clock = lobby.querySelector<HTMLElement>('.bl-clock')!;
       const face = clock.querySelector<HTMLElement>('.bl-clock-face')!;
       face.style.setProperty('--p', String(Math.min(1, left / this.clockTotal)));
+      clock.querySelector<HTMLElement>('.bl-startnow')!.hidden = !this.canStartNow || left <= START_NOW_SECS + 0.6;
       if (sec !== this.lastSec) {
         this.lastSec = sec;
         face.querySelector('b')!.textContent = String(sec);

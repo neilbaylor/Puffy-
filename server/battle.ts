@@ -12,7 +12,7 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import { CHARACTERS } from '../src/data/characters';
 import { buildArena } from '../src/shared/battle/arena';
 import { BattleSim, DT, TICK_HZ } from '../src/shared/battle/sim';
-import { MAX_BATTLERS, WEAPON_CODE, packPlayer, type ClientMsg, type Phase, type RoomPlayer, type RoomState, type ServerMsg, type SnapChair, type SnapEnemy, type SnapHazard, type SnapPrize } from '../src/shared/battle/protocol';
+import { MAX_BATTLERS, START_NOW_SECS, WEAPON_CODE, packPlayer, type ClientMsg, type Phase, type RoomPlayer, type RoomState, type ServerMsg, type SnapChair, type SnapEnemy, type SnapHazard, type SnapPrize } from '../src/shared/battle/protocol';
 
 /** (BATTLE_COUNTDOWN lengthens it, for taking screenshots) */
 /** Once two or more friends are in, the next battle counts down from this on its own. */
@@ -224,7 +224,12 @@ class Room {
         }
         return;
       case 'start':
-        // (no "start now": a battle starts by itself when the countdown runs out)
+        // "Start now": any player in the countdown skips to its last few seconds (the rumble, then the curtain)
+        if (this.phase === 'countdown' && c.slot >= 0 && this.timer > START_NOW_SECS) {
+          this.timer = START_NOW_SECS;
+          this.lastCountdownSecond = -1;
+          this.broadcastRoom();
+        }
         return;
       case 'ping':
         this.send(c, { t: 'pong', c: msg.c });
