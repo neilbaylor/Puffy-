@@ -233,6 +233,15 @@ export function makeCarrySheet(scene: Phaser.Scene, ch: (typeof CHARACTERS)[numb
 }
 
 
+/** The bad guys' weapons: blaster, chainsaw, ball and chain, and the blaster's pom-poms (only what's missing). */
+export function makeWeaponArt(scene: Phaser.Scene) {
+  const st = STYLES[ART_STYLE];
+  if (!scene.textures.exists('w-blaster')) addCanvas(scene, 'w-blaster', hires(BLASTER.w, BLASTER.h, W_RES, (ctx) => drawBlaster(ctx, st)));
+  if (!scene.textures.exists('w-saw')) sheet(scene, 'w-saw', SAW.w, SAW.h, ['s0', 's1'] as const, (ctx, f) => drawChainsaw(ctx, st, f === 's0' ? 0 : 1), W_RES);
+  if (!scene.textures.exists('w-ball')) sheet(scene, 'w-ball', 30, 30, ['open', 'shut'] as const, (ctx, f) => drawFlailBall(ctx, st, f === 'open'), W_RES);
+  if (!scene.textures.exists('w-bullet')) addCanvas(scene, 'w-bullet', hires(18, 18, W_RES, (ctx) => drawBullet(ctx, st)));
+}
+
 /** The bad guys, as separate pieces (so they can be drawn a bit at a time). */
 function baddiePieces(scene: Phaser.Scene): { name: string; run: () => void }[] {
   const st = STYLES[ART_STYLE];
@@ -255,12 +264,7 @@ function baddiePieces(scene: Phaser.Scene): { name: string; run: () => void }[] 
     {
       // the armed bad guys' weapons
       name: 'weapons',
-      run: () => {
-        addCanvas(scene, 'w-blaster', hires(BLASTER.w, BLASTER.h, W_RES, (ctx) => drawBlaster(ctx, st)));
-        sheet(scene, 'w-saw', SAW.w, SAW.h, ['s0', 's1'] as const, (ctx, f) => drawChainsaw(ctx, st, f === 's0' ? 0 : 1), W_RES);
-        sheet(scene, 'w-ball', 30, 30, ['open', 'shut'] as const, (ctx, f) => drawFlailBall(ctx, st, f === 'open'), W_RES);
-        addCanvas(scene, 'w-bullet', hires(18, 18, W_RES, (ctx) => drawBullet(ctx, st)));
-      },
+      run: () => makeWeaponArt(scene),
     },
   ];
 }
