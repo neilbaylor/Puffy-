@@ -73,7 +73,7 @@ const Q_PAD = 18;
 const Q_TOP = 24;
 const HITS = 12;
 /** The Plop King: 3 + 3 + 3 + 4 (he flies off after each of the first three rounds). */
-const KING_HITS = 13;
+const KING_HITS = 16;
 /** How tough she is overall: faster and quicker to attack again (1 = as in v0.160; v0.164-0.178 had her 5% harder). */
 const Q_TOUGH = 1;
 /** Your hearts in the ring: you start with all 6, and pick-ups top you back up. */
@@ -124,9 +124,9 @@ interface Lob {
 /** The Plop King's Plops, parachuting into the ring when he flies off (their size, toughness, pace). */
 type MinionKind = 'small' | 'medium' | 'large';
 const MINION: Record<MinionKind, { k: number; w: number; h: number; hp: number; speed: number }> = {
-  small: { k: 0.5, w: 24, h: 32, hp: 1, speed: 82 },
-  medium: { k: 0.78, w: 38, h: 58, hp: 2, speed: 92 },
-  large: { k: 1.05, w: 52, h: 80, hp: 5, speed: 62 },
+  small: { k: 0.5, w: 24, h: 32, hp: 1, speed: 100 },
+  medium: { k: 0.78, w: 38, h: 58, hp: 2, speed: 112 },
+  large: { k: 1.05, w: 52, h: 80, hp: 5, speed: 78 },
 };
 interface Minion {
   spr: Phaser.Physics.Arcade.Sprite;
@@ -563,7 +563,7 @@ export class WrestleScene extends Phaser.Scene {
   }
   /** The Plop King's jetpack: its flames (under its two nozzles) and the smoke pouring out. */
   private jet: { on: boolean; flames: Phaser.GameObjects.Sprite[]; smokeT: number } | null = null;
-  /** The Plops he sends in (every 3 hits he flies off and they parachute into the ring). */
+  /** The Plops he sends in (every 4 hits he flies off and they parachute into the ring). */
   private minions: Minion[] = [];
   private gMinions!: Phaser.Physics.Arcade.Group;
   /** How many times he's flown off so far (1: three small Plops, 2: two medium, 3: two big). */
@@ -679,7 +679,7 @@ export class WrestleScene extends Phaser.Scene {
     this.physics.add.collider(this.gRockets, this.statics, (r) => (r as Rocket).explode());
 
     // ── Queen Plop ──
-    // (the Plop King: 13 hits, and 5% tougher than the Queen)
+    // (the Plop King: 16 hits, and 5% tougher than the Queen)
     // (and Queen Plop 5% easier than she was)
     this.queen = this.kingFight ? new Queen(this, POST_R, POST_TOP, 'wr-pking', KING_HITS, Q_TOUGH * 1.05) : new Queen(this, POST_R, POST_TOP, 'wr-queen', HITS, Q_TOUGH * 0.95);
     // (the Plop King's Plops, when he sends them in)
@@ -1291,9 +1291,9 @@ export class WrestleScene extends Phaser.Scene {
       else this.flashJumbo({ kind: 'big', text: 'CHAIR SHOT!', sub: `THAT ONE COUNTS DOUBLE · ${q.hp} TO GO`, color: '#ffd23f', bg: '#3a4652' }, 2200);
     } else this.flashJumbo({ kind: 'big', text: words.replace(/!.*/, '!'), sub: `${q.hp} TO GO`, color: '#ffd23f', bg: '#5c3118' }, 900);
     if (q.hp <= 0) void (this.kingFight ? this.winKing() : this.win());
-    // the Plop King: every 3 hits he's off on his jetpack, and his Plops parachute in
-    // (after 3, 6 and 9 hits; then the last round is 4)
-    else if (this.kingFight && this.awayCount < 3 && Math.floor((q.maxHits - q.hp) / 3) > this.awayCount) void this.kingAway();
+    // the Plop King: every 4 hits he's off on his jetpack, and his Plops parachute in
+    // (after 4, 8 and 12 hits; then the last 4)
+    else if (this.kingFight && this.awayCount < 3 && Math.floor((q.maxHits - q.hp) / 4) > this.awayCount) void this.kingAway();
     return true;
   }
 
@@ -2385,8 +2385,8 @@ export class WrestleScene extends Phaser.Scene {
     // (he starts at the top of the aisle, out of the tunnel: small, far away)
     const fx = WX(TUNNEL.x);
     const fy = WY(TUNNEL.bottom);
-    // (where he ends up: on the floor in front of the ring, at its left end)
-    const ex = WX(150);
+    // (where he ends up: on the floor in front of the ring, past the challenger (not in front of them))
+    const ex = WX(520);
     const ey = GROUND_Y;
     q.spr.setTexture('wr-pking-robe', 'idle').setPosition(fx, fy).setScale(S * 0.42).setAlpha(1).setFlipX(true);
     q.facing = 1;
@@ -2426,14 +2426,16 @@ export class WrestleScene extends Phaser.Scene {
 
     // ── 2. cut to him, far off at the top of the aisle… and in close as he comes round to the ring ──
     // (his way round, in stage units: down the aisle, along the floor behind the ring (the back ropes in
-    // front of him), down the left side past the corner post, and along the front to his spot)
+    // front of him), down the left side well clear of the corner post (between the ring and the announcers'
+    // table), and along the front, past the challenger, to his spot)
     const path: { x: number; y: number; k: number }[] = [
       { x: TUNNEL.x, y: TUNNEL.bottom, k: 0.42 },
       { x: TUNNEL.x - 20, y: 372, k: 0.5 },
-      { x: 30, y: 392, k: 0.56 },
-      { x: -8, y: 420, k: 0.62 },
-      { x: -8, y: RING.groundY - 10, k: 0.96 },
-      { x: 150, y: RING.groundY, k: 1 },
+      { x: -10, y: 392, k: 0.56 },
+      { x: -90, y: 430, k: 0.63 },
+      { x: -95, y: RING.groundY - 6, k: 0.95 },
+      { x: 60, y: RING.groundY, k: 0.98 },
+      { x: 520, y: RING.groundY, k: 1 },
     ];
     if (!this.skipping) {
       this.setDark(0.45, 250);
@@ -2445,9 +2447,10 @@ export class WrestleScene extends Phaser.Scene {
       this.lowerThird('THE PLOP KING', 'Ruler of the Plops · champion of the Plop Dome');
     }
     {
-      const lens = path.slice(1).map((q, i) => Math.hypot(q.x - path[i].x, (q.y - path[i].y) * 1.6));
+      // (time along the way: quicker while he's far off and small, an unhurried strut once he's close)
+      const lens = path.slice(1).map((q, i) => Math.hypot(q.x - path[i].x, (q.y - path[i].y) * 1.6) * (0.35 + 0.65 * (q.k + path[i].k) / 2));
       const total = lens.reduce((a, b) => a + b, 0);
-      const ms = 4200;
+      const ms = 5800;
       await this.glide(ms, (u) => {
         let d = u * total;
         let i = 0;
@@ -2464,7 +2467,8 @@ export class WrestleScene extends Phaser.Scene {
         q.spr.setPosition(x, y - Math.abs(Math.sin(ph * Math.PI)) * 3 * k).setScale(S * k);
         // (facing the way he's going; behind the ring he's behind its ropes and posts, in front once he's round)
         if (Math.abs(b.x - a.x) > 4) q.spr.setFlipX(b.x > a.x);
-        q.spr.setDepth(sy > RING.frontY - 6 ? DEPTH_W.spot + 0.3 : DEPTH_W.ring - 0.5);
+        // (down the left side: in front of the ring but behind the announcers' table, until he's past it)
+        q.spr.setDepth(sy <= RING.frontY - 6 ? DEPTH_W.ring - 0.5 : sx < -30 ? DEPTH_W.ring + 0.5 : DEPTH_W.spot + 0.3);
         // (a cocky strut: a grin at the crowd, a look round)
         q.spr.setFrame(u > 0.3 && u < 0.4 ? 'grin' : u > 0.66 && u < 0.74 ? 'look' : (['walk0', 'walk1', 'walk2', 'walk3'] as const)[Math.floor(ph * 2) % 4]);
         this.spot.setPosition(x, y + 10).setScale(0.55 * k, (y + 60) / 700);
@@ -2573,7 +2577,7 @@ export class WrestleScene extends Phaser.Scene {
     this.game.events.emit('wrestle-fight');
   }
 
-  /** Every 3 hits: he blasts off out of sight on his jetpack, and his Plops parachute into the ring. */
+  /** Every 4 hits: he blasts off out of sight on his jetpack, and his Plops parachute into the ring. */
   private async kingAway() {
     const q = this.queen;
     this.awayCount++;
@@ -2593,17 +2597,17 @@ export class WrestleScene extends Phaser.Scene {
     this.setJet(false);
     q.spr.setVisible(false);
     q.shadow.setVisible(false);
-    // three small ones, then two medium, then two big ones
-    const kinds: MinionKind[] = n === 1 ? ['small', 'small', 'small'] : n === 2 ? ['medium', 'medium'] : ['large', 'large'];
-    const xs = kinds.length === 3 ? [WX(420), WX(660), WX(900)] : [WX(500), WX(840)];
+    // three small ones, then three medium, then three big ones
+    const kinds: MinionKind[] = n === 1 ? ['small', 'small', 'small'] : n === 2 ? ['medium', 'medium', 'medium'] : ['large', 'large', 'large'];
+    const xs = [WX(420), WX(660), WX(900)];
     kinds.forEach((k, i) =>
       this.time.delayedCall(i * 500, () => {
         if (this.ended) return;
         // (not right on top of you)
         let x = xs[i];
         if (Math.abs(x - this.player.x) < 70) x += x < WORLD_W / 2 ? 90 : -90;
-        // (the medium and big ones are armed: one with a blaster, one with a chainsaw)
-        this.spawnMinion(k, x, k === 'small' ? null : i % 2 ? 'saw' : 'gun');
+        // (the medium and big ones are armed: blasters either side, a chainsaw in the middle)
+        this.spawnMinion(k, x, k === 'small' ? null : i === 1 ? 'saw' : 'gun');
       }),
     );
   }
@@ -2652,9 +2656,9 @@ export class WrestleScene extends Phaser.Scene {
       .setScale(M.k / PCHUTE_RES)
       .setDepth(spr.depth - 0.1);
     const w = weapon
-      ? { kind: weapon, img: this.add.image(x, -80, weapon === 'gun' ? 'w-blaster' : 'w-saw', weapon === 'saw' ? 's0' : undefined).setScale((M.k * (weapon === 'gun' ? 1.05 : 1.1)) / W_RES).setDepth(spr.depth + 0.1), cd: 1.2 + Math.random(), warn: 0 }
+      ? { kind: weapon, img: this.add.image(x, -80, weapon === 'gun' ? 'w-blaster' : 'w-saw', weapon === 'saw' ? 's0' : undefined).setScale((M.k * (weapon === 'gun' ? 1.05 : 1.1)) / W_RES).setDepth(spr.depth + 0.1), cd: 0.7 + Math.random() * 0.6, warn: 0 }
       : null;
-    this.minions.push({ spr, kind, hp: M.hp, chute, t: Math.random() * 6, hopCd: 1 + Math.random(), hurtUntil: 0, dead: false, weapon: w });
+    this.minions.push({ spr, kind, hp: M.hp, chute, t: Math.random() * 6, hopCd: 0.6 + Math.random() * 0.6, hurtUntil: 0, dead: false, weapon: w });
   }
 
   private updateMinions(dt: number) {
@@ -2691,30 +2695,30 @@ export class WrestleScene extends Phaser.Scene {
       const ground = b.blocked.down || b.touching.down;
       const w = m.weapon;
       // a blaster: stop, take aim (a shake: your warning), fire a pom-pom across at you
-      const aiming = !!w && w.kind === 'gun' && ground && p.alive && this.fighting && Math.abs(dx) > 50 && Math.abs(dx) < 380 && Math.abs(p.y - spr.y) < 70;
+      const aiming = !!w && w.kind === 'gun' && ground && p.alive && this.fighting && Math.abs(dx) > 50 && Math.abs(dx) < 480 && Math.abs(p.y - spr.y) < 70;
       if (w?.kind === 'gun') {
         w.cd -= dt;
         if (aiming && w.cd <= 0 && w.warn <= 0) {
-          w.warn = 0.45;
+          w.warn = 0.4;
           sfx.bump();
         }
         if (w.warn > 0) {
           w.warn -= dt;
           if (w.warn <= 0) {
             if (aiming) this.minionFire(m, dir);
-            w.cd = 1.5 + Math.random() * 0.8;
+            w.cd = 1.0 + Math.random() * 0.6;
           }
         }
       }
       // a chainsaw: revving, and it comes at you faster when you're close
-      const sawing = w?.kind === 'saw' && Math.abs(dx) < 260;
+      const sawing = w?.kind === 'saw' && Math.abs(dx) < 320;
       if (aiming || (w?.kind === 'gun' && w.warn > 0)) b.setVelocityX(0);
       else if (ground) {
         b.setVelocityX(Math.abs(dx) > 10 ? dir * M.speed * (sawing ? 1.55 : 1) : 0);
         m.hopCd -= dt;
         if (m.hopCd <= 0) {
-          b.setVelocityY(m.kind === 'large' ? -360 : -420);
-          m.hopCd = 1.4 + Math.random() * 1.6;
+          b.setVelocityY(m.kind === 'large' ? -380 : -450);
+          m.hopCd = 0.9 + Math.random() * 1.1;
         }
       }
       const hw = b.halfWidth;
@@ -2769,7 +2773,7 @@ export class WrestleScene extends Phaser.Scene {
     const mx = w.img.x + dir * (BLASTER.gx - BLASTER.muzzleX) * (M.k * 1.05);
     const my = w.img.y + (BLASTER.muzzleY - BLASTER.gy) * (M.k * 1.05);
     const img = this.add.image(mx, my, 'w-bullet').setScale(1 / W_RES).setDepth(DEPTH.projectiles);
-    this.minionShots.push({ img, vx: dir * 320, life: 2.2 });
+    this.minionShots.push({ img, vx: dir * 360, life: 2.2 });
     sfx.pew();
     this.fx.muzzle(mx, my, dir as Side, w.img.x);
   }

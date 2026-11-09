@@ -21,8 +21,8 @@ const { chromium } = require('playwright');
   await p.screenshot({ path: 'shots/k4-fight.png' });
   const S = () => p.evaluate(() => { const s = window.game.scene.getScene('Wrestle'); s.player.invulnUntil = 1e12; return { hp: s.queen.hp, mode: s.queen.mode, vis: s.queen.spr.visible, minions: s.minions.map((m) => m.kind + (m.chute ? '/chute' : '')).join(','), away: s.awayCount }; });
   for (let wave = 1; wave <= 3; wave++) {
-    // three hits: off he goes
-    for (let i = 0; i < 3; i++) await p.evaluate(() => { const s = window.game.scene.getScene('Wrestle'); s.queen.invulnUntil = 0; s.hitQueen(1, 'stomp', s.player.x); });
+    // four hits: off he goes
+    for (let i = 0; i < 4; i++) await p.evaluate(() => { const s = window.game.scene.getScene('Wrestle'); s.queen.invulnUntil = 0; s.hitQueen(1, 'stomp', s.player.x); });
     await p.waitForTimeout(1200);
     if (wave === 1) await p.screenshot({ path: 'shots/k4-blastoff.png' });
     await p.waitForTimeout(2200);
