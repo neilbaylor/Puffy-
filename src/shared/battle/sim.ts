@@ -784,8 +784,11 @@ export class BattleSim {
       if (e.hp <= 0) continue;
       const [w, h] = ENEMY_BOX[e.kind];
       const dx = (e.x - p.x) * p.facing;
-      // (bad guys: as far as the chair reaches on screen, and one right up against you counts)
-      if (dx < -18 || dx > reach * 1.35 + w / 2 || Math.abs(e.y - h / 2 - my) > 34 * k + h / 2) continue;
+      // (bad guys: as far as the chair reaches on screen, and one right up against you counts;
+      // one still floating down on its parachute, up over your head too: the chair comes over the top)
+      const dy = e.y - h / 2 - my;
+      const band = 34 * k + h / 2;
+      if (dx < -18 || dx > reach * 1.35 + w / 2 || dy > band || dy < -band - (e.chute ? 60 * k : 0)) continue;
       this.hurtEnemy(e, 1, ev);
       hit = true;
       hx = e.x;
