@@ -43,7 +43,7 @@ const HOLD = process.argv[3] || 'right';
         if (!pl.alive || (chuteAt > 0 && !pl.chute && pl.onGround) || frames > 60 * 45) {
           g.events.off('preupdate', step);
           const cp = g.checkpoints.filter((c) => c.reached).map((c) => Math.round(c.x / 32));
-          done({ why: !pl.alive ? 'fainted' : frames > 60 * 45 ? 'timeout' : 'landed', secs: +((frames - chuteAt) / 60).toFixed(1), landX: +(pl.x / 32).toFixed(1), landH: g.level.data.height - Math.round(pl.bottom / 32), zone: [d.x0 / 32, d.x1 / 32], spawned, maxPlops, shotsFired: shots.length, alive: pl.alive, checkpointsReached: cp, state: { x: +(pl.x / 32).toFixed(1), h: +((g.level.data.height * 32 - pl.bottom) / 32).toFixed(1), chute: !!pl.chute, ground: pl.onGround, goo: pl.goo, vy: Math.round(pl.body.velocity.y), chuteAt }, fps: Math.round(window.game.loop.actualFps) });
+          done({ why: !pl.alive ? 'fainted' : frames > 60 * 45 ? 'timeout' : 'landed', secs: +((frames - chuteAt) / 60).toFixed(1), landX: +(pl.x / 32).toFixed(1), landH: g.level.data.height - Math.round(pl.bottom / 32), zone: [d.x0 / 32, d.x1 / 32], spawned, maxPlops, shotsFired: shots.length, nuggiesInDrop: g.auras.filter((a) => !a.scattered && a.active && a.x > d.x0 && a.x < d.x1 && a.y > d.top).length, nuggiesHeld: g.aura, alive: pl.alive, checkpointsReached: cp, state: { x: +(pl.x / 32).toFixed(1), h: +((g.level.data.height * 32 - pl.bottom) / 32).toFixed(1), chute: !!pl.chute, ground: pl.onGround, goo: pl.goo, vy: Math.round(pl.body.velocity.y), chuteAt }, fps: Math.round(window.game.loop.actualFps) });
         }
       };
       g.events.on('preupdate', step);
