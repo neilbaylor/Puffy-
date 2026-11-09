@@ -213,3 +213,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.208: the Plop King intro opens on him (about a second) before going up to the jumbotron.
 - v0.209: the Plop King walks behind the POOPA TV table; his speech bubble stays up 0.1 s longer.
 - v0.210: the Plop King stands in a proper tunnel doorway with a shadow under him (no floating over the crowd).
+- v0.211: parachuting Plops and the jetpacking King no longer go behind the jumbotron.
