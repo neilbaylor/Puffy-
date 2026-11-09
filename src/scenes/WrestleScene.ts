@@ -2394,8 +2394,10 @@ export class WrestleScene extends Phaser.Scene {
     this.camManual = true;
     const jx = WX(JUMBO.x + (JUMBO.w * JUMBO.s) / 2);
     const jy = WY(JUMBO.y + (JUMBO.h * JUMBO.s) / 2);
-    this.cut(jx, jy + 70, 1.75, 0);
+    // (it opens on him, up at the tunnel in a spotlight; then up to the jumbotron)
+    this.cut(fx, fy - 34, 2.3, 0);
     this.updateCamera(0, true);
+    this.aimSpot(fx, fy, 0.9, 1);
     this.flashJumbo({ kind: 'big', text: 'TONIGHT!', sub: 'TITLE MATCH · LIVE FROM THE PLOP DOME', color: '#ffd23f', bg: '#3d1478' }, 1e9);
     for (const sx of [WX(160), WX(1120)]) {
       const img = this.add.image(sx, WY(-80), 'spot').setOrigin(0.5, 0).setScale(0.42, 0.92).setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH_W.spot).setAlpha(0.75);
@@ -2410,12 +2412,18 @@ export class WrestleScene extends Phaser.Scene {
     playHoops();
     sfx.drum();
 
-    // ── 1. straight in to the jumbotron ──
-    this.excitedUntil = this.clock + 6000;
+    // ── 1. a moment on him (a grin at the crowd), then up to the jumbotron ──
+    this.excitedUntil = this.clock + 7000;
     sfx.cheer();
     this.flashbulbs(24, 1900);
     this.ribbonMsg = { text: 'THE PLOP KING ♛ THE PLOP KING', color: '#ffd23f', bg: '#3d1478', t0: this.clock / 1000 };
-    await this.camTo(jx, jy + 6, 2.35, 1300, 0, 'Sine.easeOut');
+    if (!this.skipping) {
+      q.spr.setFrame('grin');
+      await this.iwait(800);
+      q.spr.setFrame('idle');
+    }
+    this.tweens.add({ targets: this.spot, alpha: 0, duration: 500 });
+    await this.camTo(jx, jy + 6, 2.35, 1400, 0, 'Sine.easeInOut');
     await this.camTo(jx, jy + 4, 2.46, 1700, 0, 'Sine.easeInOut');
     if (!this.skipping) {
       this.jumbo = { kind: 'title' };
