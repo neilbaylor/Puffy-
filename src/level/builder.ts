@@ -12,7 +12,7 @@ export type Cell = 'ground' | 'rock' | 'boulder' | 'bramble' | 'cloud' | null;
 export type EnemyKind = 'puffball' | 'bigpuff' | 'giant' | 'goat' | 'plop' | 'bigplop' | 'giantplop' | 'poogoat';
 
 export interface Spawn {
-  type: EnemyKind | 'aura' | 'rootbeer' | 'checkpoint' | 'goal' | 'player' | 'tree' | 'soccer' | 'hockey' | 'para' | 'puddle' | 'chase' | 'volley' | 'drop' | 'king';
+  type: EnemyKind | 'aura' | 'rootbeer' | 'checkpoint' | 'goal' | 'player' | 'tree' | 'soccer' | 'hockey' | 'para' | 'puddle' | 'chase' | 'volley' | 'drop' | 'king' | 'baseball';
   x: number; // tile column (may be fractional for aura / trees)
   y: number; // tile row the thing occupies
   opts?: Record<string, number | string | boolean>;

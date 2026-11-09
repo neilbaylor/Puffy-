@@ -5,7 +5,7 @@ export const LEDGES: { x0: number; x1: number; h: number }[][] = [];
 
 /**
  * World 2 · Plop Invasion · Part 2 — mostly climbing UP (a rough first sketch: the layout and the
- * climbing, to try the camera and the feel; the parachute drops and the baseball game come next).
+ * climbing, the parachute drops, and the baseball game at the bottom of the first drop).
  *
  * Heights are in tiles from the bottom of the level. A jump clears ~3.5 tiles (~5 with the
  * second jump), so the ledges go up 3 at a time.
@@ -13,7 +13,7 @@ export const LEDGES: { x0: number; x1: number; h: number }[][] = [];
  *    0- 41  CLIMB 1: ledges zig-zagging up (and drifting right) from the floor to ~91; a plateau,
  *           checkpoint, a poo goat; then the edge
  *   42- 93  DROP 1 by parachute (a wall at 94-95 keeps you out of climb 2: you land at the bottom),
- *           a short walk right, the ballpark (flat, for now), quicksand poo
+ *           quicksand poo, a checkpoint, then Plop Park (56-92): the Plops playing baseball
  *   96-133  CLIMB 2 (longer): up to ~127, a plateau, checkpoint; the edge
  *  134-147  DROP 2 by parachute (longer, harder: a narrow shaft, more Plops; its far wall rises above
  *           the plateau, so there's no steering over to climb 3 or the gate)
@@ -119,7 +119,7 @@ export function buildLevel4(): LevelData {
   L.auraArc(p1.x0 + 6, 4, p1.h + 3, 1);
   L.rock(40, 41, 5, p1.h); // (a cliff from the floor up to the plateau's end: no walking round the climb)
 
-  // ── DROP 1 (by parachute), the bottom, a short walk right, the ballpark (flat for now) ──
+  // ── DROP 1 (by parachute), the bottom, and Plop Park (the Plops playing baseball) ──
   // the drop: from the plateau's edge down to the floor, x 42..93 (a wall on the far side keeps you
   // out of climb 2 on the way down: you land at the bottom)
   L.spawn('drop', 42, p1.h, { w: 52, speed: 135, n: 11 });
@@ -131,12 +131,10 @@ export function buildLevel4(): LevelData {
   // quicksand poo on the flat stretches at the bottom (never right under a climb: a missed jump
   // shouldn't land you in it)
   L.puddle(47, 50, 4);
-  L.spawn('checkpoint', 60, 4);
-  L.spawn('plop', 70, 4);
-  L.puddle(74, 77, 4);
-  L.spawn('bigplop', 80, 4);
-  L.puddle(87, 90, 4);
-  L.spawn('plop', 92, 4);
+  L.spawn('checkpoint', 53, 4);
+  // Plop Park: in through the outfield (home plate's at the far end, by climb 2); the players are
+  // the bad guys here (pitcher, batter, catcher, three fielders, one on deck)
+  L.spawn('baseball', 56, 4, { w: 36 });
 
   // ── CLIMB 2 (longer) ────────────────────────────────────────
   const t2 = climb(97, 119, 4, 125, 8, [4, 9, 19, 29, 34], [14, 24, 39], 1.9);

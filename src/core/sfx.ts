@@ -100,6 +100,12 @@ export const sfx = {
     noise(0.06, 0.18 * k, 1800, 400);
   },
   /** A rising swoosh (the broadcast wipe). */
+  /** A bat hitting a baseball: a sharp wooden crack. */
+  crack: () => {
+    noise(0.05, 0.4, 6000, 1800);
+    tone({ type: 'square', from: 1300, to: 500, dur: 0.05, vol: 0.12 });
+    tone({ type: 'triangle', from: 420, to: 200, dur: 0.08, vol: 0.18 });
+  },
   whoosh: () => {
     noise(0.5, 0.28, 400, 4200);
     tone({ type: 'sine', from: 90, to: 260, dur: 0.45, vol: 0.12 });

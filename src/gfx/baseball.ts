@@ -428,6 +428,21 @@ export const ROLE_TEAM: Record<BaseballRole, Team> = {
   'bat-stance': 'poos', 'bat-swing': 'poos', 'on-deck': 'poos', runner: 'poos',
 };
 
+/** How far each plain frame's body (and so its head) bobs up or down from standing (see drawPlop). */
+const BOB: Partial<Record<PlopFrame, number>> = { walk0: 1.5, walk1: -3.5, walk2: 1.5, walk3: -3.5, run1: -3, yell1: -3, hurt: 2.5 };
+
+/**
+ * A player in an ordinary frame (walking, yelling, hurt…), still in its team's cap (a batting
+ * helmet for the Poos): for when the game's off and they come after you.
+ */
+export function drawCappedPlop(ctx: Ctx, frame: PlopFrame, kind: PlopKind, team: Team, body?: Fill, seed = 7) {
+  drawPlop(ctx, 0, 0, frame, ST, kind, body);
+  ctx.save();
+  ctx.translate(0, BOB[frame] ?? 0);
+  drawCap(ctx, TEAM[team].cap, seed + 2, team === 'poos');
+  ctx.restore();
+}
+
 /**
  * A Plop playing baseball, in its usual 96 × 104 box (facing right; the batter is drawn flipped,
  * facing the pitcher): cap or helmet, a mitt or the bat, the catcher's mask and pads.
@@ -518,3 +533,34 @@ export function drawBaseballPlop(ctx: Ctx, role: BaseballRole, kind: PlopKind = 
     ctx.stroke();
   }
 }
+
+/** Plop Park's field length (tiles) and its players: who plays what, their size, team and colour. */
+export const BB_FIELD_TILES = 36;
+export interface BBPlayer {
+  key: string;
+  role: BaseballRole;
+  /** The poses it needs (its usual one first). */
+  roles: BaseballRole[];
+  kind: 'small' | 'medium';
+  team: Team;
+  /** Which of PLOP_COLOURS it is. */
+  body: number;
+  /** Room either side of the body in its frames (the batter's swing reaches a long way). */
+  padX: number;
+}
+export const BB_ROSTER: BBPlayer[] = [
+  { key: 'bbp-pitcher', role: 'fielder', roles: ['fielder', 'pitch-windup', 'pitch-throw'], kind: 'small', team: 'plops', body: 1, padX: 16 },
+  { key: 'bbp-batter', role: 'bat-stance', roles: ['bat-stance', 'bat-swing'], kind: 'medium', team: 'poos', body: 2, padX: 40 },
+  { key: 'bbp-catcher', role: 'catcher', roles: ['catcher', 'fielder-throw'], kind: 'small', team: 'plops', body: 3, padX: 16 },
+  { key: 'bbp-f1', role: 'fielder', roles: ['fielder', 'fielder-throw'], kind: 'small', team: 'plops', body: 4, padX: 16 },
+  { key: 'bbp-f2', role: 'fielder', roles: ['fielder', 'fielder-throw'], kind: 'medium', team: 'plops', body: 5, padX: 16 },
+  { key: 'bbp-f3', role: 'fielder', roles: ['fielder', 'fielder-throw'], kind: 'small', team: 'plops', body: 0, padX: 16 },
+  { key: 'bbp-ondeck', role: 'on-deck', roles: ['on-deck'], kind: 'small', team: 'poos', body: 6, padX: 16 },
+];
+/** The players' sheets: each size shown at (× its art), its body (world px), and the sheet's resolution. */
+export const BB_SIZE = { small: { k: 0.42, w: 22, h: 30, res: 1.25 }, medium: { k: 0.74, w: 36, h: 60, res: 1.6 } } as const;
+/** The plain frames on every player's sheet (and the ones that share them). */
+export const BB_PLAIN: PlopFrame[] = ['idle', 'walk0', 'walk1', 'walk2', 'walk3', 'yell0', 'yell1', 'hurt'];
+export const BB_ALIAS: Record<string, PlopFrame> = { idle1: 'idle', blink: 'idle', look: 'idle', grin: 'idle', run0: 'walk1', run1: 'walk3' };
+/** Every texture Plop Park draws (so other levels can free them). */
+export const BB_KEYS = ['bbpark-back', 'bbpark-front', 'bb-ball', 'bb-drive', ...BB_ROSTER.map((r) => r.key)];

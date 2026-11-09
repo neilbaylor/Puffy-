@@ -20,6 +20,7 @@ import { Rocket } from '../entities/Rocket';
 import { SoccerMatch } from '../entities/Soccer';
 import { HockeyMatch } from '../entities/Hockey';
 import { VolleyMatch } from '../entities/Volley';
+import { BaseballGame } from '../entities/Baseball';
 import { soloSource, sourceById } from '../input/devices';
 import type { EnemyKind } from '../level/builder';
 import { levelInfo } from '../level/levels';
@@ -142,6 +143,7 @@ export class GameScene extends Phaser.Scene {
   private matches: SoccerMatch[] = [];
   private hockey: HockeyMatch[] = [];
   private volleys: VolleyMatch[] = [];
+  private ballgames: BaseballGame[] = [];
   /** Bad guys waiting to drop in by parachute (they fall when you get near), and the ones in the air. */
   private paraWaiting: { kind: EnemyKind; x: number; y: number }[] = [];
   private paras: { e: Enemy; chute: Phaser.GameObjects.Image; t: number }[] = [];
@@ -239,6 +241,7 @@ export class GameScene extends Phaser.Scene {
     this.matches = [];
     this.hockey = [];
     this.volleys = [];
+    this.ballgames = [];
     this.paraWaiting = [];
     this.paras = [];
     this.kingAt = null;
@@ -375,6 +378,9 @@ export class GameScene extends Phaser.Scene {
         }
         case 'volley':
           this.volleys.push(new VolleyMatch(this, cx, surface(s.y), Number(s.opts?.w ?? 14)));
+          break;
+        case 'baseball':
+          this.ballgames.push(new BaseballGame(this, s.x * TILE, surface(s.y), Number(s.opts?.w ?? 36)));
           break;
         case 'chase':
           this.chases.push({ x0: s.x * TILE, x1: Number(s.opts?.to ?? s.x + 40) * TILE, speed: Number(s.opts?.speed ?? 1.1), started: false });
@@ -695,6 +701,7 @@ export class GameScene extends Phaser.Scene {
     for (const m of this.matches) m.update(dt);
     for (const h of this.hockey) h.update(dt);
     for (const v of this.volleys) v.update(dt);
+    for (const g of this.ballgames) g.update(dt);
     this.updateParachutes(dt);
     this.updateDrops(dt);
 
@@ -1854,6 +1861,15 @@ export class GameScene extends Phaser.Scene {
         });
       }
     }
+  }
+
+  /** A hero's rocket within r of (x, y), if any (things with no body of their own, like a line drive). */
+  rocketAt(x: number, y: number, r: number): Rocket | null {
+    for (const o of this.gRockets.getChildren()) {
+      const rk = o as Rocket;
+      if (rk.active && Phaser.Math.Distance.Between(rk.x, rk.y, x, y) < r) return rk;
+    }
+    return null;
   }
 
   nearestPlayer(x: number, y: number): Player | null {
