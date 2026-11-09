@@ -23,7 +23,7 @@ const tag = process.argv[2] || 'a';
     g.chuteDrops.forEach((q) => (q.n = 0));
     const bg = g.ballgames[0];
     window.__bg = bg;
-    pl.body.reset(53 * 32, bg.ground - 30);
+    pl.body.reset(bg.x0 - 3 * 32, bg.ground - 30);
     window.__btn = { left: false, right: false, jump: false, fire: false, run: false };
     pl.input = { ...pl.input, id: 'bot', poll: () => ({ ...window.__btn }) };
     window.__hits = 0;
