@@ -1589,6 +1589,11 @@ export class WrestleScene extends Phaser.Scene {
       c.swing = 0;
       c.hit = false;
       if (inReach && gap < 20) p.facing = toward;
+      // (one of his Plops right next to you, and nothing else in reach: turn to it)
+      else if (!inReach) {
+        const m = this.minionsInChairReach(LEN, true)[0];
+        if (m) p.facing = (Math.sign(m.spr.x - p.x) || p.facing) as Side;
+      }
       sfx.whoosh();
     }
     if (c.swing >= 0) {
@@ -1603,6 +1608,16 @@ export class WrestleScene extends Phaser.Scene {
       if (!c.hit && c.a > -0.75) {
         c.hit = true;
         if (inReach && toward === p.facing && this.chairHit()) return;
+        // his Plops: the chair comes down in front of you right to the floor, so even the little ones get it
+        const whacked = this.minionsInChairReach(LEN, false);
+        if (whacked.length) {
+          sfx.clank();
+          this.cameras.main.shake(140, 0.006);
+          for (const m of whacked) {
+            this.fx.stars(m.spr.x, m.spr.y - 10, 5);
+            this.hitMinion(m, 2);
+          }
+        }
       }
       if (t > UP + DOWN + 0.04) {
         // (a very short breather before the next swing: not rapid fire)
@@ -2661,6 +2676,19 @@ export class WrestleScene extends Phaser.Scene {
     // all of them done (and he's still up there): back he comes
     const q = this.queen;
     if (!this.minions.length && q.mode === 'away' && !this.ended && !q.spr.visible) void this.kingReturn();
+  }
+
+  /** His Plops a chair swing reaches: in front of you (or `either` side), from head height right down to the floor. */
+  private minionsInChairReach(len: number, either: boolean) {
+    const p = this.player;
+    return this.minions.filter((m) => {
+      if (m.dead || m.chute) return false;
+      const b = m.spr.body as Phaser.Physics.Arcade.Body;
+      const dx = b.center.x - p.x;
+      const ahead = either || Math.sign(dx) === p.facing || Math.abs(dx) < 12;
+      const gap = Math.abs(dx) - b.halfWidth - p.body.halfWidth;
+      return ahead && gap < len * 1.05 && b.top < p.bottom + 12 && b.bottom > p.body.top - len * 0.7;
+    });
   }
 
   private hitMinion(m: Minion, n: number) {
