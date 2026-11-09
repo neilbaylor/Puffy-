@@ -18,7 +18,7 @@ import type { GameData, GameOverState, GameScene, HudState, ResultState } from '
 import { TouchControls } from './touchControls';
 import { drawNuggie, drawRootBeer } from '../gfx/collectibles';
 import { VERSION } from '../version';
-import { LEVELS, canPickLevel, setTester, latestLevel, levelInfo, levelName, pickableLevels, progress } from '../level/levels';
+import { LEVELS, canPickLevel, isTester, setTester, latestLevel, levelInfo, levelName, pickableLevels, progress } from '../level/levels';
 import { account } from '../core/account';
 import { bossData } from '../scenes/WrestleScene';
 
@@ -978,8 +978,8 @@ export class UI {
   /** (Temporary, for testing) straight into the Queen Plop fight with the picked hero. */
   /** The Bosses menu: fight the boss of any level you've beaten, straight away (as practice). */
   private showBosses() {
-    // (and the work-in-progress levels' bosses, for the testers)
-    const open = BOSSES.filter((b) => progress.beaten >= b.level || LEVELS.some((l) => l.wip && l.id === b.level));
+    // (the testers get every boss)
+    const open = BOSSES.filter((b) => progress.beaten >= b.level || isTester());
     const el = h(`<div class="screen modal bosses">
       <div class="panel boss-panel">
         <h2>Boss Battles</h2>
