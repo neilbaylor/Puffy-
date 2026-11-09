@@ -38,6 +38,16 @@ export const LEVELS: LevelInfo[] = [
     speech: 'Oh no, the Plops have taken over Puff Ball Planet!',
     wrestle: true,
   },
+  {
+    id: 4,
+    world: 'World 2',
+    title: 'Plop Invasion',
+    part: 'Part 2',
+    button: 'Part 4',
+    build: buildLevel4,
+    speech: 'I guess up we go!',
+    wrestle: true,
+  },
 ];
 
 /**
@@ -55,29 +65,22 @@ export const DEV = (() => {
     return /[?&]dev\b/.test(location.search);
   }
 })();
-/** Accounts that get the work-in-progress levels (names, any case). */
+/** Accounts that get the work-in-progress levels (names, any case), and every boss in the Bosses menu. */
 const TESTERS = ['neil', 'founder'];
-const WIP: LevelInfo[] = [
-  {
-    id: 4,
-    world: 'World 2',
-    title: 'Plop Invasion',
-    part: 'Part 2',
-    button: 'Part 4',
-    build: buildLevel4,
-    speech: 'I guess up we go!',
-    wrestle: true,
-    wip: true,
-  },
-];
+/** Levels still being made: only testers see them (none right now: Part 4 is open to everyone since v0.195). */
+const WIP: LevelInfo[] = [];
+let tester = false;
+/** A tester's signed in (or this is a dev device). */
+export const isTester = () => tester;
 /**
  * Show the work-in-progress levels or not (dev devices always; otherwise whether a tester is signed
  * in — called on sign-in and sign-out). True if that changed the list.
  */
 export function setTester(name: string | null | undefined): boolean {
   const on = DEV || TESTERS.includes((name ?? '').trim().toLowerCase());
+  tester = on;
   const has = LEVELS.some((l) => l.wip);
-  if (on === has) return false;
+  if (on === has || !WIP.length) return false;
   if (on) LEVELS.push(...WIP);
   else LEVELS.splice(0, LEVELS.length, ...LEVELS.filter((l) => !l.wip));
   return true;
