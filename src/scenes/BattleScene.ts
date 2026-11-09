@@ -15,7 +15,7 @@ import { CHAIR_H, CHAIR_W, drawFoldingChair } from '../gfx/wrestle';
 import { W_RES } from '../gfx/weapons';
 import { soloSource } from '../input/devices';
 import type { BattleNet, Snapshot } from '../net/battleNet';
-import { ARENA_RAMPS, ARENA_SECTION, buildArena } from '../shared/battle/arena';
+import { ARENA_RAMPS, ARENA_VIEW, buildArena } from '../shared/battle/arena';
 import { SLOT_COLORS, type SnapChair, type SnapEnemy, type SnapHazard, type SnapPlayer } from '../shared/battle/protocol';
 import { ArenaMap, BTN, CHAIR_LIFE, CHAIR_SWING, DT, TILE_PX, ENEMY_BOX, HEARTS, POWER, PRIZE_LIFE, landingY, sizeOf, stepMove, type BEvent, type BPlayer, type EnemyKind, type PrizeKind, type RocketKind } from '../shared/battle/sim';
 import { Background } from '../world/Background';
@@ -418,7 +418,7 @@ export class BattleScene extends Phaser.Scene {
     // (the empty sky above the highest cloud is trimmed off, so the heroes are bigger)
     const SKY = 56;
     // (one screen of the arena: it's four screens wide, and the camera follows)
-    const zoom = Math.min(W / (ARENA_SECTION * TILE_PX), H / (this.map.heightPx - SKY));
+    const zoom = Math.min(W / (ARENA_VIEW * TILE_PX), H / (this.map.heightPx - SKY));
     this.fitZoom = zoom;
     cam.setZoom(zoom);
     cam.centerOn(this.camC?.x ?? this.map.widthPx / 2, (this.map.heightPx + SKY) / 2);
