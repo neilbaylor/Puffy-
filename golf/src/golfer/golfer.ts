@@ -64,6 +64,9 @@ export class Golfer {
   private pelvisBase = new THREE.Vector3();
   readonly clubHeadWorld = new THREE.Vector3();
   readonly lefty: boolean;
+  private smile = 0;
+  /** ease the face toward a smile (1) or neutral (0) */
+  smileToward(target: number, dt: number) { this.smile += (target - this.smile) * (1 - Math.exp(-dt * 5)); this.body.setSmile(this.smile); }
 
   constructor(readonly profile: GolferProfile) {
     this.k = profile.heightM / 1.905;

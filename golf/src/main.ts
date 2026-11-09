@@ -293,6 +293,10 @@ function frame(now: number) {
   }
   golfer.update({ phase: G.phase, phi: G.phi, topPhi: G.phase === 'back' ? Math.max(G.phi, 0.01) : G.topPhi, idleT: G.idleT, lookAt: state === 'intro' ? camera.position : undefined });
 
+  // face: smile on the intro, and after a good shot
+  const good = state === 'result' && !!plan && plan.tempoWord === 'Smooth' && Math.abs(ball.offline() / YD) < 10;
+  golfer.smileToward(state === 'intro' || good ? 1 : 0, dt);
+
   // swing pad
   if (SW.active || SW.trailB.length) hud.setPad(SW.active ? SW.last : [0, 0], SW.trailB, SW.trailD, SW.active && SW.phase === 'back' && G.arrived !== null && SW.depth > 12);
 

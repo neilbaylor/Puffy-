@@ -183,12 +183,12 @@ function weldNormals(g: THREE.BufferGeometry) {
   }
 }
 
-interface HeadParts { head: THREE.Mesh; hair: THREE.Mesh; ears: THREE.Mesh }
+interface HeadParts { head: THREE.Mesh; hair: THREE.Mesh; ears: THREE.Mesh; setSmile: (v: number) => void }
 
 /** Unit-sphere direction of a facial feature → texture coordinates used by the face map. */
 const faceUV = (x: number, y: number) => { const z = Math.sqrt(Math.max(0, 1 - x * x - y * y)); return [0.5 + Math.atan2(x, z) / (2 * Math.PI), 0.5 + Math.asin(y) / Math.PI]; };
 
-function sculpt(x: number, y: number, z: number, L: GolferProfile['look'], out: THREE.Vector3) {
+function sculpt(x: number, y: number, z: number, L: GolferProfile['look'], out: THREE.Vector3, smile = 0) {
   const fl = L.faceLength;
   let px = x * 0.0745, py = y * 0.118 * fl, pz = z * 0.099;
   const front = smooth(0.15, 0.7, z), back = smooth(0.05, -0.6, z);
@@ -232,6 +232,16 @@ function sculpt(x: number, y: number, z: number, L: GolferProfile['look'], out: 
     fz(0.0045 * gauss((y + 0.575) / 0.05) * gauss(x / 0.25));
     fz(-0.0032 * gauss((y + 0.522) / 0.016) * gauss(x / 0.3));
     fz(-0.0018 * gauss((y + 0.68) / 0.06) * gauss(x / 0.3)); // under the lower lip
+    if (smile > 0) {
+      for (const s of [-1, 1]) {
+        const corner = gauss((x - s * 0.31) / 0.1) * gauss((y + 0.52) / 0.08) * front;
+        py += 0.0042 * smile * corner; pz -= 0.0022 * smile * corner; px += s * 0.0018 * smile * corner; // corners up and back
+        const cheek = gauss((x - s * 0.46) / 0.17) * gauss((y + 0.24) / 0.16) * front;
+        py += 0.0024 * smile * cheek; pz += 0.0024 * smile * cheek;                                      // apple of the cheek rises
+        py += 0.0012 * smile * gauss((x - s * 0.36) / 0.12) * gauss((y + 0.03) / 0.05) * front;       // lower lid lifts: smiling eyes
+      }
+      py -= 0.0016 * smile * gauss(x / 0.22) * gauss((y + 0.6) / 0.07) * front;                       // lower lip drops a touch
+    }
   }
   out.set(px, py, pz);
 }
@@ -244,7 +254,7 @@ function hairElevation(az: number, hairline: number) {
   return -0.6;
 }
 
-function faceTexture(L: GolferProfile['look']) {
+function faceTexture(L: GolferProfile['look'], smile = false) {
   const W = 2048, H = 1024;
   seed = 11;
   return canvasTex(W, H, g => {
@@ -259,7 +269,7 @@ function faceTexture(L: GolferProfile['look']) {
       g.save(); g.translate(cx, cy); g.scale(1, ry / rx); g.translate(-cx, -cy); g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, rx * scaleX, 0, 7); g.fill(); g.restore();
     };
     const warm = new THREE.Color(L.skinWarm), wc = `rgb(${Math.round(warm.r * 255)},${Math.round(warm.g * 255)},${Math.round(warm.b * 255)})`;
-    blush(-0.5, -0.18, 0.26, 0.18, wc, 0.16); blush(0.5, -0.18, 0.26, 0.18, wc, 0.16);
+    blush(-0.5, -0.18, 0.26, 0.18, wc, smile ? 0.24 : 0.16); blush(0.5, -0.18, 0.26, 0.18, wc, smile ? 0.24 : 0.16);
     blush(0, -0.22, 0.09, 0.09, wc, 0.22); blush(0, 0.42, 0.4, 0.14, wc, 0.08);
     // ears are on the sides
     for (const s of [-1, 1]) { const cx = (0.5 + s * 0.25) * W, cy = 0.52 * H; const gr = g.createRadialGradient(cx, cy, 0, cx, cy, 70); gr.addColorStop(0, wc.replace(')', ',.45)').replace('rgb', 'rgba')); gr.addColorStop(1, wc.replace(')', ',0)').replace('rgb', 'rgba')); g.fillStyle = gr; g.fillRect(cx - 80, cy - 80, 160, 160); }
@@ -293,8 +303,27 @@ function faceTexture(L: GolferProfile['look']) {
     }
     // lips
     const lip = (yc: number, h: number, a: number) => { const [cx, cy] = P(0, yc); g.save(); g.translate(cx, cy); g.scale(1, h); const gr = g.createRadialGradient(0, 0, 0, 0, 0, 0.25 * scaleX); const lc = new THREE.Color(L.lips); const rgb = `${Math.round(lc.r * 255)},${Math.round(lc.g * 255)},${Math.round(lc.b * 255)}`; gr.addColorStop(0, `rgba(${rgb},${a})`); gr.addColorStop(0.7, `rgba(${rgb},${a * 0.8})`); gr.addColorStop(1, `rgba(${rgb},0)`); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, 0.25 * scaleX, 0, 7); g.fill(); g.restore(); };
-    lip(-0.48, 0.12, 0.5); lip(-0.565, 0.18, 0.55);
-    { const [x0, y0] = P(-0.3, -0.525), [x1] = P(0.3, -0.525), [, yc] = P(0, -0.522); g.strokeStyle = 'rgba(90,45,40,.6)'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(x0, y0 - 2); g.quadraticCurveTo((x0 + x1) / 2, yc + 4, x1, y0 - 2); g.stroke(); }
+    if (!smile) {
+      lip(-0.48, 0.12, 0.5); lip(-0.565, 0.18, 0.55);
+      const [x0, y0] = P(-0.3, -0.525), [x1] = P(0.3, -0.525), [, yc] = P(0, -0.522); g.strokeStyle = 'rgba(90,45,40,.6)'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(x0, y0 - 2); g.quadraticCurveTo((x0 + x1) / 2, yc + 4, x1, y0 - 2); g.stroke();
+    } else {
+      // an open, friendly smile: thin upper lip, a row of teeth, fuller lower lip
+      lip(-0.47, 0.09, 0.45); lip(-0.585, 0.15, 0.5);
+      const [lx, ly] = P(-0.31, -0.51), [rx] = P(0.31, -0.51), [, top] = P(0, -0.49), [, bot] = P(0, -0.572), [cx] = P(0, -0.52);
+      g.save();
+      g.beginPath(); g.moveTo(lx, ly); g.quadraticCurveTo(cx, top - 6, rx, ly); g.quadraticCurveTo(cx, bot + 10, lx, ly); g.closePath();
+      g.fillStyle = '#3a1d1a'; g.fill(); g.clip();
+      const tg = g.createLinearGradient(0, top, 0, bot); tg.addColorStop(0, '#f4efe6'); tg.addColorStop(0.75, '#e6ddd0'); tg.addColorStop(1, '#b9a99a');
+      g.fillStyle = tg; g.beginPath(); g.moveTo(lx + 10, ly - 1); g.quadraticCurveTo(cx, top - 4, rx - 10, ly - 1); g.quadraticCurveTo(cx, bot - 2, lx + 10, ly - 1); g.fill();
+      g.strokeStyle = 'rgba(150,130,115,.45)'; g.lineWidth = 1.2;
+      for (let i = -4; i <= 4; i++) { const tx = cx + i * 14 * (1 + Math.abs(i) * 0.05); g.beginPath(); g.moveTo(tx, top); g.lineTo(tx, top + 26); g.stroke(); }
+      const sh = g.createLinearGradient(lx, 0, rx, 0); sh.addColorStop(0, 'rgba(40,20,18,.75)'); sh.addColorStop(0.18, 'rgba(40,20,18,0)'); sh.addColorStop(0.82, 'rgba(40,20,18,0)'); sh.addColorStop(1, 'rgba(40,20,18,.75)');
+      g.fillStyle = sh; g.fillRect(lx, top - 10, rx - lx, bot - top + 20);
+      g.restore();
+      g.strokeStyle = 'rgba(110,60,52,.5)'; g.lineWidth = 2; g.beginPath(); g.moveTo(lx, ly); g.quadraticCurveTo(cx, top - 6, rx, ly); g.stroke();
+      // smile lines from the nose to the mouth corners
+      for (const s2 of [-1, 1]) { const [ax, ay] = P(s2 * 0.15, -0.32), [bx, by] = P(s2 * 0.31, -0.5); g.strokeStyle = 'rgba(120,70,60,.28)'; g.lineWidth = 3; g.beginPath(); g.moveTo(ax, ay); g.quadraticCurveTo(ax + s2 * 28, (ay + by) / 2, bx, by); g.stroke(); }
+    }
     // nostrils
     for (const s of [-1, 1]) { const [cx, cy] = P(s * 0.085, -0.335); g.fillStyle = 'rgba(70,35,30,.55)'; g.beginPath(); g.ellipse(cx, cy, 9, 5, s * 0.4, 0, 7); g.fill(); }
     // eyes: almond shaped, a little hooded, blue-grey irises
@@ -309,7 +338,7 @@ function faceTexture(L: GolferProfile['look']) {
     };
     for (const s of [-1, 1]) {
       const [cx, cy] = P(s * 0.36, 0.055);
-      const ew = 0.118 * scaleX, eh = 0.043 * scaleY;
+      const ew = 0.118 * scaleX, eh = (smile ? 0.034 : 0.043) * scaleY;
       // socket shading and the hooded fold above the lid
       blush(s * 0.36, 0.1, 0.17, 0.07, 'rgb(120,78,68)', 0.2);
       g.save(); almond(cx, cy, ew, eh, s); g.clip();
@@ -356,11 +385,27 @@ function buildHead(p: GolferProfile, skinMat: THREE.Material): HeadParts {
   const pos = geo.getAttribute('position') as THREE.BufferAttribute;
   const unit = pos.clone();
   const o = new THREE.Vector3();
-  for (let i = 0; i < pos.count; i++) { sculpt(pos.getX(i), pos.getY(i), pos.getZ(i), L, o); pos.setXYZ(i, o.x, o.y, o.z); }
+  const smileDelta = new Float32Array(pos.count * 3), o2 = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    sculpt(x, y, z, L, o); sculpt(x, y, z, L, o2, 1);
+    smileDelta.set([o2.x - o.x, o2.y - o.y, o2.z - o.z], i * 3);
+    pos.setXYZ(i, o.x, o.y, o.z);
+  }
   geo.computeVertexNormals(); weldNormals(geo);
+  geo.morphAttributes.position = [new THREE.BufferAttribute(smileDelta, 3)];
+  geo.morphTargetsRelative = true;
   const mat = (skinMat as THREE.MeshPhysicalMaterial).clone();
   mat.map = faceTexture(L);
   mat.color.set('#ffffff');
+  // the smile: a second face map blended in the shader, plus the morph above
+  const smileU = { value: 0 }, smileMap = { value: faceTexture(L, true) };
+  mat.onBeforeCompile = sh => {
+    sh.uniforms.uSmile = smileU; sh.uniforms.smileMap = smileMap;
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uSmile;\nuniform sampler2D smileMap;')
+      .replace('#include <map_fragment>', '#ifdef USE_MAP\n vec4 sampledDiffuseColor = mix(texture2D(map, vMapUv), texture2D(smileMap, vMapUv), uSmile);\n diffuseColor *= sampledDiffuseColor;\n#endif');
+  };
+  mat.customProgramCacheKey = () => 'face-smile';
   mat.roughness = 1;
   mat.roughnessMap = canvasTex(1024, 512, g => {
     const W = 1024, H = 512, P = (x: number, y: number) => { const [u, v] = faceUV(x, y); return [u * W, (1 - v) * H]; };
@@ -433,7 +478,9 @@ function buildHead(p: GolferProfile, skinMat: THREE.Material): HeadParts {
   }
   const earMat = (skinMat as THREE.MeshPhysicalMaterial).clone(); earMat.color.set(L.skinWarm).lerp(new THREE.Color(L.skin), 0.55);
   const earMesh = new THREE.Mesh(mergeGeometries(ears), earMat);
-  return { head, hair, ears: earMesh };
+  const setSmile = (v: number) => { smileU.value = v; head.morphTargetInfluences![0] = v; };
+  head.updateMorphTargets();
+  return { head, hair, ears: earMesh, setSmile };
 }
 
 // ───────────────────────── shoes ─────────────────────────
@@ -464,6 +511,8 @@ export interface Body {
   skel: Skeleton;
   meshes: THREE.Object3D[];
   materials: { skin: THREE.MeshPhysicalMaterial; glove: THREE.MeshStandardMaterial };
+  /** 0 = neutral, 1 = smiling */
+  setSmile: (v: number) => void;
 }
 
 export function buildBody(p: GolferProfile): Body {
@@ -600,5 +649,5 @@ export function buildBody(p: GolferProfile): Body {
   }
 
   const glove = new THREE.MeshStandardMaterial({ color: p.outfit.glove, roughness: 0.55 });
-  return { root, bones, skel: S, meshes, materials: { skin: skinMat, glove } };
+  return { root, bones, skel: S, meshes, materials: { skin: skinMat, glove }, setSmile: hp.setSmile };
 }

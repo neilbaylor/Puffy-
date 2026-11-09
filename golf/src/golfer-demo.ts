@@ -36,6 +36,7 @@ const poses: Record<string, any> = {
   through: { phase: 'follow', phi: PHI_FINISH * 0.3 },
   finish: { phase: 'follow', phi: PHI_FINISH },
 };
+golfer.body.setSmile(+(q.get('smile') ?? 0));
 const ps = poses[q.get('pose') ?? 'address'];
 if (ps) golfer.update({ topPhi: PHI_TOP, idleT: 0, ...ps });
 else { golfer.body.bones.forEach((b, i) => { b.quaternion.identity(); if (i === 1) b.position.copy(golfer.body.skel.joint[1]); }); golfer.club.group.visible = false; golfer.root.updateMatrixWorld(true); }
