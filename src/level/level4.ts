@@ -34,9 +34,10 @@ export function buildLevel4(): LevelData {
    * up and across one way (a 1–2 tile gap between them: an easy jump), then three back the other
    * way — drifting right by `drift` tiles over the climb. Nothing is ever right over the ledge
    * you're on (no bonking your head on the second jump). Every fifth ledge is a wide one (a
-   * breather: nuggies, sometimes a bad guy or a poo goat). Returns the top ledge.
+   * breather: nuggies, sometimes a bad guy or a poo goat). `nuggies` scales how often a nuggie sits
+   * on an ordinary ledge or a turn (the dice are rolled either way: the layout doesn't change). Returns the top ledge.
    */
-  const climb = (x0: number, x1: number, h0: number, h1: number, drift: number, plops: number[] = [], goats: number[] = []) => {
+  const climb = (x0: number, x1: number, h0: number, h1: number, drift: number, plops: number[] = [], goats: number[] = [], nuggies = 1) => {
     const list: { x0: number; x1: number; h: number }[] = [];
     LEDGES.push(list);
     let top = { x0: x0, x1: x0 + 3, h: h0 };
@@ -62,7 +63,7 @@ export function buildLevel4(): LevelData {
         L.cloud(ca, cw, h);
         top = { x0: ca, x1: ca + cw - 1, h };
         list.push(top);
-        if (r() < 0.4) L.aura(ca + cw / 2, h + 3);
+        if (r() < 0.4 * nuggies) L.aura(ca + cw / 2, h + 3);
         continue;
       }
       run++;
@@ -77,7 +78,7 @@ export function buildLevel4(): LevelData {
         L.auraArc(a + 1, 3, h + 3, 1);
         if (plops.includes(i)) L.spawn(i % 3 === 0 ? 'bigplop' : 'plop', a + Math.floor(w / 2), h);
         if (goats.includes(i)) L.spawn('poogoat', b - 1, h);
-      } else if (r() < 0.25) L.aura((a + b) / 2, h + 3);
+      } else if (r() < 0.25 * nuggies) L.aura((a + b) / 2, h + 3);
     }
     return top;
   };
@@ -122,8 +123,8 @@ export function buildLevel4(): LevelData {
   // the drop: from the plateau's edge down to the floor, x 42..93 (a wall on the far side keeps you
   // out of climb 2 on the way down: you land at the bottom)
   L.spawn('drop', 42, p1.h, { w: 52, speed: 135, n: 11 });
-  // nuggies floating in the air down the drop: steer over to grab them on the way down
-  for (const [x, h] of [[50, 82], [62, 72], [54, 62], [70, 52], [60, 42], [78, 32], [66, 22]] as const) L.auraArc(x, 3, h, 0.6);
+  // nuggies floating in the air down the drop: steer over to grab them on the way down (a few, not a trail)
+  for (const [x, h] of [[52, 80], [68, 60], [58, 40], [74, 24]] as const) L.auraArc(x, 2, h, 0.6);
   L.rock(94, 95, 16, p1.h + 6);
   L.ground(42, 133, 4); // (on under climb 2 too)
   L.auraArc(55, 3, 7, 1);
@@ -138,7 +139,7 @@ export function buildLevel4(): LevelData {
   L.spawn('plop', 92, 4);
 
   // ── CLIMB 2 (longer) ────────────────────────────────────────
-  const t2 = climb(97, 119, 4, 125, 8, [4, 9, 19, 29, 34], [14, 24, 39]);
+  const t2 = climb(97, 119, 4, 125, 8, [4, 9, 19, 29, 34], [14, 24, 39], 1.9);
   for (const [x, h, k] of [[106, 20, 'plop'], [114, 38, 'plop'], [108, 55, 'bigplop'], [118, 72, 'plop'], [110, 90, 'plop'], [120, 108, 'bigplop']] as const)
     L.spawn('para', x, h, { kind: k });
   const p2 = plateau(t2, 133, LEDGES[1]);
@@ -149,7 +150,7 @@ export function buildLevel4(): LevelData {
   // ── DROP 2 (longer, harder: a narrow shaft, more Plops), then CLIMB 3 to the gate ──
   // (the shaft's far wall reaches well above the plateau: no steering over to climb 3 or the gate)
   L.spawn('drop', 134, p2.h, { w: 14, speed: 150, n: 12, hard: 1 });
-  for (const [x, h] of [[136, 116], [143, 102], [137, 88], [143, 74], [136, 60], [142, 46], [137, 32]] as const) L.auraArc(x, 3, h, 0.6);
+  for (const [x, h] of [[137, 112], [143, 88], [137, 62], [142, 36]] as const) L.auraArc(x, 2, h, 0.6);
   L.rock(148, 149, 18, p2.h + 6);
   L.ground(134, W - 1, 10);
   L.puddle(137, 140, 10);
