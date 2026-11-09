@@ -39,7 +39,7 @@ export const TABLE: [number, number, number] = [-150, -20, 600];
 /** The poo puddle on the mat (stage x of its middle, half-width). */
 export const PUDDLE = { x: 1040, w: 100 };
 /** The tunnel out of the stands (top of an aisle), and where the King sits in the front row. */
-export const TUNNEL = { x: 470, top: 222, bottom: 297 };
+export const TUNNEL = { x: 470, top: 202, bottom: 297, half: 40 };
 export const KING_SEAT = { x: 520, feet: 300 };
 
 export const STEEL: Fill = { base: '#3b3530', shade: '#1d1915', light: '#6d655c' };
@@ -321,17 +321,30 @@ export function drawArenaPoo(ctx: Ctx) {
 export function drawTunnel(ctx: Ctx) {
   ctx.save();
   ctx.translate(STAGE_OX, STAGE_OY);
-  const { x, top, bottom } = TUNNEL;
-  ctx.fillStyle = '#050302';
+  const { x, top, bottom, half: w } = TUNNEL;
+  // the doorway (big enough for a King to stand in), a little warm light from inside on its floor
+  const inside = ctx.createLinearGradient(0, top, 0, bottom);
+  inside.addColorStop(0, '#050302');
+  inside.addColorStop(0.7, '#0c0704');
+  inside.addColorStop(1, '#2a180c');
+  ctx.fillStyle = inside;
   ctx.beginPath();
-  ctx.moveTo(x - 24, bottom);
-  ctx.lineTo(x - 24, top + 14);
-  ctx.quadraticCurveTo(x, top, x + 24, top + 14);
-  ctx.lineTo(x + 24, bottom);
+  ctx.moveTo(x - w, bottom);
+  ctx.lineTo(x - w, top + 20);
+  ctx.quadraticCurveTo(x, top - 4, x + w, top + 20);
+  ctx.lineTo(x + w, bottom);
   ctx.fill();
   ctx.strokeStyle = '#3b3530';
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 4;
   ctx.stroke();
+  // the step out of it: a concrete landing at the top of the aisle (where he stands)
+  ctx.fillStyle = '#4a423b';
+  ctx.fillRect(x - w - 26, bottom - 4, (w + 26) * 2, 9);
+  ctx.fillStyle = '#7a7068';
+  ctx.fillRect(x - w - 26, bottom - 4, (w + 26) * 2, 2);
+  ctx.strokeStyle = '#1d1915';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(x - w - 26, bottom - 4, (w + 26) * 2, 9);
   ctx.fillStyle = '#1d6b2a';
   ctx.fillRect(x - 15, top - 14, 30, 11);
   ctx.fillStyle = '#eafff0';
