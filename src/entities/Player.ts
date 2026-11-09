@@ -511,7 +511,8 @@ export class Player {
     const away = Math.sign(this.x - fromX) || -this.facing;
     // heavy heroes (Big Muscles) barely budge
     const k = this.char.knockback ?? 1;
-    this.body.setVelocity(away * 240 * k, -360 * (0.5 + 0.5 * k));
+    // (under a parachute: knocked sideways, hardly up — so the nuggies you drop are still below you to catch)
+    this.body.setVelocity(away * 240 * k, this.chute ? -60 : -360 * (0.5 + 0.5 * k));
     this.scene.cameras.main.shake(120, 0.004);
   }
 

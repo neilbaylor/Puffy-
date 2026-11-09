@@ -1073,7 +1073,9 @@ export class GameScene extends Phaser.Scene {
     if (!p.alive || p.invulnerable) return;
     if (this.aura > 0) {
       const n = Math.min(this.aura, SCATTER_MAX);
-      for (let i = 0; i < n; i++) this.addAura(new Aura(this, p.x, p.y - 10, true)); // nuggies scatter (grab some back!)
+      // nuggies scatter (grab some back!) — under a parachute they float down with you instead of dropping
+      const float = p.chute ? p.chute.speed : 0;
+      for (let i = 0; i < n; i++) this.addAura(new Aura(this, p.x, p.y - 10, true, float));
       this.aura = 0;
       p.knockBack(fromX);
       this.fx.auraSparkle(p.x, p.y, 14);
