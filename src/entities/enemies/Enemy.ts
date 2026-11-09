@@ -297,8 +297,17 @@ export class BigPuff extends Walker {
     const dx = tgt ? tgt.x - this.x : 0;
     const dy = tgt ? tgt.bottom - b.bottom : 0;
     const sees = !!tgt && tgt.alive && Math.abs(dx) < 340 && dy > -170 && dy < 150;
-    if (!sees) {
+    // (on a climb he only hunts you on his own ledge: with you on one above or below he keeps on
+    // patrolling his, rather than shadowing your every step from its edge and blocking your way up)
+    const vertical = !!this.gs.level.data.vertical;
+    const sameLedge = !vertical || (dy > -50 && dy < 40);
+    if (!sees || (!sameLedge && !(this.weapon?.kind === 'gun' && this.weapon.aim))) {
       if (onGround) super.tick();
+      // (in the air — floating down on a parachute — he still turns to face you: a gunner aims either way)
+      else if (tgt && tgt.alive && Math.abs(dx) < 500) {
+        this.dir = Math.sign(dx) || this.dir;
+        this.setFlipX(this.dir > 0);
+      }
       return;
     }
     if (!this.noticed) {
@@ -318,6 +327,8 @@ export class BigPuff extends Walker {
       return;
     }
     if (!onGround) {
+      this.dir = Math.sign(dx) || this.dir;
+      this.setFlipX(this.dir > 0);
       this.setFrame(this.mad ? 'm1' : 'w1');
       return;
     }
