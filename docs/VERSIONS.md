@@ -210,3 +210,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.205: the Plop King walks in calmer and round the ring (not over its corner) to stop past the hero; 16 hits (off every 4); 3 of each kind of Plop, and fiercer.
 - v0.206: Level 4: fewer nuggies in the parachute drops (8 each), a few more on climb 2.
 - v0.207: the Plop King's first wave is 5 small Plops.
+- v0.208: the Plop King intro opens on him (about a second) before going up to the jumbotron.
