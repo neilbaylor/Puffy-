@@ -15,6 +15,13 @@ export interface Look {
   earOut: number;     // how far the ears stand out
 }
 
+export interface Headwear {
+  kind: 'visor';
+  color: string;      // crown band and top of the brim
+  under: string;      // underside of the brim
+  logo: 'pizza-hut' | null;
+}
+
 export interface Outfit {
   top: 'hoodie' | 'polo';
   topColor: string;
@@ -24,7 +31,7 @@ export interface Outfit {
   shoes: string;
   shoeTrim: string;
   glove: string;
-  cap: string | null;
+  headwear: Headwear | null;
 }
 
 export interface SwingStyle {
@@ -47,7 +54,7 @@ export interface GolferProfile {
 
 // Player 1. Left-handed, 6'3", 180 lb: tall and lean.
 // Short dark-brown hair a little high at the temples, blue-grey eyes, light stubble, long lean face,
-// strong straight nose. Golf hoodie in heather grey, like the photos.
+// strong straight nose. Golf hoodie in heather grey, like the photos, and a retro Pizza Hut tour visor.
 export const NEIL: GolferProfile = {
   id: 'neil',
   name: 'Neil',
@@ -76,7 +83,7 @@ export const NEIL: GolferProfile = {
     shoes: '#f3f2ee',
     shoeTrim: '#b3262e',
     glove: '#f6f5f1',
-    cap: null,
+    headwear: { kind: 'visor', color: '#f3efe4', under: '#24382b', logo: 'pizza-hut' },
   },
   swing: { tempo: 0.95, length: 1.0, finishHigh: 1.0, waggle: true },
 };

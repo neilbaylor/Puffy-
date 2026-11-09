@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { GolferProfile } from './profile';
+import { buildVisor } from './headwear';
 
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 const smooth = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -558,6 +559,7 @@ export function buildBody(p: GolferProfile): Body {
   const attach = (bi: number, obj: THREE.Object3D, at: THREE.Vector3) => { obj.position.sub(S.joint[bi]).add(at); bones[bi].add(obj); obj.traverse(o => { if ((o as THREE.Mesh).isMesh) { o.castShadow = true; o.receiveShadow = true; } }); meshes.push(obj); };
   const hp = buildHead(p, skinMat);
   const headGroup = new THREE.Group(); headGroup.add(hp.head, hp.hair, hp.ears); headGroup.scale.setScalar(k);
+  if (p.outfit.headwear?.kind === 'visor') headGroup.add(buildVisor(p.outfit.headwear, 0.0785, 0.1, 0.006, 0.06 * p.look.faceLength, p.handed === 'left'));
   attach(BONE.head, headGroup, S.headCenter);
 
   // hood bunched at the back of the neck + drawstrings + chest emblem (chest bone)
