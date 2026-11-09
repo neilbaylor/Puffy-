@@ -282,6 +282,18 @@ class Room {
     this.broadcastRoom();
   }
 
+  /** Something went wrong mid-battle: end it (everyone back to the lobby) rather than freeze. */
+  recover() {
+    this.sim = null;
+    this.phase = 'lobby';
+    this.timer = 0;
+    for (const c of this.clients.values()) {
+      c.playing = false;
+      c.queue = [];
+    }
+    this.broadcastRoom();
+  }
+
   tick() {
     const now = Date.now();
     const hold = (this.phase === 'battle' ? REJOIN_SECS : LOBBY_REJOIN_SECS) * 1000;
@@ -454,7 +466,20 @@ export function attachBattle(server: Server) {
     last = now;
     while (acc >= DT) {
       acc -= DT;
-      for (const r of rooms.values()) r.room.tick();
+      for (const [code, r] of rooms) {
+        // (one room going wrong mustn't stop every battle on the server: log it, and end that
+        // battle — its players go back to their lobby — instead of the whole server falling over)
+        try {
+          r.room.tick();
+        } catch (e) {
+          console.error(`Battle room "${code}" failed:`, e);
+          try {
+            r.room.recover();
+          } catch {
+            rooms.delete(code);
+          }
+        }
+      }
     }
     // empty rooms go after a minute
     const t = Date.now();

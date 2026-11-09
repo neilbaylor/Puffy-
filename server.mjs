@@ -112,6 +112,10 @@ try {
 
 server.listen(PORT, '0.0.0.0', () => console.log(`Puffy is being served on port ${PORT}`));
 
+// (anything that slips through: log it and keep serving — a crash would freeze every battle)
+process.on('uncaughtException', (e) => console.error('Uncaught:', e));
+process.on('unhandledRejection', (e) => console.error('Unhandled:', e));
+
 // Railway stops the old copy with SIGTERM on every deploy: finish cleanly (a plain exit, not a
 // "command failed" in the logs)
 for (const sig of ['SIGTERM', 'SIGINT']) {
