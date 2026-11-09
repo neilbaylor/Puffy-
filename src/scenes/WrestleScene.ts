@@ -2822,16 +2822,19 @@ export class WrestleScene extends Phaser.Scene {
     });
   }
 
-  /** His Plops a chair swing reaches: in front of you (or `either` side), from head height right down to the floor. */
+  /**
+   * His Plops a chair swing reaches: in front of you (or `either` side), from head height right down to
+   * the floor — and, still on their parachutes, up over your head too (the chair comes over the top).
+   */
   private minionsInChairReach(len: number, either: boolean) {
     const p = this.player;
     return this.minions.filter((m) => {
-      if (m.dead || m.chute) return false;
+      if (m.dead) return false;
       const b = m.spr.body as Phaser.Physics.Arcade.Body;
       const dx = b.center.x - p.x;
       const ahead = either || Math.sign(dx) === p.facing || Math.abs(dx) < 12;
       const gap = Math.abs(dx) - b.halfWidth - p.body.halfWidth;
-      return ahead && gap < len * 1.05 && b.top < p.bottom + 12 && b.bottom > p.body.top - len * 0.7;
+      return ahead && gap < len * 1.05 && b.top < p.bottom + 12 && b.bottom > p.body.top - len * (m.chute ? 1.3 : 0.7);
     });
   }
 
@@ -2844,7 +2847,17 @@ export class WrestleScene extends Phaser.Scene {
     sfx.stomp();
     if (m.hp > 0) {
       this.fx.popText(spr.x, spr.y - 40, 'BONK!', '#ffffff', 16);
-      (spr.body as Phaser.Physics.Arcade.Body).setVelocityY(-220);
+      const body = spr.body as Phaser.Physics.Arcade.Body;
+      // (hit on its way down: the parachute's torn and it drops the rest of the way)
+      if (m.chute) {
+        const c = m.chute;
+        m.chute = null;
+        spr.setRotation(0);
+        body.setMaxVelocityY(900);
+        c.setFrame('popped');
+        this.tweens.add({ targets: c, y: c.y - 40, alpha: 0, angle: 30, duration: 600, onComplete: () => c.destroy() });
+      }
+      body.setVelocityY(-220);
       return;
     }
     m.dead = true;
