@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.197)
+## Where things stand (v0.198)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -190,6 +190,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Level 4 decisions (user): climbing = jumping between ledges (no wall-jumps); drop 2 longer and harder than drop 1; poo goats on the climbs; Plops sometimes parachute in while you climb (not all the time); sideways shooting while falling; baseball at the bottom of the FIRST drop, a short walk right after landing: the batter hits line drives at you; the field like Part 1's soccer pitch. Baseball art: src/gfx/baseball.ts (PARK sizes, parkSpots, drawBallparkFront/Back, drawBaseball, drawLineDrive, drawBat, drawBaseballPlop(role)), sheets sketches/level4/bb-*.png.
 - Level 4: Plops in varied colours everywhere (gfx/plops.ts PLOP_COLOURS: caramel, reddish, chocolate, olive, golden, plum; drawPlop/drawPlopChute/drawBaseballPlop take a body Fill). Baseball has two teams: TEAM.plops (blue caps, fielding) and TEAM.poos (red caps/helmets, batting: batter, on deck, runner); scoreboard PLOPS vs POOS; at least one medium Plop playing (the batter and a fielder are medium, the rest small).
 - Level 4 (Plop Invasion · Part 2) planning: mostly climbing up (~60%), 2 parachute drops (~25 s each, Plops parachuting at different speeds: slow big patched dome / middling / fast streamer; shoot them: POP), a baseball game in the middle, boss later. Concept art in src/gfx/skydive.ts (drawCanopy, drawHeroChute(ch, pose, 'pack'|'burst'|'opening'|'open'|'steer'|'land', lean), drawPlopChute(kind, 'slow'|'mid'|'fast'|'popped')), sheets in sketches/level4/ (sheet.ts renders them via esbuild + ../l4art/shot.cjs). Engine work needed: vertical terrain chunking (4096 px), climbing camera, vertical background, parachute player state, vertical fly-over.
+- v0.198: Queen tough Q_TOUGH*0.95 (5% easier; the King stays 1.05). King's medium/large minions armed (spawnMinion weapon 'gun' | 'saw': placeMinionWeapon, minionFire → minionShots pom-poms that hurt; saws charge 1.55x close up); weapon art via textures.makeWeaponArt. Flood: light shafts, gold shimmer, spray while rising, rubber ducks ('wr-duck', plopking.drawDuck). Test: sketches/level4/tarmed.cjs.
 - v0.197: Plop Dome flood without the waterfalls (they looked bad); MINION.large hp 5 (was 4).
 - v0.196: start screen Parts row compact on narrow phones (style.css @media max-width 700 / 600: .lvl min-width 74 / 66, smaller gaps, Bosses divider closer); Bosses menu 2x2 under 500 px tall. Measured: Parts + Bosses fit 568, 667, 740, 844, 932 wide; menu fits 568x320 and 844x390. Tests: sketches/level4/tphone4.cjs, tbossmodal.cjs.
 - v0.195: Part 4 open to everyone (in LEVELS; unlocked by beating Part 3; its boss in the Bosses menu once beaten). levels.ts keeps the tester machinery (TESTERS, WIP list now empty, setTester, isTester): testers see every boss in the Bosses menu. Test: sketches/level4/topen4.cjs.

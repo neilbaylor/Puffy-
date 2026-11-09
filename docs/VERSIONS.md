@@ -200,3 +200,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.195: Plop Invasion · Part 2 (Part 4) and the Plop King fight open to everyone.
 - v0.196: the Part buttons and Bosses fit on small phones; the Bosses menu fits without scrolling.
 - v0.197: no waterfalls in the Plop Dome flood; the King's big Plops take one more hit.
+- v0.198: Queen Plop 5% easier; the Plop King's medium and big Plops armed; a cooler flood.
