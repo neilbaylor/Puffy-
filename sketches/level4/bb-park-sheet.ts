@@ -1,0 +1,10 @@
+import { PARK, drawBallparkBack, drawBallparkFront } from '../wt-battle/src/gfx/baseball';
+const w = 36 * 32;
+const W = w + PARK.END * 2;
+const c = document.createElement('canvas'); c.width = W; c.height = 330; document.body.appendChild(c);
+const ctx = c.getContext('2d')!;
+ctx.fillStyle = '#e2c486'; ctx.fillRect(0, 0, W, 330);
+ctx.fillStyle = '#7a4a26'; ctx.fillRect(0, 240, W, 90);
+ctx.save(); ctx.translate(0, 240 - PARK.BACK_UP); drawBallparkBack(ctx, w, [3, 2]); ctx.restore();
+ctx.save(); ctx.translate(0, 240 - PARK.FRONT_UP); drawBallparkFront(ctx, w); ctx.restore();
+(window as any).done = true;
