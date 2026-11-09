@@ -197,3 +197,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.192: fewer Plops in the second parachute drop, most (not all) with blasters; nuggies floating in the drops to grab.
 - v0.193: in the Plop Dome the chair hits the King's Plops too, even the small ones.
 - v0.194: the Plop King walks round the ring (not through it), a longer jumbotron celebration, nicer flooding, the King 5% tougher with 13 hits.
+- v0.195: Plop Invasion · Part 2 (Part 4) and the Plop King fight open to everyone.
