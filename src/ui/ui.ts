@@ -263,7 +263,10 @@ export class UI {
     wardrobe.onChange(() => {
       if (['Game', 'Wrestle', 'Hoops', 'Battle'].some((k) => this.game.scene.isActive(k))) return;
       dropHeroSheets(this.game.textures);
-      if (this.screen?.classList.contains('start')) this.showStart();
+      // (in the Shop: the start screen under it is redrawn once you close it, not on every buy — that
+      // was a lot of drawing right as the till started counting)
+      if (this.shopEl) this.startStale = true;
+      else if (this.screen?.classList.contains('start')) this.showStart();
     });
     account.onChange(() => {
       const btn = this.screen?.querySelector<HTMLElement>('[data-act=account]');
@@ -1003,6 +1006,8 @@ export class UI {
    * hero everywhere (and in battles, to everyone).
    */
   private shopEl: HTMLElement | null = null;
+  /** What you've on changed while the Shop was open: the start screen under it wants redrawing. */
+  private startStale = false;
   /** What was on when the Shop opened. */
   private shopWore = '';
   private showShop() {
@@ -1034,6 +1039,10 @@ export class UI {
     const page = this.shopEl;
     if (!page) return;
     this.shopEl = null;
+    if (this.startStale) {
+      this.startStale = false;
+      if (this.screen?.classList.contains('start')) this.showStart();
+    }
     page.classList.remove('in');
     // (something new on: back on the start screen, your hero shows it off)
     if (wardrobe.wearKey !== this.shopWore && this.screen?.classList.contains('start')) setTimeout(() => this.cheer(this.selected), 380);
@@ -1126,15 +1135,14 @@ export class UI {
     const count = pill.querySelector<HTMLElement>('.shop-count')!;
     const paid = from - to;
     count.textContent = String(from);
-    pill.classList.remove('paid');
     const drop = document.createElement('span');
     drop.className = 'shop-paid';
     drop.innerHTML = `−${paid} <i class="rb-ico"></i>`;
     pill.appendChild(drop);
     setTimeout(() => drop.remove(), 2100);
-    // (a steady till: ~1.4 s for 20 bottles, ~2.2 s for 50, easing off for the last few; it starts a
+    // (a quick till: ~0.8 s for 20 bottles, 1.2 s for 50, easing off for the last few; it starts a
     // moment after the tap, once the Shop's pictures have been redrawn, so it doesn't hitch)
-    const dur = Math.min(2300, 900 + paid * 27);
+    const dur = Math.min(1200, 550 + paid * 13);
     let t0 = 0;
     let shown = from;
     let lastTick = 0;
@@ -1142,7 +1150,7 @@ export class UI {
       if (!pill.isConnected) return;
       t0 ||= now;
       const u = Math.min(1, (now - t0) / dur);
-      const n = Math.round(from - paid * (1 - Math.pow(1 - u, 1.7)));
+      const n = Math.round(from - paid * (1 - Math.pow(1 - u, 2)));
       if (n !== shown) {
         shown = n;
         count.textContent = String(n);
@@ -1156,8 +1164,13 @@ export class UI {
       if (u < 1) requestAnimationFrame(step);
       else {
         count.textContent = String(to);
-        sfx.kaching();
-        pill.classList.add('paid');
+        // (the bump runs on the compositor — the pill's already its own layer — and the ka-ching's
+        // sound is set up just after, so neither holds the other up)
+        pill.animate(
+          [{ transform: 'none' }, { transform: 'scale(1.08) rotate(-1.5deg)', offset: 0.35 }, { transform: 'none' }],
+          { duration: 380, easing: 'cubic-bezier(0.3, 1.3, 0.5, 1)' },
+        );
+        setTimeout(() => sfx.kaching(), 0);
       }
     };
     setTimeout(() => requestAnimationFrame(step), 160);

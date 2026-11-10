@@ -1946,6 +1946,8 @@ kbd {
 /* your root beer, big, on the pill under the title (the till counts it down when you pay) */
 .bl-sub.shop-rb {
   position: relative;
+  /* (its own layer from the start: the bump when you pay doesn't have to make one mid-animation) */
+  will-change: transform;
   margin-top: clamp(10px, 2.6vh, 18px);
   padding: 5px 18px 6px;
   font: 800 clamp(15px, 3.2vmin, 20px) / 1.2 var(--body);
@@ -1962,12 +1964,6 @@ kbd {
 .shop-rb .rb-ico { width: 1em; height: 1.35em; vertical-align: -0.3em; }
 /* already yours: "Wear it" in the gold of the other gold buttons */
 .shop-item .btn.shop-wear { background: var(--gold-btn); }
-/* paid: ka-ching, the pill bumps */
-.shop-rb.paid { animation: till-paid 0.45s cubic-bezier(0.3, 1.6, 0.5, 1); }
-@keyframes till-paid {
-  35% { transform: scale(1.14) rotate(-2deg); }
-  100% { transform: scale(1) rotate(0); }
-}
 /* the price dropping off the pill */
 .shop-paid {
   position: absolute;
