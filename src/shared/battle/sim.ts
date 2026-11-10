@@ -225,8 +225,13 @@ export type BEvent =
   | { k: 'chairhit'; id: string; x: number; y: number; broke: boolean };
 
 const charOf = (hero: string): CharacterDef => CHARACTERS.find((c) => c.id === hero) ?? CHARACTERS[0];
-/** How big this hero is right now ("grow" makes you bigger). */
-export const sizeOf = (p: { power: number }) => (p.power === POWER.grow ? GROW : 1);
+/** Grown, no hero gets taller than this (world px): it still fits under the islands (3 tiles up). */
+export const GROW_MAX_H = 88;
+/**
+ * How big this hero is right now ("grow" makes you bigger: GROW times, but never taller than
+ * GROW_MAX_H, so Big Muscles grows a bit less and can still get under things).
+ */
+export const sizeOf = (p: { power: number; hero: string }) => (p.power === POWER.grow ? Math.min(GROW, GROW_MAX_H / (charOf(p.hero).hitH ?? 34)) : 1);
 const boxW = (c: CharacterDef, k = 1) => (c.hitW ?? 22) * k;
 const boxH = (c: CharacterDef, k = 1) => (c.hitH ?? 34) * k;
 
@@ -758,6 +763,27 @@ export class BattleSim {
   }
 
   /** Swing the chair: everyone (and every bad guy) just in front gets it — 1 heart each. */
+  /** Just grown: if there's no room for the bigger you here (a low ceiling), step aside to where there is. */
+  private makeRoom(p: BPlayer) {
+    const c = charOf(p.hero);
+    const k = sizeOf(p);
+    const w = boxW(c, k);
+    const h = boxH(c, k);
+    const fits = (x: number) => {
+      for (let y = p.y - h + 1; y < p.y - 1; y += 8) for (const dx of [-w / 2 + 1, 0, w / 2 - 1]) if (this.map.solidAt(x + dx, y)) return false;
+      return this.map.solidAt(x - w / 2 + 1, p.y - h + 1) === false && this.map.solidAt(x + w / 2 - 1, p.y - h + 1) === false;
+    };
+    if (fits(p.x)) return;
+    for (let d = 8; d <= TILE_PX * 6; d += 8)
+      for (const s of [1, -1]) {
+        const x = p.x + s * d;
+        if (fits(x)) {
+          p.x = x;
+          return;
+        }
+      }
+  }
+
   private swingChair(p: BPlayer, chair: BChair, ev: BEvent[]) {
     chair.swing = CHAIR_SWING;
     ev.push({ k: 'chairswing', id: p.id });
@@ -1024,6 +1050,7 @@ export class BattleSim {
       case 'grow':
         p.power = POWER.grow;
         p.powerT = POWER_SECS[POWER.grow];
+        this.makeRoom(p);
         break;
       case 'rapid':
         p.power = POWER.rapid;
