@@ -1936,24 +1936,27 @@ kbd {
   position: absolute;
   top: calc(10px + var(--safe-t));
   right: calc(12px + var(--safe-r));
-  font: 900 24px/1 var(--body);
+  display: grid;
+  place-items: center;
 }
+/* a good thick ✕ (a drawn one: the font's is thin) */
+.shop-x svg { width: clamp(24px, 4.6vmin, 30px); height: clamp(24px, 4.6vmin, 30px); flex: none; fill: none; stroke: var(--ink); stroke-width: 3.6; stroke-linecap: round; }
 /* the title as Battle's (letters hopping one after another), in pink */
 .bl-title.shop-title { color: #ff6fb1; }
 /* your root beer, big, on the pill under the title (the till counts it down when you pay) */
 .bl-sub.shop-rb {
   position: relative;
   margin-top: clamp(10px, 2.6vh, 18px);
-  padding: 6px 22px 7px;
-  font: 800 clamp(16px, 3.6vmin, 22px) / 1.2 var(--body);
+  padding: 5px 18px 6px;
+  font: 800 clamp(15px, 3.2vmin, 20px) / 1.2 var(--body);
 }
 .shop-rb .shop-count {
   display: inline-block;
   min-width: 1.4ch;
   will-change: transform;
   color: var(--gold);
-  font: 400 1.55em/1 var(--display);
-  vertical-align: -0.08em;
+  font: 400 1.4em/1 var(--display);
+  vertical-align: -0.06em;
   font-variant-numeric: tabular-nums;
 }
 .shop-rb .rb-ico { width: 1em; height: 1.35em; vertical-align: -0.3em; }

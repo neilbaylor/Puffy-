@@ -1008,7 +1008,7 @@ export class UI {
   private showShop() {
     if (this.shopEl) return;
     const page = h(`<div class="shop-page" role="dialog" aria-label="Shop">
-      <button class="icon-btn shop-x" aria-label="Close">✕</button>
+      <button class="icon-btn shop-x" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 5.5 18.5 18.5M18.5 5.5 5.5 18.5"/></svg></button>
       <header class="bl-head">
         <h1 class="bl-title shop-title" aria-label="Shop!">${[...'Shop!'].map((ch, i) => `<span style="--i:${i}">${ch}</span>`).join('')}</h1>
         <p class="bl-sub shop-rb"></p>
