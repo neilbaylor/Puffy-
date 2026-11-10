@@ -1,28 +1,36 @@
-// the Shop with three things: 33 root beer, buy and wear all three; the start screen and level 1 with them on
+// the Shop page (slides up): 95 root beer, buy and wear all three; the start screen and level 1 with them on
 const { chromium } = require('playwright');
 const hero = process.argv[2] || 'puffy';
 (async () => {
   const br = await chromium.launch({ args: ['--use-gl=swiftshader'] });
   const ctx = await br.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 2 });
-  await ctx.addInitScript((hero) => { if (!sessionStorage.getItem('x')) { sessionStorage.setItem('x', '1'); localStorage.clear(); localStorage.setItem('puffy.rootbeer', '33'); localStorage.setItem('puffy.hero', hero); localStorage.setItem('puffy.hat', 'party'); } }, hero);
+  await ctx.addInitScript((hero) => { if (!sessionStorage.getItem('x')) { sessionStorage.setItem('x', '1'); localStorage.clear(); localStorage.setItem('puffy.rootbeer', '95'); localStorage.setItem('puffy.hero', hero); localStorage.setItem('puffy.hat', 'party'); } }, hero);
   const p = await ctx.newPage();
   const errs = []; p.on('pageerror', (e) => errs.push(e.message + ' ' + (e.stack || '').split('\n').slice(0, 2).join(' | ')));
   await p.goto('http://localhost:8091/');
   await p.waitForFunction(() => window.game?.registry?.get('ready'), null, { timeout: 300000 });
   console.log('migrated hat:', await p.evaluate(() => [localStorage.getItem('puffy.hat'), localStorage.getItem('puffy.wear')].join(' / ')));
+  await p.screenshot({ path: `shots/gear-start0-${hero}.png` });
   await p.click('[data-act=shop]');
-  await p.waitForSelector('.shop-panel');
+  await p.waitForTimeout(150);
+  await p.screenshot({ path: `shots/gear-shopslide-${hero}.png` });
+  await p.waitForTimeout(600);
   await p.screenshot({ path: `shots/gear-shop0-${hero}.png` });
   for (const id of ['party', 'frogskins', 'board']) { await p.click(`[data-buy=${id}]`); await p.waitForTimeout(250); }
-  const st = () => p.evaluate(() => [document.querySelector('.shop-rb').textContent.trim(), [...document.querySelectorAll('.shop-info .btn')].map((b) => b.textContent.trim()).join(','), localStorage.getItem('puffy.items'), localStorage.getItem('puffy.wear')].join(' | '));
+  const st = () => p.evaluate(() => [document.querySelector('.shop-rb').textContent.trim(), [...document.querySelectorAll('.shop-item .btn')].map((b) => b.textContent.trim()).join(','), localStorage.getItem('puffy.items'), localStorage.getItem('puffy.wear')].join(' | '));
   console.log('bought:', await st());
   await p.screenshot({ path: `shots/gear-shop1-${hero}.png` });
   await p.click('[data-off=party]'); await p.waitForTimeout(250);
   console.log('hat off:', await st());
-  await p.click('[data-wear=party]'); await p.waitForTimeout(250);
-  console.log('hat on:', await st());
-  await p.click('[data-act=back]');
+  await p.click('[data-wear=party]'); await p.waitForTimeout(330);
+  await p.screenshot({ path: `shots/gear-shopcheer-${hero}.png` });
   await p.waitForTimeout(600);
+  console.log('hat on:', await st());
+  await p.click('.shop-x');
+  await p.waitForTimeout(200);
+  await p.screenshot({ path: `shots/gear-shopclose-${hero}.png` });
+  await p.waitForTimeout(700);
+  console.log('shop gone:', await p.evaluate(() => !document.querySelector('.shop-page')));
   await p.screenshot({ path: `shots/gear-start-${hero}.png` });
   await p.click('[data-act=play]');
   await p.waitForFunction(() => window.game.scene.isActive('Game') && window.game.scene.getScene('Game').players?.[0]?.body, null, { timeout: 120000 });

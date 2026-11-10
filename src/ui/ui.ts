@@ -335,7 +335,7 @@ export class UI {
     // (a few times a second is plenty for a two-frame shuffle: not a job on every frame of the game)
     const animatePuffy = () => {
       if (!this.rotate.hidden) {
-        poses ??= renderPoseSet(CHARACTERS[0], ['idle0', 'idle1'], rc.width);
+        poses ??= renderPoseSet(CHARACTERS[0], ['idle0', 'idle1'], rc.width, '');
         const pose = Math.floor((performance.now() - t0) / 450) % 2 ? 'idle1' : 'idle0';
         if (pose !== lastPose && poses[pose]) {
           lastPose = pose;
@@ -566,7 +566,8 @@ export class UI {
         </dl>
       </button>`);
       const cv = card.querySelector('canvas')!;
-      drawHeroCard(cv, c, 'idle0');
+      // (what you've got on from the Shop shows on the picked hero only: the others stand there bare)
+      drawHeroCard(cv, c, 'idle0', undefined, i === this.selected ? wardrobe.wearKey : '');
       // select the moment a finger touches the card (a tap can trigger full screen and
       // shift the layout before the finger lifts); tapping the picked card again plays
       let pickedOnDown = false;
@@ -841,10 +842,10 @@ export class UI {
     this.selected = i;
     const el = this.screen;
     if (!el) return;
-    // the hero we moved away from goes back to a plain face
+    // the hero we moved away from goes back to a plain face, and hands over the Shop things
     if (prev !== i) {
       const pc = el.querySelectorAll<HTMLElement>('.card')[prev]?.querySelector('canvas');
-      if (pc) drawHeroCard(pc, CHARACTERS[prev], 'idle0');
+      if (pc) drawHeroCard(pc, CHARACTERS[prev], 'idle0', undefined, '');
     }
     el.querySelectorAll<HTMLElement>('.card').forEach((c, k) => {
       c.classList.toggle('picked', k === i);
@@ -855,28 +856,36 @@ export class UI {
     if (!quiet) {
       sfx.select();
       this.cheer(i);
+      // (the Shop things go on the hero you pick: a little sparkle as they appear)
+      if (wardrobe.wearKey) this.sparkle(el.querySelectorAll<HTMLElement>('.card')[i]);
     }
   }
 
-  /** Each hero's card poses, drawn once (a hop flips between them with no redraw cost). */
-  private cardPoses = new Map<string, Record<string, HTMLCanvasElement>>();
+  /**
+   * Each hero's card poses in what you've got on, drawn once (a hop flips between them with no
+   * redraw cost). Only the picked hero hops, so it's always them in their Shop things — the jump's
+   * the skateboard's ollie if they're on it. (Kept per hero; drawn again if what's on changes.)
+   */
+  private cardPoses = new Map<string, { key: string; poses: Record<string, HTMLCanvasElement> }>();
   private cheerRaf = 0;
 
-  private posesFor(i: number, cv: HTMLCanvasElement) {
+  private posesFor(i: number, cv: HTMLCanvasElement, wear = wardrobe.wearKey) {
     const ch = CHARACTERS[i];
-    let poses = this.cardPoses.get(ch.id);
-    if (!poses || poses.idle0.width !== cv.width || poses.idle0.height !== cv.height) {
-      poses = {};
+    const key = `${wear}|${cv.width}x${cv.height}`;
+    let kept = this.cardPoses.get(ch.id);
+    if (!kept || kept.key !== key) {
+      const poses: Record<string, HTMLCanvasElement> = {};
       for (const pose of ['idle0', 'jump', 'fall'] as const) {
         const c = document.createElement('canvas');
         c.width = cv.width;
         c.height = cv.height;
-        drawHeroCard(c, ch, pose);
+        drawHeroCard(c, ch, pose, undefined, wear);
         poses[pose] = c;
       }
-      this.cardPoses.set(ch.id, poses);
+      kept = { key, poses };
+      this.cardPoses.set(ch.id, kept);
     }
-    return poses;
+    return kept.poses;
   }
 
   /** The cards' hop poses, drawn ahead of time (the picked hero's during loading, the others just after). */
@@ -905,13 +914,10 @@ export class UI {
     cancelAnimationFrame(this.cheerRaf);
     this.screen?.querySelectorAll<HTMLElement>('.card.cheer').forEach((c) => {
       c.classList.remove('cheer');
+      // (one still hopping when another's picked: it lands, bare)
       const other = c.querySelector('canvas');
-      const op = this.cardPoses.get(CHARACTERS[Number(c.dataset.i)].id);
-      if (other && op) {
-        const oc = other.getContext('2d')!;
-        oc.clearRect(0, 0, other.width, other.height);
-        oc.drawImage(op.idle0, 0, 0);
-      }
+      const k = Number(c.dataset.i);
+      if (other && k !== i) drawHeroCard(other, CHARACTERS[k], 'idle0', undefined, '');
     });
         void card.offsetWidth;
     card.classList.add('cheer');
@@ -989,81 +995,182 @@ export class UI {
   }
 
   /**
-   * The Shop: things for your hero, bought with root beer (a party hat, sunglasses, a skateboard).
-   * Each shows your hero with it on (with whatever else they've on); once it's yours, put it on or
-   * take it off — one on your head, one over your eyes, one under your feet. Whatever you've on
-   * shows on your hero everywhere (and in battles, to everyone).
+   * The Shop: a page of its own that slides up from the bottom over the start screen (and back down
+   * when you close it, × top right). Things for your hero, bought with root beer: a party hat,
+   * sunglasses, a skateboard. Each shows your hero with it on (with whatever else they've on); once
+   * it's yours, put it on or take it off — one on your head, one over your eyes, one under your
+   * feet. Putting one on, your hero does their celebration in it. Whatever you've on shows on your
+   * hero everywhere (and in battles, to everyone).
    */
+  private shopEl: HTMLElement | null = null;
+  /** What was on when the Shop opened. */
+  private shopWore = '';
   private showShop() {
+    if (this.shopEl) return;
+    const page = h(`<div class="shop-page" role="dialog" aria-label="Shop">
+      <button class="icon-btn shop-x" aria-label="Close">✕</button>
+      <header class="bl-head">
+        <h1 class="bl-title shop-title" aria-label="Shop!">${[...'Shop!'].map((ch, i) => `<span style="--i:${i}">${ch}</span>`).join('')}</h1>
+        <p class="bl-sub shop-rb"></p>
+      </header>
+      <div class="shop-list"></div>
+      <p class="shop-note">Find root beer in the levels: every bottle you find, you can spend here.</p>
+    </div>`);
+    this.shopEl = page;
+    this.shopWore = wardrobe.wearKey;
+    this.root.appendChild(page);
+    // (slides up on the next frame, from where it starts: below the screen)
+    void page.offsetWidth;
+    page.classList.add('in');
+    page.querySelector('.shop-x')!.addEventListener('click', () => {
+      sfx.back();
+      this.closeShop();
+    });
+    this.renderShop();
+  }
+
+  /** Slide the Shop back down, then it's gone (the start screen's under it all along). */
+  private closeShop() {
+    const page = this.shopEl;
+    if (!page) return;
+    this.shopEl = null;
+    page.classList.remove('in');
+    // (something new on: back on the start screen, your hero shows it off)
+    if (wardrobe.wearKey !== this.shopWore && this.screen?.classList.contains('start')) setTimeout(() => this.cheer(this.selected), 380);
+    let gone = false;
+    const done = () => {
+      if (gone) return;
+      gone = true;
+      page.remove();
+    };
+    // (the page's own slide: a button's transition ending inside it bubbles up here too)
+    page.addEventListener('transitionend', (e) => e.target === page && done());
+    setTimeout(done, 700);
+  }
+
+  /** The Shop's things (drawn again after each buy / put on / take off). */
+  private renderShop(cheerId?: string) {
+    const page = this.shopEl;
+    if (!page) return;
     const hero = CHARACTERS[this.selected];
     const left = bank.rootbeerLeft;
-    const el = h(`<div class="screen modal shop">
-      <div class="panel shop-panel">
-        <h2>Shop</h2>
-        <p class="shop-rb"><i class="rb-ico"></i><b>${left}</b> root beer to spend</p>
-        <div class="shop-list">${SHOP.map((it) => {
-          const own = wardrobe.owns(it.id);
-          const on = wardrobe.isOn(it.id);
-          const btn = on
-            ? `<button class="btn btn-alt" data-off="${it.id}">Take it off</button>`
-            : own
-              ? `<button class="btn btn-go" data-wear="${it.id}">Wear it</button>`
-              : left >= it.price
-                ? `<button class="btn btn-go" data-buy="${it.id}">Buy · ${it.price} <i class="rb-ico"></i></button>`
-                : `<button class="btn" disabled>Need ${it.price - left} more <i class="rb-ico"></i></button>`;
-          return `<div class="shop-item${on ? ' on' : ''}">
-            <canvas width="160" height="160" data-prev="${it.id}"></canvas>
-            <div class="shop-info">
-              <h3>${esc(it.name)}${on ? ` <small>${it.slot === 'ride' ? 'riding it' : 'wearing it'}</small>` : own ? ' <small>yours</small>' : ''}</h3>
-              <p>${esc(it.blurb)}</p>
-              <p class="shop-price">${own ? '' : `${it.price} <i class="rb-ico"></i> root beer`}</p>
-              ${btn}
-            </div>
-          </div>`;
-        }).join('')}</div>
-        <p class="shop-note">Find root beer in the levels: every bottle you find, you can spend here.</p>
-        <div class="row"><button class="btn btn-alt" data-act="back">Back</button></div>
-      </div>
-    </div>`);
-        // (each with that on, and whatever else you've on that it doesn't replace)
+    page.querySelector('.shop-rb')!.innerHTML = `<i class="rb-ico"></i> <b>${left}</b> root beer to spend`;
+    const list = page.querySelector('.shop-list')!;
+    list.innerHTML = SHOP.map((it) => {
+      const own = wardrobe.owns(it.id);
+      const on = wardrobe.isOn(it.id);
+      const btn = on
+        ? `<button class="btn btn-alt" data-off="${it.id}">Take it off</button>`
+        : own
+          ? `<button class="btn btn-go" data-wear="${it.id}">${it.slot === 'ride' ? 'Ride it' : 'Wear it'}</button>`
+          : left >= it.price
+            ? `<button class="btn btn-go" data-buy="${it.id}">Buy · ${it.price} <i class="rb-ico"></i></button>`
+            : `<button class="btn" disabled>${it.price} <i class="rb-ico"></i> · need ${it.price - left} more</button>`;
+      return `<div class="shop-item${on ? ' on' : ''}" data-id="${it.id}" data-hero="${hero.id}">
+        <canvas width="240" height="240"></canvas>
+        <h3>${esc(it.name)}</h3>
+        <p class="shop-tag">${on ? (it.slot === 'ride' ? 'Riding it' : 'Wearing it') : own ? 'Yours' : `${it.price} root beer`}</p>
+        <p class="shop-blurb">${esc(it.blurb)}</p>
+        ${btn}
+      </div>`;
+    }).join('');
+    // (each with that on, and whatever else you've on that it doesn't replace)
     const withIt = (id: string) => {
       const slot = SHOP.find((i) => i.id === id)!.slot;
       return [...wardrobe.equipped.filter((x) => SHOP.find((i) => i.id === x)?.slot !== slot), id].sort().join(',');
     };
-    el.querySelectorAll<HTMLCanvasElement>('canvas[data-prev]').forEach((cv) => drawHeroCard(cv, hero, 'idle0', undefined, withIt(cv.dataset.prev!)));
+    list.querySelectorAll<HTMLElement>('.shop-item').forEach((item) => {
+      const cv = item.querySelector('canvas')!;
+      const wear = withIt(item.dataset.id!);
+      drawHeroCard(cv, hero, 'idle0', undefined, wear);
+      if (item.dataset.id === cheerId) this.hop(item, cv, hero, wear);
+    });
     // (what you wear changed: the hero's pictures are drawn again, with or without it, next time they're needed)
-    const changed = () => {
+    const changed = (id?: string) => {
       dropHeroSheets(this.game.textures);
       account.save();
-      this.showShop();
+      this.renderShop(id);
     };
-    el.querySelectorAll<HTMLButtonElement>('[data-buy]').forEach((b) =>
+    list.querySelectorAll<HTMLButtonElement>('[data-buy]').forEach((b) =>
       b.addEventListener('click', () => {
         if (!wardrobe.buy(b.dataset.buy!)) return;
         sfx.powerup();
         wardrobe.wear(b.dataset.buy!, true);
-        changed();
+        changed(b.dataset.buy);
       }),
     );
-    el.querySelectorAll<HTMLButtonElement>('[data-wear]').forEach((b) =>
+    list.querySelectorAll<HTMLButtonElement>('[data-wear]').forEach((b) =>
       b.addEventListener('click', () => {
         sfx.select();
         wardrobe.wear(b.dataset.wear!, true);
-        changed();
+        changed(b.dataset.wear);
       }),
     );
-    el.querySelectorAll<HTMLButtonElement>('[data-off]').forEach((b) =>
+    list.querySelectorAll<HTMLButtonElement>('[data-off]').forEach((b) =>
       b.addEventListener('click', () => {
         sfx.back();
         wardrobe.wear(b.dataset.off!, false);
         changed();
       }),
     );
-    el.querySelector('[data-act=back]')!.addEventListener('click', () => {
-      sfx.back();
-      this.showStart();
-    });
-    this.setScreen(el);
+  }
+
+  /** A burst of little sparkles over a card's hero (their Shop things going on). */
+  private sparkle(card: HTMLElement | undefined) {
+    const cv = card?.querySelector('canvas');
+    if (!card || !cv || LIGHT) return;
+    card.querySelectorAll('.gear-spark').forEach((e) => e.remove());
+    const cx = cv.offsetLeft + cv.offsetWidth / 2;
+    const cy = cv.offsetTop + cv.offsetHeight * 0.42;
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * Math.PI * 2 + 0.3;
+      const r = Math.max(44, cv.offsetHeight * 0.62) * (0.8 + (k % 2) * 0.3);
+      const sp = document.createElement('i');
+      sp.className = 'gear-spark';
+      sp.style.cssText = `--sc:${['#ff6fb1', '#ffc94a', '#2ec4c4', '#8a5cf6'][k % 4]};left:${cx}px;top:${cy}px;--dx:${Math.cos(a) * r}px;--dy:${Math.sin(a) * r * 0.8}px;--d:${(k % 3) * 40}ms`;
+      card.appendChild(sp);
+      setTimeout(() => sp.remove(), 900);
+    }
+  }
+
+  /**
+   * A hero's celebration in a picture (`box` gets .cheer, which runs the hop on `cv`): crouch, up
+   * (their jump — on the skateboard, the ollie), coming down, landed, in what `wear` puts on them.
+   * The poses follow the hop's own clock, so they always line up with it.
+   */
+  private hop(box: HTMLElement, cv: HTMLCanvasElement, ch: CharacterDef, wear: string) {
+    const poses: Record<string, HTMLCanvasElement> = {};
+    for (const pose of ['idle0', 'jump', 'fall'] as const) {
+      const c = document.createElement('canvas');
+      c.width = cv.width;
+      c.height = cv.height;
+      drawHeroCard(c, ch, pose, undefined, wear);
+      poses[pose] = c;
+    }
+    const ctx = cv.getContext('2d')!;
+    let shown = '';
+    const show = (pose: string) => {
+      if (pose === shown) return;
+      shown = pose;
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      ctx.drawImage(poses[pose], 0, 0);
+    };
+    box.classList.remove('cheer');
+    void box.offsetWidth;
+    box.classList.add('cheer');
+    const anim = cv.getAnimations()[0];
+    const t0 = performance.now();
+    const [up, down, end] = ch.id === 'scruffy' ? [355, 570, 860] : [330, 540, 760];
+    const step = () => {
+      const t = anim && typeof anim.currentTime === 'number' ? anim.currentTime : performance.now() - t0;
+      show(t < 105 ? 'idle0' : t < up ? 'jump' : t < down ? 'fall' : 'idle0');
+      if (box.isConnected && anim?.playState !== 'finished' && t < end) requestAnimationFrame(step);
+      else {
+        show('idle0');
+        box.classList.remove('cheer');
+      }
+    };
+    requestAnimationFrame(step);
   }
 
   /** (Temporary, for testing) straight into the Queen Plop fight with the picked hero. */

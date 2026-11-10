@@ -1883,40 +1883,101 @@ kbd {
 /* ───────────── the Shop ───────────── */
 /* its button sits beside Battle, top right: the same size, party pink */
 .battle-btn.shop-btn { background: linear-gradient(180deg, #ffb3d9, #ff6fb1); }
-.shop-panel { align-items: center; text-align: center; min-width: min(100%, 420px); max-width: 560px; }
-.shop-panel h2 { margin: 0; }
-.shop-rb { margin: 2px 0 6px; font: 800 16px/1.2 var(--body); }
-.shop-rb b { font: 400 22px/1 var(--display); margin-right: 2px; }
-.shop-list { display: grid; gap: 12px; width: 100%; }
+/* the Shop things appearing on the hero you pick: little stars flying out */
+.gear-spark {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  z-index: 2;
+  pointer-events: none;
+  background: var(--sc, #ff6fb1);
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  filter: drop-shadow(0 1px 0 var(--ink));
+  opacity: 0;
+  animation: gear-spark 0.75s cubic-bezier(0.2, 0.8, 0.4, 1) var(--d) both;
+}
+@keyframes gear-spark {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.2) rotate(0deg); }
+  20% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(1.1) rotate(160deg); }
+}
+/* the Shop is a page of its own: it slides up from the bottom over the start screen, and back down */
+.shop-page {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(8px, 2.4vh, 18px);
+  padding: calc(7px + var(--safe-t)) calc(16px + var(--safe-r)) calc(12px + var(--safe-b)) calc(16px + var(--safe-l));
+  overflow-y: auto;
+  /* party pink, with polka dots like the hat's */
+  background:
+    radial-gradient(circle, #ffffff8c 0 3px, transparent 3.5px) 0 0 / 34px 34px,
+    radial-gradient(circle, #ffffff59 0 2px, transparent 2.5px) 17px 17px / 34px 34px,
+    linear-gradient(180deg, #ffd6ea, #ffb3d6);
+  transform: translateY(100%);
+  transition: transform 0.42s cubic-bezier(0.55, 0, 0.75, 0.2);
+  will-change: transform;
+}
+.shop-page.in { transform: translateY(0); transition: transform 0.5s cubic-bezier(0.2, 0.9, 0.3, 1); }
+@media (prefers-reduced-motion: reduce) {
+  .shop-page, .shop-page.in { transition: opacity 0.2s; }
+  .shop-page { transform: none; opacity: 0; }
+  .shop-page.in { opacity: 1; }
+}
+.shop-x {
+  position: absolute;
+  top: calc(10px + var(--safe-t));
+  right: calc(12px + var(--safe-r));
+  font: 900 24px/1 var(--body);
+}
+/* the title as Battle's (letters hopping one after another), in pink */
+.bl-title.shop-title { color: #ff6fb1; }
+.shop-rb b { color: var(--gold); }
+.shop-rb .rb-ico { vertical-align: -0.2em; }
+.shop-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 220px));
+  justify-content: center;
+  gap: clamp(10px, 2.4vw, 22px);
+  width: 100%;
+  margin: auto 0;
+}
 .shop-item {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 14px;
-  padding: 10px 14px;
+  gap: 3px;
+  padding: 10px 12px 12px;
   border: 3px solid var(--ink);
-  border-radius: 16px;
+  border-radius: 18px;
   background: #fff8ec;
-  box-shadow: 0 4px 0 var(--ink);
-  text-align: left;
+  box-shadow: 0 5px 0 var(--ink);
+  text-align: center;
 }
-.shop-item.on { background: #ffe9f4; }
-.shop-item canvas { width: 116px; height: 116px; flex: none; }
-.shop-info { display: grid; gap: 4px; justify-items: start; }
-.shop-info h3 { margin: 0; font: 400 22px/1.1 var(--display); }
-.shop-info h3 small { font: 800 11px/1 var(--body); letter-spacing: 0.06em; text-transform: uppercase; background: #ff6fb1; color: #fff; border-radius: 6px; padding: 3px 6px; vertical-align: 3px; }
-.shop-info p { margin: 0; font: 600 14px/1.3 var(--body); }
-.shop-price { font-weight: 800 !important; }
-.shop-price:empty { display: none; }
-.shop-info .btn { margin-top: 4px; }
-.shop-info .btn:disabled { opacity: 0.6; cursor: default; }
-.shop-note { margin: 8px 0 4px; font: 600 13px/1.3 var(--body); opacity: 0.75; }
-@media (max-width: 520px) {
-  .shop-item { flex-direction: column; text-align: center; }
-  .shop-info { justify-items: center; }
-}
+.shop-item.on { background: #fff0f7; border-color: #c2286f; box-shadow: 0 5px 0 #c2286f; }
+.shop-item canvas { width: clamp(84px, 24vh, 150px); height: clamp(84px, 24vh, 150px); }
+.shop-item h3 { margin: 2px 0 0; font: 400 clamp(19px, 3.6vh, 26px)/1.05 var(--display); color: var(--ink); }
+.shop-tag { margin: 0; font: 800 12px/1 var(--body); letter-spacing: 0.06em; text-transform: uppercase; color: #c2286f; }
+.shop-blurb { margin: 2px 0 6px; font: 600 13px/1.3 var(--body); color: var(--ink); flex: 1; }
+.shop-item .btn { padding-inline: 14px; }
+.shop-item .btn:disabled { opacity: 0.65; cursor: default; }
+.shop-item .rb-ico { width: 0.7em; height: 1em; vertical-align: -0.15em; }
+.shop-note { margin: 0; font: 700 13px/1.3 var(--body); color: var(--ink); opacity: 0.7; }
+/* putting something on: your hero's celebration, as on the pick-a-player cards */
+.shop-item.cheer canvas { transform-origin: 50% 100%; animation: card-cheer 0.75s linear; }
+.shop-item.cheer[data-hero='scruffy'] canvas { transform-origin: 50% 80%; animation: flip-hop 0.84s linear, flip-spin 0.84s linear; }
 @media (max-height: 460px) {
-  .shop-item canvas { width: 90px; height: 90px; }
-  .shop-note { display: none; }
+  .shop-blurb, .shop-note { display: none; }
+  .shop-page { gap: 6px; }
+  .bl-title.shop-title { font-size: clamp(30px, 9vh, 48px); }
+}
+@media (max-width: 560px) {
+  .shop-list { grid-template-columns: minmax(0, 300px); }
 }
 
 /* ───────────── online battle ───────────── */

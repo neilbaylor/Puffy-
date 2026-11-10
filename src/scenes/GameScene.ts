@@ -1628,11 +1628,14 @@ export class GameScene extends Phaser.Scene {
     this.fx.popText(hero.x, hero.body.top - 36, 'RUN!', '#ffd23f', 30);
   }
 
-  /** Level 1: the first Giant Puff that comes into view, the hero goes "Wow!" (once a level). */
+  /**
+   * Level 1: the first Giant Puff (the big one at a checkpoint, not a medium guy), once all of it's
+   * on screen, the hero goes "Wow!" (once a level) — so it's plainly the Giant they're wowed by.
+   */
   private wowAtGiant() {
     if (this.saidWow || this.levelId !== 1 || !this.players[0]?.alive) return;
     const v = this.cameras.main.worldView;
-    const g = this.enemies.find((e) => e.kind === 'giant' && !e.dead && e.body.left < v.right - 30 && e.body.right > v.left + 30 && e.body.bottom > v.top && e.body.top < v.bottom);
+    const g = this.enemies.find((e) => e.kind === 'giant' && !e.dead && e.body.left > v.left + 20 && e.body.right < v.right - 20 && e.body.top > v.top && e.body.bottom < v.bottom + 4);
     if (!g) return;
     this.saidWow = true;
     this.say(this.players[0], 'Wow!', 1800);
