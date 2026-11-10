@@ -221,3 +221,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.216: Battle: the chair hits bad guys still parachuting in (reaches up over your head for them).
 - v0.217: Level 4: fewer Plops while parachuting, more nuggies on the first two climbs, a big wall before Plop Park (land left of it).
 - v0.218: Battle: no chairs; the tall rock on the far right is a jump lower (every hero clears it).
+- v0.219: Battle: grown heroes no longer get stuck under the islands (Big Muscles grows a little less).
