@@ -315,7 +315,7 @@ export class UI {
             <div class="hud-stamina" title="Stamina"><b>STAMINA</b><div class="bar"><i></i></div></div>
           </div>
         </div>
-        <button class="icon-btn hud-pause" aria-label="Pause">❚❚</button>
+        <button class="icon-btn hud-pause" aria-label="Pause"><svg class="pause-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="5.6" y="4.5" width="4.8" height="15" rx="1.4"/><rect x="13.6" y="4.5" width="4.8" height="15" rx="1.4"/></svg></button>
       </div>`);
     this.root.appendChild(this.hud);
     this.hud.querySelector('.hud-pause')!.addEventListener('click', () => this.pause());

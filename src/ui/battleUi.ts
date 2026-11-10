@@ -622,7 +622,7 @@ export class BattleUI {
       <div class="bhud-time">2:00</div>
       <div class="bhud-bombs" hidden></div>
       <div class="bhud-chips"></div>
-      <button class="icon-btn bhud-leave" aria-label="Pause">❚❚</button>
+      <button class="icon-btn bhud-leave" aria-label="Pause"><svg class="pause-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="5.6" y="4.5" width="4.8" height="15" rx="1.4"/><rect x="13.6" y="4.5" width="4.8" height="15" rx="1.4"/></svg></button>
       <div class="bhud-lost" hidden>
         <div class="panel">
           <h3>Lost the connection</h3>

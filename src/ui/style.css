@@ -575,6 +575,9 @@ html:has(body.booting) body { background: #5fc4ff; }
 .hud .icon-btn {
   pointer-events: auto;
 }
+/* the pause icon, drawn (the ❚❚ character isn't in our font: each browser drew its own, and desktop
+   Chrome's was two fat blocks) — two rounded bars, the same everywhere */
+.icon-btn .pause-ico { display: block; margin: auto; width: 1.6em; height: 1.6em; fill: currentColor; }
 .hud-hero {
   display: flex;
   align-items: center;
