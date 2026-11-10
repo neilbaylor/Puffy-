@@ -2860,12 +2860,14 @@ html.light .start .logo span { transform: rotate(-2deg); }
 /* on tablets and computers the Shop's tiles are bigger, filling the page out (like the battle lobby's
    squares): wider columns, a bigger hero, bigger words and button */
 @media (min-height: 501px) {
+  /* (in the start screen's "Pick your player" style: white, a thick ink outline) */
   .shop-welcome {
     display: block;
     margin: auto 0 0;
-    font: 400 clamp(18px, 2.8vh, 24px) / 1.1 var(--display);
-    letter-spacing: 0.02em;
-    color: #c2286f;
+    font: 400 clamp(20px, 4.6vmin, 36px) / 1.1 var(--display);
+    color: #fff;
+    -webkit-text-stroke: 6px var(--ink);
+    paint-order: stroke fill;
   }
   .shop-list { grid-template-columns: repeat(3, minmax(0, 320px)); gap: clamp(14px, 2.4vw, 28px); width: min(100%, 1040px); margin: clamp(2px, 0.6vh, 8px) 0 auto; }
   .shop-item { padding: 16px 16px 18px; gap: 6px; border-radius: 22px; }
