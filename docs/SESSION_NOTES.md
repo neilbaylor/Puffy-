@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.235)
+## Where things stand (v0.236)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -190,6 +190,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Level 4 decisions (user): climbing = jumping between ledges (no wall-jumps); drop 2 longer and harder than drop 1; poo goats on the climbs; Plops sometimes parachute in while you climb (not all the time); sideways shooting while falling; baseball at the bottom of the FIRST drop, a short walk right after landing: the batter hits line drives at you; the field like Part 1's soccer pitch. Baseball art: src/gfx/baseball.ts (PARK sizes, parkSpots, drawBallparkFront/Back, drawBaseball, drawLineDrive, drawBat, drawBaseballPlop(role)), sheets sketches/level4/bb-*.png.
 - Level 4: Plops in varied colours everywhere (gfx/plops.ts PLOP_COLOURS: caramel, reddish, chocolate, olive, golden, plum; drawPlop/drawPlopChute/drawBaseballPlop take a body Fill). Baseball has two teams: TEAM.plops (blue caps, fielding) and TEAM.poos (red caps/helmets, batting: batter, on deck, runner); scoreboard PLOPS vs POOS; at least one medium Plop playing (the batter and a fielder are medium, the rest small).
 - Level 4 (Plop Invasion · Part 2) planning: mostly climbing up (~60%), 2 parachute drops (~25 s each, Plops parachuting at different speeds: slow big patched dome / middling / fast streamer; shoot them: POP), a baseball game in the middle, boss later. Concept art in src/gfx/skydive.ts (drawCanopy, drawHeroChute(ch, pose, 'pack'|'burst'|'opening'|'open'|'steer'|'land', lean), drawPlopChute(kind, 'slow'|'mid'|'fast'|'popped')), sheets in sketches/level4/ (sheet.ts renders them via esbuild + ../l4art/shot.cjs). Engine work needed: vertical terrain chunking (4096 px), climbing camera, vertical background, parachute player state, vertical fly-over.
+- v0.236: .shop-list margin-top clamp(14px, 3vh, 30px) under the welcome line (it sits higher). Left-aligned variant shown to the user (welcome width = the tiles' span, text-align left), pending their pick.
 - v0.235: .shop-welcome styled like .start h2 ("Pick your player": white, -webkit-text-stroke 6px ink, clamp(20px, 4.6vmin, 36px)).
 - v0.234: .shop-welcome "Welcome to Puffy Boutique" (p before .shop-list; display:none, shown in the min-height 501px block with margin auto 0 0; the list then margin small 0 auto).
 - v0.233: .shop-note removed. @media (min-height: 501px) at the end of style.css: bigger Shop tiles (columns ≤320px, list ≤1040px, canvas clamp(130px, 27vh, 250px), bigger h3/tag/blurb/button), like the battle lobby's.
