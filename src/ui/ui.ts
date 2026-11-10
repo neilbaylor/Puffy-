@@ -1055,7 +1055,7 @@ export class UI {
     const hero = CHARACTERS[this.selected];
     const left = bank.rootbeerLeft;
     const pill = page.querySelector<HTMLElement>('.shop-rb')!;
-    pill.innerHTML = `<i class="rb-ico"></i> <b class="shop-count">${left}</b> root beer to spend`;
+    pill.innerHTML = `<i class="rb-ico"></i> <b class="shop-count">${left}</b> root beer`;
     if (paidFrom !== undefined && paidFrom > left) this.ringUp(pill, paidFrom, left);
     const list = page.querySelector('.shop-list')!;
     list.innerHTML = SHOP.map((it) => {
