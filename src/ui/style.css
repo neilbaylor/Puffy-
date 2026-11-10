@@ -3,6 +3,8 @@
   --ink-soft: #6b4e3c;
   --paper: #fff8ec;
   --gold: #ffc533;
+  /* the gold buttons (Battle, Bosses, the picked Part): one gradient for all of them */
+  --gold-btn: linear-gradient(180deg, #ffe27a, var(--gold));
   --aura: #6ff0d8;
   --aura-deep: #2fb8b0;
   --orange: #f28a2e;
@@ -1572,13 +1574,13 @@ html.rotating body {
   touch-action: manipulation;
 }
 .lvl.picked {
-  background: var(--gold);
+  background: var(--gold-btn);
 }
 /* the Bosses button: off to the right of the level buttons (they stay centred), past a thin divider */
 .levels { position: relative; }
 .lvl-side { position: absolute; left: 100%; top: 0; bottom: 0; display: flex; align-items: center; padding-left: 30px; }
 .lvl-side::before { content: ''; position: absolute; left: 14px; top: 18%; bottom: 18%; width: 2px; border-radius: 1px; background: rgba(255, 255, 255, 0.55); box-shadow: 0 0 0 0.5px rgba(58, 36, 24, 0.25); }
-.lvl.lvl-bosses { background: #ffe14d; white-space: nowrap; }
+.lvl.lvl-bosses { background: var(--gold-btn); white-space: nowrap; }
 /* narrow phones (iPhone SE and smaller): four Parts and Bosses still fit across */
 @media (max-width: 700px) {
   .levels { gap: 6px; }
@@ -2036,7 +2038,7 @@ kbd {
   justify-content: center;
   font: 900 clamp(21px, 4vmin, 28px) / 1 var(--display);
   letter-spacing: 0.02em;
-  background: linear-gradient(180deg, #ffe27a, var(--gold));
+  background: var(--gold-btn);
 }
 /* full screen and Battle, side by side in the top right, the same height and lined up */
 .start-tr {
