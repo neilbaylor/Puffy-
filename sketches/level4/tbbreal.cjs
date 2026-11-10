@@ -3,7 +3,7 @@ const { chromium } = require('playwright');
 (async () => {
   const br = await chromium.launch({ args: ['--use-gl=swiftshader'] });
   const ctx = await br.newContext({ viewport: { width: 844, height: 390 } });
-  await ctx.addInitScript(() => { if (!sessionStorage.getItem('x')) { sessionStorage.setItem('x', '1'); localStorage.setItem('puffy.beaten', '3'); localStorage.setItem('puffy.dev', '1'); localStorage.setItem('puffy.hero', 'puffy'); } });
+  await ctx.addInitScript((HERO) => { if (!sessionStorage.getItem('x')) { sessionStorage.setItem('x', '1'); localStorage.setItem('puffy.beaten', '3'); localStorage.setItem('puffy.dev', '1'); localStorage.setItem('puffy.hero', HERO); } }, process.argv[2] || 'puffy');
   const p = await ctx.newPage();
   const errs = []; p.on('pageerror', (e) => errs.push(e.message));
   await p.goto('http://localhost:8091/');

@@ -12,9 +12,9 @@ export const LEDGES: { x0: number; x1: number; h: number }[][] = [];
  *
  *    0- 41  CLIMB 1: ledges zig-zagging up (and drifting right) from the floor to ~91; a plateau,
  *           checkpoint, a poo goat; then the edge
- *   42-105  DROP 1 by parachute (a wall at 106-107 keeps you out of climb 2: you land at the bottom),
- *           quicksand poo, a checkpoint, a stretch of open ground, then Plop Park (68-104): the
- *           Plops playing baseball
+ *   42- 65  DROP 1 by parachute (a big wall at 66-67 keeps you out of Plop Park: you land at the
+ *           bottom, left of it), quicksand poo, a checkpoint, a stretch of open ground; under the
+ *           wall into Plop Park (68-104): the Plops playing baseball
  *  108-145  CLIMB 2 (longer): up to ~127, a plateau, checkpoint; the edge
  *  146-159  DROP 2 by parachute (longer, harder: a narrow shaft, more Plops; its far wall rises above
  *           the plateau, so there's no steering over to climb 3 or the gate)
@@ -82,7 +82,11 @@ export function buildLevel4(): LevelData {
         L.auraArc(a + 1, 3, h + 3, 1);
         if (plops.includes(i)) L.spawn(i % 3 === 0 ? 'bigplop' : 'plop', a + Math.floor(w / 2), h);
         if (goats.includes(i)) L.spawn('poogoat', b - 1, h);
-      } else if (r() < 0.25 * nuggies) L.aura((a + b) / 2, h + 3);
+      } else if (r() < 0.25 * nuggies) {
+        // (a climb with lots of nuggies: a pair over the ledge, not just one)
+        if (nuggies >= 3 && w >= 3) L.auraArc((a + b) / 2 - 0.6, 2, h + 3, 0.4);
+        else L.aura((a + b) / 2, h + 3);
+      }
     }
     return top;
   };
@@ -111,7 +115,7 @@ export function buildLevel4(): LevelData {
   L.spawn('plop', 18, 4);
 
   // ── CLIMB 1 ─────────────────────────────────────────────────
-  const t1 = climb(2, 22, 4, 89, 8, [4, 14, 24], [9, 19]);
+  const t1 = climb(2, 22, 4, 89, 8, [4, 14, 24], [9, 19], 3);
   // Plops parachuting in now and then on the way up
   for (const [x, h, k] of [[10, 26, 'plop'], [16, 44, 'plop'], [12, 62, 'bigplop'], [22, 80, 'plop']] as const) L.spawn('para', x, h, { kind: k });
 
@@ -126,9 +130,13 @@ export function buildLevel4(): LevelData {
   // ── DROP 1 (by parachute), the bottom, and Plop Park (the Plops playing baseball) ──
   // the drop: from the plateau's edge down to the floor, x 42..93 (a wall on the far side keeps you
   // out of climb 2 on the way down: you land at the bottom)
-  L.spawn('drop', 42, p1.h, { w: 52 + D, speed: 135, n: 11 });
+  // (it ends at a big wall just before Plop Park: you land in the open ground left of it, and walk
+  // in under it — no coming down in the middle of their game)
+  const parkWall = 54 + D;
+  L.spawn('drop', 42, p1.h, { w: parkWall - 42, speed: 135, n: 6 });
+  L.rock(parkWall, parkWall + 1, 8, p1.h + 6);
   // nuggies floating in the air down the drop: steer over to grab them on the way down (a few, not a trail)
-  for (const [x, h] of [[52, 80], [70, 60], [60, 40], [80, 24]] as const) L.auraArc(x, 2, h, 0.6);
+  for (const [x, h] of [[50, 80], [60, 60], [53, 40], [61, 24]] as const) L.auraArc(x, 2, h, 0.6);
   L.rock(94 + D, 95 + D, 16, p1.h + 6);
   L.ground(42, 133 + D, 4); // (on under climb 2 too)
   L.auraArc(55, 3, 7, 1);
@@ -142,7 +150,7 @@ export function buildLevel4(): LevelData {
   L.spawn('baseball', 56 + D, 4, { w: 36 });
 
   // ── CLIMB 2 (longer) ────────────────────────────────────────
-  const t2 = climb(97 + D, 119 + D, 4, 125, 8, [4, 9, 19, 29, 34], [14, 24, 39], 1.9);
+  const t2 = climb(97 + D, 119 + D, 4, 125, 8, [4, 9, 19, 29, 34], [14, 24, 39], 3.2);
   for (const [x, h, k] of [[106, 20, 'plop'], [114, 38, 'plop'], [108, 55, 'bigplop'], [118, 72, 'plop'], [110, 90, 'plop'], [120, 108, 'bigplop']] as const)
     L.spawn('para', x + D, h, { kind: k });
   const p2 = plateau(t2, 133 + D, LEDGES[1]);
@@ -152,7 +160,7 @@ export function buildLevel4(): LevelData {
 
   // ── DROP 2 (longer, harder: a narrow shaft, more Plops), then CLIMB 3 to the gate ──
   // (the shaft's far wall reaches well above the plateau: no steering over to climb 3 or the gate)
-  L.spawn('drop', 134 + D, p2.h, { w: 14, speed: 150, n: 12, hard: 1 });
+  L.spawn('drop', 134 + D, p2.h, { w: 14, speed: 150, n: 7, hard: 1 });
   for (const [x, h] of [[137, 112], [143, 88], [137, 62], [142, 36]] as const) L.auraArc(x + D, 2, h, 0.6);
   L.rock(148 + D, 149 + D, 18, p2.h + 6);
   L.ground(134 + D, W - 1, 10);
