@@ -223,3 +223,8 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.218: Battle: no chairs; the tall rock on the far right is a jump lower (every hero clears it).
 - v0.219: Battle: grown heroes no longer get stuck under the islands (Big Muscles grows a little less).
 - v0.220: the Shop: buy a party hat with root beer; your hero wears it everywhere (battles too).
+- v0.221: Sunglasses and a skateboard in the Shop (ollie on jump); the hat sits better on Scruffy and Big Muscles; "Wow!" at the first Giant Puff.
+- v0.222: The Shop is its own page (slides up, pink hopping title); prices 20/25/50; gear shows on the picked hero, who celebrates in it.
+- v0.223: Shop: bigger root beer badge; buying counts it down like a till (ka-ching).
+- v0.224: Shop badge just says "N root beer".
+- v0.225: Shop: no pink price line on things you haven't bought.
