@@ -237,3 +237,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.232: Shop: the root beer count-down quicker and smoother (no stutter as the badge bumps).
 - v0.233: Shop: no note at the bottom; bigger tiles on tablets and computers.
 - v0.234: Shop: "Welcome to Puffy Boutique" over the tiles on tablets and computers.
+- v0.235: Shop: the welcome line in the "Pick your player" style.
