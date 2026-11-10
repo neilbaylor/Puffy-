@@ -3,14 +3,14 @@
  * style (the same inked, shaded shapes as Puffy and the Plops), facing RIGHT as in the drawings —
  * tail on the left, mouth on the right — each in a frame of its own size.
  *
- *   orange — the level's main bad guy: a little orange fish, one big eye, a forked tail; he shoots
- *            bubbles from his tail (fire0–fire2)
+ *   badguy — Bad guy fish, the level's main bad guy: a little orange fish, one big eye, a forked tail;
+ *            he shoots bubbles from his tail (fire0–fire2). badguybig: a bigger one, deeper red-orange
  *   kai    — Kai fish: a small blue-purple fish with big grey shark fins (one sweeping up over its back)
  *   fat    — Fat Fish: huge and yellow, a grumpy brow, a blue hat saying "FAT FISH!" with a plume
  *   zippy  — Zippy: a tiny grey round fish with a grin and whiskers
  *   kingbob — King Bob, the king: big, white with orange patches, a gold crown, a cross eye, a rosy cheek
  *   slinger — Slinger: a long grey-and-white fish with a gold crown and a cross eye
- *   toothy — a long yellow fish with a grey band and a big round head that's all jagged teeth
+ *   stone  — Stone: a long yellow fish with a grey band and a big round head that's all jagged teeth
  *
  * The swim cycle (sw0–sw5): the tail sweeps up and down, the fins flap, the body bobs and tips a
  * touch; the toothy one chomps as it goes.
@@ -18,61 +18,65 @@
 import type { Ctx } from './draw';
 import { STYLES, ellipsePts, grow, type Fill, type Pt, type Style } from './handdrawn';
 
-export type FishKind = 'orange' | 'kai' | 'fat' | 'zippy' | 'kingbob' | 'slinger' | 'toothy';
-export const FISH_KINDS: FishKind[] = ['orange', 'kai', 'fat', 'zippy', 'kingbob', 'slinger', 'toothy'];
+export type FishKind = 'badguy' | 'badguybig' | 'kai' | 'fat' | 'zippy' | 'kingbob' | 'slinger' | 'stone';
+export const FISH_KINDS: FishKind[] = ['badguy', 'badguybig', 'kai', 'fat', 'zippy', 'kingbob', 'slinger', 'stone'];
 export type SwimFrame = 'sw0' | 'sw1' | 'sw2' | 'sw3' | 'sw4' | 'sw5';
 export const SWIM_FRAMES: SwimFrame[] = ['sw0', 'sw1', 'sw2', 'sw3', 'sw4', 'sw5'];
 /**
- * The orange fish firing a bubble from his tail: fire0 the wind-up (he scrunches up, tail cocked
+ * The bad guy fish firing a bubble from his tail: fire0 the wind-up (he scrunches up, tail cocked
  * forward over his back), fire1 the snap (tail flung out behind, a puff of bubbles at its tip — the
  * shot itself is its own sprite, BUBBLE_FRAMES), fire2 settling back.
  */
 export type FireFrame = 'fire0' | 'fire1' | 'fire2';
 export const FIRE_FRAMES: FireFrame[] = ['fire0', 'fire1', 'fire2'];
 export type FishFrame = SwimFrame | FireFrame;
-/** Every fish's frames: the swim cycle (and for the orange fish, firing). */
+/** Every fish's frames: the swim cycle (and for the bad guy fish, firing). */
 export const FISH_FRAMES: Record<FishKind, FishFrame[]> = {
-  orange: [...SWIM_FRAMES, ...FIRE_FRAMES],
+  badguy: [...SWIM_FRAMES, ...FIRE_FRAMES],
+  badguybig: [...SWIM_FRAMES, ...FIRE_FRAMES],
   kai: SWIM_FRAMES,
   fat: SWIM_FRAMES,
   zippy: SWIM_FRAMES,
   kingbob: SWIM_FRAMES,
   slinger: SWIM_FRAMES,
-  toothy: SWIM_FRAMES,
+  stone: SWIM_FRAMES,
 };
 /**
  * How big each fish is in the game: its frame's units × this = game pixels (a hero's 56-unit frame
- * and the Giant Puff's are 1:1). Fat Fish is as big as a Giant Puff (~180 px), King Bob big too;
- * Slinger a bit bigger than the hero; the orange fish, Kai and Zippy small.
+ * and the Giant Puff's are 1:1). Fat Fish about a Giant Puff, King Bob big too;
+ * Slinger bigger than the heroes; the bad guy fish (two sizes), Kai and Zippy small.
  */
 export const FISH_SCALE: Record<FishKind, number> = {
-  orange: 0.85,
+  badguy: 0.85,
+  badguybig: 1.45,
   kai: 0.75,
-  fat: 1.15,
+  fat: 1.0,
   zippy: 0.8,
   kingbob: 2.3,
-  slinger: 1.35,
-  toothy: 1.1,
+  slinger: 1.5,
+  stone: 1.1,
 };
 /** Each fish's frame (units; drawn at ART_RES in the game). */
 export const FISH_SIZE: Record<FishKind, { w: number; h: number }> = {
-  orange: { w: 74, h: 54 },
+  badguy: { w: 74, h: 54 },
+  badguybig: { w: 74, h: 54 },
   kai: { w: 92, h: 84 },
   fat: { w: 210, h: 176 },
   zippy: { w: 54, h: 40 },
   kingbob: { w: 100, h: 88 },
   slinger: { w: 128, h: 80 },
-  toothy: { w: 128, h: 70 },
+  stone: { w: 128, h: 70 },
 };
 /** What the drawings call them (the ones whose names we haven't got yet are placeholders). */
 export const FISH_NAME: Record<FishKind, string> = {
-  orange: 'Orange fish',
+  badguy: 'Bad guy fish',
+  badguybig: 'Bad guy fish (big)',
   kai: 'Kai fish',
   fat: 'Fat Fish',
   zippy: 'Zippy',
   kingbob: 'King Bob',
   slinger: 'Slinger',
-  toothy: 'Toothy fish',
+  stone: 'Stone',
 };
 
 const F = (base: string, shade: string, light: string): Fill => ({ base, shade, light });
@@ -205,7 +209,7 @@ function patches(ctx: Ctx, body: Pt[], draw: () => void) {
 
 /** Draw fish `kind` in swim frame `f`, its frame's top-left at (ox, oy). */
 export function drawFish(ctx: Ctx, ox: number, oy: number, kind: FishKind, f: FishFrame, st: Style = STYLES.polished) {
-  if (!f.startsWith('sw') && kind !== 'orange') f = 'sw0';
+  if (!f.startsWith('sw') && kind !== 'badguy' && kind !== 'badguybig') f = 'sw0';
   const p = phaseOf(f);
   const fire = f.startsWith('fire') ? +f.slice(4) : -1;
   const sw = Math.sin(p); // the tail's sweep
@@ -221,8 +225,11 @@ export function drawFish(ctx: Ctx, ox: number, oy: number, kind: FishKind, f: Fi
   ctx.rotate(tip);
   ctx.translate(-w / 2, -h / 2);
   switch (kind) {
-    case 'orange':
-      drawOrange(ctx, st, sw, flap, fire);
+    case 'badguy':
+      drawBadGuy(ctx, st, sw, fire, BADGUY);
+      break;
+    case 'badguybig':
+      drawBadGuy(ctx, st, sw, fire, BADGUY_BIG);
       break;
     case 'kai':
       drawKai(ctx, st, sw, flap);
@@ -239,8 +246,8 @@ export function drawFish(ctx: Ctx, ox: number, oy: number, kind: FishKind, f: Fi
     case 'slinger':
       drawSlinger(ctx, st, sw, flap);
       break;
-    case 'toothy':
-      drawToothy(ctx, st, sw, flap, p);
+    case 'stone':
+      drawStone(ctx, st, sw, flap, p);
       break;
   }
   ctx.restore();
@@ -248,8 +255,10 @@ export function drawFish(ctx: Ctx, ox: number, oy: number, kind: FishKind, f: Fi
 
 // ───────────────────────────── the fish ──
 
-function drawOrange(ctx: Ctx, st: Style, sw: number, _flap: number, fire = -1) {
-  const BODY = F('#ff9a3c', '#e2661a', '#ffc98c');
+/** Bad guy fish: orange; the big ones a deeper red-orange. */
+const BADGUY = F('#ff9a3c', '#e2661a', '#ffc98c');
+const BADGUY_BIG = F('#f2603a', '#bf3a1c', '#ff9f80');
+function drawBadGuy(ctx: Ctx, st: Style, sw: number, fire: number, BODY: Fill) {
   const cx = 42;
   const cy = 27;
   // firing: the wind-up cocks the tail up and forward over his back (scrunched up), the snap flings
@@ -407,7 +416,7 @@ function drawSlinger(ctx: Ctx, st: Style, sw: number, _flap: number) {
   crown(st, ctx, cx + 14, cy - 20, 22, 12, 0.12, 9608);
 }
 
-function drawToothy(ctx: Ctx, st: Style, sw: number, _flap: number, p: number) {
+function drawStone(ctx: Ctx, st: Style, sw: number, _flap: number, p: number) {
   const BODY = F('#ffe45c', '#e2b92a', '#fff6b0');
   const BAND = F('#8a8f96', '#62666d', '#b6bac0');
   const hx = 96;
@@ -476,7 +485,7 @@ function bubble(ctx: Ctx, x: number, y: number, r: number) {
   ctx.restore();
 }
 
-/** The orange fish's shot: a wobbling bubble (b0, b1), BUBBLE_SIZE units square, drawn round its middle. */
+/** The bad guy fish's shot: a wobbling bubble (b0, b1), BUBBLE_SIZE units square, drawn round its middle. */
 export type BubbleFrame = 'b0' | 'b1';
 export const BUBBLE_FRAMES: BubbleFrame[] = ['b0', 'b1'];
 export const BUBBLE_SIZE = 22;

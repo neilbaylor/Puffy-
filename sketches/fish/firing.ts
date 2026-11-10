@@ -10,8 +10,8 @@ const seq: { f: FishFrame; shot?: number }[] = [
   { f: 'sw4', shot: 4 }, { f: 'sw5', shot: 5 }, { f: 'sw0', shot: 6 }, { f: 'sw1', shot: 7 }, { f: 'sw2', shot: 8 }, { f: 'sw3', shot: 9 },
 ];
 const out: string[] = [];
-const fx = W - FISH_SIZE.orange.w - 10;
-const fy = (H - FISH_SIZE.orange.h) / 2;
+const fx = W - FISH_SIZE.badguy.w - 10;
+const fy = (H - FISH_SIZE.badguy.h) / 2;
 for (const s of seq) {
   const c = document.createElement('canvas');
   c.width = W * S;
@@ -23,7 +23,7 @@ for (const s of seq) {
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, c.width, c.height);
   ctx.scale(S, S);
-  drawFish(ctx, fx, fy, 'orange', s.f);
+  drawFish(ctx, fx, fy, 'badguy', s.f);
   if (s.shot !== undefined) {
     // the shot flies off the tail tip, to the left
     const bx = fx - 8 - s.shot * 16 - BUBBLE_SIZE / 2;

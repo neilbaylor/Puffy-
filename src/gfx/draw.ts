@@ -279,55 +279,68 @@ function drawRegulator(ctx: Ctx, ox: number, oy: number, ch: CharacterDef, pose:
   st.shape(ctx, [[mx - 3 * k.s, my - 2.6 * k.s], [mx + 3.4 * k.s, my - 2.8 * k.s], [mx + 3.8 * k.s, my + 2.8 * k.s], [mx - 3 * k.s, my + 2.6 * k.s]], { base: '#2b3036', shade: '#16191d', light: '#57606a' }, 8803, { lw: 0.8 });
   st.shape(ctx, ellipsePts(mx + 3.6 * k.s, my, 2.2 * k.s, 2.4 * k.s, 0, 14), { base: '#ffcc33', shade: '#d99a12', light: '#fff0a8' }, 8804, { lw: 0.7 });
 }
-/** The dive mask: one wide window over both eyes in a dark rubber frame, its strap round the back of the head. */
+/**
+ * The dive mask, old-school: a small oval glass faceplate snug over the eyes in a polished metal rim
+ * (with a couple of rivets), a black rubber strap round the back of the head.
+ */
 function drawMask(ctx: Ctx, ox: number, oy: number, ch: CharacterDef, pose: Pose) {
   const G = GLASSES[ch.id] ?? GLASSES.puffy;
   const h = headShift(ch, pose);
-  const pad = 1.2;
-  const x0 = Math.min(...G.lenses.map((l) => l.x - l.w / 2)) - pad;
-  const x1 = Math.max(...G.lenses.map((l) => l.x + l.w / 2)) + pad;
-  const y0 = Math.min(...G.lenses.map((l) => l.y - l.h / 2)) - pad;
-  const y1 = Math.max(...G.lenses.map((l) => l.y + l.h / 2)) + pad;
+  const x0 = Math.min(...G.lenses.map((l) => l.x - l.w / 2));
+  const x1 = Math.max(...G.lenses.map((l) => l.x + l.w / 2));
+  const y0 = Math.min(...G.lenses.map((l) => l.y - l.h / 2));
+  const y1 = Math.max(...G.lenses.map((l) => l.y + l.h / 2));
+  const cx = (x0 + x1) / 2;
+  const cy = (y0 + y1) / 2;
+  const rx = (x1 - x0) / 2 + 0.3;
+  const ry = (y1 - y0) / 2 + 0.2;
   ctx.save();
   ctx.translate(ox + h.e.x, oy + h.e.y);
   ctx.rotate(h.rot);
   ctx.translate(-h.e0.x, -h.e0.y);
-  const rr = (x: number, y: number, w: number, hh: number, r: number) => {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.arcTo(x + w, y, x + w, y + hh, r);
-    ctx.arcTo(x + w, y + hh, x, y + hh, r);
-    ctx.arcTo(x, y + hh, x, y, r);
-    ctx.arcTo(x, y, x + w, y, r);
-    ctx.closePath();
-  };
   // the strap, back round the head to the ear
   ctx.lineCap = 'round';
   ctx.strokeStyle = '#1f2328';
-  ctx.lineWidth = 2.6 * G.s;
+  ctx.lineWidth = 2.2 * G.s;
   ctx.beginPath();
-  ctx.moveTo(x0 + 1, (y0 + y1) / 2 - 1);
-  ctx.quadraticCurveTo((x0 + G.ear.x) / 2, y0 - 2, G.ear.x, G.ear.y);
+  ctx.moveTo(cx - rx + 0.5, cy - 0.5);
+  ctx.quadraticCurveTo((cx - rx + G.ear.x) / 2, cy - ry - 1.5, G.ear.x, G.ear.y);
   ctx.stroke();
-  // the glass: pale sea-blue and see-through (the eyes show), then the rubber frame round it, a glare
-  rr(x0, y0, x1 - x0, y1 - y0, 4);
-  ctx.fillStyle = 'rgba(175,230,252,0.28)';
+  // the glass: pale sea-blue and see-through (the eyes show)
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(175,230,252,0.26)';
   ctx.fill();
+  // the metal rim: ink outline, a steel band, a bright edge
   ctx.strokeStyle = '#1c1a1f';
-  ctx.lineWidth = 3.4;
+  ctx.lineWidth = 3.2;
   ctx.stroke();
-  ctx.strokeStyle = '#3d6a8a';
-  ctx.lineWidth = 1.6;
+  ctx.strokeStyle = '#9aa4ae';
+  ctx.lineWidth = 1.7;
   ctx.stroke();
-  ctx.save();
-  rr(x0, y0, x1 - x0, y1 - y0, 4);
-  ctx.clip();
-  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+  ctx.lineWidth = 0.6;
   ctx.beginPath();
-  ctx.moveTo(x0 + 1, y0 + (y1 - y0) * 0.55);
-  ctx.lineTo(x0 + (x1 - x0) * 0.35, y0 - 1);
-  ctx.lineTo(x0 + (x1 - x0) * 0.5, y0 - 1);
-  ctx.lineTo(x0 + 2.5, y0 + (y1 - y0) * 0.85);
+  ctx.ellipse(cx, cy, rx, ry, 0, Math.PI * 1.05, Math.PI * 1.55);
+  ctx.stroke();
+  // rivets on the rim
+  ctx.fillStyle = '#e8edf2';
+  for (const a of [Math.PI * 0.25, Math.PI * 0.75, Math.PI * 1.25, Math.PI * 1.75]) {
+    ctx.beginPath();
+    ctx.arc(cx + Math.cos(a) * rx, cy + Math.sin(a) * ry, 0.55, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // a glare across the glass
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+  ctx.clip();
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.beginPath();
+  ctx.moveTo(cx - rx, cy + ry * 0.1);
+  ctx.lineTo(cx - rx * 0.25, cy - ry - 1);
+  ctx.lineTo(cx + rx * 0.05, cy - ry - 1);
+  ctx.lineTo(cx - rx * 0.75, cy + ry * 0.45);
   ctx.closePath();
   ctx.fill();
   ctx.restore();
