@@ -18,9 +18,9 @@ export interface ShopItem {
 }
 
 export const SHOP: ShopItem[] = [
-  { id: 'party', slot: 'head', name: 'Party Hat', price: 20, blurb: 'A stripy birthday-party hat with a fluffy pom-pom on top.' },
-  { id: 'frogskins', slot: 'eyes', name: 'Sunglasses', price: 25, blurb: 'Chunky black frames with orange lenses. Very cool.' },
-  { id: 'board', slot: 'ride', name: 'Skateboard', price: 50, blurb: 'Ride everywhere on it — and every jump’s an ollie.' },
+  { id: 'party', slot: 'head', name: 'Party Hat', price: 20, blurb: 'A fun party hat with a pom-pom on top. Just like you always wanted.' },
+  { id: 'frogskins', slot: 'eyes', name: 'Sunglasses', price: 25, blurb: 'Chunky black frames with reflective orange lenses.' },
+  { id: 'board', slot: 'ride', name: 'Skateboard', price: 50, blurb: 'Why walk when you can ride and look cool doing it?' },
 ];
 
 const item = (id: string) => SHOP.find((i) => i.id === id);

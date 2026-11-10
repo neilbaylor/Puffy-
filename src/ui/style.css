@@ -2007,8 +2007,8 @@ kbd {
   box-shadow: 0 5px 0 var(--ink);
   text-align: center;
 }
-/* what you've on: the picked hero's frame from the start screen (lifted, a coloured ring then ink) in the Shop's pink, no star */
-.shop-item.on { transform: translateY(-6px); box-shadow: 0 0 0 4px #ff6fb1, 0 0 0 7px var(--ink), 0 12px 0 5px var(--ink); }
+/* what you've on: the picked hero's frame from the start screen (a coloured ring then ink) in the Shop's pink, no star, not lifted */
+.shop-item.on { box-shadow: 0 0 0 4px #ff6fb1, 0 0 0 7px var(--ink), 0 12px 0 5px var(--ink); }
 .shop-item canvas { width: clamp(84px, 24vh, 150px); height: clamp(84px, 24vh, 150px); }
 .shop-item h3 { margin: 2px 0 0; font: 400 clamp(19px, 3.6vh, 26px)/1.05 var(--display); color: var(--ink); }
 .shop-tag { margin: 0; min-height: 1em; font: 800 12px/1 var(--body); letter-spacing: 0.06em; text-transform: uppercase; color: #c2286f; }
