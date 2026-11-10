@@ -282,6 +282,8 @@ function drawRegulator(ctx: Ctx, ox: number, oy: number, ch: CharacterDef, pose:
 /** A hero's own mask oval (middle x, y, radii; standing, frame units) where the one from the eyes' spots doesn't fit. */
 const MASK_FIT: Record<string, [number, number, number, number]> = {
   puffy: [35, 19.2, 9.6, 8.6],
+  // (a size up on Big Muscles: his eyes sit well inside it)
+  muscles: [32.2, 18.7, 9.6, 6.4],
 };
 /**
  * The dive mask, old-school: a small oval glass faceplate snug over the eyes in a polished metal rim
