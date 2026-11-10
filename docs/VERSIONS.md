@@ -219,3 +219,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.214: Level 4: more room before Plop Park (map wider), parachuting Plops aim both ways, Plops don't shadow you from ledges, no Plop at the gate.
 - v0.215: in the Plop King fight the chair hits his Plops while they're still parachuting in.
 - v0.216: Battle: the chair hits bad guys still parachuting in (reaches up over your head for them).
+- v0.217: Level 4: fewer Plops while parachuting, more nuggies on the first two climbs, a big wall before Plop Park (land left of it).
