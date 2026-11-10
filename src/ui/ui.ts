@@ -1071,7 +1071,7 @@ export class UI {
       return `<div class="shop-item${on ? ' on' : ''}" data-id="${it.id}" data-hero="${hero.id}">
         <canvas width="240" height="240"></canvas>
         <h3>${esc(it.name)}</h3>
-        <p class="shop-tag">${on ? (it.slot === 'ride' ? 'Riding it' : 'Wearing it') : own ? 'Yours' : `${it.price} root beer`}</p>
+        <p class="shop-tag">${on ? (it.slot === 'ride' ? 'Riding it' : 'Wearing it') : own ? 'Yours' : ''}</p>
         <p class="shop-blurb">${esc(it.blurb)}</p>
         ${btn}
       </div>`;
