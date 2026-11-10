@@ -1032,13 +1032,43 @@ export class UI {
       this.closeShop();
     });
     this.renderShop();
+    this.alignShop();
+    window.addEventListener('resize', this.alignShopSoon);
   }
+
+  /**
+   * On tablets and computers the welcome line and the tiles sit level with the start screen's
+   * "Pick your player" and its cards (the start screen's still there, under the Shop: measure it).
+   * Where the start screen hides its title (short screens), the Shop keeps its own layout.
+   */
+  private alignShop() {
+    const page = this.shopEl;
+    const welcome = page?.querySelector<HTMLElement>('.shop-welcome');
+    const list = page?.querySelector<HTMLElement>('.shop-list');
+    if (!page || !welcome || !list) return;
+    welcome.style.marginTop = '';
+    list.style.marginTop = '';
+    const h2 = this.screen?.querySelector<HTMLElement>('.start h2');
+    const card = this.screen?.querySelector<HTMLElement>('.card');
+    if (!h2 || !card || !h2.offsetHeight || !welcome.offsetHeight) return;
+    // (layout positions: offsetTop isn't moved by the page's slide)
+    const want = h2.getBoundingClientRect().top;
+    const wantCards = card.getBoundingClientRect().top;
+    // (each row measured where it lands with no margin, then nudged to the line; a little negative
+    // margin is fine — it eats into the page's row gap, never into the badge or the welcome line)
+    welcome.style.marginTop = '0px';
+    list.style.marginTop = '0px';
+    welcome.style.marginTop = `${Math.max(-14, want - welcome.offsetTop)}px`;
+    list.style.marginTop = `${Math.max(-14, wantCards - list.offsetTop)}px`;
+  }
+  private alignShopSoon = () => requestAnimationFrame(() => this.alignShop());
 
   /** Slide the Shop back down, then it's gone (the start screen's under it all along). */
   private closeShop() {
     const page = this.shopEl;
     if (!page) return;
     this.shopEl = null;
+    window.removeEventListener('resize', this.alignShopSoon);
     if (this.startStale) {
       this.startStale = false;
       if (this.screen?.classList.contains('start')) this.showStart();
