@@ -15,7 +15,7 @@ export type Phase = 'lobby' | 'countdown' | 'battle' | 'results';
 
 // ── game → server ──
 export type ClientMsg =
-  | { t: 'hello'; name: string; hero: string; token: string }
+  | { t: 'hello'; name: string; hero: string; token: string; hat?: string }
   | { t: 'hero'; hero: string }
   | { t: 'name'; name: string }
   /** Buttons for one tick (seq counts up by one per tick). */
@@ -29,6 +29,8 @@ export interface RoomPlayer {
   id: string;
   name: string;
   hero: string;
+  /** The hat they wear (a Shop id; '' none). */
+  hat: string;
   slot: number;
   connected: boolean;
   /** In the current battle (people who join mid-battle wait for the next one). */

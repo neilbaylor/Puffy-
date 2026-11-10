@@ -31,6 +31,8 @@ interface Client {
   ws: WebSocket | null;
   name: string;
   hero: string;
+  /** The hat they wear (a Shop id; '' none). */
+  hat: string;
   slot: number;
   playing: boolean;
   /** Buttons waiting to be used, one per tick: [seq, buttons]. */
@@ -47,6 +49,8 @@ const ARENA = buildArena();
 const LAG = Math.max(0, Number(process.env.BATTLE_LAG_MS) || 0);
 const later = (fn: () => void) => (LAG ? setTimeout(fn, LAG) : fn());
 const heroOk = (h: string) => (CHARACTERS.some((c) => c.id === h) ? h : 'puffy');
+/** A hat from the Shop: an id (lower case, digits, dashes), else none. */
+const hatOk = (h: unknown) => (typeof h === 'string' && /^[a-z0-9-]{1,20}$/.test(h) && h !== 'none' ? h : '');
 const cleanName = (n: unknown, slot: number) => {
   const s = String(n ?? '').replace(/[^\p{L}\p{N} _'!.-]/gu, '').trim().slice(0, 10);
   return s || (slot >= 0 ? `Player ${slot + 1}` : 'Fan');
@@ -128,6 +132,7 @@ class Room {
         c.ws?.close();
         c.ws = ws;
         c.droppedAt = 0;
+        c.hat = hatOk(msg.hat);
         this.send(c, { t: 'welcome', id: c.id });
         this.broadcastRoom();
         return c;
@@ -145,6 +150,7 @@ class Room {
       ws,
       name: cleanName(msg.name, slot),
       hero: heroOk(msg.hero),
+      hat: hatOk(msg.hat),
       slot,
       playing: false,
       queue: [],
@@ -383,7 +389,7 @@ class Room {
   roomState(): RoomState {
     const players: RoomPlayer[] = [...this.clients.values()]
       .sort((a, b) => a.slot - b.slot)
-      .map((c) => ({ id: c.id, name: c.name, hero: c.hero, slot: c.slot, connected: !!c.ws, playing: c.playing, kos: c.kos, deaths: c.deaths }));
+      .map((c) => ({ id: c.id, name: c.name, hero: c.hero, hat: c.hat, slot: c.slot, connected: !!c.ws, playing: c.playing, kos: c.kos, deaths: c.deaths }));
     return { phase: this.phase, players, timer: Math.max(0, Math.ceil(this.timer)), winner: this.winner };
   }
 

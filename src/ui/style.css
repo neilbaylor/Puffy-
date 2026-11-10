@@ -1880,6 +1880,45 @@ kbd {
 .start-foot .controls { margin-top: 13px; }
 .mouse-ico { vertical-align: -3px; }
 
+/* ───────────── the Shop ───────────── */
+/* its button sits beside Battle, top right: the same size, party pink */
+.battle-btn.shop-btn { background: linear-gradient(180deg, #ffb3d9, #ff6fb1); }
+.shop-panel { align-items: center; text-align: center; min-width: min(100%, 420px); max-width: 560px; }
+.shop-panel h2 { margin: 0; }
+.shop-rb { margin: 2px 0 6px; font: 800 16px/1.2 var(--body); }
+.shop-rb b { font: 400 22px/1 var(--display); margin-right: 2px; }
+.shop-list { display: grid; gap: 12px; width: 100%; }
+.shop-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  border: 3px solid var(--ink);
+  border-radius: 16px;
+  background: #fff8ec;
+  box-shadow: 0 4px 0 var(--ink);
+  text-align: left;
+}
+.shop-item.on { background: #ffe9f4; }
+.shop-item canvas { width: 116px; height: 116px; flex: none; }
+.shop-info { display: grid; gap: 4px; justify-items: start; }
+.shop-info h3 { margin: 0; font: 400 22px/1.1 var(--display); }
+.shop-info h3 small { font: 800 11px/1 var(--body); letter-spacing: 0.06em; text-transform: uppercase; background: #ff6fb1; color: #fff; border-radius: 6px; padding: 3px 6px; vertical-align: 3px; }
+.shop-info p { margin: 0; font: 600 14px/1.3 var(--body); }
+.shop-price { font-weight: 800 !important; }
+.shop-price:empty { display: none; }
+.shop-info .btn { margin-top: 4px; }
+.shop-info .btn:disabled { opacity: 0.6; cursor: default; }
+.shop-note { margin: 8px 0 4px; font: 600 13px/1.3 var(--body); opacity: 0.75; }
+@media (max-width: 520px) {
+  .shop-item { flex-direction: column; text-align: center; }
+  .shop-info { justify-items: center; }
+}
+@media (max-height: 460px) {
+  .shop-item canvas { width: 90px; height: 90px; }
+  .shop-note { display: none; }
+}
+
 /* ───────────── online battle ───────────── */
 
 /* the Battle button, top right of the start screen (full screen sits to its left) */

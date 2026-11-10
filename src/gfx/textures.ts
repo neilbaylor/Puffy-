@@ -18,8 +18,9 @@ import { PLOP_FRAMES, PLOP_H, PLOP_W, drawPlop, type PlopKind } from './plops';
 import { drawPoo } from './hazards';
 import { BB_ALIAS, BB_FIELD_TILES, BB_KEYS, BB_PLAIN, BB_ROSTER, BB_SIZE, PARK, drawBallparkBack, drawBallparkFront, drawBaseball, drawBaseballPlop, drawCappedPlop, drawLineDrive, type BBPlayer, type BaseballRole } from './baseball';
 import { PLOP_COLOURS } from './plops';
+import { wardrobe } from '../core/wardrobe';
 import { FLAME_FRAMES, FLAME_H, FLAME_W, drawDyingFlame, drawFlame, drawScorch } from './flame';
-import { ART_RES, ART_STYLE, CARRY_SWING, CHAR_H, CHAR_W, POSES, canvas, carry, drawCharacter, ellipse, type CarryFrame, type Ctx, type Pose } from './draw';
+import { ART_RES, ART_STYLE, CARRY_SWING, CHAR_H, CHAR_W, HAT_UP, POSES, canvas, carry, drawCharacter, ellipse, type CarryFrame, type Ctx, type Pose } from './draw';
 import { FACE_FRAMES, faceFromKey } from './face';
 import { STYLES } from './handdrawn';
 import { themesFor } from '../world/theme';
@@ -154,9 +155,23 @@ function makeCollisionTiles(scene: Phaser.Scene) {
 const HERO_M = 8;
 /** One hero's animation frames (`face`: the standing pose with each little face they pull now and then). */
 function makeCharacter(scene: Phaser.Scene, ch: (typeof CHARACTERS)[number], face: boolean) {
+  makeHeroSheet(scene, face ? `char-${ch.id}-face` : `char-${ch.id}`, ch, face, wardrobe.hat);
+}
+
+/**
+ * A hero's frames (or their faces) wearing `hat` (null: none) — with room over their head for it
+ * if there's one (HAT_UP), the hero at the bottom as always. (A battle draws each player's own.)
+ */
+export function makeHeroSheet(scene: Phaser.Scene, key: string, ch: (typeof CHARACTERS)[number], face: boolean, hat: string | null) {
   const M = HERO_M;
-  if (!face) sheet(scene, `char-${ch.id}`, CHAR_W + M * 2, CHAR_H, POSES, (ctx, p) => drawCharacter(ctx, M, 0, ch, p));
-  else sheet(scene, `char-${ch.id}-face`, CHAR_W + M * 2, CHAR_H, FACE_FRAMES, (ctx, f) => drawCharacter(ctx, M, 0, ch, 'idle0', faceFromKey(f)));
+  const up = hat ? HAT_UP : 0;
+  if (!face) sheet(scene, key, CHAR_W + M * 2, CHAR_H + up, POSES, (ctx, p) => drawCharacter(ctx, M, up, ch, p, undefined, hat));
+  else sheet(scene, key, CHAR_W + M * 2, CHAR_H + up, FACE_FRAMES, (ctx, f) => drawCharacter(ctx, M, up, ch, 'idle0', faceFromKey(f), hat));
+}
+
+/** The hero pictures drawn with a hat (or without): when you change hats they're drawn again, next time they're needed. */
+export function dropHeroSheets(textures: Phaser.Textures.TextureManager) {
+  for (const k of textures.getTextureKeys()) if (k.startsWith('char-') || k.startsWith('bchar-')) textures.remove(k);
 }
 
 /**
@@ -222,10 +237,11 @@ export function makeCarrySheet(scene: Phaser.Scene, ch: (typeof CHARACTERS)[numb
   const frames: (Pose | CarryFrame)[] = [...POSES, ...(Object.keys(CARRY_SWING) as CarryFrame[])];
   carry.on = true;
   try {
-    sheet(scene, key, CHAR_W + HERO_M * 2, CHAR_H, frames, (ctx, f) => {
+    const up = wardrobe.hat ? HAT_UP : 0;
+    sheet(scene, key, CHAR_W + HERO_M * 2, CHAR_H + up, frames, (ctx, f) => {
       const sw = (CARRY_SWING as Record<string, number>)[f];
       carry.a = sw ?? -1.75;
-      drawCharacter(ctx, HERO_M, 0, ch, sw === undefined ? (f as Pose) : f === 'lift' ? 'idle1' : 'idle0');
+      drawCharacter(ctx, HERO_M, up, ch, sw === undefined ? (f as Pose) : f === 'lift' ? 'idle1' : 'idle0');
     });
   } finally {
     carry.on = false;

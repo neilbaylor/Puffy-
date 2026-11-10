@@ -1981,7 +1981,7 @@ export class GameScene extends Phaser.Scene {
       charId: p.char.id,
       name: p.char.name,
       aura: this.aura,
-      rootbeer: bank.rootbeer,
+      rootbeer: bank.rootbeerLeft,
       stamina: Math.round(p.stamina * 100) / 100,
       exhausted: p.exhausted,
       running: p.running,

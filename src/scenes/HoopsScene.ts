@@ -667,7 +667,7 @@ export class HoopsScene extends Phaser.Scene {
     if (this.heroCrowned && !this.tweens.isTweening(c)) {
       // the champion wears it now
       const h = this.hero;
-      c.setPosition(h.x + (h.flipX ? -2 : 2), h.y - h.displayHeight * 0.9 + 12).setAngle(h.flipX ? 12 : -12);
+      c.setPosition(h.x + (h.flipX ? -2 : 2), h.y - CHAR_H * ART_RES * Math.abs(h.scaleY) * 0.9 + 12).setAngle(h.flipX ? 12 : -12);
     } else if (cs.mode === 'on') {
       cs.tilt *= Math.exp(-dt / 1000 * 3);
       c.setPosition(headX, headY).setRotation(k.rotation + cs.tilt).setFlipX(k.flipX);
@@ -778,7 +778,7 @@ export class HoopsScene extends Phaser.Scene {
       const two = Math.random() < 0.4;
       this.tweens.add({ targets: this.heroHop, h: two ? 14 : 22, duration: two ? 130 : 180, yoyo: true, repeat: two ? 1 : 0, ease: 'Quad.easeOut', onComplete: () => (this.heroHop.h = 0) });
     }
-    h.setOrigin(0.5, 1 + this.heroHop.h / (CHAR_H * ART_RES));
+    h.setOrigin(0.5, 1 + this.heroHop.h / h.frame.realHeight);
   }
 
   private updateLighting() {
@@ -974,7 +974,7 @@ export class HoopsScene extends Phaser.Scene {
     this.tweens.add({ targets: this.crown, y: cy - 520, angle: 900, duration: 1100, ease: 'Quad.easeOut' });
     this.time.delayedCall(1100, () => {
       const h = this.hero;
-      const top = h.y - h.displayHeight * 0.9;
+      const top = h.y - CHAR_H * ART_RES * Math.abs(h.scaleY) * 0.9;
       this.crown.setDepth(8.06);
       this.tweens.add({
         targets: this.crown,

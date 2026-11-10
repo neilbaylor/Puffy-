@@ -5,6 +5,7 @@
  * the connection (same place in the room for 30 s).
  */
 import { unpackPlayer, type ClientMsg, type RoomState, type ServerMsg, type SnapChair, type SnapEnemy, type SnapHazard, type SnapPlayer, type SnapPrize, type SnapRocket } from '../shared/battle/protocol';
+import { wardrobe } from '../core/wardrobe';
 import type { BEvent } from '../shared/battle/sim';
 
 export interface Snapshot {
@@ -87,7 +88,7 @@ export class BattleNet {
     this.ws = ws;
     ws.onopen = () => {
       this.retry = 0;
-      this.send({ t: 'hello', name: this.name, hero: this.hero, token: token() });
+      this.send({ t: 'hello', name: this.name, hero: this.hero, token: token(), hat: wardrobe.hat ?? '' });
       clearInterval(this.pingTimer);
       this.pingTimer = window.setInterval(() => this.send({ t: 'ping', c: performance.now() }), 2000);
     };

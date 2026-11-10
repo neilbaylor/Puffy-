@@ -12,9 +12,10 @@
  *   POST /api/register  { name, password }            → 201 { token, user }
  *   POST /api/login     { name, password }            → { token, user } (404 { unknown: true } if no such player)
  *   GET  /api/me        (Authorization: Bearer token) → { user }
- *   PUT  /api/progress  (Bearer) { rootbeer, nuggies, kills, level } → { user }
+ *   PUT  /api/progress  (Bearer) { rootbeer, nuggies, kills, level, spent?, items?, hat? } → { user }
  *   POST /api/logout    (Bearer)                      → 204
- * where user = { name, rootbeer, nuggies, kills, level }.
+ * where user = { name, rootbeer, nuggies, kills, level, spent, items, hat } (root beer is every bottle
+ * ever found, spent what the Shop has had; items the Shop ids owned, comma separated; hat the one worn).
  */
 import { createHash, randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
@@ -30,6 +31,10 @@ export interface PublicUser {
   nuggies: number;
   kills: number;
   level: number;
+  /** Root beer spent in the Shop, what's been bought there (ids, comma separated), the hat worn. */
+  spent: number;
+  items: string;
+  hat: string;
 }
 
 interface UserRow extends PublicUser {
@@ -72,6 +77,9 @@ async function openSqlite(file: string): Promise<Store> {
       nuggies INTEGER NOT NULL DEFAULT 0,
       kills INTEGER NOT NULL DEFAULT 0,
       level INTEGER NOT NULL DEFAULT 1,
+      spent INTEGER NOT NULL DEFAULT 0,
+      items TEXT NOT NULL DEFAULT '',
+      hat TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -84,11 +92,14 @@ async function openSqlite(file: string): Promise<Store> {
   // (a database made before a column existed gets it added)
   const cols = (db.prepare('PRAGMA table_info(users)').all() as { name: string }[]).map((c) => c.name);
   if (!cols.includes('kills')) db.exec('ALTER TABLE users ADD COLUMN kills INTEGER NOT NULL DEFAULT 0');
+  if (!cols.includes('spent')) db.exec('ALTER TABLE users ADD COLUMN spent INTEGER NOT NULL DEFAULT 0');
+  if (!cols.includes('items')) db.exec("ALTER TABLE users ADD COLUMN items TEXT NOT NULL DEFAULT ''");
+  if (!cols.includes('hat')) db.exec("ALTER TABLE users ADD COLUMN hat TEXT NOT NULL DEFAULT ''");
   const q = {
-    byName: db.prepare('SELECT id, name, hash, salt, rootbeer, nuggies, kills, level FROM users WHERE name = ? COLLATE NOCASE'),
-    byId: db.prepare('SELECT id, name, hash, salt, rootbeer, nuggies, kills, level FROM users WHERE id = ?'),
+    byName: db.prepare('SELECT id, name, hash, salt, rootbeer, nuggies, kills, level, spent, items, hat FROM users WHERE name = ? COLLATE NOCASE'),
+    byId: db.prepare('SELECT id, name, hash, salt, rootbeer, nuggies, kills, level, spent, items, hat FROM users WHERE id = ?'),
     create: db.prepare('INSERT INTO users (name, hash, salt) VALUES (?, ?, ?)'),
-    progress: db.prepare("UPDATE users SET rootbeer = ?, nuggies = ?, kills = ?, level = ?, updated_at = datetime('now') WHERE id = ?"),
+    progress: db.prepare("UPDATE users SET rootbeer = ?, nuggies = ?, kills = ?, level = ?, spent = ?, items = ?, hat = ?, updated_at = datetime('now') WHERE id = ?"),
     addSession: db.prepare('INSERT INTO sessions (token_hash, user_id) VALUES (?, ?)'),
     session: db.prepare('SELECT user_id FROM sessions WHERE token_hash = ?'),
     dropSession: db.prepare('DELETE FROM sessions WHERE token_hash = ?'),
@@ -102,7 +113,7 @@ async function openSqlite(file: string): Promise<Store> {
       const r = q.create.run(name, hash, salt);
       return row(q.byId.get(Number(r.lastInsertRowid)))!;
     },
-    setProgress: (id, p) => void q.progress.run(p.rootbeer, p.nuggies, p.kills, p.level, id),
+    setProgress: (id, p) => void q.progress.run(p.rootbeer, p.nuggies, p.kills, p.level, p.spent, p.items, p.hat, id),
     addSession: (t, id) => void q.addSession.run(t, id),
     session: (t) => (q.session.get(t) as { user_id: number } | undefined)?.user_id,
     dropSession: (t) => void q.dropSession.run(t),
@@ -114,7 +125,12 @@ function openJson(file: string): Store {
   type Data = { next: number; users: UserRow[]; sessions: Record<string, number> };
   let data: Data = { next: 1, users: [], sessions: {} };
   if (existsSync(file)) data = JSON.parse(readFileSync(file, 'utf8')) as Data;
-  for (const u of data.users) u.kills ??= 0;
+  for (const u of data.users) {
+    u.kills ??= 0;
+    u.spent ??= 0;
+    u.items ??= '';
+    u.hat ??= '';
+  }
   const save = () => {
     writeFileSync(file + '.tmp', JSON.stringify(data));
     renameSync(file + '.tmp', file);
@@ -125,7 +141,7 @@ function openJson(file: string): Store {
     byName: (name) => data.users.find((u) => u.name.toLowerCase() === name.toLowerCase()),
     byId: (id) => data.users.find((u) => u.id === id),
     create: (name, hash, salt) => {
-      const u: UserRow = { id: data.next++, name, hash, salt, rootbeer: 0, nuggies: 0, kills: 0, level: 1 };
+      const u: UserRow = { id: data.next++, name, hash, salt, rootbeer: 0, nuggies: 0, kills: 0, level: 1, spent: 0, items: '', hat: '' };
       data.users.push(u);
       save();
       return u;
@@ -162,7 +178,16 @@ export async function openStore(file = dbPath()): Promise<Store> {
 /** Names: 2–16 letters, numbers, spaces, - or _ (the game itself caps them at 10). */
 const NAME_RE = /^[A-Za-z0-9 _-]{2,16}$/;
 const sha = (s: string) => createHash('sha256').update(s).digest('hex');
-const pub = (u: UserRow): PublicUser => ({ name: u.name, rootbeer: u.rootbeer, nuggies: u.nuggies, kills: u.kills, level: u.level });
+const pub = (u: UserRow): PublicUser => ({ name: u.name, rootbeer: u.rootbeer, nuggies: u.nuggies, kills: u.kills, level: u.level, spent: u.spent ?? 0, items: u.items ?? '', hat: u.hat ?? '' });
+/** Shop ids (lower case, digits, dashes), comma separated: anything else is dropped. */
+const ids = (v: unknown, max: number) =>
+  typeof v === 'string'
+    ? v
+        .split(',')
+        .filter((x) => /^[a-z0-9-]{1,20}$/.test(x))
+        .slice(0, max)
+        .join(',')
+    : '';
 const int = (v: unknown, lo: number, hi: number) => Math.max(lo, Math.min(hi, Math.floor(Number(v) || 0)));
 
 async function hashPassword(pw: string, salt: Buffer) {
@@ -261,7 +286,16 @@ export async function createUserApi() {
         const u = userFrom(req);
         if (!u) return void send(res, 401, { error: 'Not signed in.' }), true;
         const body = await readBody(req);
-        const p = { rootbeer: int(body.rootbeer, 0, 1_000_000), nuggies: int(body.nuggies, 0, 10_000_000), kills: int(body.kills, 0, 10_000_000), level: int(body.level, 1, 99) };
+        const p = {
+          rootbeer: int(body.rootbeer, 0, 1_000_000),
+          nuggies: int(body.nuggies, 0, 10_000_000),
+          kills: int(body.kills, 0, 10_000_000),
+          level: int(body.level, 1, 99),
+          // (an older game that doesn't send these keeps what the account has)
+          spent: body.spent === undefined ? (u.spent ?? 0) : int(body.spent, 0, 1_000_000),
+          items: body.items === undefined ? (u.items ?? '') : ids(body.items, 50),
+          hat: body.hat === undefined ? (u.hat ?? '') : ids(body.hat, 1),
+        };
         store.setProgress(u.id, p);
         return void send(res, 200, { user: pub(store.byId(u.id)!) }), true;
       }
