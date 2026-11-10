@@ -2012,6 +2012,8 @@ kbd {
 /* not enough root beer: the Buy button, greyed out */
 .shop-item .btn:disabled { filter: grayscale(0.7); opacity: 0.62; cursor: default; }
 .shop-item .rb-ico { width: 0.7em; height: 1em; vertical-align: -0.15em; }
+/* the little welcome over the tiles (tablets and computers only: phones haven't the room) */
+.shop-welcome { display: none; }
 /* putting something on: your hero's celebration, as on the pick-a-player cards */
 .shop-item.cheer canvas { transform-origin: 50% 100%; animation: card-cheer 0.75s linear; }
 .shop-item.cheer[data-hero='scruffy'] canvas { transform-origin: 50% 80%; animation: flip-hop 0.84s linear, flip-spin 0.84s linear; }
@@ -2858,7 +2860,14 @@ html.light .start .logo span { transform: rotate(-2deg); }
 /* on tablets and computers the Shop's tiles are bigger, filling the page out (like the battle lobby's
    squares): wider columns, a bigger hero, bigger words and button */
 @media (min-height: 501px) {
-  .shop-list { grid-template-columns: repeat(3, minmax(0, 320px)); gap: clamp(14px, 2.4vw, 28px); width: min(100%, 1040px); }
+  .shop-welcome {
+    display: block;
+    margin: auto 0 0;
+    font: 400 clamp(18px, 2.8vh, 24px) / 1.1 var(--display);
+    letter-spacing: 0.02em;
+    color: #c2286f;
+  }
+  .shop-list { grid-template-columns: repeat(3, minmax(0, 320px)); gap: clamp(14px, 2.4vw, 28px); width: min(100%, 1040px); margin: clamp(2px, 0.6vh, 8px) 0 auto; }
   .shop-item { padding: 16px 16px 18px; gap: 6px; border-radius: 22px; }
   .shop-item canvas { width: clamp(130px, 27vh, 250px); height: clamp(130px, 27vh, 250px); }
   .shop-item h3 { font-size: clamp(24px, 3.8vh, 34px); }
