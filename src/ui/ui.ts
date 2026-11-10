@@ -1101,7 +1101,7 @@ export class UI {
       const own = wardrobe.owns(it.id);
       const on = wardrobe.isOn(it.id);
       const btn = on
-        ? `<button class="btn btn-alt" data-off="${it.id}">Take it off</button>`
+        ? `<button class="btn btn-alt" data-off="${it.id}">${it.slot === 'ride' ? 'Stop Riding' : it.slot === 'eyes' ? 'Take them off' : 'Take it off'}</button>`
         : own
           ? `<button class="btn shop-wear" data-wear="${it.id}">${it.slot === 'ride' ? 'Ride it' : 'Wear it'}</button>`
           : // (not enough root beer yet: the same Buy button, greyed out)
