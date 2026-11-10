@@ -6,6 +6,7 @@ import { PLOP_H } from '../../gfx/plops';
 import type { EnemyKind } from '../../level/builder';
 import type { GameScene } from '../../scenes/GameScene';
 import type { WeaponKind } from './Weapons';
+import { BadFish } from './Fish';
 import { BigPuff, Giant, Glob, Goat, Puffball, colHash, createEnemy, type DeathKind, type Enemy } from './Enemy';
 
 /**
@@ -423,6 +424,7 @@ export function createBadGuy(gs: GameScene, kind: EnemyKind, x: number, y: numbe
     return e;
   }
   if (kind === 'giantplop') return new GiantPlop(gs, x, y);
+  if (kind === 'fish' || kind === 'bigfish') return new BadFish(gs, x, y, kind === 'bigfish');
   if (kind === 'poogoat') return new PooGoat(gs, x, y);
   return createEnemy(gs, kind, x, y);
 }

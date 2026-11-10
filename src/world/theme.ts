@@ -1,4 +1,5 @@
 import { PALETTES, seaColor } from '../gfx/world';
+import '../gfx/sea';
 import { LIGHT } from '../core/light';
 
 /**
@@ -15,7 +16,9 @@ export const THEMES = ['puff', 'candy', 'golden', 'meadow'] as const;
 export const MOUNTAIN_THEMES = ['m-pastel', 'm-frost', 'm-sunset'] as const;
 /** Plop Invasion's looks: murky noon, smoggy dusk, stinky haze. */
 export const PLOP_THEMES = ['p-muck', 'p-dusk', 'p-stink'] as const;
-export type ThemeId = (typeof THEMES)[number] | (typeof MOUNTAIN_THEMES)[number] | (typeof PLOP_THEMES)[number];
+/** Under the sea's looks: a sunny lagoon, the deep blue, a twilight reef. */
+export const SEA_THEMES = ['w-lagoon', 'w-deep', 'w-dusk'] as const;
+export type ThemeId = (typeof THEMES)[number] | (typeof MOUNTAIN_THEMES)[number] | (typeof PLOP_THEMES)[number] | (typeof SEA_THEMES)[number];
 
 const HOLD = 20;
 const BLEND = 10;
@@ -44,7 +47,7 @@ export function themeMix(t: number, themes: readonly ThemeId[] = LIGHT ? THEMES.
 }
 
 /** The looks a level cycles through. */
-const allThemesFor = (level: number): readonly ThemeId[] => (level === 2 ? MOUNTAIN_THEMES : level >= 3 ? PLOP_THEMES : THEMES);
+const allThemesFor = (level: number): readonly ThemeId[] => (level === 2 ? MOUNTAIN_THEMES : level === 5 ? SEA_THEMES : level >= 3 ? PLOP_THEMES : THEMES);
 /** A level's looks, in order. (Light mode: just its first — no other looks to draw and hold, and
  * never two whole backgrounds showing at once while one fades into the next.) */
 export const themesFor = (level: number): readonly ThemeId[] => (LIGHT ? allThemesFor(level).slice(0, 1) : allThemesFor(level));
@@ -61,6 +64,9 @@ const TINT: Record<ThemeId, number> = {
   'p-muck': 0xfff2e0,
   'p-dusk': 0xffe2d4,
   'p-stink': 0xf0f4dc,
+  'w-lagoon': 0xeafcff,
+  'w-deep': 0xdcecff,
+  'w-dusk': 0xece6ff,
 };
 
 export const lerpRgb = (x: number, y: number, w: number) => {

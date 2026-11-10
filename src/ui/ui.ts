@@ -83,10 +83,11 @@ const store = {
 const kc = (k: string) => `<kbd>${k}</kbd>`;
 /** A little mouse (the emoji doesn't show on every computer). */
 const MOUSE = `<svg class="mouse-ico" viewBox="0 0 14 20" width="11" height="16" aria-hidden="true"><rect x="1.2" y="1.2" width="11.6" height="17.6" rx="5.8" fill="#fff" stroke="currentColor" stroke-width="1.8"/><path d="M7 1.6v5.4M1.6 7h10.8" stroke="currentColor" stroke-width="1.4"/><rect x="1.9" y="1.9" width="5" height="5" rx="2" fill="#ffd23f"/></svg>`;
-function controlsHtml(compact = false) {
+function controlsHtml(compact = false, swim = false) {
   const rows: [string, string][] = [
-    [`${kc('←')}${kc('→')} <small>or</small> ${kc('A')}${kc('D')}`, 'move'],
-    [`${kc('↑')} <small>or</small> ${kc('W')}`, compact ? 'jump (again in the air: double jump)' : 'jump — press again in the air for a double jump'],
+    [`${kc('←')}${kc('→')} <small>or</small> ${kc('A')}${kc('D')}`, swim ? 'swim' : 'move'],
+    // (under the sea: every press is a stroke up)
+    [`${kc('↑')} <small>or</small> ${kc('W')}`, swim ? (compact ? 'swim up (tap, tap, tap)' : 'swim up — each press is a stroke') : compact ? 'jump (again in the air: double jump)' : 'jump — press again in the air for a double jump'],
     [`${kc('Space')} <small>or</small> ${MOUSE} <small>click</small>`, 'fire the bazooka'],
     [`${kc('Shift')}`, 'hold to run (uses stamina)'],
     [`${kc('Esc')}`, 'pause'],
@@ -388,7 +389,7 @@ export class UI {
     game.events.on('level-intro-end', () => {
       if (!usingTouch()) {
         // a quick reminder of the keys, fading away after a few seconds
-        const tip = h(`<div class="ctl-tip">${controlsHtml(true)}</div>`);
+        const tip = h(`<div class="ctl-tip">${controlsHtml(true, (this.gameScene as { level?: { data: { water?: number } } } | null)?.level?.data.water !== undefined)}</div>`);
         this.root.appendChild(tip);
         setTimeout(() => tip.classList.add('off'), 6500);
         setTimeout(() => tip.remove(), 7300);
@@ -1485,7 +1486,7 @@ export class UI {
         <button class="btn btn-go" data-act="resume">Resume</button>
         <button class="btn" data-act="hero">Home screen</button>
         <button class="btn btn-alt" data-act="sound">${isMuted() ? 'Sound: off' : 'Sound: on'}</button>
-        ${usingTouch() ? '' : `<h3 class="ctl-title">Controls</h3>${controlsHtml()}`}
+        ${usingTouch() ? '' : `<h3 class="ctl-title">Controls</h3>${controlsHtml(false, (this.gameScene as { level?: { data: { water?: number } } } | null)?.level?.data.water !== undefined)}`}
       </div>
     </div>`);
     const act = (a: string, fn: () => void) => el.querySelector(`[data-act=${a}]`)!.addEventListener('click', fn);
@@ -1593,7 +1594,7 @@ export class UI {
             <dt>Lives left <i class="life-ico"></i></dt><dd>${r.lives}</dd>
             <dt>Aura carried <i class="aura-ico"></i></dt><dd>${r.aura}</dd>
             <dt>Root beer found <i class="rb-ico"></i></dt><dd>${r.rootbeerTotal}</dd>
-            <dt>${levelInfo(r.level ?? this.level).world === 'World 2' ? 'Plops splatted' : 'Puffballs popped'}</dt><dd>${r.popped}</dd>
+            <dt>${levelInfo(r.level ?? this.level).world === 'World 3' ? 'Bad guy fish popped' : levelInfo(r.level ?? this.level).world === 'World 2' ? 'Plops splatted' : 'Puffballs popped'}</dt><dd>${r.popped}</dd>
             <dt>${levelInfo(r.level ?? this.level).world === 'World 2' ? 'Giant Plops beaten' : 'Giants beaten'}</dt><dd>${r.giants}</dd>
             <dt>Time</dt><dd>${mins}:${secs}</dd>
           </dl>

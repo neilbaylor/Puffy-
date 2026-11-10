@@ -23,7 +23,10 @@ export class Aura extends Phaser.Physics.Arcade.Image {
   /** Scattered while you're under a parachute: it floats down at this speed (px/s) instead of dropping, so you can catch it. */
   private float = 0;
 
-  constructor(scene: Phaser.Scene, x: number, y: number, scattered = false, float = 0) {
+  /** Scattered under the water: it drifts out round you and sinks slowly. */
+  private sea = false;
+
+  constructor(scene: Phaser.Scene, x: number, y: number, scattered = false, float = 0, sea = false) {
     super(scene, x, y, 'nuggie');
     scene.add.existing(this);
     scene.physics.add.existing(this);
@@ -34,7 +37,16 @@ export class Aura extends Phaser.Physics.Arcade.Image {
     this.baseY = y;
     this.phase = Math.random() * 10;
     this.collectableAt = scattered ? scene.time.now + 450 : 0;
-    if (scattered && float > 0) {
+    if (scattered && sea) {
+      // (a slow puff of them out round you, then they sink gently: plenty of time to swim after them)
+      this.sea = true;
+      this.life = 5.5;
+      this.body.setAllowGravity(false);
+      const a = Math.random() * Math.PI * 2;
+      const sp = 110 + Math.random() * 90;
+      this.body.setVelocity(Math.cos(a) * sp, Math.sin(a) * sp * 0.8 - 30);
+      this.body.setBounce(0.4, 0.4);
+    } else if (scattered && float > 0) {
       // (a puff of them out round you, then they drift down slower than you, so you sink onto them)
       this.float = float * 0.6;
       this.life = 6;
@@ -55,6 +67,11 @@ export class Aura extends Phaser.Physics.Arcade.Image {
   tick(time: number, dt: number): boolean {
     if (this.taken) return false;
     const t = time / 1000 + this.phase;
+    if (this.sea && this.body) {
+      const v = this.body.velocity;
+      v.x *= Math.exp(-dt * 2);
+      v.y += (32 - v.y) * Math.min(1, dt * 1.8);
+    }
     if (this.float > 0 && this.body) {
       const v = this.body.velocity;
       v.x *= Math.exp(-dt * 1.6);

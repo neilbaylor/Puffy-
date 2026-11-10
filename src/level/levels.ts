@@ -3,6 +3,7 @@ import { buildLevel1 } from './level1';
 import { buildLevel2 } from './level2';
 import { buildLevel3 } from './level3';
 import { buildLevel4 } from './level4';
+import { buildLevel5 } from './level5';
 
 export interface LevelInfo {
   /** 1-based level number. */
@@ -23,6 +24,8 @@ export interface LevelInfo {
   button?: string;
   /** Work in progress: only for testers, and open to them straight away (not unlocked by beating the one before). */
   wip?: boolean;
+  /** A work-in-progress level only these accounts get (names, any case; default: every tester). */
+  testers?: string[];
 }
 
 export const LEVELS: LevelInfo[] = [
@@ -67,8 +70,20 @@ export const DEV = (() => {
 })();
 /** Accounts that get the work-in-progress levels (names, any case), and every boss in the Bosses menu. */
 const TESTERS = ['neil', 'founder'];
-/** Levels still being made: only testers see them (none right now: Part 4 is open to everyone since v0.195). */
-const WIP: LevelInfo[] = [];
+/** Levels still being made: only testers see them. */
+const WIP: LevelInfo[] = [
+  {
+    id: 5,
+    world: 'World 3',
+    title: 'The Rise of King Bob',
+    part: 'Part 1',
+    button: 'Part 5',
+    build: buildLevel5,
+    speech: 'Here goes nothing!',
+    wip: true,
+    testers: ['neil'],
+  },
+];
 let tester = false;
 /** A tester's signed in (or this is a dev device). */
 export const isTester = () => tester;
@@ -77,12 +92,14 @@ export const isTester = () => tester;
  * in — called on sign-in and sign-out). True if that changed the list.
  */
 export function setTester(name: string | null | undefined): boolean {
-  const on = DEV || TESTERS.includes((name ?? '').trim().toLowerCase());
+  const who = (name ?? '').trim().toLowerCase();
+  const on = DEV || TESTERS.includes(who);
   tester = on;
-  const has = LEVELS.some((l) => l.wip);
-  if (on === has || !WIP.length) return false;
-  if (on) LEVELS.push(...WIP);
-  else LEVELS.splice(0, LEVELS.length, ...LEVELS.filter((l) => !l.wip));
+  // (each work-in-progress level for its own testers, or every tester)
+  const want = on ? WIP.filter((l) => DEV || !l.testers || l.testers.includes(who)) : [];
+  const has = LEVELS.filter((l) => l.wip);
+  if (want.length === has.length && want.every((l) => has.includes(l))) return false;
+  LEVELS.splice(0, LEVELS.length, ...LEVELS.filter((l) => !l.wip), ...want);
   return true;
 }
 // (straight away: the tester signed in on this device last time — before the account answers)

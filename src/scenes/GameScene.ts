@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { DEPTH, GRAVITY, MAX_FALL_SPEED, MIN_VIEW_W, TILE, VIEW_H } from '../config';
-import { PROP_RES, addCanvas, dropBaddiesExcept, ensureLook, freeLooksExcept, gameArtJobs, hires, lookJobs } from '../gfx/textures';
+import { PROP_RES, addCanvas, dropBaddiesExcept, dropOtherHeroSheets, ensureLook, freeLooksExcept, gameArtJobs, hires, lookJobs } from '../gfx/textures';
 import { PALETTES } from '../gfx/world';
 import { drawRock } from '../gfx/hazards';
 import { POO, POO_DARK } from '../gfx/plopworld';
@@ -15,7 +15,7 @@ import { KING_RES, PCHUTE_DOWN, PCHUTE_RES, PCHUTE_UP, PLOP_RES } from '../gfx/t
 import { JET_NOZZLES, KING_FEET, KING_H, KING_MID } from '../gfx/plopking';
 import type { WeaponKind } from '../entities/enemies/Weapons';
 import { Aura, Checkpoint, Goal, RootBeer } from '../entities/Pickups';
-import { Player } from '../entities/Player';
+import { Player, WATER_G } from '../entities/Player';
 import { Rocket } from '../entities/Rocket';
 import { SoccerMatch } from '../entities/Soccer';
 import { HockeyMatch } from '../entities/Hockey';
@@ -137,7 +137,7 @@ export class GameScene extends Phaser.Scene {
   level!: LevelView;
   fx!: Fx;
   private bg!: Background;
-  private amb!: Ambience;
+  amb!: Ambience;
 
   players: Player[] = [];
   private matches: SoccerMatch[] = [];
@@ -161,6 +161,16 @@ export class GameScene extends Phaser.Scene {
   private dropPlops: { e: Enemy; img: Phaser.GameObjects.Image; how: 'slow' | 'mid' | 'fast'; t: number }[] = [];
   private enemies: Enemy[] = [];
   private rockets: Rocket[] = [];
+  /** The rockets flying now (a bad guy fish's bubbles pop on them). */
+  get liveRockets() {
+    return this.rockets;
+  }
+  /** A little scene's playing (the world's paused). */
+  get cutsceneOn() {
+    return this.cutscene || !!this.intro;
+  }
+  /** Under the sea: the camera's top limit (it eases down to just over the surface once you've dived in). */
+  private camMin = 0;
   private auras: Aura[] = [];
   private rootbeers: RootBeer[] = [];
   private pendingAura: { at: number; p: Player }[] = [];
@@ -275,7 +285,9 @@ export class GameScene extends Phaser.Scene {
     this.levelId = this.data0.level ?? 1;
     const data = (levelInfo(this.levelId).build ?? buildLevel1)();
     this.wideZones = data.wide ?? [];
-    this.physics.world.gravity.y = GRAVITY;
+    // (under the sea the water's own gravity: the heroes get the usual back above the surface)
+    this.physics.world.gravity.y = data.water !== undefined ? WATER_G : GRAVITY;
+    this.camMin = 0;
     this.physics.world.TILE_BIAS = 24;
     // only the terrain where the camera starts is drawn now (the end of the level, where the
     // fly-over begins, or the checkpoint on a retry); the rest a chunk per frame as it plays,
@@ -298,14 +310,17 @@ export class GameScene extends Phaser.Scene {
     // this level's bad guys (drawn behind the loading card before the level started; here if not
     // yet, e.g. a restart); the other levels' are freed
     for (const job of gameArtJobs(this, { heroes: this.session.players.map((p) => p.characterId), level: this.levelId })) job.run();
-    if (!this.scene.isActive('Battle')) dropBaddiesExcept(this, this.levelId);
+    if (!this.scene.isActive('Battle')) {
+      dropBaddiesExcept(this, this.levelId);
+      dropOtherHeroSheets(this, this.levelId);
+    }
     this.lookNext = 0;
     if (!this.scene.isActive('Menu') && !this.scene.isActive('Battle')) freeLooksExcept(this, themesFor(this.levelId));
-    this.bg = new Background(this, heightPx - VIEW_H, false, !!data.vertical);
+    this.bg = new Background(this, heightPx - VIEW_H, false, !!data.vertical, data.water !== undefined);
     this.amb = new Ambience(this, this.levelId, (x, y, max) => {
       for (let d = 0; d <= max; d += 6) if (this.level.isSolidAt(x, y + d)) return Math.floor((y + d) / TILE) * TILE;
       return null;
-    });
+    }, data.water !== undefined ? { surface: data.water, width: widthPx } : undefined);
     this.applyTheme();
     this.fx = new Fx(this);
 
@@ -441,10 +456,26 @@ export class GameScene extends Phaser.Scene {
     const specs = this.session.players.length ? this.session.players : [{ slot: 0, characterId: 'puffy', inputId: 'solo' }];
     specs.forEach((spec, i) => {
       const p = new Player(this, characterById(spec.characterId), sourceById(spec.inputId) ?? soloSource, start.x - i * 28, start.y);
+      if (data.water !== undefined) {
+        // (under the sea: in the dive gear)
+        p.key = `char-${spec.characterId}-sea`;
+        p.view.setTexture(p.key, 'idle0');
+        p.setWater(data.water);
+      }
       p.spawnProtection();
       this.players.push(p);
       this.gPlayers.add(p.hitbox);
     });
+
+    // ── Under the sea: a splash as you dive in, bubbles on every stroke ──
+    this.events.off('hero-splash');
+    this.events.off('hero-stroke');
+    this.events.on('hero-splash', (p: Player) => {
+      this.amb.sea?.splash(p.x);
+      sfx.splash();
+      this.cameras.main.shake(140, 0.003);
+    });
+    this.events.on('hero-stroke', (p: Player) => this.amb.sea?.bubbles(p.x + p.facing * 10, p.body.top + 8, 2));
 
     // ── Collisions ──
     const layer = this.level.layer;
@@ -486,6 +517,8 @@ export class GameScene extends Phaser.Scene {
     this.intro = null;
     this.introTop = null;
     if (!this.retry) this.startIntro(start.x);
+    // (back at the start of an under-the-sea level: straight off the pier again)
+    else if (data.water !== undefined) for (const p of this.players) if (!p.swimming) this.diveIn(p, 700);
     this.cameras.main.fadeIn(this.retry ? 250 : 400, 255, 248, 236);
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.players.forEach((p) => p.destroy()));
@@ -788,9 +821,27 @@ export class GameScene extends Phaser.Scene {
     const line = levelInfo(this.levelId).speech;
     const speak = () => {
       if (line && this.players[0]) this.time.delayedCall(350, () => this.say(this.players[0], line));
+      // under the sea: "Here goes nothing!" — then a hop and a dive off the end of the pier
+      if (this.level.data.water !== undefined) for (const p of this.players) if (!p.swimming) this.diveIn(p);
     };
     if (this.king) this.kingBlastsOff(speak);
     else speak();
+  }
+
+  /** Under the sea's opening: stood on the pier while they speak, then a run-up hop and a head-first dive. */
+  private diveIn(p: Player, wait = 2100) {
+    p.diving = true;
+    p.facing = 1;
+    this.time.delayedCall(wait, () => {
+      if (!p.alive || p.swimming) return;
+      p.squash = { x: 1.25, y: 0.78 };
+      this.time.delayedCall(120, () => {
+        if (!p.alive || p.swimming) return;
+        p.body.setVelocity(255, -440);
+        p.squash = { x: 0.75, y: 1.3 };
+        sfx.jump();
+      });
+    });
   }
 
   /** The jetpack's flames, under its nozzles (wherever the King is). */
@@ -923,7 +974,8 @@ export class GameScene extends Phaser.Scene {
     const endX = Phaser.Math.Clamp(this.players[0]?.x ?? I.x1, vwEnd / 2, Math.max(vwEnd / 2, widthPx - vwEnd / 2));
     const rawX = I.x0 + (endX - I.x0) * introGlide(u);
     const x = Phaser.Math.Clamp(rawX, vw / 2, Math.max(vw / 2, widthPx - vw / 2));
-    const clampTop = (t: number) => Phaser.Math.Clamp(t, Math.min(0, heightPx - vh), heightPx - vh);
+    const water = this.level.data.water;
+    const clampTop = (t: number) => Phaser.Math.Clamp(t, Math.min(water !== undefined ? water - 230 : 0, heightPx - vh), heightPx - vh);
     // ride above the terrain (it climbs on the mountain), then blend onto the hero's framing
     // spatially smoothed ground height under the view (smooth because x moves smoothly),
     // so the camera keeps up with steep slopes without lagging behind them
@@ -1043,7 +1095,12 @@ export class GameScene extends Phaser.Scene {
       this.camTop += (tTop - this.camTop) * (snap ? 1 : 1 - Math.exp(-dt * 4));
     }
     this.camX = Phaser.Math.Clamp(this.camX, vw / 2, Math.max(vw / 2, widthPx - vw / 2));
-    this.camTop = Phaser.Math.Clamp(this.camTop, Math.min(0, heightPx - vh), heightPx - vh);
+    // (under the sea, once you're in: no higher than a sliver of sky over the surface)
+    const water = this.level.data.water;
+    // (and before: up on the pier, more of the sky over you)
+    const camMin = water === undefined ? Math.min(0, heightPx - vh) : tracked.length && tracked.every((p) => p.swimming) ? Math.min(water - 52, heightPx - vh) : Math.min(water - 230, heightPx - vh);
+    this.camMin = snap ? camMin : this.camMin + (camMin - this.camMin) * (1 - Math.exp(-dt * 1.5));
+    this.camTop = Phaser.Math.Clamp(this.camTop, this.camMin, heightPx - vh);
 
     const left = Math.round((this.camX - vw / 2) * zoom) / zoom;
     const top = Math.round(this.camTop * zoom) / zoom;
@@ -1084,7 +1141,8 @@ export class GameScene extends Phaser.Scene {
       const n = Math.min(this.aura, SCATTER_MAX);
       // nuggies scatter (grab some back!) — under a parachute they float down with you instead of dropping
       const float = p.chute ? p.chute.speed : 0;
-      for (let i = 0; i < n; i++) this.addAura(new Aura(this, p.x, p.y - 10, true, float));
+      // (and under the water they drift out round you and sink slowly, so you can swim after them)
+      for (let i = 0; i < n; i++) this.addAura(new Aura(this, p.x, p.y - 10, true, float, p.swimming));
       this.aura = 0;
       p.knockBack(fromX);
       this.fx.auraSparkle(p.x, p.y, 14);

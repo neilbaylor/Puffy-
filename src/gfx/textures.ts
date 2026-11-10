@@ -17,6 +17,7 @@ import { POOWAVE_H, POOWAVE_W, drawPooOnGoat, drawPooPile, drawPooWave, drawStin
 import { PLOP_FRAMES, PLOP_H, PLOP_W, drawPlop, type PlopKind } from './plops';
 import { BUBBLE_FRAMES, BUBBLE_SIZE, FISH_FRAMES, FISH_SIZE, drawBubbleShot, drawFish, type FishKind } from './fish';
 import { drawPoo } from './hazards';
+import { CRAB_FRAMES, CRAB_H, CRAB_W, JELLY_FRAMES, JELLY_H, JELLY_W, SCHOOL_FRAMES, SEA_PROPS, SEA_PROP_H, SEA_PROP_W, SURFACE_H, TURTLE_FRAMES, TURTLE_H, TURTLE_W, drawCrab, drawJelly, drawLightRay, drawSchoolFish, drawSeaBubble, drawSeaFar, drawSeaMid, drawSeaNear, drawSeaProp, drawSeaSky, drawSurface, drawTurtle } from './sea';
 import { BB_ALIAS, BB_FIELD_TILES, BB_KEYS, BB_PLAIN, BB_ROSTER, BB_SIZE, PARK, drawBallparkBack, drawBallparkFront, drawBaseball, drawBaseballPlop, drawCappedPlop, drawLineDrive, type BBPlayer, type BaseballRole } from './baseball';
 import { PLOP_COLOURS } from './plops';
 import { gearOf, wardrobe } from '../core/wardrobe';
@@ -113,6 +114,11 @@ export function frameGrid(n: number, fw: number, fh: number, gap = 4) {
 /** The heroes' own sheets are read back (recoloured for the other players in a battle); everything else lets its pixels go once uploaded. */
 // (the heroes' frames, faces and chair-carrying frames: Battle recolours them for each player)
 const keepPixels = (key: string) => /^char-[a-z]+(-face|-carry)?$/.test(key);
+
+/** What a hero wears under the sea: their own things, the dive gear on (no skateboard in the water). */
+export const seaWear = () => [...wardrobe.wearKey.split(',').filter((w) => w && w !== 'board'), 'scuba'].sort().join(',');
+/** A level where you swim (World 3): its hero sheets are the dive-gear ones (`char-<id>-sea`). */
+export const swimLevel = (level: number | 'battle' | null | undefined) => level === 5;
 
 /** A frame sheet: each frame is drawn in world units w × h at `res`. */
 function sheet<F extends string>(
@@ -544,7 +550,12 @@ function makeBgLayer(scene: Phaser.Scene, id: string, layer: BgLayer) {
   const L = BG_LAYERS;
   const opts = { release: true };
   if (layer === 'sky') addCanvas(scene, key, hires(4, 512, 1, (ctx) => drawSky(ctx, 4, 512, pal)));
-  else if (layer === 'far')
+  else if (pal.sea) {
+    // (under the sea: hazy rock pillars, the reef, the sandy sea bed)
+    const L2 = L[layer];
+    const draw = layer === 'far' ? drawSeaFar : layer === 'hills' ? drawSeaMid : drawSeaNear;
+    addCanvas(scene, key, hiresPadV(L2.w, L2.h, BG_RES, (ctx) => draw(ctx, L2.w, L2.h, pal)), undefined, opts);
+  } else if (layer === 'far')
     addCanvas(scene, key, hiresPadV(L.far.w, L.far.h, BG_RES, (ctx) => (look ? drawMountainFar(ctx, L.far.w, L.far.h, look) : drawFarLayer(ctx, L.far.w, L.far.h, pal))), undefined, opts);
   else if (layer === 'hills')
     addCanvas(scene, key, hiresPadV(L.hills.w, L.hills.h, BG_RES, (ctx) => (look ? drawMountainMid(ctx, L.hills.w, L.hills.h, look) : drawHillsLayer(ctx, L.hills.w, L.hills.h, pal))), undefined, opts);
@@ -621,6 +632,7 @@ const BADDIE_KEYS: Record<string, string[]> = {
   chutes: ['pchute'],
   king: ['pking-jet', 'jetflame', 'jetsmoke'],
   baseball: BB_KEYS,
+  fish: ['fish-badguy', 'fish-badguybig', 'fish-bubble'],
 };
 
 /** The bad guys each level has (and a battle): only those are drawn, the others freed. */
@@ -629,6 +641,7 @@ const BADDIES_FOR: Record<string, string[]> = {
   2: ['puffball', 'bigpuff', 'giant', 'goat', 'weapons'],
   3: ['goat', 'weapons', 'plops'],
   4: ['goat', 'weapons', 'plops', 'chutes', 'king', 'baseball'],
+  5: ['fish'],
   battle: ['puffball', 'bigpuff', 'giant', 'weapons'],
 };
 
@@ -640,13 +653,22 @@ const BADDIES_FOR: Record<string, string[]> = {
 export function gameArtJobs(scene: Phaser.Scene, opts: { heroes: readonly string[]; level?: number | 'battle' | null }): Step[] {
   const T = scene.textures;
   const out: Step[] = [];
+  const sea = swimLevel(opts.level);
   for (const id of new Set(opts.heroes)) {
     const ch = CHARACTERS.find((c) => c.id === id);
     if (!ch) continue;
+    if (sea) {
+      // (under the sea: in the dive gear)
+      if (!T.exists(`char-${id}-sea`)) out.push({ name: `hero ${id} diving`, run: () => makeHeroSheet(scene, `char-${id}-sea`, ch, false, seaWear()) });
+      if (!T.exists(`char-${id}-sea-face`)) out.push({ name: `hero ${id} diving faces`, run: () => makeHeroSheet(scene, `char-${id}-sea-face`, ch, true, seaWear()) });
+      continue;
+    }
     if (!T.exists(`char-${id}`)) out.push({ name: `hero ${id}`, run: () => makeCharacter(scene, ch, false) });
     if (!T.exists(`char-${id}-face`)) out.push({ name: `hero ${id} faces`, run: () => makeCharacter(scene, ch, true) });
   }
   const want = opts.level == null ? [] : (BADDIES_FOR[String(opts.level)] ?? BADDIES_FOR[1]);
+  if (want.includes('fish'))
+    for (const k of ['badguy', 'badguybig'] as const) if (!T.exists(`fish-${k}`)) out.push({ name: `fish ${k}`, run: () => { makeFish(scene, k); makeFishBubble(scene); } });
   for (const b of baddiePieces(scene)) if (want.includes(b.name) && !BADDIE_KEYS[b.name].every((k) => T.exists(k))) out.push(b);
   if (want.includes('plops')) (['small', 'medium', 'large'] as const).forEach((k) => !T.exists(`gplop-${k}`) && out.push({ name: `plops ${k}`, run: () => makePlops(scene, k) }));
   // (level 4's opening: the Plop King with his jetpack)
@@ -679,6 +701,31 @@ export function dropBaddiesExcept(scene: Phaser.Scene, level: number | 'battle')
   const want = BADDIES_FOR[String(level)] ?? BADDIES_FOR[1];
   for (const [name, keys] of Object.entries(BADDIE_KEYS)) if (!want.includes(name)) for (const k of keys) if (scene.textures.exists(k)) scene.textures.remove(k);
   if (!want.includes('chutes')) for (const c of CHARACTERS) if (scene.textures.exists(`chute-${c.id}`)) scene.textures.remove(`chute-${c.id}`);
+}
+
+/** Only one set of a hero's pictures at a time: the dive-gear ones under the sea, the usual ones elsewhere (memory). */
+export function dropOtherHeroSheets(scene: Phaser.Scene, level: number) {
+  const sea = swimLevel(level);
+  for (const k of scene.textures.getTextureKeys())
+    if (/^char-[a-z]+(-face)?$/.test(k) ? sea : /^char-[a-z]+-sea(-face)?$/.test(k) && !sea) scene.textures.remove(k);
+}
+
+/**
+ * Under the sea's own little pictures (the start screen's fly-over needs them too): the sea-bed props,
+ * the sea creatures, bubbles, light rays, the sky over the water and the surface.
+ */
+export function ensureSeaArt(scene: Phaser.Scene) {
+  const T = scene.textures;
+  if (T.exists('sea-surface')) return;
+  sheet(scene, 'sea-props', SEA_PROP_W, SEA_PROP_H, SEA_PROPS, (ctx, f) => drawSeaProp(ctx, f), PROP_RES);
+  sheet(scene, 'sea-jelly', JELLY_W, JELLY_H, JELLY_FRAMES, (ctx, f) => drawJelly(ctx, f), 1.5);
+  sheet(scene, 'sea-school', 24, 14, SCHOOL_FRAMES, (ctx, f) => drawSchoolFish(ctx, f), 1.5);
+  sheet(scene, 'sea-turtle', TURTLE_W, TURTLE_H, TURTLE_FRAMES, (ctx, f) => drawTurtle(ctx, f), 1.5);
+  sheet(scene, 'sea-crab', CRAB_W, CRAB_H, CRAB_FRAMES, (ctx, f) => drawCrab(ctx, f), 2);
+  addCanvas(scene, 'sea-bubble', hires(16, 16, 2, (ctx) => drawSeaBubble(ctx)));
+  addCanvas(scene, 'sea-ray', hires(64, 256, 0.5, (ctx) => drawLightRay(ctx)), undefined, { release: true });
+  addCanvas(scene, 'sea-sky', hires(1024, 160, BG_RES, (ctx) => drawSeaSky(ctx, 1024, 160)), undefined, { release: true });
+  addCanvas(scene, 'sea-surface', hires(512, SURFACE_H, PROP_RES, (ctx) => drawSurface(ctx, 512)), undefined, { release: true });
 }
 
 

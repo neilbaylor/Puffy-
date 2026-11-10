@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { DEPTH, MAX_FALL_SPEED } from '../config';
+import { DEPTH, GRAVITY, MAX_FALL_SPEED } from '../config';
 import type { CharacterDef } from '../data/characters';
 import { sfx } from '../core/sfx';
 import { ART_RES, WALK_FRAMES, bodyLift } from '../gfx/draw';
@@ -36,6 +36,19 @@ const GOO_AIR = 150;
 const CHUTE_OPEN_AT = 0.16;
 const CHUTE_STEER = 165;
 const CHUTE_ACCEL = 460;
+
+/**
+ * Under the sea (World 3): the water's own gravity (the level's), how fast you can sink, a stroke
+ * (every jump press: up you go, a bit at a time), and how fast you swim across (× walk / run speed).
+ */
+export const WATER_G = 420;
+const SINK_MAX = 115;
+const STROKE = 265;
+const STROKE_EVERY = 0.14;
+const SWIM_WALK = 0.95;
+const SWIM_RUN = 0.62;
+/** How far under the surface your middle is held (you can't swim up out of the water). */
+const SURFACE_HOLD = 8;
 
 const HIT_W = 22;
 const HIT_H = 34;
@@ -104,6 +117,17 @@ export class Player {
   /** The canopy (behind the hero) and the harness (over them), while under a parachute. */
   private chuteBack: Phaser.GameObjects.Sprite | null = null;
   private chuteFront: Phaser.GameObjects.Sprite | null = null;
+  /** The hero's sheet of frames (`char-<id>`; under the sea `char-<id>-sea`, in the dive gear). */
+  key: string;
+  /** Under the sea: the water's surface (world y), or null on dry levels. */
+  water: number | null = null;
+  /** In the water now (swimming, not walking). */
+  swimming = false;
+  /** Diving in off the pier: no control until you're in the water. */
+  diving = false;
+  private strokeCd = 0;
+  /** A stroke's kick in the swim animation (fades out). */
+  private stroke = 0;
 
   constructor(
     private scene: PlayerHost,
@@ -120,6 +144,7 @@ export class Player {
     this.body.setCollideWorldBounds(true);
     this.hitbox.setData('player', this);
 
+    this.key = `char-${char.id}`;
     this.view = scene.add.sprite(x, y, `char-${char.id}`, 'idle0').setOrigin(0.5, 1).setScale(this.S).setDepth(DEPTH.players);
     this.meter = scene.add.graphics().setDepth(DEPTH.text);
   }
@@ -151,6 +176,7 @@ export class Player {
       input = emptyInput();
       input.jump = this.onGround && Math.random() < 0.03; // happy hops at the goal
     }
+    if (this.diving) input = emptyInput();
 
     const c = this.char;
     const b = this.body;
@@ -163,7 +189,7 @@ export class Player {
     // ── Stamina: running drains it fast; it refills as soon as you stop ──
     const wantsRun = input.run && dir !== 0;
     this.running = wantsRun && !this.exhausted && this.stamina > 0;
-    if (this.running && onGround && !this.freeRun) {
+    if (this.running && (onGround || this.swimming) && !this.freeRun) {
       this.stamina -= dt / c.staminaSecs;
       if (this.stamina <= 0) {
         this.stamina = 0;
@@ -182,6 +208,16 @@ export class Player {
       if (b.blocked.down || this.state !== 'alive') this.endChute(b.blocked.down);
       else {
         this.updateChute(dt, input, dir, controllable);
+        return;
+      }
+    }
+
+    // ── Under the sea: in the water you swim (above it, on the pier, the usual gravity) ──
+    if (this.water !== null) {
+      const inWater = b.center.y > this.water;
+      if (inWater !== this.swimming) this.enterWater(inWater);
+      if (this.swimming) {
+        this.updateSwim(dt, input, dir, jumpPressed, controllable, onGround);
         return;
       }
     }
@@ -218,7 +254,7 @@ export class Player {
       if (Math.abs(vx) > maxSpeed && Math.sign(vx) === dir) accel = c.accel * 0.5; // ease down from run speed
       vx = approach(vx, dir * maxSpeed, accel * dt);
       this.facing = dir as 1 | -1;
-    } else if (controllable) {
+    } else if (controllable && !(this.diving && !onGround)) {
       vx = approach(vx, 0, (onGround ? c.accel * 1.4 : c.airAccel * 0.3) * dt);
     }
     b.setVelocityX(vx);
@@ -279,6 +315,67 @@ export class Player {
       this.squash = { x: 1.3, y: 0.75 };
       this.scene.fx.dust(this.x, this.bottom, 4);
     }
+    this.wasOnGround = onGround;
+    this.prev = input;
+  }
+
+  /** Under the sea: the surface at world y (in the water already, or above it on the pier). */
+  setWater(y: number) {
+    this.water = y;
+    this.swimming = this.body.center.y > y;
+    this.body.setGravityY(this.swimming ? 0 : GRAVITY - WATER_G);
+  }
+
+  /** Into the water (a splash, the dive's over: you swim from now on) or out of it. */
+  private enterWater(on: boolean) {
+    this.swimming = on;
+    const b = this.body;
+    if (on) {
+      // (the water swallows most of the dive's speed)
+      b.setVelocity(b.velocity.x * 0.5, Math.min(b.velocity.y * 0.35, 160));
+      b.setGravityY(0);
+      this.jumping = false;
+      this.diving = false;
+      this.squash = { x: 0.85, y: 1.18 };
+      this.scene.events.emit('hero-splash', this);
+    } else b.setGravityY(GRAVITY - WATER_G);
+  }
+
+  /**
+   * Swimming: every jump press is a stroke up (as often as you like, nearly), and in between you sink
+   * slowly back towards the sea bed; you glide on a little when you let go. You can't swim up out of
+   * the water. On the sea bed you walk along (in the dive gear that's swimming too).
+   */
+  private updateSwim(dt: number, input: InputState, dir: number, jumpPressed: boolean, controllable: boolean, onGround: boolean) {
+    const b = this.body;
+    const c = this.char;
+    this.strokeCd -= dt;
+    this.stroke = Math.max(0, this.stroke - dt);
+    if (b.velocity.y > SINK_MAX) b.setVelocityY(approach(b.velocity.y, SINK_MAX, 1200 * dt));
+    if (controllable && jumpPressed && this.strokeCd <= 0 && this.state === 'alive') {
+      b.setVelocityY(Math.min(b.velocity.y * 0.3, -STROKE));
+      this.strokeCd = STROKE_EVERY;
+      this.stroke = 0.4;
+      this.squash = { x: 0.9, y: 1.12 };
+      this.scene.events.emit('hero-stroke', this);
+      sfx.stroke();
+    }
+    // (held just under the surface)
+    const top = this.water! + SURFACE_HOLD;
+    if (b.center.y < top) {
+      b.y += top - b.center.y;
+      if (b.velocity.y < 0) b.setVelocityY(0);
+    }
+    const max = this.running ? c.runSpeed * SWIM_RUN : c.walkSpeed * SWIM_WALK;
+    let vx = b.velocity.x;
+    if (dir !== 0) {
+      vx = approach(vx, dir * max, c.airAccel * (Math.sign(vx) !== dir ? 0.9 : 0.55) * dt);
+      this.facing = dir as 1 | -1;
+    } else if (controllable) vx = approach(vx, 0, c.airAccel * (onGround ? 0.8 : 0.22) * dt);
+    b.setVelocityX(vx);
+    this.jumping = false;
+    this.airJumps = 1;
+    this.bazooka(dt, input, controllable);
     this.wasOnGround = onGround;
     this.prev = input;
   }
@@ -385,8 +482,11 @@ export class Player {
       this.view.setPosition(b.center.x - this.facing * this.recoilShift, b.bottom + 2);
       this.view.setFlipX(this.facing < 0);
       const speed = Math.abs(b.velocity.x);
-      const targetTilt = (b.velocity.x / this.char.runSpeed) * (this.onGround ? 0.14 : 0.06);
-      this.tilt += (targetTilt - this.tilt) * Math.min(1, dt * 12);
+      let targetTilt = (b.velocity.x / this.char.runSpeed) * (this.onGround ? 0.14 : 0.06);
+      // (swimming: nose up as you stroke, down as you sink; diving in: head first)
+      if (this.swimming && !this.onGround) targetTilt = (b.velocity.x / this.char.runSpeed) * 0.05 - this.facing * Phaser.Math.Clamp(-b.velocity.y / 1100, -0.1, 0.22);
+      if (this.diving && !this.swimming) targetTilt = this.facing * Phaser.Math.Clamp(Math.atan2(b.velocity.y, Math.abs(b.velocity.x) + 1) * 0.9, -0.5, 1.3);
+      this.tilt += (targetTilt - this.tilt) * Math.min(1, dt * (this.diving ? 8 : 12));
       this.view.setRotation(this.tilt);
       this.view.setScale(this.squash.x * this.S, this.squash.y * this.S);
 
@@ -394,11 +494,15 @@ export class Player {
       if (this.stun > 0) frame = 'hurt';
       else if (this.recoil > 0) frame = 'shoot';
       else if (this.eating > 0) frame = this.eating > 0.12 ? (Math.floor(this.eating * 10) % 2 ? 'eat0' : 'eat1') : 'idle0';
-      else if (!this.onGround) frame = b.velocity.y < 0 ? 'jump' : 'fall';
+      else if (this.swimming && !this.onGround) {
+        // (swimming: the swim cycle all the time, quicker on a stroke and when going along)
+        this.animTime += dt * (4 + speed / 28 + this.stroke * 22);
+        frame = `walk${Math.floor(this.animTime) % WALK_FRAMES}`;
+      } else if (!this.onGround) frame = b.velocity.y < 0 ? 'jump' : 'fall';
       else if (speed > 15) {
         this.animTime += dt * (8 + speed / 11);
         frame = `walk${Math.floor(this.animTime) % WALK_FRAMES}`;
-        if (this.running && Math.random() < 0.25) this.scene.fx.dust(this.x - this.facing * 8, this.bottom, 1);
+        if (this.running && !this.swimming && Math.random() < 0.25) this.scene.fx.dust(this.x - this.facing * 8, this.bottom, 1);
       } else {
         this.animTime += dt * 1.6;
         frame = `idle${Math.floor(this.animTime) % 2}`;
@@ -412,8 +516,8 @@ export class Player {
       if (this.sheet) {
         if (this.view.texture.key !== this.sheet) this.view.setTexture(this.sheet, frame);
         else this.view.setFrame(frame);
-      } else if (fk) this.view.setTexture(`char-${this.char.id}-face`, fk);
-      else if (this.view.texture.key !== `char-${this.char.id}`) this.view.setTexture(`char-${this.char.id}`, frame);
+      } else if (fk) this.view.setTexture(`${this.key}-face`, fk);
+      else if (this.view.texture.key !== this.key) this.view.setTexture(this.key, frame);
       else this.view.setFrame(frame);
       this.view.setAlpha(this.invulnerable ? (Math.floor(this.scene.time.now / 70) % 2 ? 0.4 : 1) : 1);
     }
@@ -515,7 +619,8 @@ export class Player {
     // heavy heroes (Big Muscles) barely budge
     const k = this.char.knockback ?? 1;
     // (under a parachute: knocked sideways, hardly up — so the nuggies you drop are still below you to catch)
-    this.body.setVelocity(away * 240 * k, this.chute ? -60 : -360 * (0.5 + 0.5 * k));
+    // (and in the water: pushed away through it, hardly up)
+    this.body.setVelocity(away * 240 * k, this.chute ? -60 : this.swimming ? -120 : -360 * (0.5 + 0.5 * k));
     this.scene.cameras.main.shake(120, 0.004);
   }
 

@@ -115,6 +115,15 @@ export const sfx = {
     tone({ type: 'square', from: 2300, to: 2500, dur: 0.12, vol: 0.05 });
     tone({ type: 'square', from: 2500, to: 2300, dur: 0.22, vol: 0.05, delay: 0.14 });
   },
+  /** A swim stroke: a soft whoosh of water. */
+  stroke: () => tone({ type: 'sine', from: 240, to: 420, dur: 0.16, vol: 0.07 }),
+  /** Into the water: a splash. */
+  splash: () => {
+    noise(0.4, 0.3, 1800, 300);
+    tone({ type: 'sine', from: 520, to: 160, dur: 0.25, vol: 0.08 });
+  },
+  /** A bubble popping (a bad guy fish's shot, or a fish). */
+  bloop: () => tone({ type: 'sine', from: 380, to: 900, dur: 0.1, vol: 0.09 }),
   jump2: () => {
     tone({ type: 'square', from: 520, to: 980, dur: 0.12, vol: 0.07 });
     noise(0.12, 0.12, 3000, 900);

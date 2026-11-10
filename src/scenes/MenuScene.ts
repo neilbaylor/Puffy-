@@ -153,7 +153,7 @@ export class MenuScene extends Phaser.Scene {
       }),
       step(() => {
         const lv = level!;
-        const bg = new Background(this, lv.heightPx - VIEW_H, true, !!data.vertical);
+        const bg = new Background(this, lv.heightPx - VIEW_H, true, !!data.vertical, data.water !== undefined);
         const look0 = themesFor(id)[0];
         ensureLook(this, look0);
         const mix = themeMix(0, themesFor(id));
@@ -162,7 +162,7 @@ export class MenuScene extends Phaser.Scene {
         const amb = new Ambience(this, id, (x, y, max) => {
           for (let d = 0; d <= max; d += 8) if (lv.isSolidAt(x, y + d)) return Math.floor((y + d) / TILE) * TILE;
           return null;
-        });
+        }, data.water !== undefined ? { surface: data.water, width: lv.widthPx } : undefined);
         this.pendingWorld = { id, w: { objs, level: lv, bg, amb, x0, x: x0, loopEnd: loopEnd.v, top: null, lastSurf: 0, t: 0 } };
       }),
       () => {
@@ -371,7 +371,7 @@ export class MenuScene extends Phaser.Scene {
     const loopEnd = x0 + Math.max(level.widthPx * 0.2, 1800);
     level.trimPending(loopEnd + vw + 400);
     // (still clouds on the start screen: re-drawing their shapes is a constant job it doesn't need)
-    const bg = new Background(this, level.heightPx - VIEW_H, true, !!data.vertical);
+    const bg = new Background(this, level.heightPx - VIEW_H, true, !!data.vertical, data.water !== undefined);
     // (in its own look from the start, even built ahead out of sight)
     const look0 = themesFor(id)[0];
     ensureLook(this, look0);
@@ -381,7 +381,7 @@ export class MenuScene extends Phaser.Scene {
     const amb = new Ambience(this, id, (x, y, max) => {
       for (let d = 0; d <= max; d += 8) if (level.isSolidAt(x, y + d)) return Math.floor((y + d) / TILE) * TILE;
       return null;
-    });
+    }, data.water !== undefined ? { surface: data.water, width: level.widthPx } : undefined);
     const objs = this.children.list.filter((o) => !before.has(o));
     return { objs, level, bg, amb, x0, x: x0, loopEnd, top: null, lastSurf: 0, t: 0 };
   }

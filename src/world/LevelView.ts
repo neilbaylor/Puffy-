@@ -2,7 +2,8 @@ import Phaser from 'phaser';
 import { DEPTH, TILE } from '../config';
 import { rng } from '../gfx/draw';
 import type { Pt } from '../gfx/handdrawn';
-import { PROP_RES, TERRAIN_RES, addCanvas, hires } from '../gfx/textures';
+import { PROP_RES, TERRAIN_RES, addCanvas, ensureSeaArt, hires } from '../gfx/textures';
+import { SEA_PROPS, SEA_SWAYS, drawKelp, drawPier } from '../gfx/sea';
 import { DEFAULT_PALETTE, PALETTES, drawCloudPlatform, drawPuffTree, drawTerrainPiece, roundPoly, traceCells, type TerrainKind, type WorldPalette } from '../gfx/world';
 import { drawPine } from '../gfx/mountain';
 import type { Cell, LevelData } from '../level/builder';
@@ -147,6 +148,7 @@ export class LevelView {
     this.heightPx = data.height * TILE;
 
     const first = scene.children.list.length;
+    if (data.water !== undefined) ensureSeaArt(scene);
     this.drawTerrain('ground');
     this.drawTerrain('rock');
     this.placeClouds();
@@ -375,6 +377,18 @@ export class LevelView {
         while (this.cell(x + len, y) === 'cloud') len++;
         const key = `cloud-${d.name}-${n++}`;
         const w = len * TILE;
+        if (this.paletteAt(x * TILE).sea) {
+          // (under the sea: a wooden pier, its posts down to the sea bed)
+          let down = TILE * 2;
+          while (y * TILE + down < this.heightPx && !this.isSolidAt(x * TILE + w - 8, y * TILE + down)) down += 8;
+          if (!this.scene.textures.exists(key)) addCanvas(this.scene, key, hires(w, down + 14, PROP_RES, (ctx) => drawPier(ctx, w, down + 8)));
+          this.scene.add
+            .image(x * TILE, y * TILE - 6, key)
+            .setOrigin(0, 0)
+            .setScale(1 / PROP_RES)
+            .setDepth(DEPTH.tiles + 1);
+          continue;
+        }
         if (!this.scene.textures.exists(key))
           addCanvas(this.scene, key, hires(w + 24, 34, PROP_RES, (ctx) => drawCloudPlatform(ctx, 12, 8, w, DEFAULT_PALETTE, x * 7 + y)));
         this.scene.add
@@ -415,6 +429,17 @@ export class LevelView {
       .forEach((s, i) => {
         const h = Number(s.opts?.h ?? 60);
         const key = `tree-${d.name}-${i}`;
+        if (this.paletteAt(s.x * TILE).sea) {
+          // (under the sea: a tall strand of kelp, swaying in the current)
+          if (!this.scene.textures.exists(key)) addCanvas(this.scene, key, hires(64, h + 24, PROP_RES, (ctx) => drawKelp(ctx, 32, h + 20, h, 300 + i * 17)));
+          const img = this.scene.add
+            .image(s.x * TILE + TILE / 2, (s.y + 1) * TILE + 4, key)
+            .setOrigin(0.5, 1)
+            .setScale(1 / PROP_RES)
+            .setDepth(DEPTH.decor - 0.5);
+          this.sway.push({ img, amp: 5, speed: 0.9 + (i % 3) * 0.15, ph: i * 1.7 });
+          return;
+        }
         if (!this.scene.textures.exists(key))
           addCanvas(
             this.scene,
@@ -442,6 +467,19 @@ export class LevelView {
       const wx = x * TILE + TILE / 2 + (r() - 0.5) * 16;
       const wy = y * TILE + 3;
       const roll = r();
+      if (this.paletteAt(wx).sea) {
+        // under the sea: seaweed that sways, coral, starfish and shells on the sand
+        if (roll < 0.3) {
+          const f = SEA_PROPS[Math.floor(r() * 3)];
+          const img = this.scene.add.image(wx, wy + 4, 'sea-props', f).setOrigin(0.5, 46 / 48).setScale((0.8 + r() * 0.5) / PROP_RES).setDepth(DEPTH.decor);
+          this.sway.push({ img, amp: 9, speed: 1.1 + r() * 0.5, ph: wx * 0.013 });
+        } else if (roll < 0.5) {
+          const f = SEA_PROPS[3 + Math.floor(r() * (SEA_PROPS.length - 3))];
+          const img = this.scene.add.image(wx, wy + 4, 'sea-props', f).setOrigin(0.5, 46 / 48).setScale((0.75 + r() * 0.35) / PROP_RES).setDepth(DEPTH.decor);
+          if (SEA_SWAYS(f)) this.sway.push({ img, amp: 9, speed: 1.2, ph: wx * 0.013 });
+        }
+        continue;
+      }
       if (this.paletteAt(wx).poo) {
         // Plop Invasion: little poo piles where the flowers were
         if (roll < 0.34) this.scene.add.image(wx, wy + 1, 'poopile', `p${Math.floor(r() * 4)}`).setOrigin(0.5, 1).setScale(1 / PROP_RES).setDepth(DEPTH.decor);

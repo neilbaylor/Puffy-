@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { DEPTH } from '../config';
+import { SeaLife } from './Sea';
 
 /**
  * Life and light for the platforming levels (purely visual, no gameplay):
@@ -254,17 +255,23 @@ export class Ambience {
   private readonly arctic: boolean;
   /** Plop Invasion: flies buzzing about instead of butterflies, drab birds. */
   private readonly stinky: boolean;
+  /** Under the sea (a level with water): its own life and light instead of birds, butterflies and sun. */
+  readonly sea: SeaLife | null;
 
   constructor(
     private scene: Phaser.Scene,
     levelId: number,
     /** First solid ground below a point (or null) — for shadows and butterflies. */
     private groundBelow: (x: number, y: number, max: number) => number | null,
+    /** Under the sea: the water's surface (world y) and the level's width. */
+    water?: { surface: number; width: number },
   ) {
     makeTextures(scene);
     this.arctic = levelId === 2;
-    this.stinky = levelId >= 3;
+    this.stinky = levelId === 3 || levelId === 4;
     this.glow = scene.add.image(0, 0, 'amb-glow').setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.clouds - 1).setAlpha(0.55);
+    this.sea = water ? new SeaLife(scene, water.surface, water.width, groundBelow) : null;
+    if (this.sea) this.glow.setVisible(false);
     // (no light shafts or vignette any more: each was a whole extra screenful to draw every frame,
     // for an effect you could hardly see)
   }
@@ -301,6 +308,12 @@ export class Ambience {
       const h = Math.max(0, gy - tg.bottom);
       const k = 1 - Math.min(1, h / 220);
       sh.setVisible(true).setPosition(tg.x, gy + 1).setDisplaySize(tg.w * (1.45 - 0.5 * (1 - k)), 12 * (0.6 + 0.4 * k)).setAlpha(k);
+    }
+
+    // ── under the sea: fish, jellyfish, light from the surface (no birds or butterflies) ──
+    if (this.sea) {
+      this.sea.update(view, dt);
+      return;
     }
 
     // ── birds: a little flock now and then, far off in the sky ──

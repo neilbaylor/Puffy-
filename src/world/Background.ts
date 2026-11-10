@@ -122,19 +122,25 @@ export class Background {
     private stillClouds = false,
     /** A climb (Plop Invasion · Part 2): clouds stream past as you go up, the sky smoggier higher up. */
     private vertical = false,
+    /** Under the sea: no clouds; little bubbles drift up instead of puff seeds. */
+    private sea = false,
   ) {
     this.skyA = scene.add.image(0, 0, bgKey('sky', 'puff')).setOrigin(0, 0).setDepth(DEPTH.sky);
     this.skyB = scene.add.image(0, 0, bgKey('sky', 'puff')).setOrigin(0, 0).setDepth(DEPTH.sky).setVisible(false);
     this.add('far', BG_LAYERS.far.h, 0.08, 0.04, 0.3, 0, DEPTH.far);
     // two bands of living clouds: small far ones up high, big slow ones lower down
-    this.bands.push(this.makeBand(5, 7, 0.16, 0.08, 0.02, CLOUD_W, [0.75, 1.25], [34, 150], DEPTH.clouds, 1));
-    this.bands.push(this.makeBand(9, 4, 0.28, 0.14, 0.2, 1400, [1.3, 1.8], [40, 110], DEPTH.hills - 1, 0.9));
+    if (!sea) {
+      this.bands.push(this.makeBand(5, 7, 0.16, 0.08, 0.02, CLOUD_W, [0.75, 1.25], [34, 150], DEPTH.clouds, 1));
+      this.bands.push(this.makeBand(9, 4, 0.28, 0.14, 0.2, 1400, [1.3, 1.8], [40, 110], DEPTH.hills - 1, 0.9));
+    }
     // (a climb: nearer clouds spread all the way down the screen, passing quicker as you go up)
     if (vertical) this.bands.push(this.makeBand(13, 6, 0.22, 0.45, 0, 1100, [0.9, 1.4], [0, 640], DEPTH.clouds, 0.85));
     // dandelion-puff seeds drifting across on the breeze
     const r = rng(77);
     for (let i = 0; i < 14; i++) {
-      const img = scene.add.image(0, 0, 'puff').setDepth(DEPTH.near + 1).setScale(0.1 + r() * 0.12).setAlpha(0.85);
+      const img = sea
+        ? scene.add.image(0, 0, 'sea-bubble').setDepth(i % 2 ? DEPTH.near + 1 : DEPTH.hills + 1).setScale(0.25 + r() * 0.3).setAlpha(0.7)
+        : scene.add.image(0, 0, 'puff').setDepth(DEPTH.near + 1).setScale(0.1 + r() * 0.12).setAlpha(0.85);
       this.seeds.push({ x: r(), y: 0.15 + r() * 0.6, vx: 16 + r() * 26, ph: r() * 6.28, img });
     }
     this.add('hills', BG_LAYERS.hills.h, 0.32, 0.16, 0.42, 0, DEPTH.hills);
@@ -329,6 +335,18 @@ export class Background {
 
   /** Puff seeds floating across the screen on the breeze. */
   private drawSeeds(view: View, dt: number) {
+    if (this.sea) {
+      // (bubbles wobbling up from the sea bed, round again from the bottom)
+      for (const sd of this.seeds) {
+        sd.y -= (sd.vx * 1.4 * dt) / Math.max(1, view.height);
+        if (sd.y < -0.05) {
+          sd.y += 1.1;
+          sd.x = Math.random();
+        }
+        sd.img.setPosition(view.left + sd.x * view.width + Math.sin(this.t * 2.2 + sd.ph) * 6, view.top + sd.y * view.height);
+      }
+      return;
+    }
     for (const sd of this.seeds) {
       sd.x += (sd.vx * dt) / Math.max(1, view.width);
       if (sd.x > 1.05) sd.x -= 1.1;

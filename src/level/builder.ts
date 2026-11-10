@@ -9,7 +9,7 @@ import { TILE } from '../config';
 
 export type Cell = 'ground' | 'rock' | 'boulder' | 'bramble' | 'cloud' | null;
 
-export type EnemyKind = 'puffball' | 'bigpuff' | 'giant' | 'goat' | 'plop' | 'bigplop' | 'giantplop' | 'poogoat';
+export type EnemyKind = 'puffball' | 'bigpuff' | 'giant' | 'goat' | 'plop' | 'bigplop' | 'giantplop' | 'poogoat' | 'fish' | 'bigfish';
 
 export interface Spawn {
   type: EnemyKind | 'aura' | 'rootbeer' | 'checkpoint' | 'goal' | 'player' | 'tree' | 'soccer' | 'hockey' | 'para' | 'puddle' | 'chase' | 'volley' | 'drop' | 'king' | 'baseball';
@@ -31,6 +31,8 @@ export interface LevelData {
   vertical?: boolean;
   /** A climb's fly-over: the points it flies through (tile x, height in tiles), from the start of the flight; it ends on the hero. */
   flyPath?: [number, number][];
+  /** Under the sea (World 3): the water's surface (world px from the top). Below it you swim. */
+  water?: number;
   width: number;
   height: number;
   tiles: number[][];
@@ -48,6 +50,19 @@ export class LevelBuilder {
   /** Mostly climbing up (see LevelData.vertical). */
   vertical = false;
   flyPath: [number, number][] | undefined;
+  /** Under the sea: the surface's world y (see LevelData.water). */
+  waterY: number | undefined;
+
+  /** The level's under the sea: the water's surface is at the top of ground height h. */
+  water(h: number) {
+    this.waterY = this.top(h) * TILE;
+    return this;
+  }
+
+  /** A wooden pier from x0 to x1, its deck at height h (you can stand on it; drawn by LevelView). */
+  pier(x0: number, x1: number, h: number) {
+    return this.cloud(x0, x1 - x0 + 1, h);
+  }
 
   /** Columns x0..x1 use terrain palette `pal` (by piece centre). */
   zone(x0: number, x1: number, pal: string) {
@@ -190,6 +205,7 @@ export class LevelBuilder {
       pal: this.pal,
       vertical: this.vertical || undefined,
       flyPath: this.flyPath,
+      water: this.waterY,
       width: this.width,
       height: this.height,
       tiles: this.cells.map((row) => row.map((c) => (c ? idx[c] : T.EMPTY))),

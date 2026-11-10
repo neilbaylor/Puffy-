@@ -41,6 +41,8 @@ export interface WorldPalette {
   flowers: string[];
   /** Plop Invasion: everything covered in poo (drips, poo caps, poo piles, soft-serve hills). */
   poo?: boolean;
+  /** Under the sea (World 3): sand, shells and pebbles instead of puff-moss and dandelions. */
+  sea?: boolean;
 }
 
 export const PALETTES: Record<string, WorldPalette> = {
@@ -401,7 +403,7 @@ export function drawTerrainPiece(ctx: Ctx, o: TerrainPieceOpts) {
         const rr = 2.6 + r() * 2.4;
         const rot = r() * 3;
         if (!vis(px, py)) continue;
-        ST.shape(ctx, fluffPts(px, py, rr, rr, 6, 0.12, rot), { base: '#fff4ea', shade: '#efd2d6', light: '#ffffff' }, seed + i, { lw: 0.45, plain: true });
+        ST.shape(ctx, fluffPts(px, py, rr, rr, 6, 0.12, rot), pal.sea ? { base: '#e2c08e', shade: '#c09a68', light: '#f6e2bc' } : { base: '#fff4ea', shade: '#efd2d6', light: '#ffffff' }, seed + i, { lw: 0.45, plain: true });
       }
     }
     // fine crayon grain
@@ -514,6 +516,11 @@ export function drawTerrainPiece(ctx: Ctx, o: TerrainPieceOpts) {
           const dark = r() < 0.3;
           if (!vis(p[0])) continue;
           drawPooSwirl(ctx, p[0], p[1] + 1, w, dark ? POO_DARK : pal.grass, seed + p[0]);
+        } else if (roll < 0.58 && pal.sea) {
+          // under the sea: a little pebble half in the sand
+          const rr = 2.4 + r() * 2;
+          if (!vis(p[0])) continue;
+          ST.shape(ctx, ellipsePts(p[0], p[1] - 1, rr * 1.3, rr, 0, 14), { base: '#b8a4c8', shade: '#8a76a0', light: '#e2d8ee' }, seed + p[0] + 3, { lw: 0.5, plain: true });
         } else if (roll < 0.58) {
           const h = 9 + r() * 7;
           const lean = (r() - 0.5) * 5;
