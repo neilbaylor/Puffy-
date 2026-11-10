@@ -14,7 +14,7 @@ export const ARENA_H = 17;
  *  1. the meadow: two low walls, a floating island, clouds on three levels;
  *  2. the hill: a grassy mound with a tree on top, a small island either side, clouds above;
  *  3. the steps: three islands like a staircase up and down, a wall at each end;
- *  4. the cliffs: a tall rock and a short one, a long island, high clouds, then the end rise.
+ *  4. the cliffs: a taller rock and a short one, a long island, high clouds, then the end rise.
  */
 export function buildArena(): LevelData {
   const b = new LevelBuilder('arena', 'Battle', ARENA_W, ARENA_H);
@@ -64,7 +64,7 @@ export function buildArena(): LevelData {
   // 4. the cliffs
   o = S * 3;
   b.rock(o + 5, o + 5, 3, 4);
-  b.rock(o + 17, o + 18, 3, 6);
+  b.rock(o + 17, o + 18, 3, 5);
   b.island(o + 7, o + 14, 8, 1);
   b.spawn('tree', o + 9, 8, { h: 70 });
   b.cloud(o + 1, 4, 6);
@@ -100,7 +100,7 @@ export const ARENA_SPAWNS: [number, number][] = [
   // the steps
   [ARENA_SECTION * 2 + 5, 2], [ARENA_SECTION * 2 + 22, 2], [ARENA_SECTION * 2 + 13, 10], [ARENA_SECTION * 2 + 6, 7], [ARENA_SECTION * 2 + 21, 7],
   // the cliffs
-  [ARENA_SECTION * 3 + 3, 2], [ARENA_SECTION * 3 + 22, 2], [ARENA_SECTION * 3 + 11, 8], [ARENA_SECTION * 3 + 17, 6], [ARENA_SECTION * 3 + 3, 11],
+  [ARENA_SECTION * 3 + 3, 2], [ARENA_SECTION * 3 + 22, 2], [ARENA_SECTION * 3 + 11, 8], [ARENA_SECTION * 3 + 17, 5], [ARENA_SECTION * 3 + 3, 11],
 ];
 
 /** Where the heroes start (by slot): a stretch each, as far apart as the arena allows. */
