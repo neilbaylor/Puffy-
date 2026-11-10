@@ -1914,7 +1914,8 @@ kbd {
   flex-direction: column;
   align-items: center;
   gap: clamp(8px, 2.4vh, 18px);
-  padding: calc(7px + var(--safe-t)) calc(16px + var(--safe-r)) calc(12px + var(--safe-b)) calc(16px + var(--safe-l));
+  /* (the title sits a little lower than Battle's) */
+  padding: calc(clamp(12px, 3.6vh, 26px) + var(--safe-t)) calc(16px + var(--safe-r)) calc(12px + var(--safe-b)) calc(16px + var(--safe-l));
   overflow-y: auto;
   /* party pink, with polka dots like the hat's */
   background:
@@ -1942,6 +1943,7 @@ kbd {
 /* your root beer, big, on the pill under the title (the till counts it down when you pay) */
 .bl-sub.shop-rb {
   position: relative;
+  margin-top: clamp(10px, 2.6vh, 18px);
   padding: 6px 22px 7px;
   font: 800 clamp(16px, 3.6vmin, 22px) / 1.2 var(--body);
 }
