@@ -243,3 +243,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.238: Shop: "Welcome to The Puffy Boutique"; what you've on is framed like the picked hero.
 - v0.239: Shop: the worn tile's frame in pink, no star.
 - v0.240: Shop: the worn tile doesn't shift up; new item descriptions.
+- v0.241: start screen top right: Shop, Battle, full screen.
