@@ -1019,7 +1019,6 @@ export class UI {
         <p class="bl-sub shop-rb"></p>
       </header>
       <div class="shop-list"></div>
-      <p class="shop-note">Find root beer in the levels: every bottle you find, you can spend here.</p>
     </div>`);
     this.shopEl = page;
     this.shopWore = wardrobe.wearKey;
