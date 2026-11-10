@@ -12,6 +12,7 @@ import { CHARACTERS, characterById } from '../data/characters';
 import { drawHeroCard, drawPortrait } from '../gfx/draw';
 import { FaceClock, faceFromKey } from '../gfx/face';
 import { recolorForSlot } from '../gfx/recolor';
+import { gearOf } from '../core/wardrobe';
 import { gameArtJobs } from '../gfx/textures';
 import { loadArt } from './artLoader';
 import { BattleNet, battleUrl, type NetStatus } from '../net/battleNet';
@@ -70,27 +71,37 @@ function storedName() {
 }
 
 /** A hero portrait in a player slot's colour (in a pose, with a face). */
-function slotPortrait(target: HTMLCanvasElement, hero: string, slot: number, pose: 'idle0' | 'idle1' = 'idle0', faceKey: string | null = null, hat = '') {
+function slotPortrait(target: HTMLCanvasElement, hero: string, slot: number, pose: 'idle0' | 'idle1' = 'idle0', faceKey: string | null = null, wear = '') {
   const tmp = document.createElement('canvas');
   tmp.width = target.width;
   tmp.height = target.height;
-  drawPortrait(tmp, characterById(hero), pose, faceKey ? faceFromKey(faceKey) : undefined, 'idle0', hat || null);
+  const ch = characterById(hero);
+  const face = faceKey ? faceFromKey(faceKey) : undefined;
+  // (the hero in the slot's colour, then their sunglasses over it as they are)
+  drawPortrait(tmp, ch, pose, face, 'idle0', wear, 'body');
   const out = recolorForSlot(tmp, slot);
   const ctx = target.getContext('2d')!;
   ctx.clearRect(0, 0, target.width, target.height);
   ctx.drawImage(out, 0, 0);
+  if (gearOf(wear).eyes) {
+    drawPortrait(tmp, ch, pose, face, 'idle0', wear, 'eyes');
+    ctx.drawImage(tmp, 0, 0);
+  }
 }
 
 /**
  * A hero standing in a lobby square, in the slot's colour: drawn like the start screen's cards
  * (feet on the bottom edge, each hero at their own size — Big Muscles the biggest).
  */
-function slotCard(target: HTMLCanvasElement, hero: string, slot: number, pose: 'idle0' | 'idle1', faceKey: string | null, hat = '') {
+function slotCard(target: HTMLCanvasElement, hero: string, slot: number, pose: 'idle0' | 'idle1', faceKey: string | null, wear = '') {
   const tmp = document.createElement('canvas');
   tmp.width = target.width;
   tmp.height = target.height;
-  drawHeroCard(tmp, characterById(hero), pose, faceKey ? faceFromKey(faceKey) : undefined, hat || null);
+  const ch = characterById(hero);
+  const face = faceKey ? faceFromKey(faceKey) : undefined;
+  drawHeroCard(tmp, ch, pose, face, wear, 'body');
   const out = recolorForSlot(tmp, slot);
+  if (gearOf(wear).eyes) drawHeroCard(out, ch, pose, face, wear, 'eyes');
   const ctx = target.getContext('2d')!;
   ctx.clearRect(0, 0, target.width, target.height);
   ctx.drawImage(out, 0, 0);
@@ -363,13 +374,13 @@ export class BattleUI {
         <small>${p ? `${me ? 'You · ' : ''}${characterById(p.hero).name}` : SLOT_NAMES[slot]}</small>
         ${p && played && p.kos > 0 ? `<span class="bl-last${p.id === r?.winner ? ' won' : ''}" title="Last battle">${p.id === r?.winner ? '🏆 ' : ''}${p.kos} KO${p.kos === 1 ? '' : 's'}</span>` : ''}
       </div>`);
-      if (p) this.liveSlot(el.querySelector('canvas')!, p.hero, slot, p.hat ?? '');
+      if (p) this.liveSlot(el.querySelector('canvas')!, p.hero, slot, p.wear ?? '');
       box.appendChild(el);
     }
   }
 
   /** The heroes in the squares stand there breathing, blinking and glancing about, like on the start screen. */
-  private liveSlot(cv: HTMLCanvasElement, hero: string, slot: number, hat = '') {
+  private liveSlot(cv: HTMLCanvasElement, hero: string, slot: number, wear = '') {
     const face = new FaceClock();
     let pose: 'idle0' | 'idle1' = 'idle0';
     let shown = '';
@@ -378,7 +389,7 @@ export class BattleUI {
       const k = `${pose}|${face.key}`;
       if (k === shown) return;
       shown = k;
-      slotCard(cv, hero, slot, pose, face.key, hat);
+      slotCard(cv, hero, slot, pose, face.key, wear);
     };
     draw();
     const iv = window.setInterval(() => {
@@ -738,7 +749,7 @@ export class BattleUI {
         <div class="row"><button class="btn btn-alt" data-act="leave">Leave</button></div>
       </div>
     </div>`);
-    if (winner) slotPortrait(el.querySelector<HTMLCanvasElement>('.br-winner')!, winner.hero, winner.slot, 'idle0', null, winner.hat ?? '');
+    if (winner) slotPortrait(el.querySelector<HTMLCanvasElement>('.br-winner')!, winner.hero, winner.slot, 'idle0', null, winner.wear ?? '');
     el.querySelector('[data-act=leave]')!.addEventListener('click', () => this.leave());
     this.host.setScreen(el);
     if (iWon) sfx.cheer();

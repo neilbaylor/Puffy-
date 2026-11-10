@@ -16,10 +16,10 @@ export interface AccountUser {
   nuggies: number;
   kills: number;
   level: number;
-  /** Root beer spent in the Shop; what you own there (ids, comma separated); the hat you've on ('' never chosen, 'none'). */
+  /** Root beer spent in the Shop; what you own there (ids, comma separated); what you've on ('' never chosen, 'none' nothing). */
   spent?: number;
   items?: string;
-  hat?: string;
+  wear?: string;
 }
 
 const TOKEN_KEY = 'puffy.token';
@@ -77,12 +77,12 @@ async function api(method: string, path: string, body?: unknown): Promise<{ ok: 
 }
 
 /** This browser's progress, as the account keeps it. */
-const local = () => ({ rootbeer: bank.rootbeer, nuggies: bank.nuggies, kills: bank.kills, level: latestLevel(), spent: bank.spent, items: wardrobe.owned.join(','), hat: wardrobe.hatChoice });
+const local = () => ({ rootbeer: bank.rootbeer, nuggies: bank.nuggies, kills: bank.kills, level: latestLevel(), spent: bank.spent, items: wardrobe.owned.join(','), wear: wardrobe.wearChoice });
 
 /** Take the bigger of each (this browser vs. the account), then save that to the account. */
 async function merge(u: AccountUser) {
   bank.setAtLeast(u.rootbeer, u.nuggies, u.kills, u.spent ?? 0);
-  wardrobe.merge(u.items ?? '', u.hat ?? '');
+  wardrobe.merge(u.items ?? '', u.wear ?? '');
   if (u.level - 1 > progress.beaten) progress.markBeaten(u.level - 1);
   user = u;
   await push();

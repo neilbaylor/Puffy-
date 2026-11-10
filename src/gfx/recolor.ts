@@ -46,6 +46,9 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
   return [Math.round(f(h + 1 / 3) * 255), Math.round(f(h) * 255), Math.round(f(h - 1 / 3) * 255)];
 }
 
+/** Does this slot change the hero's colour? (The first keeps the hero's own orange.) */
+export const slotRecolors = (slot: number) => SLOT_HUE[slot % SLOT_HUE.length] !== null;
+
 /** A copy of `src` with the hero's orange turned into the slot's colour (slot 0 returns `src`). */
 export function recolorForSlot(src: HTMLCanvasElement | HTMLImageElement, slot: number): HTMLCanvasElement {
   const c = document.createElement('canvas');

@@ -10,7 +10,7 @@ import type { Ctx, Pose } from './draw';
 import { carry, carryArms, gait } from './draw';
 import { drawBazooka } from './bazooka';
 import { ellipsePts, paddlePts, type Fill, type Pt, type Style } from './handdrawn';
-import { face } from './face';
+import { face, markEyes } from './face';
 
 export const PUFFY = {
   body: { base: '#f28a2e', shade: '#c9611a', light: '#ffc27a' } as Fill,
@@ -120,6 +120,7 @@ function drawPuffyPose(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style, 
     st.line(ctx, [[cx - rx - 3, cy + 1], [cx - rx - 6.5, cy + 1]], seed + 42, 0.7);
   }
 
+  markEyes(ctx, cx + 4, cy - 6);
   if (hurt) {
     drawHurtFace(ctx, cx, cy, st, seed);
   } else {

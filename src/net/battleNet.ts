@@ -88,7 +88,7 @@ export class BattleNet {
     this.ws = ws;
     ws.onopen = () => {
       this.retry = 0;
-      this.send({ t: 'hello', name: this.name, hero: this.hero, token: token(), hat: wardrobe.hat ?? '' });
+      this.send({ t: 'hello', name: this.name, hero: this.hero, token: token(), wear: wardrobe.wearKey });
       clearInterval(this.pingTimer);
       this.pingTimer = window.setInterval(() => this.send({ t: 'ping', c: performance.now() }), 2000);
     };

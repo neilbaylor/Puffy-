@@ -18,9 +18,9 @@ import { PLOP_FRAMES, PLOP_H, PLOP_W, drawPlop, type PlopKind } from './plops';
 import { drawPoo } from './hazards';
 import { BB_ALIAS, BB_FIELD_TILES, BB_KEYS, BB_PLAIN, BB_ROSTER, BB_SIZE, PARK, drawBallparkBack, drawBallparkFront, drawBaseball, drawBaseballPlop, drawCappedPlop, drawLineDrive, type BBPlayer, type BaseballRole } from './baseball';
 import { PLOP_COLOURS } from './plops';
-import { wardrobe } from '../core/wardrobe';
+import { gearOf, wardrobe } from '../core/wardrobe';
 import { FLAME_FRAMES, FLAME_H, FLAME_W, drawDyingFlame, drawFlame, drawScorch } from './flame';
-import { ART_RES, ART_STYLE, CARRY_SWING, CHAR_H, CHAR_W, HAT_UP, POSES, canvas, carry, drawCharacter, ellipse, type CarryFrame, type Ctx, type Pose } from './draw';
+import { ART_RES, ART_STYLE, CARRY_SWING, CHAR_H, CHAR_W, POSES, gearUp, canvas, carry, drawCharacter, ellipse, type CarryFrame, type Ctx, type Layer, type Pose } from './draw';
 import { FACE_FRAMES, faceFromKey } from './face';
 import { STYLES } from './handdrawn';
 import { themesFor } from '../world/theme';
@@ -122,23 +122,32 @@ function sheet<F extends string>(
   frames: readonly F[],
   draw: (ctx: Ctx, f: F) => void,
   res = ART_RES,
+  /** (then the whole sheet's swapped for this — a battle player's colour — and `over` drawn on each frame of that) */
+  post?: { swap: (c: HTMLCanvasElement) => HTMLCanvasElement; over: (ctx: Ctx, f: F) => void },
 ) {
   // each frame is clipped to its own cell, with a transparent gutter between cells,
   // so nothing from one frame (a bazooka tip, a fist) ever shows up in the next
   const fw = Math.round(w * res);
   const fh = Math.round(h * res);
   const g = frameGrid(frames.length, fw, fh);
-  const { c, ctx } = canvas(g.w, g.h);
-  frames.forEach((f, i) => {
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(g.x(i), g.y(i), fw, fh);
-    ctx.clip();
-    ctx.translate(g.x(i), g.y(i));
-    ctx.scale(res, res);
-    draw(ctx, f);
-    ctx.restore();
-  });
+  let { c, ctx } = canvas(g.w, g.h);
+  const each = (fn: (ctx: Ctx, f: F) => void) =>
+    frames.forEach((f, i) => {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(g.x(i), g.y(i), fw, fh);
+      ctx.clip();
+      ctx.translate(g.x(i), g.y(i));
+      ctx.scale(res, res);
+      fn(ctx, f);
+      ctx.restore();
+    });
+  each(draw);
+  if (post) {
+    c = post.swap(c);
+    ctx = c.getContext('2d')!;
+    each(post.over);
+  }
   addCanvas(scene, key, c, (t) => frames.forEach((f, i) => t.add(f, 0, g.x(i), g.y(i), fw, fh)), { release: !keepPixels(key) });
 }
 
@@ -155,21 +164,30 @@ function makeCollisionTiles(scene: Phaser.Scene) {
 const HERO_M = 8;
 /** One hero's animation frames (`face`: the standing pose with each little face they pull now and then). */
 function makeCharacter(scene: Phaser.Scene, ch: (typeof CHARACTERS)[number], face: boolean) {
-  makeHeroSheet(scene, face ? `char-${ch.id}-face` : `char-${ch.id}`, ch, face, wardrobe.hat);
+  makeHeroSheet(scene, face ? `char-${ch.id}-face` : `char-${ch.id}`, ch, face, wardrobe.wearKey);
 }
 
 /**
- * A hero's frames (or their faces) wearing `hat` (null: none) — with room over their head for it
- * if there's one (HAT_UP), the hero at the bottom as always. (A battle draws each player's own.)
+ * A hero's frames (or their faces) in what they've got on (`wear`: Shop ids, '' nothing) — with room
+ * over their head for a hat or the skateboard if there's one (gearUp), the hero at the bottom as
+ * always. `recolor`: a battle player's colour, put on before the sunglasses so they stay orange.
  */
-export function makeHeroSheet(scene: Phaser.Scene, key: string, ch: (typeof CHARACTERS)[number], face: boolean, hat: string | null) {
+export function makeHeroSheet(scene: Phaser.Scene, key: string, ch: (typeof CHARACTERS)[number], face: boolean, wear: string, recolor?: (c: HTMLCanvasElement) => HTMLCanvasElement) {
   const M = HERO_M;
-  const up = hat ? HAT_UP : 0;
-  if (!face) sheet(scene, key, CHAR_W + M * 2, CHAR_H + up, POSES, (ctx, p) => drawCharacter(ctx, M, up, ch, p, undefined, hat));
-  else sheet(scene, key, CHAR_W + M * 2, CHAR_H + up, FACE_FRAMES, (ctx, f) => drawCharacter(ctx, M, up, ch, 'idle0', faceFromKey(f), hat));
+  const up = gearUp(wear);
+  const layered = !!recolor && gearOf(wear).eyes;
+  const draw = (ctx: Ctx, f: string, layer: Layer) =>
+    face ? drawCharacter(ctx, M, up, ch, 'idle0', faceFromKey(f), wear, layer) : drawCharacter(ctx, M, up, ch, f as Pose, undefined, wear, layer);
+  const frames: readonly string[] = face ? FACE_FRAMES : POSES;
+  if (!recolor) sheet(scene, key, CHAR_W + M * 2, CHAR_H + up, frames, (ctx, f) => draw(ctx, f, 'all'));
+  else
+    sheet(scene, key, CHAR_W + M * 2, CHAR_H + up, frames, (ctx, f) => draw(ctx, f, layered ? 'body' : 'all'), ART_RES, {
+      swap: recolor,
+      over: (ctx, f) => layered && draw(ctx, f, 'eyes'),
+    });
 }
 
-/** The hero pictures drawn with a hat (or without): when you change hats they're drawn again, next time they're needed. */
+/** The hero pictures drawn in what you've got on: when that changes they're drawn again, next time they're needed. */
 export function dropHeroSheets(textures: Phaser.Textures.TextureManager) {
   for (const k of textures.getTextureKeys()) if (k.startsWith('char-') || k.startsWith('bchar-')) textures.remove(k);
 }
@@ -237,7 +255,7 @@ export function makeCarrySheet(scene: Phaser.Scene, ch: (typeof CHARACTERS)[numb
   const frames: (Pose | CarryFrame)[] = [...POSES, ...(Object.keys(CARRY_SWING) as CarryFrame[])];
   carry.on = true;
   try {
-    const up = wardrobe.hat ? HAT_UP : 0;
+    const up = gearUp(wardrobe.wearKey);
     sheet(scene, key, CHAR_W + HERO_M * 2, CHAR_H + up, frames, (ctx, f) => {
       const sw = (CARRY_SWING as Record<string, number>)[f];
       carry.a = sw ?? -1.75;

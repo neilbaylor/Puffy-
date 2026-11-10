@@ -6,7 +6,8 @@ import { fadeOutMusic, playHoops } from '../core/music';
 import { sfx } from '../core/sfx';
 import { loseLife, lives } from '../core/lives';
 import { bank } from '../core/bank';
-import { ART_RES, CARRY_SWING, CHAR_H, CHAR_W, canvas, carryHand } from '../gfx/draw';
+import { ART_RES, CARRY_SWING, CHAR_H, CHAR_W, bodyLift, canvas, carryHand } from '../gfx/draw';
+import { wardrobe } from '../core/wardrobe';
 import { ARENA_H, ARENA_W, CROWD_H, FRONT_H, JUMBO, RIBBON, STAGE_OX, STAGE_OY, drawArena, drawArenaFront, drawCrowd, drawCameraFlash, drawRibbonScreen, drawSpotlight, setArenaStyle, type JumboContent } from '../gfx/hoops';
 import { PLOP_FRAMES, PLOP_H, PLOP_W, QUEEN_KO_FRAMES, QUEEN_KO_GROUND, QUEEN_KO_H, QUEEN_KO_W, drawPlop, drawQueen, drawQueenKO, type PlopFrame } from '../gfx/plops';
 import { POOWAVE_H, POOWAVE_W, drawPooWave } from '../gfx/plopworld';
@@ -1501,7 +1502,7 @@ export class WrestleScene extends Phaser.Scene {
     const k = Math.abs(v.scaleX) * ART_RES;
     const [hx, hy] = carryHand(p.char.id, a);
     const dx = (hx + HERO_SHEET_M - (CHAR_W + HERO_SHEET_M * 2) / 2) * k;
-    const dy = (hy - CHAR_H) * Math.abs(v.scaleY) * ART_RES;
+    const dy = (hy - bodyLift(wardrobe.wearKey) - CHAR_H) * Math.abs(v.scaleY) * ART_RES;
     return [v.x + (p.facing < 0 ? -dx : dx), v.y + dy];
   }
 

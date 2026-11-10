@@ -3,7 +3,8 @@ import { characterById } from '../data/characters';
 import type { Session } from '../core/session';
 import { fadeOutMusic, playHoops, setMusicRate } from '../core/music';
 import { sfx } from '../core/sfx';
-import { ART_RES, CHAR_H, canvas } from '../gfx/draw';
+import { ART_RES, CHAR_H, bodyLift, canvas } from '../gfx/draw';
+import { wardrobe } from '../core/wardrobe';
 import {
   ARENA_H,
   ARENA_W,
@@ -667,7 +668,7 @@ export class HoopsScene extends Phaser.Scene {
     if (this.heroCrowned && !this.tweens.isTweening(c)) {
       // the champion wears it now
       const h = this.hero;
-      c.setPosition(h.x + (h.flipX ? -2 : 2), h.y - CHAR_H * ART_RES * Math.abs(h.scaleY) * 0.9 + 12).setAngle(h.flipX ? 12 : -12);
+      c.setPosition(h.x + (h.flipX ? -2 : 2), h.y - (CHAR_H * 0.9 + bodyLift(wardrobe.wearKey)) * ART_RES * Math.abs(h.scaleY) + 12).setAngle(h.flipX ? 12 : -12);
     } else if (cs.mode === 'on') {
       cs.tilt *= Math.exp(-dt / 1000 * 3);
       c.setPosition(headX, headY).setRotation(k.rotation + cs.tilt).setFlipX(k.flipX);
@@ -974,7 +975,7 @@ export class HoopsScene extends Phaser.Scene {
     this.tweens.add({ targets: this.crown, y: cy - 520, angle: 900, duration: 1100, ease: 'Quad.easeOut' });
     this.time.delayedCall(1100, () => {
       const h = this.hero;
-      const top = h.y - CHAR_H * ART_RES * Math.abs(h.scaleY) * 0.9;
+      const top = h.y - (CHAR_H * 0.9 + bodyLift(wardrobe.wearKey)) * ART_RES * Math.abs(h.scaleY);
       this.crown.setDepth(8.06);
       this.tweens.add({
         targets: this.crown,

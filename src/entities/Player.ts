@@ -2,7 +2,8 @@ import Phaser from 'phaser';
 import { DEPTH, MAX_FALL_SPEED } from '../config';
 import type { CharacterDef } from '../data/characters';
 import { sfx } from '../core/sfx';
-import { ART_RES, WALK_FRAMES } from '../gfx/draw';
+import { ART_RES, WALK_FRAMES, bodyLift } from '../gfx/draw';
+import { wardrobe } from '../core/wardrobe';
 import { FaceClock } from '../gfx/face';
 import { emptyInput, type InputSource, type InputState } from '../input/types';
 import type { Fx } from '../world/Fx';
@@ -422,8 +423,10 @@ export class Player {
       // (it's on as soon as you step off: it just billows open)
       const f = t < 0.07 ? 'burst' : t < CHUTE_OPEN_AT ? 'opening' : 'open';
       const lean = this.chute.lean * 0.2 + Math.sin(this.scene.time.now / 520) * 0.03;
+      // (on a skateboard the hero's up on its deck: the rig with them)
+      const up = bodyLift(wardrobe.wearKey) * ART_RES * Math.abs(this.view.scaleY);
       for (const sp of [this.chuteBack, this.chuteFront!]) {
-        sp.setPosition(this.view.x, this.view.y).setFlipX(this.facing < 0).setRotation(lean).setScale(this.view.scaleX, this.view.scaleY).setAlpha(this.view.alpha);
+        sp.setPosition(this.view.x + Math.sin(lean) * up, this.view.y - Math.cos(lean) * up).setFlipX(this.facing < 0).setRotation(lean).setScale(this.view.scaleX, this.view.scaleY).setAlpha(this.view.alpha);
       }
       this.chuteBack.setFrame(f);
       this.view.setRotation(lean * 0.6);

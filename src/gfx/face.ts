@@ -15,6 +15,18 @@ export interface Face {
   mouth: Mouth;
 }
 
+/**
+ * Where the eyes of the hero just drawn are (the middle of them, in the canvas's own pixels) and how
+ * they're turned: each hero's drawing marks it as it draws them, so the sunglasses find them in any pose.
+ */
+export const eyeMark = { x: 0, y: 0, rot: 0 };
+export function markEyes(ctx: CanvasRenderingContext2D, x: number, y: number) {
+  const t = ctx.getTransform();
+  eyeMark.x = t.a * x + t.c * y + t.e;
+  eyeMark.y = t.b * x + t.d * y + t.f;
+  eyeMark.rot = Math.atan2(t.b, t.a);
+}
+
 export const NEUTRAL_FACE: Face = { lookX: 0, lookY: 0, blink: false, mouth: 'rest' };
 
 let current: Face = NEUTRAL_FACE;

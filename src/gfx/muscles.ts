@@ -4,7 +4,7 @@
  * tuft of hair, lumpy muscly arms and long thick legs with curled feet.
  * He flexes one arm and carries the bazooka with the other.
  */
-import { face } from './face';
+import { face, markEyes } from './face';
 import type { Ctx, Pose } from './draw';
 import { carry, carryArms, gait } from './draw';
 import { ellipsePts, petalPts, roundRectPts, type Fill, type Pt, type Style } from './handdrawn';
@@ -119,6 +119,7 @@ function drawMusclesPose(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style
   // little tuft of hair (the arc on top of his head)
   st.line(ctx, [[cx - 7, cy - ry + 1], [cx - 1, cy - ry - 3.5], [cx + 6, cy - ry - 1.5]], seed + 5, 0.9);
 
+  markEyes(ctx, cx + 4.5, cy - 4.25);
   if (hurt) {
     // from the "hurt Big Muscles" sketch: one huge stunned eye with a dark
     // black-eye ring, the other eye an X

@@ -271,6 +271,7 @@ export class GameScene extends Phaser.Scene {
 
   create() {
     this.bossSongReady = false;
+    this.saidWow = false;
     this.levelId = this.data0.level ?? 1;
     const data = (levelInfo(this.levelId).build ?? buildLevel1)();
     this.wideZones = data.wide ?? [];
@@ -686,6 +687,7 @@ export class GameScene extends Phaser.Scene {
       if (!e.awake && !e.dead && e.body.left < wakeR && e.body.right > wakeL && (!vertical || (e.body.bottom > this.view.top - 160 && e.body.top < this.view.top + this.view.height + 160))) e.wake();
       e.update(dt);
     }
+    this.wowAtGiant();
 
     this.rockets = this.rockets.filter((r) => r.active);
     for (const r of this.rockets) {
@@ -1625,6 +1627,17 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.shake(400, 0.008);
     this.fx.popText(hero.x, hero.body.top - 36, 'RUN!', '#ffd23f', 30);
   }
+
+  /** Level 1: the first Giant Puff that comes into view, the hero goes "Wow!" (once a level). */
+  private wowAtGiant() {
+    if (this.saidWow || this.levelId !== 1 || !this.players[0]?.alive) return;
+    const v = this.cameras.main.worldView;
+    const g = this.enemies.find((e) => e.kind === 'giant' && !e.dead && e.body.left < v.right - 30 && e.body.right > v.left + 30 && e.body.bottom > v.top && e.body.top < v.bottom);
+    if (!g) return;
+    this.saidWow = true;
+    this.say(this.players[0], 'Wow!', 1800);
+  }
+  private saidWow = false;
 
   /** A speech bubble over a hero's head for a few seconds. */
   private say(p: Player, text: string, ms = 3900) {

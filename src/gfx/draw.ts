@@ -9,9 +9,10 @@ import { drawScruffyStyled } from './scruffy';
 import { drawMusclesStyled } from './muscles';
 import { ellipsePts } from './handdrawn';
 import { drawNuggie } from './collectibles';
-import { withFace, type Face } from './face';
+import { eyeMark, withFace, type Face } from './face';
 import { drawHat } from './hats';
-import { wardrobe } from '../core/wardrobe';
+import { BOARD_LIFT, drawFrogskins, drawSkateboard, type Lens } from './gear';
+import { gearOf, wardrobe } from '../core/wardrobe';
 
 /** Which hand-drawn look the game renders Puffy with (see the look-development page). */
 export const ART_STYLE = 'polished' as const;
@@ -98,6 +99,13 @@ export const CHAR_W = 56;
  */
 export const HAT_UP = 16;
 export const CHAR_H = 56;
+/** How far up a hero's body is drawn in what they've got on (frame units): on the skateboard, the deck's height. */
+export const bodyLift = (wear: string | null | undefined) => (gearOf(wear).ride ? BOARD_LIFT : 0);
+/** Room over a hero's frame for what they've got on ('' nothing): a hat, and the skateboard's lift. */
+export function gearUp(wear: string | null | undefined) {
+  const g = gearOf(wear);
+  return (g.head ? HAT_UP : 0) + (g.ride ? BOARD_LIFT + 1 : 0);
+}
 
 /**
  * Carrying something over the head in both hands (the folding chair in the ring): no bazooka, both
@@ -127,36 +135,178 @@ export function carryArms(id: string, ox: number, oy: number) {
   return { front: arm(c.f), back: arm(c.b), hand: [ox + hx, oy + hy] as [number, number] };
 }
 
-/** Draws a hero facing right, feet touching y = oy + CHAR_H - 2. */
-export function drawCharacter(ctx: Ctx, ox: number, oy: number, ch: CharacterDef, pose: Pose, f?: Face, hat: string | null = wardrobe.hat) {
-  if (f) return withFace(f, () => drawCharacter(ctx, ox, oy, ch, pose, undefined, hat));
-  const st = STYLES[ART_STYLE];
-  const base: Pose = pose === 'eat0' ? 'idle0' : pose === 'eat1' ? 'idle1' : pose;
-  switch (ch.id) {
-    case 'scruffy':
-      drawScruffyStyled(ctx, ox, oy, base, st);
-      break;
-    case 'muscles':
-      drawMusclesStyled(ctx, ox, oy, base, st);
-      break;
-    default:
-      drawPuffyStyled(ctx, ox, oy, base, st);
+/** Which part of a hero to draw: everything, all but the sunglasses, or only them. */
+export type Layer = 'all' | 'body' | 'eyes';
+
+/**
+ * Draws a hero facing right, feet touching y = oy + CHAR_H - 2 (or the skateboard's wheels, if
+ * they're on one), in what they've got on (`wear`: Shop item ids, see wardrobe.ts). `layer`: 'body'
+ * leaves off the sunglasses and 'eyes' draws only them — a battle player's colour change has to go
+ * between the two, or it'd turn the orange lenses too.
+ */
+export function drawCharacter(ctx: Ctx, ox: number, oy: number, ch: CharacterDef, pose: Pose, f?: Face, wear: string = wardrobe.wearKey, layer: Layer = 'all') {
+  if (f) return withFace(f, () => drawCharacter(ctx, ox, oy, ch, pose, undefined, wear, layer));
+  const g = wear ? gearOf(wear) : {};
+  const eating = pose === 'eat0' || pose === 'eat1';
+  let base: Pose = pose === 'eat0' ? 'idle0' : pose === 'eat1' ? 'idle1' : pose;
+  // on the skateboard: standing on it rolling along (no walking), up on it by the deck's height
+  if (g.ride && base.startsWith('walk')) base = +base[4] < 4 ? 'idle0' : 'idle1';
+  const lift = g.ride ? BOARD_LIFT : 0;
+  const by = oy - lift;
+  if (layer !== 'eyes') {
+    if (g.ride) drawBoard(ctx, ox, oy, ch, base);
+    const st = STYLES[ART_STYLE];
+    switch (ch.id) {
+      case 'scruffy':
+        drawScruffyStyled(ctx, ox, by, base, st);
+        break;
+      case 'muscles':
+        drawMusclesStyled(ctx, ox, by, base, st);
+        break;
+      default:
+        drawPuffyStyled(ctx, ox, by, base, st);
+    }
+    if (eating) drawEating(ctx, ox, by, ch.id, pose === 'eat1', st);
   }
-  if (pose === 'eat0' || pose === 'eat1') drawEating(ctx, ox, oy, ch.id, pose === 'eat1', st);
+  if (g.eyes && layer !== 'body') drawGlasses(ctx, ox, by, ch, base);
   // a hat from the Shop, on top of the head
-  if (hat) {
+  if (g.head && layer !== 'eyes') {
     const a = headTop(ch, base);
     const k = HAT_FIT[ch.id] ?? HAT_FIT.puffy;
-    drawHat(ctx, hat, ox + a.x + k.dx, oy + a.y + k.dy, a.tilt - 0.2, k.s);
+    drawHat(ctx, g.head, ox + a.x + k.dx, by + a.y + k.dy, a.tilt - 0.2, k.s);
   }
 }
 
 /** Each hero's hat: its size, and a nudge from the top of the head the drawing finds. */
 const HAT_FIT: Record<string, { s: number; dx: number; dy: number }> = {
   puffy: { s: 1, dx: 0, dy: 3 },
-  scruffy: { s: 0.78, dx: 0, dy: 2.5 },
-  muscles: { s: 0.95, dx: 0, dy: 3 },
+  scruffy: { s: 0.88, dx: 0.5, dy: 3.5 },
+  muscles: { s: 1, dx: 0, dy: 6 },
 };
+
+/**
+ * Each hero's sunglasses, standing (idle0, frame units): the lenses over the eyes, the near one
+ * first, and where the arm goes back to. In other poses they move and turn with the head.
+ */
+const GLASSES: Record<string, { lenses: Lens[]; ear: { x: number; y: number }; s: number }> = {
+  puffy: { lenses: [{ x: 32.5, y: 19.6, w: 12.4, h: 11.6 }, { x: 41.8, y: 19, w: 3.8, h: 10 }], ear: { x: 17, y: 18 }, s: 1 },
+  scruffy: { lenses: [{ x: 26.5, y: 30.6, w: 6.6, h: 6 }, { x: 33.3, y: 29.6, w: 6.6, h: 6 }], ear: { x: 16, y: 30 }, s: 0.8 },
+  muscles: { lenses: [{ x: 28.5, y: 18.8, w: 7.6, h: 7 }, { x: 35.9, y: 18.6, w: 7.6, h: 7 }], ear: { x: 17, y: 18 }, s: 0.9 },
+};
+
+function drawGlasses(ctx: Ctx, ox: number, oy: number, ch: CharacterDef, pose: Pose) {
+  const G = GLASSES[ch.id] ?? GLASSES.puffy;
+  const e0 = eyesOf(ch, 'idle0');
+  const e = eyesOf(ch, pose);
+  ctx.save();
+  // (the eyes have moved and turned from where they are standing: the glasses go with them)
+  ctx.translate(ox + e.x, oy + e.y);
+  ctx.rotate(e.rot - e0.rot);
+  ctx.translate(-e0.x, -e0.y);
+  drawFrogskins(ctx, G.lenses, G.ear, G.s);
+  ctx.restore();
+}
+
+/** Where a hero's eyes are in a pose (frame units; see markEyes), found once by drawing it. */
+const eyesAt = new Map<string, { x: number; y: number; rot: number }>();
+function eyesOf(ch: CharacterDef, pose: Pose) {
+  const key = `${ch.id}/${pose}`;
+  let e = eyesAt.get(key);
+  if (!e) {
+    // (drawn somewhere tiny: only where the eyes go is wanted)
+    const { ctx } = canvas(2, 2);
+    drawCharacter(ctx, 0, 0, ch, pose, undefined, '', 'body');
+    e = { ...eyeMark };
+    eyesAt.set(key, e);
+  }
+  return e;
+}
+
+/** Each hero's skateboard length (units). */
+const BOARD_LEN: Record<string, number> = { puffy: 30, scruffy: 26, muscles: 34 };
+
+/**
+ * The skateboard under a hero's feet: flat on the ground standing and rolling; in a jump the ollie
+ * (popped up under the feet, nose high); falling, level under them coming down.
+ */
+function drawBoard(ctx: Ctx, ox: number, oy: number, ch: CharacterDef, pose: Pose) {
+  const len = BOARD_LEN[ch.id] ?? 30;
+  const ft = feetOf(ch, pose);
+  ctx.save();
+  if (pose === 'jump') {
+    // (the deck along the bottoms of both feet, the back one on the tail: nose up)
+    const a = Math.max(-0.55, Math.min(-0.22, Math.atan2(ft.yr - ft.yl, ft.xr - ft.xl)));
+    const mx = (ft.xl + ft.xr) / 2;
+    const my = Math.max(ft.yl + (mx - ft.xl) * Math.tan(a), ft.yr - (ft.xr - mx) * Math.tan(a));
+    ctx.translate(ox + mx, oy + my - BOARD_LIFT + 0.3);
+    ctx.rotate(a);
+  } else if (pose === 'fall' || pose === 'hurt') {
+    ctx.translate(ox + ft.x, oy + ft.y - BOARD_LIFT + 0.4);
+    ctx.rotate(pose === 'hurt' ? 0.16 : 0.06);
+  } else ctx.translate(ox + ft.x, oy + CHAR_H - 2 - BOARD_LIFT);
+  drawSkateboard(ctx, len);
+  ctx.restore();
+}
+
+/** A hero drawn bare in a pose, at 4× (for measuring), kept while the measuring's done. */
+function measure(ch: CharacterDef, pose: Pose) {
+  const R = 4;
+  const { c, ctx } = canvas(CHAR_W * R, CHAR_H * R);
+  ctx.scale(R, R);
+  drawCharacter(ctx, 0, 0, ch, pose, undefined, '');
+  const d = ctx.getImageData(0, 0, c.width, c.height).data;
+  const W = c.width;
+  const solid = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < c.height && d[(y * W + x) * 4 + 3] > 60;
+  return { R, W, H: c.height, solid };
+}
+
+/** Where a hero's feet are in a pose (frame units): the middle of the lowest bit of them, and its bottom. */
+type Feet = { x: number; y: number; xl: number; yl: number; xr: number; yr: number };
+const feet = new Map<string, Feet>();
+function feetOf(ch: CharacterDef, pose: Pose) {
+  const key = `${ch.id}/${pose}`;
+  const hit = feet.get(key);
+  if (hit) return hit;
+  const { R, H, solid } = measure(ch, pose);
+  const xa = 10 * R;
+  const xb = 46 * R;
+  let bottom = -1;
+  for (let y = H - 1; y >= 0 && bottom < 0; y--)
+    for (let x = xa; x < xb; x++)
+      if (solid(x, y)) {
+        bottom = y;
+        break;
+      }
+  let out: Feet = { x: 28, y: CHAR_H - 2, xl: 22, yl: CHAR_H - 2, xr: 34, yr: CHAR_H - 2 };
+  if (bottom >= 0) {
+    // (both feet: everything solid in the bottom 3 units)
+    let x0 = xb;
+    let x1 = xa;
+    for (let y = bottom - 3 * R; y <= bottom; y++)
+      for (let x = xa; x < xb; x++)
+        if (solid(x, y)) {
+          if (x < x0) x0 = x;
+          if (x > x1) x1 = x;
+        }
+    // (and each foot's own bottom, back and front: the lowest point in each quarter of the bottom 9 units' width)
+    let f0 = xb;
+    let f1 = xa;
+    for (let y = bottom - 9 * R; y <= bottom; y++)
+      for (let x = xa; x < xb; x++)
+        if (solid(x, y)) {
+          if (x < f0) f0 = x;
+          if (x > f1) f1 = x;
+        }
+    const lowIn = (a: number, b: number) => {
+      for (let y = bottom; y > bottom - 12 * R; y--) for (let x = Math.round(a); x < b; x++) if (solid(x, y)) return (y + 1) / R;
+      return (bottom + 1) / R;
+    };
+    const q = (f1 - f0) / 4;
+    out = { x: (x0 + x1) / 2 / R, y: (bottom + 1) / R, xl: (f0 + q) / R, yl: lowIn(f0, f0 + q * 2), xr: (f1 - q) / R, yr: lowIn(f1 - q * 2, f1) };
+  }
+  feet.set(key, out);
+  return out;
+}
 
 /**
  * The top of a hero's head in a pose (frame units) and how the head's tilted there: found once by
@@ -169,13 +319,8 @@ function headTop(ch: CharacterDef, pose: Pose) {
   const key = `${ch.id}/${pose}`;
   const hit = heads.get(key);
   if (hit) return hit;
-  const R = 4;
-  const { c, ctx } = canvas(CHAR_W * R, CHAR_H * R);
-  ctx.scale(R, R);
-  drawCharacter(ctx, 0, 0, ch, pose, undefined, null);
-  const d = ctx.getImageData(0, 0, c.width, c.height).data;
-  const W = c.width;
-  const solid = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < c.height && d[(y * W + x) * 4 + 3] > 60;
+  const { R, W, H, solid } = measure(ch, pose);
+  const c = { width: W, height: H };
   // (look between these columns: the head, not a fist or the bazooka off to the side)
   const xa = Math.round(12 * R);
   const xb = Math.round(48 * R);
@@ -248,7 +393,7 @@ function spanOf(ch: CharacterDef): [number, number] {
   const M = 24; // room either side for the bazooka
   const { c, ctx } = canvas((CHAR_W + M * 2) * R, CHAR_H * R);
   ctx.scale(R, R);
-  drawCharacter(ctx, M, 0, ch, 'idle0', undefined, null);
+  drawCharacter(ctx, M, 0, ch, 'idle0', undefined, '');
   const data = ctx.getImageData(0, 0, c.width, c.height).data;
   let x0 = c.width;
   let x1 = 0;
@@ -263,22 +408,47 @@ function spanOf(ch: CharacterDef): [number, number] {
   return sp;
 }
 
+/** How high a hero's standing drawing reaches in what they've got on (frame units: 0 is the top of the frame, less is higher), measured once. */
+const heroTop = new Map<string, number>();
+function topOf(ch: CharacterDef, wear: string) {
+  const key = `${ch.id}|${wear}`;
+  let t = heroTop.get(key);
+  if (t !== undefined) return t;
+  const R = 2;
+  const up = gearUp(wear);
+  const { c, ctx } = canvas(CHAR_W * R, (CHAR_H + up) * R);
+  ctx.scale(R, R);
+  drawCharacter(ctx, 0, up, ch, 'idle0', undefined, wear);
+  const d = ctx.getImageData(0, 0, c.width, c.height).data;
+  t = 0;
+  find: for (let y = 0; y < c.height; y++)
+    for (let x = 0; x < c.width; x++)
+      if (d[(y * c.width + x) * 4 + 3] > 24) {
+        t = y / R - up;
+        break find;
+      }
+  heroTop.set(key, t);
+  return t;
+}
+
 /**
  * Big lobby picture: feet on the bottom edge, heroes drawn at their real
  * relative sizes, centred on the whole drawing (bazooka included) and made
  * smaller if they'd otherwise poke out of the side of the card.
  */
-export function drawHeroCard(target: HTMLCanvasElement, ch: CharacterDef, pose: Pose = 'idle0', f?: Face, hat: string | null = wardrobe.hat) {
+export function drawHeroCard(target: HTMLCanvasElement, ch: CharacterDef, pose: Pose = 'idle0', f?: Face, wear: string = wardrobe.wearKey, layer: Layer = 'all') {
   const ctx = target.getContext('2d')!;
-  ctx.clearRect(0, 0, target.width, target.height);
+  // (the sunglasses alone go over what's there: see drawCharacter)
+  if (layer !== 'eyes') ctx.clearRect(0, 0, target.width, target.height);
   const [l, r] = spanOf(ch);
   const mid = (l + r) / 2;
   const half = (r - l) / 2;
-  const s = Math.min((target.height / (56 * 1.32)) * ch.scale, (target.width * 0.48) / half);
+  // (and smaller still if what they've got on — a hat, the skateboard — would poke out of the top)
+  const s = Math.min((target.height / (56 * 1.32)) * ch.scale, (target.width * 0.48) / half, (target.height * 0.96) / (54 - topOf(ch, wear)));
   ctx.save();
   ctx.translate(target.width / 2 - mid * s, target.height * 0.985);
   ctx.scale(s, s);
-  drawCharacter(ctx, -27, -54, ch, pose, f, hat);
+  drawCharacter(ctx, -27, -54, ch, pose, f, wear, layer);
   ctx.restore();
 }
 
@@ -300,12 +470,12 @@ const portraitBox = new Map<string, [number, number, number, number]>();
  */
 const portraitCache = new Map<string, HTMLCanvasElement>();
 
-export function drawPortrait(target: HTMLCanvasElement, ch: CharacterDef, pose: Pose = 'idle0', f?: Face, boxPose: Pose = pose, hat: string | null = wardrobe.hat) {
-  const key = `${ch.id}|${ch.colors.main}|${pose}|${boxPose}|${f ? `${f.lookX},${f.lookY},${f.blink ? 1 : 0},${f.mouth}` : '-'}|${target.width}x${target.height}|${hat ?? ''}`;
+export function drawPortrait(target: HTMLCanvasElement, ch: CharacterDef, pose: Pose = 'idle0', f?: Face, boxPose: Pose = pose, wear: string = wardrobe.wearKey, layer: Layer = 'all') {
+  const key = `${ch.id}|${ch.colors.main}|${pose}|${boxPose}|${f ? `${f.lookX},${f.lookY},${f.blink ? 1 : 0},${f.mouth}` : '-'}|${target.width}x${target.height}|${wear}|${layer}`;
   let done = portraitCache.get(key);
   if (!done) {
     done = canvas(target.width, target.height).c;
-    paintPortrait(done, ch, pose, f, boxPose, hat);
+    paintPortrait(done, ch, pose, f, boxPose, wear, layer);
     if (portraitCache.size >= 48) portraitCache.delete(portraitCache.keys().next().value!);
     portraitCache.set(key, done);
   }
@@ -314,21 +484,21 @@ export function drawPortrait(target: HTMLCanvasElement, ch: CharacterDef, pose: 
   ctx.drawImage(done, 0, 0);
 }
 
-function paintPortrait(target: HTMLCanvasElement, ch: CharacterDef, pose: Pose, f: Face | undefined, boxPose: Pose, hat: string | null) {
+function paintPortrait(target: HTMLCanvasElement, ch: CharacterDef, pose: Pose, f: Face | undefined, boxPose: Pose, wear: string, layer: Layer) {
   const R = 4;
-  // (room over the head for a hat, if there's one)
-  const up = hat ? HAT_UP : 0;
+  // (room over the head for a hat or the skateboard, if there's one)
+  const up = gearUp(wear);
   const { c: tmp, ctx: t } = canvas((CHAR_W + EDGE * 2) * R, (CHAR_H + EDGE + up) * R);
   t.scale(R, R);
-  drawCharacter(t, EDGE, EDGE + up, ch, pose, f, hat);
+  drawCharacter(t, EDGE, EDGE + up, ch, pose, f, wear, layer);
   // find the drawing's bounding box (with the neutral face, once per hero + pose)
   // (frames of one animation share the box of `boxPose`, so they don't jump in size)
-  const key = `${ch.id}:${boxPose}:${hat ?? ''}`;
+  const key = `${ch.id}:${boxPose}:${wear}`;
   let box = portraitBox.get(key);
   if (!box) {
     const { c: m, ctx: mc } = canvas((CHAR_W + EDGE * 2) * R, (CHAR_H + EDGE + up) * R);
     mc.scale(R, R);
-    drawCharacter(mc, EDGE, EDGE + up, ch, boxPose, undefined, hat);
+    drawCharacter(mc, EDGE, EDGE + up, ch, boxPose, undefined, wear);
     const data = mc.getImageData(0, 0, m.width, m.height).data;
     let x0 = m.width, y0 = m.height, x1 = 0, y1 = 0;
     for (let y = 0; y < m.height; y += 2)
@@ -359,13 +529,13 @@ function paintPortrait(target: HTMLCanvasElement, ch: CharacterDef, pose: Pose, 
  * scale and with the feet on the same baseline, so flipping between them is a
  * cheap drawImage and the hero never changes size from pose to pose.
  */
-export function renderPoseSet(ch: CharacterDef, poses: Pose[], size: number, hat: string | null = wardrobe.hat): Record<string, HTMLCanvasElement> {
+export function renderPoseSet(ch: CharacterDef, poses: Pose[], size: number, wear: string = wardrobe.wearKey): Record<string, HTMLCanvasElement> {
   const R = 4;
-  const up = hat ? HAT_UP : 0;
+  const up = gearUp(wear);
   const drawn = poses.map((pose) => {
     const { c, ctx } = canvas((CHAR_W + EDGE * 2) * R, (CHAR_H + EDGE + up) * R);
     ctx.scale(R, R);
-    drawCharacter(ctx, EDGE, EDGE + up, ch, pose, undefined, hat);
+    drawCharacter(ctx, EDGE, EDGE + up, ch, pose, undefined, wear);
     return c;
   });
   // the union of every pose's outline

@@ -12,10 +12,14 @@
  *   POST /api/register  { name, password }            → 201 { token, user }
  *   POST /api/login     { name, password }            → { token, user } (404 { unknown: true } if no such player)
  *   GET  /api/me        (Authorization: Bearer token) → { user }
- *   PUT  /api/progress  (Bearer) { rootbeer, nuggies, kills, level, spent?, items?, hat? } → { user }
+ *   PUT  /api/progress  (Bearer) { rootbeer, nuggies, kills, level, spent?, items?, wear? } → { user }
  *   POST /api/logout    (Bearer)                      → 204
- * where user = { name, rootbeer, nuggies, kills, level, spent, items, hat } (root beer is every bottle
- * ever found, spent what the Shop has had; items the Shop ids owned, comma separated; hat the one worn).
+ * where user = { name, rootbeer, nuggies, kills, level, spent, items, wear } (root beer is every bottle
+ * ever found, spent what the Shop has had; items the Shop ids owned and wear the ones on, comma
+ * separated — 'none' when everything's off, '' never chosen).
+ *
+ * What's been bought is a row each in user_items (user, item, equipped: whether it's on), so a
+ * player keeps it whatever browser they play on. Things are never taken away once bought.
  */
 import { createHash, randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
@@ -31,10 +35,10 @@ export interface PublicUser {
   nuggies: number;
   kills: number;
   level: number;
-  /** Root beer spent in the Shop, what's been bought there (ids, comma separated), the hat worn. */
+  /** Root beer spent in the Shop, what's been bought there (ids, comma separated), what's on ('none' nothing, '' never chosen). */
   spent: number;
   items: string;
-  hat: string;
+  wear: string;
 }
 
 interface UserRow extends PublicUser {
@@ -55,11 +59,19 @@ interface Store {
   kind: string;
   byName(name: string): UserRow | undefined;
   create(name: string, hash: string, salt: string): UserRow;
-  setProgress(id: number, p: Omit<PublicUser, 'name'>): void;
+  setProgress(id: number, p: Omit<PublicUser, 'name' | 'items' | 'wear'>): void;
+  /** Add what's been bought (never removes any); `wear` (ids on, or none of them) sets each one's equipped flag, null leaves them. */
+  setItems(id: number, items: string[], wear: string[] | null): void;
   byId(id: number): UserRow | undefined;
   addSession(tokenHash: string, userId: number): void;
   session(tokenHash: string): number | undefined;
   dropSession(tokenHash: string): void;
+}
+
+/** What's on, from each thing's equipped flag: the ids, 'none' if everything's off, '' if there's nothing. */
+function wearOf(gear: { item: string; equipped: number | boolean }[]) {
+  if (!gear.length) return '';
+  return gear.filter((g) => g.equipped).map((g) => g.item).join(',') || 'none';
 }
 
 async function openSqlite(file: string): Promise<Store> {
@@ -83,6 +95,13 @@ async function openSqlite(file: string): Promise<Store> {
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+    CREATE TABLE IF NOT EXISTS user_items (
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      item TEXT NOT NULL,
+      equipped INTEGER NOT NULL DEFAULT 0,
+      bought_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (user_id, item)
+    );
     CREATE TABLE IF NOT EXISTS sessions (
       token_hash TEXT PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -95,16 +114,32 @@ async function openSqlite(file: string): Promise<Store> {
   if (!cols.includes('spent')) db.exec('ALTER TABLE users ADD COLUMN spent INTEGER NOT NULL DEFAULT 0');
   if (!cols.includes('items')) db.exec("ALTER TABLE users ADD COLUMN items TEXT NOT NULL DEFAULT ''");
   if (!cols.includes('hat')) db.exec("ALTER TABLE users ADD COLUMN hat TEXT NOT NULL DEFAULT ''");
+  // (v0.220 kept them as a list on the user, and the hat worn: moved into user_items once)
+  if ((db.prepare('SELECT COUNT(*) AS n FROM user_items').get() as { n: number }).n === 0) {
+    const add = db.prepare('INSERT OR IGNORE INTO user_items (user_id, item, equipped) VALUES (?, ?, ?)');
+    for (const u of db.prepare("SELECT id, items, hat FROM users WHERE items != ''").all() as { id: number; items: string; hat: string }[])
+      for (const it of u.items.split(',').filter(Boolean)) add.run(u.id, it, u.hat.split(',').includes(it) ? 1 : 0);
+  }
   const q = {
-    byName: db.prepare('SELECT id, name, hash, salt, rootbeer, nuggies, kills, level, spent, items, hat FROM users WHERE name = ? COLLATE NOCASE'),
-    byId: db.prepare('SELECT id, name, hash, salt, rootbeer, nuggies, kills, level, spent, items, hat FROM users WHERE id = ?'),
+    byName: db.prepare('SELECT id, name, hash, salt, rootbeer, nuggies, kills, level, spent FROM users WHERE name = ? COLLATE NOCASE'),
+    byId: db.prepare('SELECT id, name, hash, salt, rootbeer, nuggies, kills, level, spent FROM users WHERE id = ?'),
+    items: db.prepare('SELECT item, equipped FROM user_items WHERE user_id = ? ORDER BY bought_at, item'),
+    addItem: db.prepare('INSERT OR IGNORE INTO user_items (user_id, item) VALUES (?, ?)'),
+    equip: db.prepare('UPDATE user_items SET equipped = ? WHERE user_id = ? AND item = ?'),
     create: db.prepare('INSERT INTO users (name, hash, salt) VALUES (?, ?, ?)'),
-    progress: db.prepare("UPDATE users SET rootbeer = ?, nuggies = ?, kills = ?, level = ?, spent = ?, items = ?, hat = ?, updated_at = datetime('now') WHERE id = ?"),
+    progress: db.prepare("UPDATE users SET rootbeer = ?, nuggies = ?, kills = ?, level = ?, spent = ?, updated_at = datetime('now') WHERE id = ?"),
     addSession: db.prepare('INSERT INTO sessions (token_hash, user_id) VALUES (?, ?)'),
     session: db.prepare('SELECT user_id FROM sessions WHERE token_hash = ?'),
     dropSession: db.prepare('DELETE FROM sessions WHERE token_hash = ?'),
   };
-  const row = (r: unknown) => (r ? ({ ...(r as UserRow) } as UserRow) : undefined);
+  const row = (r: unknown) => {
+    if (!r) return undefined;
+    const u = { ...(r as UserRow) };
+    const its = q.items.all(u.id) as { item: string; equipped: number }[];
+    u.items = its.map((i) => i.item).join(',');
+    u.wear = wearOf(its);
+    return u;
+  };
   return {
     kind: `SQLite (${file})`,
     byName: (name) => row(q.byName.get(name)),
@@ -113,7 +148,11 @@ async function openSqlite(file: string): Promise<Store> {
       const r = q.create.run(name, hash, salt);
       return row(q.byId.get(Number(r.lastInsertRowid)))!;
     },
-    setProgress: (id, p) => void q.progress.run(p.rootbeer, p.nuggies, p.kills, p.level, p.spent, p.items, p.hat, id),
+    setProgress: (id, p) => void q.progress.run(p.rootbeer, p.nuggies, p.kills, p.level, p.spent, id),
+    setItems: (id, items, wear) => {
+      for (const it of items) q.addItem.run(id, it);
+      if (wear) for (const { item } of q.items.all(id) as { item: string }[]) q.equip.run(wear.includes(item) ? 1 : 0, id, item);
+    },
     addSession: (t, id) => void q.addSession.run(t, id),
     session: (t) => (q.session.get(t) as { user_id: number } | undefined)?.user_id,
     dropSession: (t) => void q.dropSession.run(t),
@@ -122,15 +161,23 @@ async function openSqlite(file: string): Promise<Store> {
 
 /** The fallback: everything in one small JSON file, written (atomically) on every change. */
 function openJson(file: string): Store {
-  type Data = { next: number; users: UserRow[]; sessions: Record<string, number> };
+  type Row = Omit<UserRow, 'items' | 'wear'> & { gear?: { item: string; equipped: boolean }[]; items?: string; hat?: string };
+  type Data = { next: number; users: Row[]; sessions: Record<string, number> };
   let data: Data = { next: 1, users: [], sessions: {} };
   if (existsSync(file)) data = JSON.parse(readFileSync(file, 'utf8')) as Data;
   for (const u of data.users) {
     u.kills ??= 0;
     u.spent ??= 0;
-    u.items ??= '';
-    u.hat ??= '';
+    // (v0.220: a list, and the hat worn)
+    if (!u.gear) u.gear = (u.items ?? '').split(',').filter(Boolean).map((item) => ({ item, equipped: (u.hat ?? '').split(',').includes(item) }));
+    delete u.items;
+    delete u.hat;
   }
+  const out = (u: Row | undefined): UserRow | undefined => {
+    if (!u) return undefined;
+    const { gear = [], ...rest } = u;
+    return { ...rest, items: gear.map((g) => g.item).join(','), wear: wearOf(gear) };
+  };
   const save = () => {
     writeFileSync(file + '.tmp', JSON.stringify(data));
     renameSync(file + '.tmp', file);
@@ -138,17 +185,25 @@ function openJson(file: string): Store {
   save();
   return {
     kind: `JSON file (${file})`,
-    byName: (name) => data.users.find((u) => u.name.toLowerCase() === name.toLowerCase()),
-    byId: (id) => data.users.find((u) => u.id === id),
+    byName: (name) => out(data.users.find((u) => u.name.toLowerCase() === name.toLowerCase())),
+    byId: (id) => out(data.users.find((u) => u.id === id)),
     create: (name, hash, salt) => {
-      const u: UserRow = { id: data.next++, name, hash, salt, rootbeer: 0, nuggies: 0, kills: 0, level: 1, spent: 0, items: '', hat: '' };
+      const u: Row = { id: data.next++, name, hash, salt, rootbeer: 0, nuggies: 0, kills: 0, level: 1, spent: 0, gear: [] };
       data.users.push(u);
       save();
-      return u;
+      return out(u)!;
     },
     setProgress: (id, p) => {
       const u = data.users.find((x) => x.id === id);
       if (u) Object.assign(u, p);
+      save();
+    },
+    setItems: (id, items, wear) => {
+      const u = data.users.find((x) => x.id === id);
+      if (!u) return;
+      const gear = (u.gear ??= []);
+      for (const item of items) if (!gear.some((g) => g.item === item)) gear.push({ item, equipped: false });
+      if (wear) for (const g of gear) g.equipped = wear.includes(g.item);
       save();
     },
     addSession: (t, id) => {
@@ -178,7 +233,7 @@ export async function openStore(file = dbPath()): Promise<Store> {
 /** Names: 2–16 letters, numbers, spaces, - or _ (the game itself caps them at 10). */
 const NAME_RE = /^[A-Za-z0-9 _-]{2,16}$/;
 const sha = (s: string) => createHash('sha256').update(s).digest('hex');
-const pub = (u: UserRow): PublicUser => ({ name: u.name, rootbeer: u.rootbeer, nuggies: u.nuggies, kills: u.kills, level: u.level, spent: u.spent ?? 0, items: u.items ?? '', hat: u.hat ?? '' });
+const pub = (u: UserRow): PublicUser => ({ name: u.name, rootbeer: u.rootbeer, nuggies: u.nuggies, kills: u.kills, level: u.level, spent: u.spent ?? 0, items: u.items ?? '', wear: u.wear ?? '' });
 /** Shop ids (lower case, digits, dashes), comma separated: anything else is dropped. */
 const ids = (v: unknown, max: number) =>
   typeof v === 'string'
@@ -293,10 +348,11 @@ export async function createUserApi() {
           level: int(body.level, 1, 99),
           // (an older game that doesn't send these keeps what the account has)
           spent: body.spent === undefined ? (u.spent ?? 0) : int(body.spent, 0, 1_000_000),
-          items: body.items === undefined ? (u.items ?? '') : ids(body.items, 50),
-          hat: body.hat === undefined ? (u.hat ?? '') : ids(body.hat, 1),
         };
         store.setProgress(u.id, p);
+        // what's been bought, and what's on ('' not chosen yet: leave it; v0.220 sent just a hat)
+        const wear = body.wear !== undefined ? String(body.wear) : body.hat !== undefined ? String(body.hat) : '';
+        store.setItems(u.id, ids(body.items, 50).split(',').filter(Boolean), wear ? ids(wear, 10).split(',').filter((x) => x && x !== 'none') : null);
         return void send(res, 200, { user: pub(store.byId(u.id)!) }), true;
       }
       if (route === 'POST /api/logout') {

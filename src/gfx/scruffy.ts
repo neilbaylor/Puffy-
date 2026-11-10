@@ -7,7 +7,7 @@ import type { Ctx, Pose } from './draw';
 import { carry, carryArms, gait } from './draw';
 import { ellipsePts, paddlePts, type Fill, type Pt, type Style } from './handdrawn';
 import { drawBazooka } from './bazooka';
-import { face } from './face';
+import { face, markEyes } from './face';
 
 export const SCRUFFY = {
   body: { base: '#f7953a', shade: '#cf6b1c', light: '#ffc98a' } as Fill,
@@ -133,6 +133,7 @@ function drawScruffyPose(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style
   }
 
   // two eyes looking up and forward (they can glance about, and blink)
+  markEyes(ctx, cx + 3.75, cy - 3.6);
   for (const [ex, ey, s] of [
     [cx + 0.5, cy - 3.2, 1],
     [cx + 7, cy - 4, 2],

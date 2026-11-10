@@ -989,9 +989,10 @@ export class UI {
   }
 
   /**
-   * The Shop: things for your hero, bought with root beer (the party hat, to start with). Each shows
-   * your hero wearing it; once it's yours, put it on or take it off. Whatever you wear shows on your
-   * hero everywhere (and in battles, to everyone).
+   * The Shop: things for your hero, bought with root beer (a party hat, sunglasses, a skateboard).
+   * Each shows your hero with it on (with whatever else they've on); once it's yours, put it on or
+   * take it off — one on your head, one over your eyes, one under your feet. Whatever you've on
+   * shows on your hero everywhere (and in battles, to everyone).
    */
   private showShop() {
     const hero = CHARACTERS[this.selected];
@@ -1002,7 +1003,7 @@ export class UI {
         <p class="shop-rb"><i class="rb-ico"></i><b>${left}</b> root beer to spend</p>
         <div class="shop-list">${SHOP.map((it) => {
           const own = wardrobe.owns(it.id);
-          const on = wardrobe.hat === it.id;
+          const on = wardrobe.isOn(it.id);
           const btn = on
             ? `<button class="btn btn-alt" data-off="${it.id}">Take it off</button>`
             : own
@@ -1013,7 +1014,7 @@ export class UI {
           return `<div class="shop-item${on ? ' on' : ''}">
             <canvas width="160" height="160" data-prev="${it.id}"></canvas>
             <div class="shop-info">
-              <h3>${esc(it.name)}${on ? ' <small>wearing it</small>' : own ? ' <small>yours</small>' : ''}</h3>
+              <h3>${esc(it.name)}${on ? ` <small>${it.slot === 'ride' ? 'riding it' : 'wearing it'}</small>` : own ? ' <small>yours</small>' : ''}</h3>
               <p>${esc(it.blurb)}</p>
               <p class="shop-price">${own ? '' : `${it.price} <i class="rb-ico"></i> root beer`}</p>
               ${btn}
@@ -1024,7 +1025,12 @@ export class UI {
         <div class="row"><button class="btn btn-alt" data-act="back">Back</button></div>
       </div>
     </div>`);
-    el.querySelectorAll<HTMLCanvasElement>('canvas[data-prev]').forEach((cv) => drawHeroCard(cv, hero, 'idle0', undefined, cv.dataset.prev!));
+        // (each with that on, and whatever else you've on that it doesn't replace)
+    const withIt = (id: string) => {
+      const slot = SHOP.find((i) => i.id === id)!.slot;
+      return [...wardrobe.equipped.filter((x) => SHOP.find((i) => i.id === x)?.slot !== slot), id].sort().join(',');
+    };
+    el.querySelectorAll<HTMLCanvasElement>('canvas[data-prev]').forEach((cv) => drawHeroCard(cv, hero, 'idle0', undefined, withIt(cv.dataset.prev!)));
     // (what you wear changed: the hero's pictures are drawn again, with or without it, next time they're needed)
     const changed = () => {
       dropHeroSheets(this.game.textures);
@@ -1035,21 +1041,21 @@ export class UI {
       b.addEventListener('click', () => {
         if (!wardrobe.buy(b.dataset.buy!)) return;
         sfx.powerup();
-        wardrobe.wear(b.dataset.buy!);
+        wardrobe.wear(b.dataset.buy!, true);
         changed();
       }),
     );
     el.querySelectorAll<HTMLButtonElement>('[data-wear]').forEach((b) =>
       b.addEventListener('click', () => {
         sfx.select();
-        wardrobe.wear(b.dataset.wear!);
+        wardrobe.wear(b.dataset.wear!, true);
         changed();
       }),
     );
     el.querySelectorAll<HTMLButtonElement>('[data-off]').forEach((b) =>
       b.addEventListener('click', () => {
         sfx.back();
-        wardrobe.wear(null);
+        wardrobe.wear(b.dataset.off!, false);
         changed();
       }),
     );
