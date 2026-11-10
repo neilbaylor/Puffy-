@@ -15,6 +15,7 @@ import { MOUNTAIN_LOOKS, drawMountainFar, drawMountainMid, drawMountainNear } fr
 import './plopLooks'; // (registers Plop Invasion's palettes)
 import { POOWAVE_H, POOWAVE_W, drawPooOnGoat, drawPooPile, drawPooWave, drawStink, drawVolleyNetSide, drawVolleyball } from './plopworld';
 import { PLOP_FRAMES, PLOP_H, PLOP_W, drawPlop, type PlopKind } from './plops';
+import { FISH_FRAMES, FISH_SIZE, drawFish, type FishKind } from './fish';
 import { drawPoo } from './hazards';
 import { BB_ALIAS, BB_FIELD_TILES, BB_KEYS, BB_PLAIN, BB_ROSTER, BB_SIZE, PARK, drawBallparkBack, drawBallparkFront, drawBaseball, drawBaseballPlop, drawCappedPlop, drawLineDrive, type BBPlayer, type BaseballRole } from './baseball';
 import { PLOP_COLOURS } from './plops';
@@ -312,6 +313,19 @@ export const PLOP_PAD = 16;
 export const PLOP_TOP = 22;
 
 /** One size of Plop's frames for the game (`gplop-<kind>`), plus what Plops throw and leave about. */
+/**
+ * One fish's swim cycle (frames sw0–sw5), as `fish-<kind>`, made when a level first needs it. The
+ * fish face right (as in the drawings): flip the sprite to swim left.
+ */
+export function makeFish(scene: Phaser.Scene, kind: FishKind) {
+  const key = `fish-${kind}`;
+  if (scene.textures.exists(key)) return key;
+  const { w, h } = FISH_SIZE[kind];
+  const st = STYLES[ART_STYLE];
+  sheet(scene, key, w, h, FISH_FRAMES, (ctx, f) => drawFish(ctx, 0, 0, kind, f, st));
+  return key;
+}
+
 export function makePlops(scene: Phaser.Scene, kind: PlopKind) {
   const key = `gplop-${kind}`;
   if (scene.textures.exists(key)) return;
