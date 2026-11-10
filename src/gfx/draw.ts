@@ -147,6 +147,8 @@ export type Layer = 'all' | 'body' | 'eyes';
 export function drawCharacter(ctx: Ctx, ox: number, oy: number, ch: CharacterDef, pose: Pose, f?: Face, wear: string = wardrobe.wearKey, layer: Layer = 'all') {
   if (f) return withFace(f, () => drawCharacter(ctx, ox, oy, ch, pose, undefined, wear, layer));
   const g = wear ? gearOf(wear) : {};
+  // 'scuba' in what's on: the underwater level's dive gear (not a Shop thing: the level adds it)
+  const scuba = !!wear && wear.split(',').includes('scuba');
   const eating = pose === 'eat0' || pose === 'eat1';
   let base: Pose = pose === 'eat0' ? 'idle0' : pose === 'eat1' ? 'idle1' : pose;
   // on the skateboard: standing on it rolling along (no walking), up on it by the deck's height
@@ -155,6 +157,8 @@ export function drawCharacter(ctx: Ctx, ox: number, oy: number, ch: CharacterDef
   const by = oy - lift;
   if (layer !== 'eyes') {
     if (g.ride) drawBoard(ctx, ox, oy, ch, base);
+    // (underwater: the air tank on its back, behind the body)
+    if (scuba) drawTank(ctx, ox, by, ch, base);
     const st = STYLES[ART_STYLE];
     switch (ch.id) {
       case 'scruffy':
@@ -167,8 +171,12 @@ export function drawCharacter(ctx: Ctx, ox: number, oy: number, ch: CharacterDef
         drawPuffyStyled(ctx, ox, by, base, st);
     }
     if (eating) drawEating(ctx, ox, by, ch.id, pose === 'eat1', st);
+    if (scuba) drawRegulator(ctx, ox, by, ch, base);
   }
-  if (g.eyes && layer !== 'body') drawGlasses(ctx, ox, by, ch, base);
+  // (underwater the dive mask goes on, instead of any sunglasses)
+  if (scuba) {
+    if (layer !== 'body') drawMask(ctx, ox, by, ch, base);
+  } else if (g.eyes && layer !== 'body') drawGlasses(ctx, ox, by, ch, base);
   // a hat from the Shop, on top of the head
   if (g.head && layer !== 'eyes') {
     const a = headTop(ch, base);
@@ -204,6 +212,125 @@ function drawGlasses(ctx: Ctx, ox: number, oy: number, ch: CharacterDef, pose: P
   ctx.rotate(e.rot - e0.rot);
   ctx.translate(-e0.x, -e0.y);
   drawFrogskins(ctx, G.lenses, G.ear, G.s);
+  ctx.restore();
+}
+
+/**
+ * The underwater dive gear (wear 'scuba'): a yellow air tank on the back, a hose over the shoulder
+ * to a mouthpiece, and a dive mask over the eyes (in place of sunglasses). Each hero's spots, standing
+ * (idle0); in other poses they move with the head.
+ */
+const SCUBA: Record<string, { tank: [number, number, number, number]; mouth: [number, number]; s: number }> = {
+  // tank: middle x, top y, bottom y, width
+  puffy: { tank: [11.5, 21, 41, 9], mouth: [37, 29], s: 1 },
+  scruffy: { tank: [10, 28, 44, 8], mouth: [33, 38.5], s: 0.85 },
+  muscles: { tank: [10, 16, 39, 10], mouth: [33, 28.5], s: 1.05 },
+};
+const TANK = { base: '#ffcc33', shade: '#d99a12', light: '#fff0a8' };
+/** How far the head's moved (and turned) from where it is standing, in this pose. */
+function headShift(ch: CharacterDef, pose: Pose) {
+  const e0 = eyesOf(ch, 'idle0');
+  const e = eyesOf(ch, pose);
+  return { dx: e.x - e0.x, dy: e.y - e0.y, rot: e.rot - e0.rot, e0, e };
+}
+function drawTank(ctx: Ctx, ox: number, oy: number, ch: CharacterDef, pose: Pose) {
+  const k = SCUBA[ch.id] ?? SCUBA.puffy;
+  const st = STYLES[ART_STYLE];
+  const h = headShift(ch, pose);
+  const [x, y0, y1, w] = k.tank;
+  const tx = ox + x + h.dx * 0.6;
+  const ty = oy + h.dy * 0.6;
+  ctx.save();
+  ctx.translate(tx, ty + (y0 + y1) / 2);
+  ctx.rotate(h.rot * 0.6 - 0.12);
+  const half = (y1 - y0) / 2;
+  // the valve on top, then the tank: a rounded yellow cylinder with a dark band
+  st.shape(ctx, [[-1.6, -half - 4], [1.6, -half - 4], [1.6, -half + 1], [-1.6, -half + 1]], { base: '#8d949c', shade: '#626a73', light: '#c9ced4' }, 8801, { lw: 0.7 });
+  const r = w / 2;
+  const pts: [number, number][] = [];
+  for (let i = 0; i <= 10; i++) pts.push([-r * Math.cos((i / 10) * Math.PI), -half + r - r * Math.sin((i / 10) * Math.PI)]);
+  for (let i = 0; i <= 10; i++) pts.push([r * Math.cos((i / 10) * Math.PI), half - r + r * Math.sin((i / 10) * Math.PI)]);
+  st.shape(ctx, pts, TANK, 8802, { lw: 0.9, light: [-r * 0.5, -half + 3] });
+  ctx.fillStyle = '#3a3f46';
+  ctx.fillRect(-r + 0.6, -half + r + 3, w - 1.2, 1.8);
+  ctx.restore();
+}
+function drawRegulator(ctx: Ctx, ox: number, oy: number, ch: CharacterDef, pose: Pose) {
+  const k = SCUBA[ch.id] ?? SCUBA.puffy;
+  const h = headShift(ch, pose);
+  const [x, y0] = k.tank;
+  const vx = ox + x + h.dx * 0.6 + 1;
+  const vy = oy + y0 - 3 + h.dy * 0.6;
+  const mx = ox + k.mouth[0] + h.dx;
+  const my = oy + k.mouth[1] + h.dy;
+  // the hose: from the tank's valve, over the top of the shoulder, to the mouthpiece
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = '#1f2328';
+  ctx.lineWidth = 3 * k.s;
+  ctx.beginPath();
+  ctx.moveTo(vx, vy);
+  ctx.bezierCurveTo(vx + 2, vy - 9 * k.s, mx - 14 * k.s, my - 2, mx - 2, my + 1);
+  ctx.stroke();
+  ctx.strokeStyle = '#5b636d';
+  ctx.lineWidth = 1.1 * k.s;
+  ctx.stroke();
+  // the mouthpiece: a dark rounded block with a round purge button
+  const st = STYLES[ART_STYLE];
+  st.shape(ctx, [[mx - 3 * k.s, my - 2.6 * k.s], [mx + 3.4 * k.s, my - 2.8 * k.s], [mx + 3.8 * k.s, my + 2.8 * k.s], [mx - 3 * k.s, my + 2.6 * k.s]], { base: '#2b3036', shade: '#16191d', light: '#57606a' }, 8803, { lw: 0.8 });
+  st.shape(ctx, ellipsePts(mx + 3.6 * k.s, my, 2.2 * k.s, 2.4 * k.s, 0, 14), { base: '#ffcc33', shade: '#d99a12', light: '#fff0a8' }, 8804, { lw: 0.7 });
+}
+/** The dive mask: one wide window over both eyes in a dark rubber frame, its strap round the back of the head. */
+function drawMask(ctx: Ctx, ox: number, oy: number, ch: CharacterDef, pose: Pose) {
+  const G = GLASSES[ch.id] ?? GLASSES.puffy;
+  const h = headShift(ch, pose);
+  const pad = 1.2;
+  const x0 = Math.min(...G.lenses.map((l) => l.x - l.w / 2)) - pad;
+  const x1 = Math.max(...G.lenses.map((l) => l.x + l.w / 2)) + pad;
+  const y0 = Math.min(...G.lenses.map((l) => l.y - l.h / 2)) - pad;
+  const y1 = Math.max(...G.lenses.map((l) => l.y + l.h / 2)) + pad;
+  ctx.save();
+  ctx.translate(ox + h.e.x, oy + h.e.y);
+  ctx.rotate(h.rot);
+  ctx.translate(-h.e0.x, -h.e0.y);
+  const rr = (x: number, y: number, w: number, hh: number, r: number) => {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + hh, r);
+    ctx.arcTo(x + w, y + hh, x, y + hh, r);
+    ctx.arcTo(x, y + hh, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  };
+  // the strap, back round the head to the ear
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = '#1f2328';
+  ctx.lineWidth = 2.6 * G.s;
+  ctx.beginPath();
+  ctx.moveTo(x0 + 1, (y0 + y1) / 2 - 1);
+  ctx.quadraticCurveTo((x0 + G.ear.x) / 2, y0 - 2, G.ear.x, G.ear.y);
+  ctx.stroke();
+  // the glass: pale sea-blue and see-through (the eyes show), then the rubber frame round it, a glare
+  rr(x0, y0, x1 - x0, y1 - y0, 4);
+  ctx.fillStyle = 'rgba(175,230,252,0.28)';
+  ctx.fill();
+  ctx.strokeStyle = '#1c1a1f';
+  ctx.lineWidth = 3.4;
+  ctx.stroke();
+  ctx.strokeStyle = '#3d6a8a';
+  ctx.lineWidth = 1.6;
+  ctx.stroke();
+  ctx.save();
+  rr(x0, y0, x1 - x0, y1 - y0, 4);
+  ctx.clip();
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.beginPath();
+  ctx.moveTo(x0 + 1, y0 + (y1 - y0) * 0.55);
+  ctx.lineTo(x0 + (x1 - x0) * 0.35, y0 - 1);
+  ctx.lineTo(x0 + (x1 - x0) * 0.5, y0 - 1);
+  ctx.lineTo(x0 + 2.5, y0 + (y1 - y0) * 0.85);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
   ctx.restore();
 }
 

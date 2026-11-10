@@ -3,12 +3,13 @@
  * style (the same inked, shaded shapes as Puffy and the Plops), facing RIGHT as in the drawings —
  * tail on the left, mouth on the right — each in a frame of its own size.
  *
- *   orange — a little orange fish: one big eye, a forked tail, a small smile
- *   purple — a purple fish with big grey shark fins (one sweeping up over its back)
+ *   orange — the level's main bad guy: a little orange fish, one big eye, a forked tail; he shoots
+ *            bubbles from his tail (fire0–fire2)
+ *   kai    — Kai fish: a small blue-purple fish with big grey shark fins (one sweeping up over its back)
  *   fat    — Fat Fish: huge and yellow, a grumpy brow, a blue hat saying "FAT FISH!" with a plume
  *   zippy  — Zippy: a tiny grey round fish with a grin and whiskers
- *   kingbob — King Bob: white with orange patches, a gold crown, a cross eye and a rosy cheek
- *   greyking — a long grey-and-white fish with a gold crown and a cross eye
+ *   kingbob — King Bob, the king: big, white with orange patches, a gold crown, a cross eye, a rosy cheek
+ *   slinger — Slinger: a long grey-and-white fish with a gold crown and a cross eye
  *   toothy — a long yellow fish with a grey band and a big round head that's all jagged teeth
  *
  * The swim cycle (sw0–sw5): the tail sweeps up and down, the fins flap, the body bobs and tips a
@@ -17,28 +18,60 @@
 import type { Ctx } from './draw';
 import { STYLES, ellipsePts, grow, type Fill, type Pt, type Style } from './handdrawn';
 
-export type FishKind = 'orange' | 'purple' | 'fat' | 'zippy' | 'kingbob' | 'greyking' | 'toothy';
-export const FISH_KINDS: FishKind[] = ['orange', 'purple', 'fat', 'zippy', 'kingbob', 'greyking', 'toothy'];
-export type FishFrame = 'sw0' | 'sw1' | 'sw2' | 'sw3' | 'sw4' | 'sw5';
-export const FISH_FRAMES: FishFrame[] = ['sw0', 'sw1', 'sw2', 'sw3', 'sw4', 'sw5'];
+export type FishKind = 'orange' | 'kai' | 'fat' | 'zippy' | 'kingbob' | 'slinger' | 'toothy';
+export const FISH_KINDS: FishKind[] = ['orange', 'kai', 'fat', 'zippy', 'kingbob', 'slinger', 'toothy'];
+export type SwimFrame = 'sw0' | 'sw1' | 'sw2' | 'sw3' | 'sw4' | 'sw5';
+export const SWIM_FRAMES: SwimFrame[] = ['sw0', 'sw1', 'sw2', 'sw3', 'sw4', 'sw5'];
+/**
+ * The orange fish firing a bubble from his tail: fire0 the wind-up (he scrunches up, tail cocked
+ * forward over his back), fire1 the snap (tail flung out behind, a puff of bubbles at its tip — the
+ * shot itself is its own sprite, BUBBLE_FRAMES), fire2 settling back.
+ */
+export type FireFrame = 'fire0' | 'fire1' | 'fire2';
+export const FIRE_FRAMES: FireFrame[] = ['fire0', 'fire1', 'fire2'];
+export type FishFrame = SwimFrame | FireFrame;
+/** Every fish's frames: the swim cycle (and for the orange fish, firing). */
+export const FISH_FRAMES: Record<FishKind, FishFrame[]> = {
+  orange: [...SWIM_FRAMES, ...FIRE_FRAMES],
+  kai: SWIM_FRAMES,
+  fat: SWIM_FRAMES,
+  zippy: SWIM_FRAMES,
+  kingbob: SWIM_FRAMES,
+  slinger: SWIM_FRAMES,
+  toothy: SWIM_FRAMES,
+};
+/**
+ * How big each fish is in the game: its frame's units × this = game pixels (a hero's 56-unit frame
+ * and the Giant Puff's are 1:1). Fat Fish is as big as a Giant Puff (~180 px), King Bob big too;
+ * Slinger a bit bigger than the hero; the orange fish, Kai and Zippy small.
+ */
+export const FISH_SCALE: Record<FishKind, number> = {
+  orange: 0.85,
+  kai: 0.75,
+  fat: 1.15,
+  zippy: 0.8,
+  kingbob: 2.3,
+  slinger: 1.35,
+  toothy: 1.1,
+};
 /** Each fish's frame (units; drawn at ART_RES in the game). */
 export const FISH_SIZE: Record<FishKind, { w: number; h: number }> = {
   orange: { w: 74, h: 54 },
-  purple: { w: 92, h: 84 },
+  kai: { w: 92, h: 84 },
   fat: { w: 210, h: 176 },
   zippy: { w: 54, h: 40 },
   kingbob: { w: 100, h: 88 },
-  greyking: { w: 128, h: 80 },
+  slinger: { w: 128, h: 80 },
   toothy: { w: 128, h: 70 },
 };
 /** What the drawings call them (the ones whose names we haven't got yet are placeholders). */
 export const FISH_NAME: Record<FishKind, string> = {
   orange: 'Orange fish',
-  purple: 'Purple fish',
+  kai: 'Kai fish',
   fat: 'Fat Fish',
   zippy: 'Zippy',
   kingbob: 'King Bob',
-  greyking: 'Grey crowned fish',
+  slinger: 'Slinger',
   toothy: 'Toothy fish',
 };
 
@@ -54,8 +87,8 @@ const rot = (pts: Pt[], px: number, py: number, a: number): Pt[] => {
   return pts.map(([x, y]) => [px + (x - px) * c - (y - py) * s, py + (x - px) * s + (y - py) * c]);
 };
 
-/** Where in the swim cycle a frame is (0…2π). */
-const phaseOf = (f: FishFrame) => (+f.slice(2) / FISH_FRAMES.length) * Math.PI * 2;
+/** Where in the swim cycle a frame is (0…2π; the fire frames hold still at the start). */
+const phaseOf = (f: FishFrame) => (f.startsWith('sw') ? (+f.slice(2) / SWIM_FRAMES.length) * Math.PI * 2 : 0);
 
 /** A forked tail, pinned at (px, py) on the body, `len` long, the two lobes `spread` apart, swung by `a`. */
 function tail(st: Style, ctx: Ctx, px: number, py: number, len: number, spread: number, a: number, fill: Fill, seed: number, root = 0.32) {
@@ -172,11 +205,14 @@ function patches(ctx: Ctx, body: Pt[], draw: () => void) {
 
 /** Draw fish `kind` in swim frame `f`, its frame's top-left at (ox, oy). */
 export function drawFish(ctx: Ctx, ox: number, oy: number, kind: FishKind, f: FishFrame, st: Style = STYLES.polished) {
+  if (!f.startsWith('sw') && kind !== 'orange') f = 'sw0';
   const p = phaseOf(f);
+  const fire = f.startsWith('fire') ? +f.slice(4) : -1;
   const sw = Math.sin(p); // the tail's sweep
-  const bob = Math.sin(p + Math.PI / 2) * 1.2; // the body rises and falls
+  const bob = fire >= 0 ? 0 : Math.sin(p + Math.PI / 2) * 1.2; // the body rises and falls
   const flap = Math.sin(p + 1.1); // fins
-  const tip = sw * 0.035; // the body tips a touch with each stroke
+  // the body tips a touch with each stroke (firing: it rocks forward on the wind-up, back on the snap)
+  const tip = fire === 0 ? -0.1 : fire === 1 ? 0.09 : fire === 2 ? 0.03 : sw * 0.035;
   const { w, h } = FISH_SIZE[kind];
   ctx.save();
   ctx.translate(ox, oy + bob);
@@ -186,10 +222,10 @@ export function drawFish(ctx: Ctx, ox: number, oy: number, kind: FishKind, f: Fi
   ctx.translate(-w / 2, -h / 2);
   switch (kind) {
     case 'orange':
-      drawOrange(ctx, st, sw, flap);
+      drawOrange(ctx, st, sw, flap, fire);
       break;
-    case 'purple':
-      drawPurple(ctx, st, sw, flap);
+    case 'kai':
+      drawKai(ctx, st, sw, flap);
       break;
     case 'fat':
       drawFat(ctx, st, sw, flap);
@@ -200,8 +236,8 @@ export function drawFish(ctx: Ctx, ox: number, oy: number, kind: FishKind, f: Fi
     case 'kingbob':
       drawKingBob(ctx, st, sw, flap);
       break;
-    case 'greyking':
-      drawGreyKing(ctx, st, sw, flap);
+    case 'slinger':
+      drawSlinger(ctx, st, sw, flap);
       break;
     case 'toothy':
       drawToothy(ctx, st, sw, flap, p);
@@ -212,18 +248,31 @@ export function drawFish(ctx: Ctx, ox: number, oy: number, kind: FishKind, f: Fi
 
 // ───────────────────────────── the fish ──
 
-function drawOrange(ctx: Ctx, st: Style, sw: number, _flap: number) {
+function drawOrange(ctx: Ctx, st: Style, sw: number, _flap: number, fire = -1) {
   const BODY = F('#ff9a3c', '#e2661a', '#ffc98c');
   const cx = 42;
   const cy = 27;
-  tail(st, ctx, cx - 15, cy, 20, 13, sw * 0.38, BODY, 9101);
-  const body = ellipsePts(cx, cy, 19, 16, 0, 40);
+  // firing: the wind-up cocks the tail up and forward over his back (scrunched up), the snap flings
+  // it out long behind him, then it settles
+  const tailA = fire === 0 ? 1.15 : fire === 1 ? -0.12 : fire === 2 ? 0.2 : sw * 0.38;
+  const tailLen = fire === 0 ? 17 : fire === 1 ? 24 : 20;
+  const sx = fire === 0 ? 0.92 : fire === 1 ? 1.07 : 1;
+  const sy = fire === 0 ? 1.08 : fire === 1 ? 0.94 : 1;
+  tail(st, ctx, cx - 15 * sx, cy, tailLen, fire === 1 ? 11 : 13, tailA, BODY, 9101);
+  const body = ellipsePts(cx, cy, 19 * sx, 16 * sy, 0, 40);
   st.shape(ctx, body, BODY, 9102, { lw: 1.1, light: [cx - 4, cy - 9] });
+  if (fire === 1) {
+    // the shot leaving the tail: a puff of little bubbles and speed lines at its tip
+    const tx = cx - 15 * sx - tailLen - 3;
+    for (const [dx, dy, r] of [[-2, -5, 2.4], [-5, 3, 1.8], [1, 6, 1.3], [-8, -1, 1.4]] as const) bubble(ctx, tx + dx, cy + dy, r);
+    st.line(ctx, [[tx - 4, cy - 10], [tx - 10, cy - 13]], 9108, 0.7);
+    st.line(ctx, [[tx - 5, cy + 10], [tx - 11, cy + 13]], 9109, 0.7);
+  }
   eye(st, ctx, cx + 1, cy - 4, 6.5, 8, 9104);
   mouth(st, ctx, cx + 17, cy + 6, 5.2, 9105);
 }
 
-function drawPurple(ctx: Ctx, st: Style, sw: number, flap: number) {
+function drawKai(ctx: Ctx, st: Style, sw: number, flap: number) {
   const BODY = F('#6d5fd8', '#4536a8', '#a196f2');
   const cx = 52;
   const cy = 46;
@@ -326,7 +375,7 @@ function drawKingBob(ctx: Ctx, st: Style, sw: number, _flap: number) {
   crown(st, ctx, cx + 8, cy - 23, 22, 14, 0.18, 9507);
 }
 
-function drawGreyKing(ctx: Ctx, st: Style, sw: number, _flap: number) {
+function drawSlinger(ctx: Ctx, st: Style, sw: number, _flap: number) {
   const BODY = F('#f4f3ef', '#d6d4ce', '#ffffff');
   const GREY = F('#7c8088', '#565a61', '#b2b6bc');
   const cx = 70;
@@ -408,4 +457,58 @@ function drawToothy(ctx: Ctx, st: Style, sw: number, _flap: number, p: number) {
   // a fierce little eye up on the back of the head
   eye(st, ctx, hx - 12, hy - 13, 4.5, 5, 9708);
   brow(st, ctx, hx - 12, hy - 20, 10, 9709);
+}
+
+/** A small bubble: a pale see-through ball, a bright rim and a glint. */
+function bubble(ctx: Ctx, x: number, y: number, r: number) {
+  ctx.save();
+  ctx.fillStyle = 'rgba(210,245,255,0.35)';
+  ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+  ctx.lineWidth = Math.max(0.6, r * 0.28);
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(x - r * 0.35, y - r * 0.35, r * 0.25, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+/** The orange fish's shot: a wobbling bubble (b0, b1), BUBBLE_SIZE units square, drawn round its middle. */
+export type BubbleFrame = 'b0' | 'b1';
+export const BUBBLE_FRAMES: BubbleFrame[] = ['b0', 'b1'];
+export const BUBBLE_SIZE = 22;
+export function drawBubbleShot(ctx: Ctx, ox: number, oy: number, f: BubbleFrame, st: Style = STYLES.polished) {
+  const c = BUBBLE_SIZE / 2;
+  const x = ox + c;
+  const y = oy + c;
+  // (it wobbles as it flies: a touch wide, then a touch tall)
+  const [rx, ry] = f === 'b0' ? [8.6, 7.6] : [7.6, 8.6];
+  ctx.save();
+  const g = ctx.createRadialGradient(x - 3, y - 3, 1, x, y, 9);
+  g.addColorStop(0, 'rgba(255,255,255,0.55)');
+  g.addColorStop(0.6, 'rgba(170,230,255,0.35)');
+  g.addColorStop(1, 'rgba(90,190,235,0.55)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.lineWidth = 1.1;
+  ctx.strokeStyle = st.ink;
+  ctx.globalAlpha = 0.75;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  // a bright glint and a little curved shine
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.ellipse(x - rx * 0.4, y - ry * 0.42, 2.2, 1.5, -0.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(x, y, Math.min(rx, ry) * 0.7, 0.2, 1.1);
+  ctx.stroke();
+  ctx.restore();
 }
