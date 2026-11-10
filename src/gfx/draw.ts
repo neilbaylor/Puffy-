@@ -68,10 +68,16 @@ export function roundRect(
 // Characters
 // ─────────────────────────────────────────────────────────────
 
-export type Pose = 'idle0' | 'idle1' | `walk${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7}` | 'jump' | 'fall' | 'hurt' | 'shoot' | 'eat0' | 'eat1';
+export type Pose = 'idle0' | 'idle1' | `walk${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7}` | 'jump' | 'fall' | 'hurt' | 'shoot' | 'eat0' | 'eat1' | `swim${0 | 1 | 2 | 3}`;
 /** Walk cycle length (frames). */
 export const WALK_FRAMES = 8;
 export const POSES: Pose[] = ['idle0', 'idle1', 'walk0', 'walk1', 'walk2', 'walk3', 'walk4', 'walk5', 'walk6', 'walk7', 'jump', 'fall', 'hurt', 'shoot', 'eat0', 'eat1'];
+/**
+ * Swimming (the underwater level, in the dive gear): the hero leans forward into the water, legs
+ * flutter-kicking, bobbing a little, bubbles rising from the regulator. Only in sheets drawn with
+ * 'scuba' on (makeHeroSheet), so other levels' sheets stay the same size.
+ */
+export const SWIM_POSES: Pose[] = ['swim0', 'swim1', 'swim2', 'swim3'];
 
 /**
  * One smooth walk cycle from a single phase (frame f of WALK_FRAMES): the legs
@@ -146,6 +152,7 @@ export type Layer = 'all' | 'body' | 'eyes';
  */
 export function drawCharacter(ctx: Ctx, ox: number, oy: number, ch: CharacterDef, pose: Pose, f?: Face, wear: string = wardrobe.wearKey, layer: Layer = 'all') {
   if (f) return withFace(f, () => drawCharacter(ctx, ox, oy, ch, pose, undefined, wear, layer));
+  if (pose.startsWith('swim')) return drawSwim(ctx, ox, oy, ch, +pose[4], wear, layer);
   const g = wear ? gearOf(wear) : {};
   // 'scuba' in what's on: the underwater level's dive gear (not a Shop thing: the level adds it)
   const scuba = !!wear && wear.split(',').includes('scuba');
@@ -183,6 +190,49 @@ export function drawCharacter(ctx: Ctx, ox: number, oy: number, ch: CharacterDef
     const k = HAT_FIT[ch.id] ?? HAT_FIT.puffy;
     drawHat(ctx, g.head, ox + a.x + k.dx, by + a.y + k.dy, a.tilt - 0.2, k.s);
   }
+}
+
+/**
+ * A swim frame (k of 4): the hero leaned forward about their middle (a walk frame, so the legs kick
+ * — and with them leaned back behind, the stride's a flutter kick), a gentle bob, and a few bubbles
+ * rising from the regulator. The dive gear's drawn with the body, so it leans with it.
+ */
+function drawSwim(ctx: Ctx, ox: number, oy: number, ch: CharacterDef, k: number, wear: string, layer: Layer) {
+  const under: Pose = (['walk0', 'walk2', 'walk4', 'walk6'] as const)[k % 4];
+  const bob = Math.sin((k / 4) * Math.PI * 2) * 1.2;
+  const lean = 0.56 + Math.sin((k / 4) * Math.PI * 2 + 1) * 0.04;
+  const px = ox + 28;
+  const py = oy + 36;
+  ctx.save();
+  ctx.translate(px, py + bob);
+  ctx.rotate(lean);
+  ctx.translate(-px, -py);
+  drawCharacter(ctx, ox, oy, ch, under, undefined, wear, layer);
+  ctx.restore();
+  if (layer === 'eyes' || !wear.split(',').includes('scuba')) return;
+  // bubbles from the regulator, drifting up and back (a different few each frame)
+  const m = SCUBA[ch.id] ?? SCUBA.puffy;
+  const c = Math.cos(lean);
+  const s = Math.sin(lean);
+  // (from just in front of the mouthpiece, so they rise clear of the mask)
+  const mx = px + (m.mouth[0] - 28) * c - (m.mouth[1] - 36) * s + 7;
+  const my = py + bob + (m.mouth[0] - 28) * s + (m.mouth[1] - 36) * c - 2;
+  ctx.save();
+  for (let i = 0; i < 3; i++) {
+    const t = ((k + i * 1.33) % 4) / 4;
+    const r = 1 + i * 0.45;
+    const bx = mx + t * 3 + Math.sin(t * 9 + i) * 1.2;
+    const by = my - t * 22 - i * 2;
+    ctx.globalAlpha = 1 - t * 0.6;
+    ctx.fillStyle = 'rgba(215,245,255,0.35)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+    ctx.lineWidth = 0.55;
+    ctx.beginPath();
+    ctx.arc(bx, by, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 /** Each hero's hat: its size, and a nudge from the top of the head the drawing finds. */
