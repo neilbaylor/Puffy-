@@ -1,10 +1,11 @@
-// The heroes swimming in their dive gear: each swim frame, for the animated preview.
+// The heroes swimming in their dive gear — what their walk frames draw underwater (for the preview:
+// walk0, walk2, walk4, walk6 = the four swim frames).
 import { CHARACTERS } from '../../src/data/characters';
-import { CHAR_H, CHAR_W, SWIM_POSES, drawCharacter } from '../../src/gfx/draw';
+import { CHAR_H, CHAR_W, drawCharacter, type Pose } from '../../src/gfx/draw';
 const S = 4;
 const M = 14;
 const out: string[] = [];
-for (const p of SWIM_POSES) {
+for (const p of ['walk0', 'walk2', 'walk4', 'walk6'] as Pose[]) {
   const c = document.createElement('canvas');
   c.width = CHARACTERS.length * (CHAR_W + M * 2) * S;
   c.height = (CHAR_H + 20) * S;

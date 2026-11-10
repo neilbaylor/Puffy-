@@ -21,7 +21,7 @@ import { BB_ALIAS, BB_FIELD_TILES, BB_KEYS, BB_PLAIN, BB_ROSTER, BB_SIZE, PARK, 
 import { PLOP_COLOURS } from './plops';
 import { gearOf, wardrobe } from '../core/wardrobe';
 import { FLAME_FRAMES, FLAME_H, FLAME_W, drawDyingFlame, drawFlame, drawScorch } from './flame';
-import { ART_RES, ART_STYLE, CARRY_SWING, CHAR_H, CHAR_W, POSES, SWIM_POSES, gearUp, canvas, carry, drawCharacter, ellipse, type CarryFrame, type Ctx, type Layer, type Pose } from './draw';
+import { ART_RES, ART_STYLE, CARRY_SWING, CHAR_H, CHAR_W, POSES, gearUp, canvas, carry, drawCharacter, ellipse, type CarryFrame, type Ctx, type Layer, type Pose } from './draw';
 import { FACE_FRAMES, faceFromKey } from './face';
 import { STYLES } from './handdrawn';
 import { themesFor } from '../world/theme';
@@ -179,8 +179,8 @@ export function makeHeroSheet(scene: Phaser.Scene, key: string, ch: (typeof CHAR
   const layered = !!recolor && gearOf(wear).eyes;
   const draw = (ctx: Ctx, f: string, layer: Layer) =>
     face ? drawCharacter(ctx, M, up, ch, 'idle0', faceFromKey(f), wear, layer) : drawCharacter(ctx, M, up, ch, f as Pose, undefined, wear, layer);
-  // (in the dive gear: the swim frames too)
-  const frames: readonly string[] = face ? FACE_FRAMES : wear.split(',').includes('scuba') ? [...POSES, ...SWIM_POSES] : POSES;
+  // (in the dive gear the walk frames are the swim cycle: see drawCharacter)
+  const frames: readonly string[] = face ? FACE_FRAMES : POSES;
   if (!recolor) sheet(scene, key, CHAR_W + M * 2, CHAR_H + up, frames, (ctx, f) => draw(ctx, f, 'all'));
   else
     sheet(scene, key, CHAR_W + M * 2, CHAR_H + up, frames, (ctx, f) => draw(ctx, f, layered ? 'body' : 'all'), ART_RES, {

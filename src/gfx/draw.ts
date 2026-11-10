@@ -74,8 +74,8 @@ export const WALK_FRAMES = 8;
 export const POSES: Pose[] = ['idle0', 'idle1', 'walk0', 'walk1', 'walk2', 'walk3', 'walk4', 'walk5', 'walk6', 'walk7', 'jump', 'fall', 'hurt', 'shoot', 'eat0', 'eat1'];
 /**
  * Swimming (the underwater level, in the dive gear): the hero leans forward into the water, legs
- * flutter-kicking, bobbing a little, bubbles rising from the regulator. Only in sheets drawn with
- * 'scuba' on (makeHeroSheet), so other levels' sheets stay the same size.
+ * flutter-kicking, bobbing a little, bubbles rising from the regulator. In the dive gear it's what
+ * the walk frames draw (no extra frames in any sheet); swim0–3 name the frames on their own.
  */
 export const SWIM_POSES: Pose[] = ['swim0', 'swim1', 'swim2', 'swim3'];
 
@@ -153,6 +153,9 @@ export type Layer = 'all' | 'body' | 'eyes';
 export function drawCharacter(ctx: Ctx, ox: number, oy: number, ch: CharacterDef, pose: Pose, f?: Face, wear: string = wardrobe.wearKey, layer: Layer = 'all') {
   if (f) return withFace(f, () => drawCharacter(ctx, ox, oy, ch, pose, undefined, wear, layer));
   if (pose.startsWith('swim')) return drawSwim(ctx, ox, oy, ch, +pose[4], wear, layer);
+  // underwater (in the dive gear) they swim instead of walking: the walk frames are the swim cycle
+  // (two walk frames to each swim frame), so the level's moving code needn't change
+  if (!inSwim && pose.startsWith('walk') && wear && wear.split(',').includes('scuba')) return drawSwim(ctx, ox, oy, ch, Math.floor(+pose[4] / 2), wear, layer);
   const g = wear ? gearOf(wear) : {};
   // 'scuba' in what's on: the underwater level's dive gear (not a Shop thing: the level adds it)
   const scuba = !!wear && wear.split(',').includes('scuba');
@@ -197,6 +200,8 @@ export function drawCharacter(ctx: Ctx, ox: number, oy: number, ch: CharacterDef
  * — and with them leaned back behind, the stride's a flutter kick), a gentle bob, and a few bubbles
  * rising from the regulator. The dive gear's drawn with the body, so it leans with it.
  */
+/** (set while a swim frame draws its body from a walk frame) */
+let inSwim = false;
 function drawSwim(ctx: Ctx, ox: number, oy: number, ch: CharacterDef, k: number, wear: string, layer: Layer) {
   const under: Pose = (['walk0', 'walk2', 'walk4', 'walk6'] as const)[k % 4];
   const bob = Math.sin((k / 4) * Math.PI * 2) * 1.2;
@@ -207,7 +212,13 @@ function drawSwim(ctx: Ctx, ox: number, oy: number, ch: CharacterDef, k: number,
   ctx.translate(px, py + bob);
   ctx.rotate(lean);
   ctx.translate(-px, -py);
-  drawCharacter(ctx, ox, oy, ch, under, undefined, wear, layer);
+  // (the body itself: the walk frame as it is, not swum again)
+  inSwim = true;
+  try {
+    drawCharacter(ctx, ox, oy, ch, under, undefined, wear, layer);
+  } finally {
+    inSwim = false;
+  }
   ctx.restore();
   if (layer === 'eyes' || !wear.split(',').includes('scuba')) return;
   // bubbles from the regulator, drifting up and back (a different few each frame)
