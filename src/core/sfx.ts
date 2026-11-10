@@ -215,6 +215,18 @@ export const sfx = {
     tone({ type: 'square', from: 660, to: 330, dur: 0.15, vol: 0.1 });
     tone({ type: 'square', from: 330, to: 80, dur: 0.5, vol: 0.1, delay: 0.15 });
   },
+  /** The Shop's till counting down: a little mechanical click per bottle. */
+  tick: () => {
+    noise(0.025, 0.12, 5200, 2600);
+    tone({ type: 'square', from: 1900, to: 1500, dur: 0.02, vol: 0.025 });
+  },
+  /** Ka-ching! The till's drawer and its bell, as you pay. */
+  kaching: () => {
+    noise(0.07, 0.22, 2600, 700);
+    tone({ type: 'sine', from: 140, to: 90, dur: 0.08, vol: 0.18 });
+    for (const [f, d] of [[2093, 0.07], [2637, 0.07], [3136, 0.07]] as const) tone({ type: 'triangle', from: f, dur: 0.5, vol: 0.06, delay: d });
+    tone({ type: 'sine', from: 4186, dur: 0.35, vol: 0.03, delay: 0.08 });
+  },
   powerup: () => [523, 659, 784, 1047].forEach((f, i) => tone({ type: 'square', from: f, dur: 0.09, vol: 0.07, delay: i * 0.07 })),
   enemyShot: () => tone({ type: 'sawtooth', from: 300, to: 120, dur: 0.15, vol: 0.08 }),
   checkpoint: () => [659, 784, 988].forEach((f, i) => tone({ type: 'triangle', from: f, dur: 0.14, vol: 0.18, delay: i * 0.09 })),

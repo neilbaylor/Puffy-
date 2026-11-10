@@ -1049,12 +1049,14 @@ export class UI {
   }
 
   /** The Shop's things (drawn again after each buy / put on / take off). */
-  private renderShop(cheerId?: string) {
+  private renderShop(cheerId?: string, paidFrom?: number) {
     const page = this.shopEl;
     if (!page) return;
     const hero = CHARACTERS[this.selected];
     const left = bank.rootbeerLeft;
-    page.querySelector('.shop-rb')!.innerHTML = `<i class="rb-ico"></i> <b>${left}</b> root beer to spend`;
+    const pill = page.querySelector<HTMLElement>('.shop-rb')!;
+    pill.innerHTML = `<i class="rb-ico"></i> <b class="shop-count">${left}</b> root beer to spend`;
+    if (paidFrom !== undefined && paidFrom > left) this.ringUp(pill, paidFrom, left);
     const list = page.querySelector('.shop-list')!;
     list.innerHTML = SHOP.map((it) => {
       const own = wardrobe.owns(it.id);
@@ -1086,17 +1088,19 @@ export class UI {
       if (item.dataset.id === cheerId) this.hop(item, cv, hero, wear);
     });
     // (what you wear changed: the hero's pictures are drawn again, with or without it, next time they're needed)
-    const changed = (id?: string) => {
+    const changed = (id?: string, paidFrom?: number) => {
       dropHeroSheets(this.game.textures);
       account.save();
-      this.renderShop(id);
+      this.renderShop(id, paidFrom);
     };
     list.querySelectorAll<HTMLButtonElement>('[data-buy]').forEach((b) =>
       b.addEventListener('click', () => {
+        const had = bank.rootbeerLeft;
         if (!wardrobe.buy(b.dataset.buy!)) return;
-        sfx.powerup();
+        // (light mode: the new count straight away, and a cheer; else the till rings it up)
+        if (LIGHT) sfx.powerup();
         wardrobe.wear(b.dataset.buy!, true);
-        changed(b.dataset.buy);
+        changed(b.dataset.buy, LIGHT ? undefined : had);
       }),
     );
     list.querySelectorAll<HTMLButtonElement>('[data-wear]').forEach((b) =>
@@ -1113,6 +1117,51 @@ export class UI {
         changed();
       }),
     );
+  }
+
+  /**
+   * Paying, like a till: the root beer count clicks down a bottle at a time (quick at first, then
+   * slowing), the price drops off the pill ("−20"), and it ends with a ka-ching and a bump.
+   */
+  private ringUp(pill: HTMLElement, from: number, to: number) {
+    const count = pill.querySelector<HTMLElement>('.shop-count')!;
+    const paid = from - to;
+    count.textContent = String(from);
+    pill.classList.remove('paid');
+    const drop = document.createElement('span');
+    drop.className = 'shop-paid';
+    drop.innerHTML = `−${paid} <i class="rb-ico"></i>`;
+    pill.appendChild(drop);
+    setTimeout(() => drop.remove(), 1400);
+    const dur = Math.min(1100, 380 + paid * 14);
+    const t0 = performance.now();
+    let shown = from;
+    let lastTick = 0;
+    const step = () => {
+      if (!pill.isConnected) return;
+      const u = Math.min(1, (performance.now() - t0) / dur);
+      // (ease out: the till races, then clicks the last few over one by one)
+      const n = Math.round(from - paid * (1 - Math.pow(1 - u, 2.4)));
+      if (n !== shown) {
+        shown = n;
+        count.textContent = String(n);
+        count.classList.remove('roll');
+        void count.offsetWidth;
+        count.classList.add('roll');
+        const now = performance.now();
+        if (now - lastTick > 45) {
+          lastTick = now;
+          sfx.tick();
+        }
+      }
+      if (u < 1) requestAnimationFrame(step);
+      else {
+        count.textContent = String(to);
+        sfx.kaching();
+        pill.classList.add('paid');
+      }
+    };
+    requestAnimationFrame(step);
   }
 
   /** A burst of little sparkles over a card's hero (their Shop things going on). */

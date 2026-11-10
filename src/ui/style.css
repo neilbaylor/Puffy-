@@ -1937,8 +1937,52 @@ kbd {
 }
 /* the title as Battle's (letters hopping one after another), in pink */
 .bl-title.shop-title { color: #ff6fb1; }
-.shop-rb b { color: var(--gold); }
-.shop-rb .rb-ico { vertical-align: -0.2em; }
+/* your root beer, big, on the pill under the title (the till counts it down when you pay) */
+.bl-sub.shop-rb {
+  position: relative;
+  padding: 6px 22px 7px;
+  font: 800 clamp(16px, 3.6vmin, 22px) / 1.2 var(--body);
+}
+.shop-rb .shop-count {
+  display: inline-block;
+  min-width: 1.4ch;
+  color: var(--gold);
+  font: 400 1.55em/1 var(--display);
+  vertical-align: -0.08em;
+  font-variant-numeric: tabular-nums;
+}
+.shop-rb .rb-ico { width: 1em; height: 1.35em; vertical-align: -0.3em; }
+/* each bottle clicking off: the number flicks down like a till's wheel */
+.shop-count.roll { animation: till-roll 0.09s ease-out; }
+@keyframes till-roll {
+  0% { transform: translateY(-0.28em); opacity: 0.4; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+/* paid: ka-ching, the pill bumps */
+.shop-rb.paid { animation: till-paid 0.45s cubic-bezier(0.3, 1.6, 0.5, 1); }
+@keyframes till-paid {
+  35% { transform: scale(1.14) rotate(-2deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+/* the price dropping off the pill */
+.shop-paid {
+  position: absolute;
+  right: -0.6em;
+  top: 50%;
+  white-space: nowrap;
+  font: 400 1.3em/1 var(--display);
+  color: #ff4f9a;
+  -webkit-text-stroke: 0.08em var(--ink);
+  paint-order: stroke fill;
+  pointer-events: none;
+  animation: till-drop 1.3s cubic-bezier(0.2, 0.7, 0.4, 1) both;
+}
+@keyframes till-drop {
+  0% { transform: translate(40%, -50%) scale(0.6); opacity: 0; }
+  15% { transform: translate(80%, -50%) scale(1.15); opacity: 1; }
+  60% { transform: translate(85%, 10%) scale(1); opacity: 1; }
+  100% { transform: translate(90%, 90%) scale(0.9); opacity: 0; }
+}
 .shop-list {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 220px));
