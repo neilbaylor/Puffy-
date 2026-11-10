@@ -544,9 +544,9 @@ export class UI {
         <button class="icon-btn acct-btn" data-act="account" aria-label="Your player account">${this.accountLabel()}</button>
       </div>
       <div class="start-tr">
-        <button class="icon-btn fs-btn" data-act="fs" aria-label="Full screen" hidden>⛶</button>
         <button class="icon-btn battle-btn shop-btn" data-act="shop" aria-label="The Shop: things for your hero">Shop</button>
         <button class="icon-btn battle-btn" data-act="battle" aria-label="Online battle with friends">Battle</button>
+        <button class="icon-btn fs-btn" data-act="fs" aria-label="Full screen" hidden>⛶</button>
       </div>
       <p class="version">v${VERSION} · ${this.game.renderer.type === Phaser.WEBGL ? 'WebGL' : 'Canvas'}${this.lowRes()}</p>
       <div class="start-foot">

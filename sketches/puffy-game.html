@@ -184,7 +184,7 @@ return new `+this.key+`();
         <p class="br-next">Back to the lobby in a moment…</p>
         <div class="row"><button class="btn btn-alt" data-act="leave">Leave</button></div>
       </div>
-    </div>`);W&&lh(u.querySelector(".br-winner"),W.hero,W.slot,"idle0",null,W.wear??""),u.querySelector("[data-act=leave]").addEventListener("click",()=>this.leave()),this.host.setScreen(u),x&&Y.cheer()}}const N1="0.240",Bl="puffy.res";function Il(){try{const[n,c]=(localStorage.getItem(Bl)??"").split("@");if(Number(n)&&c===N1)return Number(n)}catch{}return 0}function vh(n){try{localStorage.setItem(Bl,`${n}@${N1}`)}catch{}}const Zn=.14,ch=.86;class oh{root;zone;base;knob;jumpBtn;fireBtn;bombBtn;stickId=null;origin={x:0,y:0};radius=56;buttonPointers=new Map;constructor(c){this.root=document.createElement("div"),this.root.className="touch",this.root.innerHTML=`
+    </div>`);W&&lh(u.querySelector(".br-winner"),W.hero,W.slot,"idle0",null,W.wear??""),u.querySelector("[data-act=leave]").addEventListener("click",()=>this.leave()),this.host.setScreen(u),x&&Y.cheer()}}const N1="0.241",Bl="puffy.res";function Il(){try{const[n,c]=(localStorage.getItem(Bl)??"").split("@");if(Number(n)&&c===N1)return Number(n)}catch{}return 0}function vh(n){try{localStorage.setItem(Bl,`${n}@${N1}`)}catch{}}const Zn=.14,ch=.86;class oh{root;zone;base;knob;jumpBtn;fireBtn;bombBtn;stickId=null;origin={x:0,y:0};radius=56;buttonPointers=new Map;constructor(c){this.root=document.createElement("div"),this.root.className="touch",this.root.innerHTML=`
       <div class="touch-left">
         <div class="stick-ghost" aria-hidden="true"><span>move</span></div>
         <div class="stick-base"><div class="stick-run-ring"></div><div class="stick-knob"></div></div>
@@ -229,9 +229,9 @@ return new `+this.key+`();
         <button class="icon-btn acct-btn" data-act="account" aria-label="Your player account">${this.accountLabel()}</button>
       </div>
       <div class="start-tr">
-        <button class="icon-btn fs-btn" data-act="fs" aria-label="Full screen" hidden>⛶</button>
         <button class="icon-btn battle-btn shop-btn" data-act="shop" aria-label="The Shop: things for your hero">Shop</button>
         <button class="icon-btn battle-btn" data-act="battle" aria-label="Online battle with friends">Battle</button>
+        <button class="icon-btn fs-btn" data-act="fs" aria-label="Full screen" hidden>⛶</button>
       </div>
       <p class="version">v${N1} · ${this.game.renderer.type===_.WEBGL?"WebGL":"Canvas"}${this.lowRes()}</p>
       <div class="start-foot">
