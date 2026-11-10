@@ -1950,18 +1950,15 @@ kbd {
 .shop-rb .shop-count {
   display: inline-block;
   min-width: 1.4ch;
+  will-change: transform;
   color: var(--gold);
   font: 400 1.55em/1 var(--display);
   vertical-align: -0.08em;
   font-variant-numeric: tabular-nums;
 }
 .shop-rb .rb-ico { width: 1em; height: 1.35em; vertical-align: -0.3em; }
-/* each bottle clicking off: the number flicks down like a till's wheel */
-.shop-count.roll { animation: till-roll 0.09s ease-out; }
-@keyframes till-roll {
-  0% { transform: translateY(-0.28em); opacity: 0.4; }
-  100% { transform: translateY(0); opacity: 1; }
-}
+/* already yours: "Wear it" in the gold of the other gold buttons */
+.shop-item .btn.shop-wear { background: var(--gold-btn); }
 /* paid: ka-ching, the pill bumps */
 .shop-rb.paid { animation: till-paid 0.45s cubic-bezier(0.3, 1.6, 0.5, 1); }
 @keyframes till-paid {
@@ -1979,7 +1976,7 @@ kbd {
   -webkit-text-stroke: 0.08em var(--ink);
   paint-order: stroke fill;
   pointer-events: none;
-  animation: till-drop 1.3s cubic-bezier(0.2, 0.7, 0.4, 1) both;
+  animation: till-drop 2s cubic-bezier(0.2, 0.7, 0.4, 1) both;
 }
 @keyframes till-drop {
   0% { transform: translate(40%, -50%) scale(0.6); opacity: 0; }

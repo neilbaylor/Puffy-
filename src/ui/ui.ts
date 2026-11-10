@@ -1064,7 +1064,7 @@ export class UI {
       const btn = on
         ? `<button class="btn btn-alt" data-off="${it.id}">Take it off</button>`
         : own
-          ? `<button class="btn btn-go" data-wear="${it.id}">${it.slot === 'ride' ? 'Ride it' : 'Wear it'}</button>`
+          ? `<button class="btn shop-wear" data-wear="${it.id}">${it.slot === 'ride' ? 'Ride it' : 'Wear it'}</button>`
           : left >= it.price
             ? `<button class="btn btn-go" data-buy="${it.id}">Buy · ${it.price} <i class="rb-ico"></i></button>`
             : `<button class="btn" disabled>${it.price} <i class="rb-ico"></i> · need ${it.price - left} more</button>`;
@@ -1132,24 +1132,24 @@ export class UI {
     drop.className = 'shop-paid';
     drop.innerHTML = `−${paid} <i class="rb-ico"></i>`;
     pill.appendChild(drop);
-    setTimeout(() => drop.remove(), 1400);
-    const dur = Math.min(1100, 380 + paid * 14);
-    const t0 = performance.now();
+    setTimeout(() => drop.remove(), 2100);
+    // (a steady till: ~1.4 s for 20 bottles, ~2.2 s for 50, easing off for the last few; it starts a
+    // moment after the tap, once the Shop's pictures have been redrawn, so it doesn't hitch)
+    const dur = Math.min(2300, 900 + paid * 27);
+    let t0 = 0;
     let shown = from;
     let lastTick = 0;
-    const step = () => {
+    const step = (now: number) => {
       if (!pill.isConnected) return;
-      const u = Math.min(1, (performance.now() - t0) / dur);
-      // (ease out: the till races, then clicks the last few over one by one)
-      const n = Math.round(from - paid * (1 - Math.pow(1 - u, 2.4)));
+      t0 ||= now;
+      const u = Math.min(1, (now - t0) / dur);
+      const n = Math.round(from - paid * (1 - Math.pow(1 - u, 1.7)));
       if (n !== shown) {
         shown = n;
         count.textContent = String(n);
-        count.classList.remove('roll');
-        void count.offsetWidth;
-        count.classList.add('roll');
-        const now = performance.now();
-        if (now - lastTick > 45) {
+        // (the wheel flicking over: an animation of its own, no restyling of the page)
+        count.animate([{ transform: 'translateY(-0.22em)', opacity: 0.55 }, { transform: 'none', opacity: 1 }], { duration: 110, easing: 'ease-out' });
+        if (now - lastTick > 55) {
           lastTick = now;
           sfx.tick();
         }
@@ -1161,7 +1161,7 @@ export class UI {
         pill.classList.add('paid');
       }
     };
-    requestAnimationFrame(step);
+    setTimeout(() => requestAnimationFrame(step), 160);
   }
 
   /** A burst of little sparkles over a card's hero (their Shop things going on). */
