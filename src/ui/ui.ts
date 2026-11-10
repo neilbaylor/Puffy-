@@ -1018,7 +1018,7 @@ export class UI {
         <h1 class="bl-title shop-title" aria-label="Shop!">${[...'Shop!'].map((ch, i) => `<span style="--i:${i}">${ch}</span>`).join('')}</h1>
         <p class="bl-sub shop-rb"></p>
       </header>
-      <p class="shop-welcome">Welcome to Puffy Boutique</p>
+      <p class="shop-welcome">Welcome to The Puffy Boutique</p>
       <div class="shop-list"></div>
     </div>`);
     this.shopEl = page;

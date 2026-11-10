@@ -346,7 +346,8 @@ html:has(body.booting) body { background: #5fc4ff; }
   transform: translateY(-6px);
   box-shadow: 0 0 0 4px var(--gold), 0 0 0 7px var(--ink), 0 12px 0 5px var(--ink);
 }
-.card.picked::after {
+.card.picked::after,
+.shop-item.on::after {
   content: '★';
   position: absolute;
   top: 8px;
@@ -1995,6 +1996,7 @@ kbd {
   margin: auto 0;
 }
 .shop-item {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2006,7 +2008,8 @@ kbd {
   box-shadow: 0 5px 0 var(--ink);
   text-align: center;
 }
-.shop-item.on { background: #fff0f7; border-color: #c2286f; box-shadow: 0 5px 0 #c2286f; }
+/* what you've on: the same look as the picked hero on the start screen (gold then ink frame, lifted, a gold star) */
+.shop-item.on { transform: translateY(-6px); box-shadow: 0 0 0 4px var(--gold), 0 0 0 7px var(--ink), 0 12px 0 5px var(--ink); }
 .shop-item canvas { width: clamp(84px, 24vh, 150px); height: clamp(84px, 24vh, 150px); }
 .shop-item h3 { margin: 2px 0 0; font: 400 clamp(19px, 3.6vh, 26px)/1.05 var(--display); color: var(--ink); }
 .shop-tag { margin: 0; min-height: 1em; font: 800 12px/1 var(--body); letter-spacing: 0.06em; text-transform: uppercase; color: #c2286f; }
