@@ -231,3 +231,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.226: Battle, Bosses and the picked Part button are all the same gold.
 - v0.227: Shop: title and root beer badge a little lower, more room above the badge.
 - v0.228: Shop: "Wear it" in gold; the root beer count-down slower and smoother.
+- v0.229: Shop: bolder ✕ on the close button; root beer badge a touch smaller.
