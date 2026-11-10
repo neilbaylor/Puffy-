@@ -235,3 +235,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.230: Shop: can't afford it yet → the same Buy button, greyed out.
 - v0.231: Shop: the can't-afford Buy button a touch less greyed out.
 - v0.232: Shop: the root beer count-down quicker and smoother (no stutter as the badge bumps).
+- v0.233: Shop: no note at the bottom; bigger tiles on tablets and computers.
