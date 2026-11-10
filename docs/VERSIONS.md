@@ -228,3 +228,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.223: Shop: bigger root beer badge; buying counts it down like a till (ka-ching).
 - v0.224: Shop badge just says "N root beer".
 - v0.225: Shop: no pink price line on things you haven't bought.
+- v0.226: Battle, Bosses and the picked Part button are all the same gold.

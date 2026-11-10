@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.225)
+## Where things stand (v0.226)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -190,6 +190,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Level 4 decisions (user): climbing = jumping between ledges (no wall-jumps); drop 2 longer and harder than drop 1; poo goats on the climbs; Plops sometimes parachute in while you climb (not all the time); sideways shooting while falling; baseball at the bottom of the FIRST drop, a short walk right after landing: the batter hits line drives at you; the field like Part 1's soccer pitch. Baseball art: src/gfx/baseball.ts (PARK sizes, parkSpots, drawBallparkFront/Back, drawBaseball, drawLineDrive, drawBat, drawBaseballPlop(role)), sheets sketches/level4/bb-*.png.
 - Level 4: Plops in varied colours everywhere (gfx/plops.ts PLOP_COLOURS: caramel, reddish, chocolate, olive, golden, plum; drawPlop/drawPlopChute/drawBaseballPlop take a body Fill). Baseball has two teams: TEAM.plops (blue caps, fielding) and TEAM.poos (red caps/helmets, batting: batter, on deck, runner); scoreboard PLOPS vs POOS; at least one medium Plop playing (the batter and a fielder are medium, the rest small).
 - Level 4 (Plop Invasion · Part 2) planning: mostly climbing up (~60%), 2 parachute drops (~25 s each, Plops parachuting at different speeds: slow big patched dome / middling / fast streamer; shoot them: POP), a baseball game in the middle, boss later. Concept art in src/gfx/skydive.ts (drawCanopy, drawHeroChute(ch, pose, 'pack'|'burst'|'opening'|'open'|'steer'|'land', lean), drawPlopChute(kind, 'slow'|'mid'|'fast'|'popped')), sheets in sketches/level4/ (sheet.ts renders them via esbuild + ../l4art/shot.cjs). Engine work needed: vertical terrain chunking (4096 px), climbing camera, vertical background, parachute player state, vertical fly-over.
+- v0.226: one gold for the gold buttons: --gold-btn (linear-gradient #ffe27a → --gold) on .battle-btn, .lvl.picked, .lvl.lvl-bosses (were three different yellows).
 - v0.225: Shop tiles: no pink price line on unbought things (tag only Yours / Wearing it / Riding it; .shop-tag keeps min-height so buttons line up).
 - v0.224: Shop badge just "N root beer".
 - v0.223: Shop till (ui.ts ringUp): on buy the .shop-count clicks down (ease-out, sfx.tick), "−price" drops off the pill (.shop-paid), ends sfx.kaching + .paid bump; LIGHT: no animation (sfx.powerup). Bigger pill (.bl-sub.shop-rb). Test sketches/shop/ttill.cjs.
