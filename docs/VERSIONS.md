@@ -244,3 +244,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.239: Shop: the worn tile's frame in pink, no star.
 - v0.240: Shop: the worn tile doesn't shift up; new item descriptions.
 - v0.241: start screen top right: Shop, Battle, full screen.
+- v0.242: Shop: welcome line and tiles level with "Pick your player" and the hero cards.
