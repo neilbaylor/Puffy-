@@ -279,6 +279,10 @@ function drawRegulator(ctx: Ctx, ox: number, oy: number, ch: CharacterDef, pose:
   st.shape(ctx, [[mx - 3 * k.s, my - 2.6 * k.s], [mx + 3.4 * k.s, my - 2.8 * k.s], [mx + 3.8 * k.s, my + 2.8 * k.s], [mx - 3 * k.s, my + 2.6 * k.s]], { base: '#2b3036', shade: '#16191d', light: '#57606a' }, 8803, { lw: 0.8 });
   st.shape(ctx, ellipsePts(mx + 3.6 * k.s, my, 2.2 * k.s, 2.4 * k.s, 0, 14), { base: '#ffcc33', shade: '#d99a12', light: '#fff0a8' }, 8804, { lw: 0.7 });
 }
+/** A hero's own mask shape (middle x, y, radii; standing, frame units) where the both-eyes oval doesn't suit. */
+const MASK_FIT: Record<string, [number, number, number, number]> = {
+  puffy: [32.2, 19.2, 7.6, 8.9],
+};
 /**
  * The dive mask, old-school: a small oval glass faceplate snug over the eyes in a polished metal rim
  * (with a couple of rivets), a black rubber strap round the back of the head.
@@ -290,10 +294,13 @@ function drawMask(ctx: Ctx, ox: number, oy: number, ch: CharacterDef, pose: Pose
   const x1 = Math.max(...G.lenses.map((l) => l.x + l.w / 2));
   const y0 = Math.min(...G.lenses.map((l) => l.y - l.h / 2));
   const y1 = Math.max(...G.lenses.map((l) => l.y + l.h / 2));
-  const cx = (x0 + x1) / 2;
-  const cy = (y0 + y1) / 2;
-  const rx = (x1 - x0) / 2 + 0.3;
-  const ry = (y1 - y0) / 2 + 0.2;
+  // (Puffy's seen from the side, one big eye: a round porthole round that eye alone, a little
+  // bigger than it; the others' oval covers both eyes)
+  const fit = MASK_FIT[ch.id];
+  const cx = fit ? fit[0] : (x0 + x1) / 2;
+  const cy = fit ? fit[1] : (y0 + y1) / 2;
+  const rx = fit ? fit[2] : (x1 - x0) / 2 + 0.3;
+  const ry = fit ? fit[3] : (y1 - y0) / 2 + 0.2;
   ctx.save();
   ctx.translate(ox + h.e.x, oy + h.e.y);
   ctx.rotate(h.rot);
