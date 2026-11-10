@@ -4,7 +4,8 @@ import { sfx } from '../core/sfx';
 import { characterById } from '../data/characters';
 import { ART_RES, CARRY_SWING, CHAR_H, CHAR_W, WALK_FRAMES, carryHand } from '../gfx/draw';
 import { recolorForSlot } from '../gfx/recolor';
-import { HERO_SHEET_M, addCanvas, ensureLevelLooks, frameGrid, hires, makeCarrySheet } from '../gfx/textures';
+import { HERO_SHEET_M, addCanvas, ensureLevelLooks, frameGrid, hires, makeCarrySheet, makeHeroSheet } from '../gfx/textures';
+import { wardrobe } from '../core/wardrobe';
 import { PRIZE_COLOR, drawBombBall, drawChute, drawFireball, drawPrize } from '../gfx/prizes';
 import { PLOP_FRAMES, PLOP_H, PLOP_W, drawPlop, type PlopKind } from '../gfx/plops';
 import { canvas } from '../gfx/draw';
@@ -85,6 +86,8 @@ function cheerPose(t: number, flip: boolean): { up: number; sx: number; sy: numb
 }
 
 interface HeroView {
+  /** The hat they're drawn wearing ('' none). */
+  hat: string;
   /** Seconds since this hero grabbed a bonus (the celebration hop), or -1. */
   cheer: number;
   sprite: Phaser.GameObjects.Sprite;
@@ -213,6 +216,8 @@ export class BattleScene extends Phaser.Scene {
   /** Visual-only correction for your hero, faded out over a few frames. */
   private fix = { x: 0, y: 0 };
   private names = new Map<string, string>();
+  /** Each player's hat (from the room: '' none). */
+  private hats = new Map<string, string>();
   private hudT = 0;
   private enemyViews = new Map<number, EnemyView>();
   private hazardViews = new Map<number, { img: Phaser.GameObjects.Image; shadow: Phaser.GameObjects.Ellipse; landY: number }>();
@@ -589,12 +594,24 @@ export class BattleScene extends Phaser.Scene {
     cam.centerOn(this.camC.x, this.camC.y);
   }
 
-  /** The hero's picture in this player's colour (made once per hero + colour). */
-  private textureFor(hero: string, slot: number) {
-    if (slot === 0) return `char-${hero}`;
-    const key = `bchar-${hero}-${slot}`;
+  /**
+   * A hero's pictures wearing `hat` ('' none; face: their faces): the game's own when that's the
+   * hat this browser's wearing (already drawn), else drawn for them.
+   */
+  private heroSheet(hero: string, hat: string, face: boolean) {
+    const mine = (wardrobe.hat ?? '') === hat;
+    const key = mine ? `char-${hero}${face ? '-face' : ''}` : `bchar-${hero}-h${hat || 'none'}${face ? '-face' : ''}`;
+    if (!this.textures.exists(key)) makeHeroSheet(this, key, characterById(hero), face, hat || null);
+    return key;
+  }
+
+  /** The hero's picture (in their hat) in this player's colour (made once per hero + hat + colour). */
+  private textureFor(hero: string, slot: number, hat: string) {
+    const base = this.heroSheet(hero, hat, false);
+    if (slot === 0) return base;
+    const key = `bchar-${hero}-h${hat || 'none'}-${slot}`;
     if (!this.textures.exists(key)) {
-      const src = this.textures.get(`char-${hero}`);
+      const src = this.textures.get(base);
       const canvas = recolorForSlot(src.getSourceImage() as HTMLCanvasElement, slot);
       addCanvas(this, key, canvas, (t) => {
         for (const name of src.getFrameNames()) {
@@ -636,12 +653,13 @@ export class BattleScene extends Phaser.Scene {
     return best;
   }
 
-  /** The hero's face frames (blink, glance, mouth) in this player's colour. */
-  private faceTextureFor(hero: string, slot: number) {
-    if (slot === 0) return `char-${hero}-face`;
-    const key = `bchar-${hero}-${slot}-face`;
+  /** The hero's face frames (blink, glance, mouth; in their hat) in this player's colour. */
+  private faceTextureFor(hero: string, slot: number, hat: string) {
+    const base = this.heroSheet(hero, hat, true);
+    if (slot === 0) return base;
+    const key = `bchar-${hero}-h${hat || 'none'}-${slot}-face`;
     if (!this.textures.exists(key)) {
-      const src = this.textures.get(`char-${hero}-face`);
+      const src = this.textures.get(base);
       const canvas = recolorForSlot(src.getSourceImage() as HTMLCanvasElement, slot);
       addCanvas(this, key, canvas, (t) => {
         for (const name of src.getFrameNames()) {
@@ -655,7 +673,8 @@ export class BattleScene extends Phaser.Scene {
 
   private viewFor(p: SnapPlayer): HeroView {
     let v = this.views.get(p.id);
-    if (v && (v.hero !== p.hero || v.slot !== p.slot)) {
+    const hat = this.hats.get(p.id) ?? '';
+    if (v && (v.hero !== p.hero || v.slot !== p.slot || v.hat !== hat)) {
       v.sprite.destroy();
       v.tag.destroy();
       v.hearts.destroy();
@@ -667,7 +686,7 @@ export class BattleScene extends Phaser.Scene {
     if (!v) {
       const c = characterById(p.hero);
       const col = SLOT_COLORS[p.slot % SLOT_COLORS.length];
-      const sprite = this.add.sprite(p.x, p.y, this.textureFor(p.hero, p.slot), 'idle0').setOrigin(0.5, 1).setScale(c.scale / ART_RES).setDepth(DEPTH.players);
+      const sprite = this.add.sprite(p.x, p.y, this.textureFor(p.hero, p.slot, hat), 'idle0').setOrigin(0.5, 1).setScale(c.scale / ART_RES).setDepth(DEPTH.players);
       const tag = this.add
         .text(p.x, p.y, this.names.get(p.id) ?? '', { fontFamily: 'Nunito, sans-serif', fontSize: '13px', fontStyle: '900', color: '#ffffff', stroke: col, strokeThickness: 4 })
         .setOrigin(0.5, 1)
@@ -676,7 +695,7 @@ export class BattleScene extends Phaser.Scene {
       const hearts = this.add.graphics().setDepth(DEPTH.text);
       const halo = p.id === this.net.myId ? this.add.image(p.x, p.y, 'bhalo').setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.players - 0.05) : undefined;
       const ice = this.add.image(p.x, p.y, 'bice').setOrigin(0.5, 1).setScale(1 / ART_RES).setDepth(DEPTH.players + 0.2).setVisible(false);
-      v = { cheer: -1, sprite, tag, hearts, anim: 0, tilt: 0, slot: p.slot, hero: p.hero, size: 1, sparkT: 0, face: new FaceClock(), halo, ice, chairA: null };
+      v = { hat, cheer: -1, sprite, tag, hearts, anim: 0, tilt: 0, slot: p.slot, hero: p.hero, size: 1, sparkT: 0, face: new FaceClock(), halo, ice, chairA: null };
       if (p.id !== this.net.myId) v.arrow = this.makeArrow(this.names.get(p.id) ?? '', col);
       this.views.set(p.id, v);
     }
@@ -686,7 +705,10 @@ export class BattleScene extends Phaser.Scene {
   update(_t: number, deltaMs: number) {
     const dt = Math.min(deltaMs / 1000, 0.1);
     // names from the room list
-    for (const rp of this.net.room?.players ?? []) this.names.set(rp.id, rp.name);
+    for (const rp of this.net.room?.players ?? []) {
+      this.names.set(rp.id, rp.name);
+      this.hats.set(rp.id, rp.hat ?? '');
+    }
 
     // ── new snapshots from the server ──
     if (this.net.inbox.length) {
@@ -879,8 +901,8 @@ export class BattleScene extends Phaser.Scene {
       // standing about: blink, glance around, breathe (the face frames, as in the levels)
       v.face.tick(dt);
       const fk = frame.startsWith('idle') && v.chairA === null ? v.face.key : null;
-      const bodyKey = v.chairA !== null ? this.carryTextureFor(p.hero, v.slot) : this.textureFor(p.hero, v.slot);
-      if (fk) v.sprite.setTexture(this.faceTextureFor(p.hero, v.slot), fk);
+      const bodyKey = v.chairA !== null ? this.carryTextureFor(p.hero, v.slot) : this.textureFor(p.hero, v.slot, v.hat);
+      if (fk) v.sprite.setTexture(this.faceTextureFor(p.hero, v.slot, v.hat), fk);
       else if (v.sprite.texture.key !== bodyKey) v.sprite.setTexture(bodyKey, frame);
       const targetTilt = (p.vx / c.runSpeed) * (p.onGround ? 0.14 : 0.06);
       v.tilt += (targetTilt - v.tilt) * Math.min(1, dt * 12);
@@ -958,7 +980,8 @@ export class BattleScene extends Phaser.Scene {
           .setScale(((c.hitH ?? 34) / 34) * (1 + (v.size - 1) * 0.3) * 0.6 * pulse)
           .setAlpha(0.36 + Math.sin(this.time.now / 260) * 0.08);
       }
-      const top = y - (c.hitH ?? 34) * v.size - 10;
+      // (over a hat, if they've one)
+      const top = y - (c.hitH ?? 34) * v.size - 10 - (v.hat ? 17 * c.scale * v.size : 0);
       // the name just over the head, the hearts above the name
       v.tag.setText(this.names.get(id) ?? '').setPosition(x, top + 9);
       this.drawHearts(v.hearts, x, top - 13, p.hp);

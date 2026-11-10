@@ -9,7 +9,8 @@ import { BattleUI } from './battleUi';
 import { loadArt } from './artLoader';
 import { LIGHT } from '../core/light';
 import { savedResCap } from '../core/res';
-import { gameArtJobs } from '../gfx/textures';
+import { dropHeroSheets, gameArtJobs } from '../gfx/textures';
+import { SHOP, wardrobe } from '../core/wardrobe';
 import { groundPaintJobs } from '../world/LevelView';
 import { gamepadSources } from '../input/gamepad';
 import { isKeyDown } from '../input/keyboard';
@@ -257,6 +258,13 @@ export class UI {
     this.root = document.getElementById('ui')!;
     // still signed in from last time? pick the account back up (and its progress)
     const beatenBefore = progress.beaten;
+    // (what you wear changed — the Shop, or your account brought a hat from another device: the
+    // hero's pictures are drawn again next time they're needed; not mid-game, they're in use)
+    wardrobe.onChange(() => {
+      if (['Game', 'Wrestle', 'Hoops', 'Battle'].some((k) => this.game.scene.isActive(k))) return;
+      dropHeroSheets(this.game.textures);
+      if (this.screen?.classList.contains('start')) this.showStart();
+    });
     account.onChange(() => {
       const btn = this.screen?.querySelector<HTMLElement>('[data-act=account]');
       if (btn) btn.innerHTML = this.accountLabel();
@@ -534,6 +542,7 @@ export class UI {
       </div>
       <div class="start-tr">
         <button class="icon-btn fs-btn" data-act="fs" aria-label="Full screen" hidden>⛶</button>
+        <button class="icon-btn battle-btn shop-btn" data-act="shop" aria-label="The Shop: things for your hero">Shop</button>
         <button class="icon-btn battle-btn" data-act="battle" aria-label="Online battle with friends">Battle</button>
       </div>
       <p class="version">v${VERSION} · ${this.game.renderer.type === Phaser.WEBGL ? 'WebGL' : 'Canvas'}${this.lowRes()}</p>
@@ -651,6 +660,10 @@ export class UI {
       sfx.select();
       this.battle.open();
     });
+    el.querySelector('[data-act=shop]')!.addEventListener('click', () => {
+      sfx.select();
+      this.showShop();
+    });
     // (temporary, for testing: straight into Queen Plop's ring)
     el.querySelector('[data-act=bosses]')?.addEventListener('click', () => {
       sfx.select();
@@ -703,7 +716,7 @@ export class UI {
   /** The account button's label: your name once signed in, else "Sign in". */
   private accountLabel() {
     const u = account.user;
-    return u ? `${PERSON}<span>${esc(u.name)}</span><small class="acct-rb"><i class="rb-ico"></i>${shortCount(Math.max(u.rootbeer, bank.rootbeer))}</small>` : `${PERSON}<span>Sign in</span>`;
+    return u ? `${PERSON}<span>${esc(u.name)}</span><small class="acct-rb"><i class="rb-ico"></i>${shortCount(bank.rootbeerLeft)}</small>` : `${PERSON}<span>Sign in</span>`;
   }
 
   /**
@@ -723,7 +736,7 @@ export class UI {
           <p class="eyebrow">Your player</p>
           <h2>Hi ${esc(u.name)}!</h2>
           <dl class="stat-list">
-            <dt>Root beer <i class="rb-ico"></i></dt><dd>${Math.max(u.rootbeer, bank.rootbeer)}</dd>
+            <dt>Root beer <i class="rb-ico"></i></dt><dd>${bank.rootbeerLeft}</dd>
             <dt>Nuggies eaten <i class="aura-ico"></i></dt><dd>${Math.max(u.nuggies, bank.nuggies)}</dd>
             <dt>Bad guys beaten</dt><dd>${Math.max(u.kills, bank.kills)}</dd>
             <dt>Current level</dt><dd>${esc(levelName(latestLevel()))}</dd>
@@ -973,6 +986,78 @@ export class UI {
     const hero = CHARACTERS[this.selected];
     store.set('puffy.hero', hero.id);
     this.startGame({ players: [{ slot: 0, characterId: hero.id, inputId: 'solo' }] });
+  }
+
+  /**
+   * The Shop: things for your hero, bought with root beer (the party hat, to start with). Each shows
+   * your hero wearing it; once it's yours, put it on or take it off. Whatever you wear shows on your
+   * hero everywhere (and in battles, to everyone).
+   */
+  private showShop() {
+    const hero = CHARACTERS[this.selected];
+    const left = bank.rootbeerLeft;
+    const el = h(`<div class="screen modal shop">
+      <div class="panel shop-panel">
+        <h2>Shop</h2>
+        <p class="shop-rb"><i class="rb-ico"></i><b>${left}</b> root beer to spend</p>
+        <div class="shop-list">${SHOP.map((it) => {
+          const own = wardrobe.owns(it.id);
+          const on = wardrobe.hat === it.id;
+          const btn = on
+            ? `<button class="btn btn-alt" data-off="${it.id}">Take it off</button>`
+            : own
+              ? `<button class="btn btn-go" data-wear="${it.id}">Wear it</button>`
+              : left >= it.price
+                ? `<button class="btn btn-go" data-buy="${it.id}">Buy · ${it.price} <i class="rb-ico"></i></button>`
+                : `<button class="btn" disabled>Need ${it.price - left} more <i class="rb-ico"></i></button>`;
+          return `<div class="shop-item${on ? ' on' : ''}">
+            <canvas width="160" height="160" data-prev="${it.id}"></canvas>
+            <div class="shop-info">
+              <h3>${esc(it.name)}${on ? ' <small>wearing it</small>' : own ? ' <small>yours</small>' : ''}</h3>
+              <p>${esc(it.blurb)}</p>
+              <p class="shop-price">${own ? '' : `${it.price} <i class="rb-ico"></i> root beer`}</p>
+              ${btn}
+            </div>
+          </div>`;
+        }).join('')}</div>
+        <p class="shop-note">Find root beer in the levels: every bottle you find, you can spend here.</p>
+        <div class="row"><button class="btn btn-alt" data-act="back">Back</button></div>
+      </div>
+    </div>`);
+    el.querySelectorAll<HTMLCanvasElement>('canvas[data-prev]').forEach((cv) => drawHeroCard(cv, hero, 'idle0', undefined, cv.dataset.prev!));
+    // (what you wear changed: the hero's pictures are drawn again, with or without it, next time they're needed)
+    const changed = () => {
+      dropHeroSheets(this.game.textures);
+      account.save();
+      this.showShop();
+    };
+    el.querySelectorAll<HTMLButtonElement>('[data-buy]').forEach((b) =>
+      b.addEventListener('click', () => {
+        if (!wardrobe.buy(b.dataset.buy!)) return;
+        sfx.powerup();
+        wardrobe.wear(b.dataset.buy!);
+        changed();
+      }),
+    );
+    el.querySelectorAll<HTMLButtonElement>('[data-wear]').forEach((b) =>
+      b.addEventListener('click', () => {
+        sfx.select();
+        wardrobe.wear(b.dataset.wear!);
+        changed();
+      }),
+    );
+    el.querySelectorAll<HTMLButtonElement>('[data-off]').forEach((b) =>
+      b.addEventListener('click', () => {
+        sfx.back();
+        wardrobe.wear(null);
+        changed();
+      }),
+    );
+    el.querySelector('[data-act=back]')!.addEventListener('click', () => {
+      sfx.back();
+      this.showStart();
+    });
+    this.setScreen(el);
   }
 
   /** (Temporary, for testing) straight into the Queen Plop fight with the picked hero. */

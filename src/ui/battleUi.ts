@@ -70,11 +70,11 @@ function storedName() {
 }
 
 /** A hero portrait in a player slot's colour (in a pose, with a face). */
-function slotPortrait(target: HTMLCanvasElement, hero: string, slot: number, pose: 'idle0' | 'idle1' = 'idle0', faceKey: string | null = null) {
+function slotPortrait(target: HTMLCanvasElement, hero: string, slot: number, pose: 'idle0' | 'idle1' = 'idle0', faceKey: string | null = null, hat = '') {
   const tmp = document.createElement('canvas');
   tmp.width = target.width;
   tmp.height = target.height;
-  drawPortrait(tmp, characterById(hero), pose, faceKey ? faceFromKey(faceKey) : undefined, 'idle0');
+  drawPortrait(tmp, characterById(hero), pose, faceKey ? faceFromKey(faceKey) : undefined, 'idle0', hat || null);
   const out = recolorForSlot(tmp, slot);
   const ctx = target.getContext('2d')!;
   ctx.clearRect(0, 0, target.width, target.height);
@@ -85,11 +85,11 @@ function slotPortrait(target: HTMLCanvasElement, hero: string, slot: number, pos
  * A hero standing in a lobby square, in the slot's colour: drawn like the start screen's cards
  * (feet on the bottom edge, each hero at their own size — Big Muscles the biggest).
  */
-function slotCard(target: HTMLCanvasElement, hero: string, slot: number, pose: 'idle0' | 'idle1', faceKey: string | null) {
+function slotCard(target: HTMLCanvasElement, hero: string, slot: number, pose: 'idle0' | 'idle1', faceKey: string | null, hat = '') {
   const tmp = document.createElement('canvas');
   tmp.width = target.width;
   tmp.height = target.height;
-  drawHeroCard(tmp, characterById(hero), pose, faceKey ? faceFromKey(faceKey) : undefined);
+  drawHeroCard(tmp, characterById(hero), pose, faceKey ? faceFromKey(faceKey) : undefined, hat || null);
   const out = recolorForSlot(tmp, slot);
   const ctx = target.getContext('2d')!;
   ctx.clearRect(0, 0, target.width, target.height);
@@ -363,13 +363,13 @@ export class BattleUI {
         <small>${p ? `${me ? 'You · ' : ''}${characterById(p.hero).name}` : SLOT_NAMES[slot]}</small>
         ${p && played && p.kos > 0 ? `<span class="bl-last${p.id === r?.winner ? ' won' : ''}" title="Last battle">${p.id === r?.winner ? '🏆 ' : ''}${p.kos} KO${p.kos === 1 ? '' : 's'}</span>` : ''}
       </div>`);
-      if (p) this.liveSlot(el.querySelector('canvas')!, p.hero, slot);
+      if (p) this.liveSlot(el.querySelector('canvas')!, p.hero, slot, p.hat ?? '');
       box.appendChild(el);
     }
   }
 
   /** The heroes in the squares stand there breathing, blinking and glancing about, like on the start screen. */
-  private liveSlot(cv: HTMLCanvasElement, hero: string, slot: number) {
+  private liveSlot(cv: HTMLCanvasElement, hero: string, slot: number, hat = '') {
     const face = new FaceClock();
     let pose: 'idle0' | 'idle1' = 'idle0';
     let shown = '';
@@ -378,7 +378,7 @@ export class BattleUI {
       const k = `${pose}|${face.key}`;
       if (k === shown) return;
       shown = k;
-      slotCard(cv, hero, slot, pose, face.key);
+      slotCard(cv, hero, slot, pose, face.key, hat);
     };
     draw();
     const iv = window.setInterval(() => {
@@ -738,7 +738,7 @@ export class BattleUI {
         <div class="row"><button class="btn btn-alt" data-act="leave">Leave</button></div>
       </div>
     </div>`);
-    if (winner) slotPortrait(el.querySelector<HTMLCanvasElement>('.br-winner')!, winner.hero, winner.slot);
+    if (winner) slotPortrait(el.querySelector<HTMLCanvasElement>('.br-winner')!, winner.hero, winner.slot, 'idle0', null, winner.hat ?? '');
     el.querySelector('[data-act=leave]')!.addEventListener('click', () => this.leave());
     this.host.setScreen(el);
     if (iWon) sfx.cheer();
