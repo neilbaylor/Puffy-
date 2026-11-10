@@ -57,7 +57,7 @@ const MAX_PRIZES = 3;
 export const PRIZE_LIFE = 7;
 /** Folding chairs: this many fall into each battle (at random times and places). Grab one, and FIRE
  * swings it instead of shooting: each hit takes 1 heart, and it's done after this many hits. */
-export const CHAIRS_PER_BATTLE = 5;
+export const CHAIRS_PER_BATTLE = 0;
 export const CHAIR_USES = 2;
 /** A chair lying about unclaimed goes after this long (s). */
 export const CHAIR_LIFE = 24;
