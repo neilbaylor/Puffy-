@@ -241,3 +241,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.236: Shop: the welcome line a bit higher.
 - v0.237: the pause button's icon looks the same in every browser (it was chunky in desktop Chrome).
 - v0.238: Shop: "Welcome to The Puffy Boutique"; what you've on is framed like the picked hero.
+- v0.239: Shop: the worn tile's frame in pink, no star.
