@@ -1065,9 +1065,8 @@ export class UI {
         ? `<button class="btn btn-alt" data-off="${it.id}">Take it off</button>`
         : own
           ? `<button class="btn shop-wear" data-wear="${it.id}">${it.slot === 'ride' ? 'Ride it' : 'Wear it'}</button>`
-          : left >= it.price
-            ? `<button class="btn btn-go" data-buy="${it.id}">Buy · ${it.price} <i class="rb-ico"></i></button>`
-            : `<button class="btn" disabled>${it.price} <i class="rb-ico"></i> · need ${it.price - left} more</button>`;
+          : // (not enough root beer yet: the same Buy button, greyed out)
+            `<button class="btn btn-go" ${left >= it.price ? `data-buy="${it.id}"` : 'disabled'}>Buy · ${it.price} <i class="rb-ico"></i></button>`;
       return `<div class="shop-item${on ? ' on' : ''}" data-id="${it.id}" data-hero="${hero.id}">
         <canvas width="240" height="240"></canvas>
         <h3>${esc(it.name)}</h3>
