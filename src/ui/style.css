@@ -2365,7 +2365,7 @@ kbd {
 .br-list li b { font: 400 clamp(23px, 6.2vh, 30px) / 1 var(--display); white-space: nowrap; }
 .br-list li b small { margin-left: 3px; font: 900 clamp(10px, 2.6vh, 12px) / 1 var(--body); color: var(--ink-soft); letter-spacing: 0.04em; }
 .br-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: clamp(8px, 2.6vh, 16px); }
-.br-next { font: 800 clamp(14px, 3.6vh, 17px) / 1.2 var(--body); color: var(--ink-soft); }
+.br-next { font: 400 clamp(18px, 4.8vh, 22px) / 1.15 var(--display); color: var(--ink); }
 .br-next b { display: inline-block; min-width: 1.2em; font: 400 1.25em / 1 var(--display); color: var(--ink); }
 .br-foot .btn { padding: 6px 22px; }
 /* a win: confetti falling over the card */
@@ -2408,7 +2408,7 @@ kbd {
   .br-out { font-size: 16px; }
   .br-list li b { font-size: 40px; }
   .br-list li b small { font-size: 13px; }
-  .br-next { font-size: 20px; }
+  .br-next { font-size: 27px; }
   .br-foot { margin-top: 20px; }
   .br-foot .btn { font-size: 20px; padding: 8px 28px; }
   /* the KO badges during a battle, bigger too */
