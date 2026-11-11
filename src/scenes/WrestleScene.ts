@@ -3140,7 +3140,8 @@ export class WrestleScene extends Phaser.Scene {
     await this.camTo(jx, jy + 6, 2.2, 800, 0.01, 'Sine.easeInOut');
     this.confetti.burst(jx - 120, jy + 40, 160, { power: 900, spread: Math.PI * 0.8, angle: -Math.PI / 2, scale: 0.6 });
     this.confetti.burst(jx + 120, jy + 40, 160, { power: 900, spread: Math.PI * 0.8, angle: -Math.PI / 2, scale: 0.6 });
-    await this.wait(600);
+    // (CHAMPION! stays up a good moment before the flooding warning)
+    await this.wait(1200);
     this.flashJumbo({ kind: 'big', text: 'FLOODING!', sub: 'THE BUILDING IS FLOODING · PLEASE EVACUATE', color: '#7fe7ff', bg: '#0a3a6a' }, 1e9);
     this.ribbonMsg = { text: 'PLEASE EVACUATE ⚠ PLEASE EVACUATE', color: '#7fe7ff', bg: '#0a3a6a', t0: this.clock / 1000 };
     for (let i = 0; i < 3; i++) this.time.delayedCall(i * 650, () => sfx.whistle());

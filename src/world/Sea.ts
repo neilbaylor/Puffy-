@@ -160,7 +160,7 @@ export class SeaLife {
       const k = Phaser.Math.Clamp((fy - d0) / (d1 - d0), 0, 1);
       this.darkK = k * k * (3 - 2 * k);
       const size = Math.max(view.width, view.height) * 2.3;
-      this.darkImg.setVisible(this.darkK > 0.01).setPosition(fx, fy).setDisplaySize(size, size).setAlpha(this.darkK * 0.96);
+      this.darkImg.setVisible(this.darkK > 0.01).setPosition(fx, fy).setDisplaySize(size, size).setAlpha(this.darkK * 0.38);
     }
     // ── the surface: a row of the waterline, rocking gently ──
     const sw = 512;

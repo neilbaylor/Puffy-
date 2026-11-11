@@ -20,17 +20,19 @@ import { LevelBuilder, type LevelData } from './builder';
  *   39-45   A gap in the shelf (up to the light)
  *   46-62   A reef wall; checkpoint
  *   63-92   THE BLOCK FIELD: rocks to swim in and out of, fish among them
- *   93-111  THE TRENCH: a wall from the surface right down; sink down the left side in the dark,
- *           under the wall at the very bottom (checkpoint), climb back up the right (ledges, fish)
- *   112-129 Out at the top (checkpoint), a short way, up the slope
- *   130-173 THE SHALLOWS: crab tennis, two courts in a row
- *   174-190 Down a step to the gate
+ *   93-139  THE TRENCH: a wall from the surface right down; sink down the left side as it gets
+ *           darker, under the wall at the very bottom (checkpoint), climb back up the right
+ *           (ledges, fish, Kai)
+ *   140-157 Out at the top (checkpoint), a short way, up the slope
+ *   158-201 THE SHALLOWS: crab tennis, two courts in a row
+ *   202-218 Down a step to the gate (Kai once more)
+ * Kai fish turns up three times (block field, trench, the end); beat him and he zooms off ahead.
  */
 export function buildLevel5(): LevelData {
   const B = 62;
   const H = B + 24;
   const b = (h: number) => h + B;
-  const L = new LevelBuilder('The Rise of King Bob · Part 1', 'World 3', 191, H);
+  const L = new LevelBuilder('The Rise of King Bob · Part 1', 'World 3', 219, H);
   L.pal = 'sea';
   L.water(b(20));
   // (the backgrounds sit as if the level ended just under the main sea bed; down the trench it gets dark)
@@ -94,61 +96,66 @@ export function buildLevel5(): LevelData {
   L.spawn('bigfish', 76, b(5));
   L.spawn('fish', 84, b(10));
   L.spawn('bigfish', 87, b(11));
+  // Kai fish: rare (the hero's amazed), quick and fierce; beat him and he zooms off ahead
+  L.spawn('kai', 79, b(12));
   L.auraArc(67, 3, b(9), 0.5);
   L.aura(75, b(10));
   L.auraArc(83, 3, b(10), 0.6);
 
   // ── THE TRENCH: down the left, under the wall, up the right ──
-  L.pit(93, 111);
-  L.ground(93, 111, 2);
+  // (each side about 22 tiles across: room to dodge, the walls just in view either side)
+  L.pit(93, 139);
+  L.ground(93, 139, 2);
   // the wall, from the surface down to a gap over the trench floor
-  L.rock(101, 103, 7, b(20));
-  shelf(93, 100);
-  shelf(104, 111);
-  // going down (it gets dark): a couple of fish, nuggies
-  L.spawn('bigfish', 96, 40);
-  L.spawn('fish', 98, 22);
-  L.aura(97, 52);
-  L.aura(96, 30);
-  L.aura(98, 10);
+  L.rock(115, 117, 7, b(20));
+  shelf(93, 114);
+  shelf(118, 139);
+  // going down (it gets darker): a couple of fish, nuggies
+  L.spawn('bigfish', 100, 40);
+  L.spawn('fish', 108, 22);
+  L.aura(104, 52);
+  L.aura(99, 30);
+  L.aura(110, 10);
   // the bottom: under the wall; a checkpoint on the far side
-  L.spawn('checkpoint', 106, 2);
-  // back up the right side: ledges to rest on, fish on the way
-  L.rock(110, 111, 14, 14);
-  L.rock(104, 105, 26, 26);
-  L.rock(110, 111, 38, 38);
-  L.rock(104, 105, 50, 50);
-  L.spawn('fish', 107, 20);
-  L.spawn('bigfish', 108, 33);
-  L.spawn('bigfish', 106, 46);
-  L.aura(107, 30);
-  L.aura(108, 44);
-  L.aura(107, 56);
+  L.spawn('checkpoint', 121, 2);
+  // back up the right side: ledges to rest on, fish on the way — and Kai again
+  L.rock(134, 139, 14, 14);
+  L.rock(118, 123, 26, 26);
+  L.rock(134, 139, 38, 38);
+  L.rock(118, 123, 50, 50);
+  L.spawn('fish', 124, 20);
+  L.spawn('bigfish', 131, 33);
+  L.spawn('bigfish', 122, 46);
+  L.spawn('kai', 129, 42);
+  L.aura(128, 30);
+  L.aura(130, 44);
+  L.aura(127, 56);
 
   // ── Out at the top, a short way, up the slope ────────────────
-  L.ground(112, 121, b(3));
-  L.spawn('checkpoint', 114, b(3));
-  shelf(116, 121);
-  L.spawn('tree', 118, b(3), { h: 200 });
-  L.auraArc(115, 3, b(8), 1);
-  L.ground(122, 125, b(6));
-  L.ground(126, 129, b(9));
-  L.spawn('tree', 124, b(6), { h: 150 });
+  L.ground(140, 149, b(3));
+  L.spawn('checkpoint', 142, b(3));
+  shelf(144, 149);
+  L.spawn('tree', 146, b(3), { h: 200 });
+  L.auraArc(143, 3, b(8), 1);
+  L.ground(150, 153, b(6));
+  L.ground(154, 157, b(9));
+  L.spawn('tree', 152, b(6), { h: 150 });
 
   // ── THE SHALLOWS: crab tennis, two courts in a row ───────────
-  L.ground(130, 173, b(12));
-  L.spawn('tennis', 140, b(12), { w: 18 });
-  L.aura(140, b(18));
-  L.spawn('tennis', 162, b(12), { w: 18 });
-  L.auraArc(150, 3, b(16), 1);
-  L.rootbeer(162, b(18.5));
+  L.ground(158, 201, b(12));
+  L.spawn('tennis', 168, b(12), { w: 18 });
+  L.aura(168, b(18));
+  L.spawn('tennis', 190, b(12), { w: 18 });
+  L.auraArc(178, 3, b(16), 1);
+  L.rootbeer(190, b(18.5));
 
   // ── Down a step to the gate ──────────────────────────────────
-  L.ground(174, 177, b(8));
-  L.ground(178, 190, b(5));
-  L.spawn('tree', 176, b(8), { h: 160 });
-  L.spawn('fish', 181, b(13));
-  L.spawn('bigfish', 185, b(11));
-  L.spawn('goal', 187, b(5));
+  L.ground(202, 205, b(8));
+  L.ground(206, 218, b(5));
+  L.spawn('tree', 204, b(8), { h: 160 });
+  L.spawn('fish', 209, b(13));
+  L.spawn('bigfish', 213, b(11));
+  L.spawn('kai', 206, b(9));
+  L.spawn('goal', 215, b(5));
   return L.build();
 }

@@ -424,7 +424,7 @@ export function createBadGuy(gs: GameScene, kind: EnemyKind, x: number, y: numbe
     return e;
   }
   if (kind === 'giantplop') return new GiantPlop(gs, x, y);
-  if (kind === 'fish' || kind === 'bigfish') return new BadFish(gs, x, y, kind === 'bigfish');
+  if (kind === 'fish' || kind === 'bigfish' || kind === 'kai') return new BadFish(gs, x, y, kind);
   if (kind === 'poogoat') return new PooGoat(gs, x, y);
   return createEnemy(gs, kind, x, y);
 }

@@ -653,7 +653,7 @@ const BADDIE_KEYS: Record<string, string[]> = {
   chutes: ['pchute'],
   king: ['pking-jet', 'jetflame', 'jetsmoke'],
   baseball: BB_KEYS,
-  fish: ['fish-badguy', 'fish-badguybig', 'fish-bubble'],
+  fish: ['fish-badguy', 'fish-badguybig', 'fish-kai', 'fish-bubble'],
   tennis: ['tcrab-red', 'tcrab-orange', 'tcrab-ump', 'clam', 'tennisnet'],
 };
 
@@ -702,7 +702,7 @@ export function gameArtJobs(scene: Phaser.Scene, opts: { heroes: readonly string
       },
     });
   if (want.includes('fish'))
-    for (const k of ['badguy', 'badguybig'] as const) if (!T.exists(`fish-${k}`)) out.push({ name: `fish ${k}`, run: () => { makeFish(scene, k); makeFishBubble(scene); } });
+    for (const k of ['badguy', 'badguybig', 'kai'] as const) if (!T.exists(`fish-${k}`)) out.push({ name: `fish ${k}`, run: () => { makeFish(scene, k); makeFishBubble(scene); } });
   for (const b of baddiePieces(scene)) if (want.includes(b.name) && !BADDIE_KEYS[b.name].every((k) => T.exists(k))) out.push(b);
   if (want.includes('plops')) (['small', 'medium', 'large'] as const).forEach((k) => !T.exists(`gplop-${k}`) && out.push({ name: `plops ${k}`, run: () => makePlops(scene, k) }));
   // (level 4's opening: the Plop King with his jetpack)
@@ -767,10 +767,9 @@ export function ensureSeaArt(scene: Phaser.Scene) {
     'sea-dark',
     hires(256, 256, 1, (ctx) => {
       const g = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
-      g.addColorStop(0, 'rgba(3,12,28,0)');
-      g.addColorStop(0.07, 'rgba(3,12,28,0.04)');
-      g.addColorStop(0.2, 'rgba(3,12,28,0.85)');
-      g.addColorStop(0.3, 'rgba(3,12,28,1)');
+      g.addColorStop(0, 'rgba(3,12,28,0.55)');
+      g.addColorStop(0.12, 'rgba(3,12,28,0.6)');
+      g.addColorStop(0.3, 'rgba(3,12,28,0.92)');
       g.addColorStop(1, 'rgba(3,12,28,1)');
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, 256, 256);

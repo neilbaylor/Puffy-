@@ -1434,8 +1434,10 @@ export class UI {
     const session = this.session;
     let pose: 'idle0' | 'idle1' = 'idle0';
     let face: Face | undefined;
-    // (under the sea: in the dive gear)
-    const wear = swimLevel((this.gameScene as { levelId?: number } | null)?.levelId) ? seaWear() : wardrobe.wearKey;
+    // (the HUD's little portrait: the sunglasses if they're on, and under the sea the dive gear — no
+    // party hat or skateboard up there)
+    const glasses = wardrobe.wearKey.split(',').filter((w) => w === 'frogskins');
+    const wear = (swimLevel((this.gameScene as { levelId?: number } | null)?.levelId) ? [...glasses, 'scuba'] : glasses).join(',');
     const draw = () => drawPortrait(cv, hero, pose, face, 'idle0', wear);
     draw();
     const alive = () => !this.hud.hidden && this.session === session;

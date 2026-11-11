@@ -9,7 +9,7 @@ import { TILE } from '../config';
 
 export type Cell = 'ground' | 'rock' | 'boulder' | 'bramble' | 'cloud' | null;
 
-export type EnemyKind = 'puffball' | 'bigpuff' | 'giant' | 'goat' | 'plop' | 'bigplop' | 'giantplop' | 'poogoat' | 'fish' | 'bigfish' | 'crab';
+export type EnemyKind = 'puffball' | 'bigpuff' | 'giant' | 'goat' | 'plop' | 'bigplop' | 'giantplop' | 'poogoat' | 'fish' | 'bigfish' | 'kai' | 'crab';
 
 export interface Spawn {
   type: EnemyKind | 'aura' | 'rootbeer' | 'checkpoint' | 'goal' | 'player' | 'tree' | 'soccer' | 'hockey' | 'para' | 'puddle' | 'chase' | 'volley' | 'drop' | 'king' | 'baseball' | 'tennis';

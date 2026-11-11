@@ -39,7 +39,7 @@ export const blinkFor = (i: number): BlinkFrame => (i % 6 < 3 ? 'bl1' : 'bl4');
 export const FISH_FRAMES: Record<FishKind, FishFrame[]> = {
   badguy: [...SWIM_FRAMES, ...BLINK_FRAMES, ...FIRE_FRAMES],
   badguybig: [...SWIM_FRAMES, ...BLINK_FRAMES, ...FIRE_FRAMES],
-  kai: [...SWIM_FRAMES, ...BLINK_FRAMES],
+  kai: [...SWIM_FRAMES, ...BLINK_FRAMES, ...FIRE_FRAMES],
   fat: [...SWIM_FRAMES, ...BLINK_FRAMES],
   zippy: [...SWIM_FRAMES, ...BLINK_FRAMES],
   kingbob: [...SWIM_FRAMES, ...BLINK_FRAMES],
@@ -224,7 +224,7 @@ function patches(ctx: Ctx, body: Pt[], draw: () => void) {
 
 /** Draw fish `kind` in swim frame `f`, its frame's top-left at (ox, oy). */
 export function drawFish(ctx: Ctx, ox: number, oy: number, kind: FishKind, f: FishFrame, st: Style = STYLES.polished) {
-  if (f.startsWith('fire') && kind !== 'badguy' && kind !== 'badguybig') f = 'sw0';
+  if (f.startsWith('fire') && kind !== 'badguy' && kind !== 'badguybig' && kind !== 'kai') f = 'sw0';
   shut = f.startsWith('bl');
   const p = phaseOf(f);
   const fire = f.startsWith('fire') ? +f.slice(4) : -1;
@@ -248,7 +248,7 @@ export function drawFish(ctx: Ctx, ox: number, oy: number, kind: FishKind, f: Fi
       drawBadGuy(ctx, st, sw, fire, BADGUY_BIG);
       break;
     case 'kai':
-      drawKai(ctx, st, sw, flap);
+      drawKai(ctx, st, sw, flap, fire);
       break;
     case 'fat':
       drawFat(ctx, st, sw, flap);
@@ -299,15 +299,27 @@ function drawBadGuy(ctx: Ctx, st: Style, sw: number, fire: number, BODY: Fill) {
   mouth(st, ctx, cx + 17, cy + 6, 5.2, 9105);
 }
 
-function drawKai(ctx: Ctx, st: Style, sw: number, flap: number) {
+function drawKai(ctx: Ctx, st: Style, sw: number, flap: number, fire = -1) {
   const BODY = F('#6d5fd8', '#4536a8', '#a196f2');
   const cx = 52;
   const cy = 46;
+  // firing (like the bad guy fish): the tail cocked up over his back, then flung out long behind
+  // him with a puff of bubbles at its tip, then settling
+  const tailA = fire === 0 ? 1.1 : fire === 1 ? -0.1 : fire === 2 ? 0.18 : sw * 0.4;
+  const tailLen = fire === 0 ? 19 : fire === 1 ? 29 : 24;
+  const sx = fire === 0 ? 0.93 : fire === 1 ? 1.06 : 1;
+  const sy = fire === 0 ? 1.07 : fire === 1 ? 0.95 : 1;
   // the big grey fin sweeping up over its back (behind the body), the tail, the fin under it
-  fin(st, ctx, cx - 10, cy - 12, 44, 13, -0.75 + flap * 0.05, 0.45, GREY_FIN, 9201);
-  tail(st, ctx, cx - 17, cy - 2, 24, 13, sw * 0.4, GREY_FIN, 9202);
+  fin(st, ctx, cx - 10, cy - 12, 44, 13, -0.75 + flap * 0.05 + (fire === 0 ? 0.15 : 0), 0.45, GREY_FIN, 9201);
+  tail(st, ctx, cx - 17 * sx, cy - 2, tailLen, fire === 1 ? 11 : 13, tailA, GREY_FIN, 9202);
   fin(st, ctx, cx - 6, cy + 14, 24, 9, 2.1 + flap * 0.18, 0.35, GREY_FIN, 9203);
-  const body = ellipsePts(cx, cy, 22, 20, 0, 40);
+  if (fire === 1) {
+    const tx = cx - 17 * sx - tailLen - 3;
+    for (const [dx, dy, r] of [[-2, -6, 2.8], [-6, 3, 2.1], [1, 7, 1.5], [-9, -1, 1.6]] as const) bubble(ctx, tx + dx, cy - 2 + dy, r);
+    st.line(ctx, [[tx - 4, cy - 13], [tx - 11, cy - 16]], 9210, 0.7);
+    st.line(ctx, [[tx - 5, cy + 9], [tx - 12, cy + 12]], 9211, 0.7);
+  }
+  const body = ellipsePts(cx, cy, 22 * sx, 20 * sy, 0, 40);
   st.shape(ctx, body, BODY, 9204, { lw: 1.1, light: [cx - 6, cy - 10] });
   lidFill = BODY;
   // a dark streak over the top of the head, as in the drawing

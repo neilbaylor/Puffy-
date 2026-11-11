@@ -288,6 +288,7 @@ export class GameScene extends Phaser.Scene {
   create() {
     this.bossSongReady = false;
     this.saidWow = false;
+    this.kaiSeen = false;
     this.levelId = this.data0.level ?? 1;
     const data = (levelInfo(this.levelId).build ?? buildLevel1)();
     this.wideZones = data.wide ?? [];
@@ -881,6 +882,13 @@ export class GameScene extends Phaser.Scene {
     if (!p) this.swanGlint = false;
   }
   private swanGlint = false;
+  /** The first Kai fish you see: the hero's amazed. (Once a play.) */
+  private kaiSeen = false;
+  spottedKai() {
+    if (this.kaiSeen || !this.players[0]?.alive) return;
+    this.kaiSeen = true;
+    this.say(this.players[0], 'Kai Fish! Those are rare!', 2600);
+  }
 
   /** The jetpack's flames, under its nozzles (wherever the King is). */
   private placeKingJets() {
@@ -1862,6 +1870,8 @@ export class GameScene extends Phaser.Scene {
     const giant = e.kind === 'giant' || e.kind === 'giantplop';
     if (giant) run.giants++;
     else run.popped++;
+    // (Kai isn't popped: he gets away)
+    if (e.kind === 'kai') return;
     const plop = e.kind === 'plop' || e.kind === 'bigplop';
     this.fx.popText(e.x, e.y - e.displayHeight / 2 - 6, e.kind === 'giantplop' ? 'BIG PLOP DOWN!' : giant ? 'GIANT DOWN!' : plop ? 'SPLAT!' : 'POP!', '#ffffff', giant ? 22 : 15);
   }

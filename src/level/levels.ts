@@ -81,7 +81,7 @@ const WIP: LevelInfo[] = [
     build: buildLevel5,
     speech: 'Here goes nothing!',
     wip: true,
-    testers: ['neil'],
+    testers: ['neil', 'founder'],
   },
 ];
 let tester = false;
