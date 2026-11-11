@@ -22,6 +22,11 @@ import {
   drawFarSeaStrip,
   drawFishShadow,
   drawHullShadow,
+  drawDock,
+  drawHost,
+  DOCK,
+  HOST,
+  HOST_FRAMES,
   drawIsland,
   drawRay,
   drawRipple,
@@ -54,16 +59,29 @@ const WATER = 520;
 const WORLD_W = 3600;
 const WORLD_TOP = -360;
 const WORLD_BOTTOM = 880;
-/** The boat picture's left edge (world). */
-const BOAT_X = 40;
-const BOAT_Y = WATER - BOAT.water;
+/** The world's left edge: the show's dock is out there, over to the left of the boat. */
+const WORLD_L = -1700;
+/** The boat picture's left edge (world), and how big it's drawn (world px per picture unit). */
+const BOAT_X = 20;
+const BS = 1.18;
+const BOAT_Y = WATER - BOAT.water * BS;
+/** Across the boat (picture units) → the world. */
+const bx = (x: number) => BOAT_X + x * BS;
+/** King Bob's bowl: how big (world px per bowl unit). */
+const BOWL_K = 1.32;
+/** The boat sits a touch bow-up. */
+const TRIM = 0.014;
+/** The dock (world): its left edge, and its deck's height (where the host stands). */
+const DOCK_X = -1450;
+const DOCK_TOP = WATER - 58;
+const HOST_X = DOCK_X + 470;
 const ROUNDS = 6;
 /** The share of bites you tap in time that end up a fish on the line. */
 const CATCH = 0.17;
 /** King Bob lands about this share of his casts. */
-const KING_CATCH = 0.5;
+const KING_CATCH = 0.62;
 /** A hero's size here: world px per art unit. */
-const HERO_K = 2.15;
+const HERO_K = 2.38;
 /** How long the BITE button can be hit for (ms). */
 const BITE_MS = 850;
 /** The rods: length (world px), and how far the handle reaches behind the hands. */
@@ -159,6 +177,12 @@ export class FishingScene extends Phaser.Scene {
   private kingSpr!: Phaser.GameObjects.Sprite;
   private bucket!: Phaser.GameObjects.Image;
   private hero!: Phaser.GameObjects.Sprite;
+  /** The show's host, on the dock: talking (his mouth going), pointing off at the boat. */
+  private host!: Phaser.GameObjects.Image;
+  private hostTalk = false;
+  private hostPoint = false;
+  private hostMouthT = 0;
+  private hostOpen = false;
   private heroKey = '';
   private heroScale = 1;
   /** the hero's arm angle (the frame nearest it is shown; the rod follows it, a bit more upright) */
@@ -252,6 +276,8 @@ export class FishingScene extends Phaser.Scene {
     this.gullList = [];
     this.skipping = false;
     this.inIntro = false;
+    this.hostTalk = false;
+    this.hostPoint = false;
   }
 
   // ───────────────────────────────────────────── setup ──
@@ -266,6 +292,8 @@ export class FishingScene extends Phaser.Scene {
     };
     add('fl-boat', BOAT.w, BOAT.h, 1.5, (ctx) => drawBoat(ctx));
     add('fl-hullshadow', 256, 64, 1, (ctx) => drawHullShadow(ctx, 256, 64));
+    add('fl-dock', DOCK.w, DOCK.h, 1.5, (ctx) => drawDock(ctx));
+    for (const f of HOST_FRAMES) add(`fl-host-${f}`, HOST.w, HOST.h, 2, (ctx) => drawHost(ctx, f));
     add('fl-cooler', COOLER.w, COOLER.h, 2, (ctx) => drawCooler(ctx, false));
     add('fl-cooler-open', COOLER.w, COOLER.h, 2, (ctx) => drawCooler(ctx, true));
     add('fl-bowl-back', BOWL.w, BOWL.h, 2, (ctx) => drawBowlBack(ctx));
@@ -300,14 +328,14 @@ export class FishingScene extends Phaser.Scene {
     // ── the sky, the far-off sea and an island on the horizon ──
     const HORIZON = WATER - 74;
     this.add
-      .image(-400, WORLD_TOP, 'fl-sky')
+      .image(WORLD_L, WORLD_TOP, 'fl-sky')
       .setOrigin(0, 0)
-      .setDisplaySize(WORLD_W + 800, HORIZON - WORLD_TOP)
+      .setDisplaySize(WORLD_W - WORLD_L + 400, HORIZON - WORLD_TOP)
       .setDepth(0);
     this.add
-      .image(-400, HORIZON, 'fl-farsea')
+      .image(WORLD_L, HORIZON, 'fl-farsea')
       .setOrigin(0, 0)
-      .setDisplaySize(WORLD_W + 800, WATER - HORIZON + 10)
+      .setDisplaySize(WORLD_W - WORLD_L + 400, WATER - HORIZON + 10)
       .setDepth(0.2);
     // the sun, a soft glow (it barely moves: far away)
     this.add.image(1180, 150, 'fl-burst').setScale(1.1).setAlpha(0.55).setDepth(0.1).setScrollFactor(0.15, 0.6);
@@ -346,9 +374,9 @@ export class FishingScene extends Phaser.Scene {
 
     // ── the water: deep under the surface, light coming down in rays, little fish going by ──
     this.add
-      .image(-400, WATER, 'fl-deep')
+      .image(WORLD_L, WATER, 'fl-deep')
       .setOrigin(0, 0)
-      .setDisplaySize(WORLD_W + 800, WORLD_BOTTOM - WATER + 40)
+      .setDisplaySize(WORLD_W - WORLD_L + 400, WORLD_BOTTOM - WATER + 40)
       .setDepth(1);
     for (let i = 0; i < 7; i++) {
       const r = this.add
@@ -375,14 +403,25 @@ export class FishingScene extends Phaser.Scene {
     // ── the boat, King Bob in his bowl, the cooler, the hero ──
     this.boat = this.add
       .image(0, 0, 'fl-boat')
-      .setScale(1 / 1.5)
+      .setScale(BS / 1.5)
       .setDepth(4);
     // (the hull's shadow down in the water under it)
     this.add
-      .image(BOAT_X + BOAT.w * 0.46, WATER + 64, 'fl-hullshadow')
-      .setDisplaySize(BOAT.w * 1.05, 150)
+      .image(bx(BOAT.w * 0.46), WATER + 70, 'fl-hullshadow')
+      .setDisplaySize(BOAT.w * BS * 1.05, 170)
       .setDepth(1.25)
       .setAlpha(0.8);
+    // the show's dock off to the left, and its host on it
+    this.add
+      .image(DOCK_X, DOCK_TOP - DOCK.deck, 'fl-dock')
+      .setOrigin(0, 0)
+      .setScale(1 / 1.5)
+      .setDepth(3.5);
+    this.host = this.add
+      .image(HOST_X, DOCK_TOP - 12, 'fl-host-t0')
+      .setOrigin(62 / HOST.w, 186 / HOST.h)
+      .setScale(0.92 / 2)
+      .setDepth(3.6);
     this.cooler = this.add
       .image(0, 0, 'fl-cooler')
       .setScale(1 / 2)
@@ -391,16 +430,16 @@ export class FishingScene extends Phaser.Scene {
     this.bucket = this.add.image(0, 0, 'fl-cooler').setScale(0.42).setOrigin(0.5, 1).setDepth(4.15).setTint(0xffe28a);
     this.bowlBack = this.add
       .image(0, 0, 'fl-bowl-back')
-      .setScale(1 / 2)
+      .setScale(BOWL_K / 2)
       .setOrigin(0.5, 1)
       .setDepth(4.3);
     this.kingSpr = this.add
       .sprite(0, 0, 'fl-kingbob', 'sw0')
-      .setScale(0.95 / 2)
+      .setScale((0.98 * BOWL_K) / 2)
       .setDepth(4.35);
     this.bowlFront = this.add
       .image(0, 0, 'fl-bowl-front')
-      .setScale(1 / 2)
+      .setScale(BOWL_K / 2)
       .setOrigin(0.5, 1)
       .setDepth(4.4);
     this.heroScale = (HERO_K / ART_RES) * ch.scale;
@@ -412,7 +451,7 @@ export class FishingScene extends Phaser.Scene {
       [WATER - WAVE.top, 1, 6, 1],
     ] as const) {
       const w = this.add
-        .tileSprite(-400, y, WORLD_W + 800, WAVE.h, 'fl-wave')
+        .tileSprite(WORLD_L, y, WORLD_W - WORLD_L + 400, WAVE.h, 'fl-wave')
         .setOrigin(0, 0)
         .setTileScale(0.5, 0.5)
         .setDepth(d)
@@ -421,9 +460,9 @@ export class FishingScene extends Phaser.Scene {
       this.waves.push(w);
     }
     this.add
-      .image(-400, WATER + 22, 'fl-px')
+      .image(WORLD_L, WATER + 22, 'fl-px')
       .setOrigin(0, 0)
-      .setDisplaySize(WORLD_W + 800, WORLD_BOTTOM - WATER)
+      .setDisplaySize(WORLD_W - WORLD_L + 400, WORLD_BOTTOM - WATER)
       .setTint(0x0d5f92)
       .setAlpha(0.3)
       .setDepth(6.4);
@@ -462,6 +501,12 @@ export class FishingScene extends Phaser.Scene {
         <div class="fsh-row" data-who="hero"><img class="tv-face" alt=""><span class="fsh-name">${ch.name.toUpperCase()}</span><span class="fsh-dots"></span><b class="fsh-total">0</b></div>
         <div class="fsh-row" data-who="king"><img class="tv-face" alt=""><span class="fsh-name">KING BOB</span><span class="fsh-dots"></span><b class="fsh-total">0</b></div>
         <div class="tv-foot"><span class="fsh-round"></span><span class="tv-best"></span></div>
+      </div>
+      <div class="tv-old" hidden>
+        <div class="tvo-roll"></div>
+        <div class="tvo-bug">WWS<small>LIVE</small></div>
+        <div class="tvo-title"><small>THE WONDERFUL WORLD OF</small><b>SPORTS</b><span>CHUCK RIVERS · LIVE FROM THE DOCKS</span></div>
+        <div class="tvo-cc"></div>
       </div>
       <div class="tv-ticker" hidden><b>REEL ROYAL TV</b><div class="tv-crawl"><span></span></div></div>
       <div class="hoops-meters fsh-meter" hidden>
@@ -528,31 +573,44 @@ export class FishingScene extends Phaser.Scene {
   }
 
   /** A point on the boat (picture coords) → the world, with the boat's rock and bob. */
-  private onBoat(bx: number, by: number) {
-    const px = BOAT_X + BOAT.w / 2;
+  private onBoat(px0: number, py0: number) {
+    // (about the waterline amidships: picture units scaled to the world, then the rock and the bob)
+    const px = bx(BOAT.w / 2);
     const py = WATER;
-    const x = BOAT_X + bx - px;
-    const y = BOAT_Y + by - py;
-    const c = Math.cos(this.rock);
-    const s = Math.sin(this.rock);
+    const x = bx(px0) - px;
+    const y = BOAT_Y + py0 * BS - py;
+    const a = this.rock + TRIM;
+    const c = Math.cos(a);
+    const s = Math.sin(a);
     return { x: px + x * c - y * s, y: py + this.bob + x * s + y * c };
+  }
+  /** A point on King Bob's bowl (bowl units from the bottom of its stand) → the world. */
+  private bowlAt(dx: number, dy: number) {
+    const base = this.onBoat(BOAT.king, BOAT.feet + 3);
+    const a = this.rock + TRIM;
+    const c = Math.cos(a);
+    const s = Math.sin(a);
+    const x = dx * BOWL_K;
+    const y = dy * BOWL_K;
+    return { x: base.x + x * c - y * s, y: base.y + x * s + y * c };
   }
 
   private placeBoat() {
+    const a = this.rock + TRIM;
     const p = this.onBoat(BOAT.w / 2, BOAT.h / 2);
-    this.boat.setPosition(p.x, p.y).setRotation(this.rock);
-    const c = this.onBoat(BOAT.cooler, BOAT.deck + 2);
-    this.cooler.setPosition(c.x, c.y).setRotation(this.rock);
-    const bk = this.onBoat(BOAT.king - 92, BOAT.deck + 2);
-    this.bucket.setPosition(bk.x, bk.y).setRotation(this.rock);
-    const b = this.onBoat(BOAT.king, BOAT.deck + 4);
-    this.bowlBack.setPosition(b.x, b.y).setRotation(this.rock);
-    this.bowlFront.setPosition(b.x, b.y).setRotation(this.rock);
+    this.boat.setPosition(p.x, p.y).setRotation(a);
+    const c = this.onBoat(BOAT.cooler, BOAT.feet + 2);
+    this.cooler.setPosition(c.x, c.y).setRotation(a);
+    const bk = this.onBoat(BOAT.king - 98, BOAT.feet + 2);
+    this.bucket.setPosition(bk.x, bk.y).setRotation(a);
+    const b = this.bowlAt(0, 0);
+    this.bowlBack.setPosition(b.x, b.y).setRotation(a);
+    this.bowlFront.setPosition(b.x, b.y).setRotation(a);
     // King Bob in his water, swaying a little
-    const kc = this.onBoat(BOAT.king + 2, BOAT.deck + 4 - BOWL.h + BOWL.cy + 8 + Math.sin(this.clock / 700) * 3);
-    this.kingSpr.setPosition(kc.x, kc.y).setRotation(this.rock + Math.sin(this.clock / 900) * 0.05);
-    const h = this.onBoat(BOAT.hero, BOAT.deck + 2);
-    this.hero.setPosition(h.x, h.y).setRotation(this.rock);
+    const kc = this.bowlAt(2, -(BOWL.h - BOWL.cy) + 10 + Math.sin(this.clock / 700) * 3);
+    this.kingSpr.setPosition(kc.x, kc.y).setRotation(a + Math.sin(this.clock / 900) * 0.05);
+    const h = this.onBoat(BOAT.hero, BOAT.feet + 2);
+    this.hero.setPosition(h.x, h.y).setRotation(a);
   }
 
   /** The hero's hands (world), from the frame shown. */
@@ -562,8 +620,8 @@ export class FishingScene extends Phaser.Scene {
     const [hx, hy] = carryHand(id, frameA);
     const dx = (hx + HERO_SHEET_M - (CHAR_W + HERO_SHEET_M * 2) / 2) * k;
     const dy = (hy - CHAR_H) * k;
-    const c = Math.cos(this.rock);
-    const s = Math.sin(this.rock);
+    const c = Math.cos(this.rock + TRIM);
+    const s = Math.sin(this.rock + TRIM);
     return {
       x: this.hero.x + dx * c - dy * s,
       y: this.hero.y + dx * s + dy * c,
@@ -603,19 +661,19 @@ export class FishingScene extends Phaser.Scene {
     const vh = this.scale.height / zoom;
     const cx = cam.midPoint.x + (this.cam.x - cam.midPoint.x) * k;
     const cy = cam.midPoint.y + (this.cam.y - cam.midPoint.y) * k;
-    const x = Phaser.Math.Clamp(snap ? this.cam.x : cx, -380 + vw / 2, WORLD_W + 380 - vw / 2);
+    const x = Phaser.Math.Clamp(snap ? this.cam.x : cx, WORLD_L + 20 + vw / 2, WORLD_W + 380 - vw / 2);
     const y = Phaser.Math.Clamp(snap ? this.cam.y : cy, WORLD_TOP + vh / 2, WORLD_BOTTOM - vh / 2);
     cam.centerOn(x, y);
   }
 
   /** Frame the boat (the stern, King Bob and the sea just off it). */
   private shotBoat(zoom = 1) {
-    this.cam = { x: BOAT_X + BOAT.hero - 110, y: WATER - 70, zoom };
+    this.cam = { x: bx(BOAT.hero) - 110, y: WATER - 70, zoom };
   }
   /** Frame the hero's line: from the boat out to the bobber. */
   private shotLine(who: Who = 'hero') {
     const L = this.lures[who];
-    const x0 = BOAT_X + (who === 'hero' ? BOAT.hero : BOAT.king) - 160;
+    const x0 = bx(who === 'hero' ? BOAT.hero : BOAT.king) - 160;
     const span = Math.max(500, L.x - x0 + 220);
     const zoom = Phaser.Math.Clamp(1280 / span, 0.6, 1.05);
     this.cam = {
@@ -652,6 +710,15 @@ export class FishingScene extends Phaser.Scene {
       if (f.img.x < -300) f.img.x = WORLD_W + 200;
     }
     this.drawGulls(t, s);
+
+    // the host: his mouth flapping while he talks
+    this.hostMouthT -= dt;
+    if (this.hostMouthT <= 0) {
+      this.hostOpen = this.hostTalk && !this.hostOpen;
+      this.hostMouthT = 80 + Math.random() * 110;
+    }
+    this.host.setTexture(`fl-host-${this.hostPoint ? 'p' : 't'}${this.hostOpen ? 1 : 0}`);
+    this.host.y = DOCK_TOP - 12 + (this.hostTalk ? Math.sin(this.clock / 130) * 1.5 : 0);
 
     // the anglers
     this.placeBoat();
@@ -729,7 +796,7 @@ export class FishingScene extends Phaser.Scene {
     };
     h.tip = tipOf(h, ROD_LEN);
     const k = this.rod.king;
-    k.hands = this.onBoat(BOAT.king + 42, BOAT.deck + 4 - BOWL.h + 30);
+    k.hands = this.bowlAt(44, -BOWL.h + 30);
     k.tip = tipOf(k, KING_ROD_LEN);
     h.reel += h.reelRate * s * Math.PI * 2;
     k.reel += k.reelRate * s * Math.PI * 2;
@@ -972,12 +1039,18 @@ export class FishingScene extends Phaser.Scene {
     for (const who of ['hero', 'king'] as const) {
       const row = board.querySelector<HTMLElement>(`[data-who=${who}]`)!;
       const s = this.score[who];
-      row.querySelector('.fsh-dots')!.innerHTML = Array.from({ length: n }, (_, i) => `<i class="${i < s.length ? (s[i] ? 'got' : 'miss') : ''}${i >= ROUNDS ? ' sd' : ''}"></i>`).join('');
+      // (into sudden death: the dots get smaller, and only the last eight rounds show)
+      const from = Math.max(0, n - 8);
+      row.querySelector('.fsh-dots')!.innerHTML = Array.from({ length: n - from }, (_, j) => {
+        const i = from + j;
+        return `<i class="${i < s.length ? (s[i] ? 'got' : 'miss') : ''}${i >= ROUNDS ? ' sd' : ''}"></i>`;
+      }).join('');
       row.querySelector('.fsh-total')!.textContent = String(s.filter(Boolean).length);
     }
+    board.classList.toggle('many', n > ROUNDS);
     board.querySelector('.fsh-round')!.textContent = round > ROUNDS ? 'SUDDEN DEATH' : `ROUND ${round} OF ${ROUNDS}`;
     const b = this.best;
-    board.querySelector('.tv-best')!.innerHTML = b ? `BIGGEST <b>${b.lb.toFixed(1)} lb</b> ${b.who === 'king' ? 'King Bob' : 'You'}` : 'BIGGEST <b>—</b>';
+    board.querySelector('.tv-best')!.innerHTML = b ? `BIGGEST <b>${b.lb.toFixed(1)} lb</b> ${b.who === 'king' ? 'KING BOB' : 'YOU'}` : 'BIGGEST <b>—</b>';
     this.tickerOn();
   }
 
@@ -1116,17 +1189,34 @@ export class FishingScene extends Phaser.Scene {
   private async run() {
     playHoops();
     this.inIntro = true;
-    stingerTitle(`<div><div class="crown"></div><small>KING BOB'S</small><strong>FISHING<br>CONTEST</strong><em>ON THE REEL ROYAL</em></div>`);
+    stingerTitle(`<div><div class="crown"></div><small>THE WONDERFUL WORLD OF SPORTS</small><strong>KING BOB'S<br>FISH-OFF</strong><em>LIVE FROM THE REEL ROYAL</em></div>`);
     sfx.drum();
-    // (the camera starts out over the open sea and drifts back to the boat)
-    this.cam = { x: 2000, y: WATER - 120, zoom: 0.9 };
+    // ── on the dock: the show's host, on an old telly ──
+    const tv = this.dom.querySelector<HTMLElement>('.tv-old')!;
+    tv.hidden = false;
+    tv.classList.remove('off');
+    this.cam = { x: HOST_X + 70, y: DOCK_TOP - 92, zoom: 1.75 };
     this.fitCamera(true);
     await this.iwait(1300);
     void stingerReveal();
-    this.camK = 1.1;
-    this.shotBoat(1.25);
-    this.cam.x = BOAT_X + BOAT.king + 40;
-    await this.iwait(2200);
+    await this.iwait(600);
+    // (a slow push in on him while he talks)
+    this.camK = 0.4;
+    this.cam = { x: HOST_X + 50, y: DOCK_TOP - 96, zoom: 2.0 };
+    const name = characterById(this.fd.charId).name;
+    await this.hostSays("On today's Wonderful World of Sports, we bring you some HUGE fishing action!", 3600);
+    await this.hostSays(`King Bob versus ${name}!`, 2200);
+    await this.hostSays('What a duel this should be.', 2000);
+    this.hostPoint = true;
+    await this.hostSays("Let's head down to the boat to check it out!", 2400);
+    // ── and off over the water to the boat ──
+    tv.classList.add('off');
+    this.time.delayedCall(700, () => (tv.hidden = true));
+    this.camK = 0.95;
+    this.shotBoat(1.2);
+    this.cam.x = bx(BOAT.king) + 60;
+    await this.iwait(2600);
+    this.hostPoint = false;
     await this.kingSays('Nobody out-fishes the King!', 1900);
     this.camK = 2.2;
     this.shotBoat(1);
@@ -1165,10 +1255,28 @@ export class FishingScene extends Phaser.Scene {
     return who === 'king' && y !== k;
   }
 
+  /** The host says a line: closed captions typed out along the bottom of the old telly, his mouth going. */
+  private async hostSays(text: string, ms: number) {
+    const cc = this.dom.querySelector<HTMLElement>('.tvo-cc')!;
+    cc.textContent = '';
+    cc.classList.add('show');
+    this.hostTalk = true;
+    const t0 = this.clock;
+    const typeMs = Math.min(ms - 500, text.length * 38);
+    while (this.clock - t0 < ms && !this.skipping) {
+      const n = Math.min(text.length, Math.ceil(((this.clock - t0) / typeMs) * text.length));
+      if (cc.textContent!.length !== n) cc.textContent = text.slice(0, n).toUpperCase();
+      this.hostTalk = this.clock - t0 < typeMs + 150;
+      await this.wait(30);
+    }
+    this.hostTalk = false;
+    cc.classList.remove('show');
+  }
+
   /** King Bob says something (a bubble over his bowl). */
   private async kingSays(text: string, ms: number) {
     // (up to the right of his bowl, the tail pointing in at him: clear of the scoreboard in the corner)
-    const at = this.onBoat(BOAT.king + 48, BOAT.deck - BOWL.h + 30);
+    const at = this.bowlAt(50, -BOWL.h + 26);
     const t = this.add
       .text(0, 0, text, { fontFamily: 'Nunito, sans-serif', fontSize: '17px', fontStyle: '900', color: '#3a2418', align: 'center', wordWrap: { width: 200 } })
       .setOrigin(0.5)
@@ -1201,7 +1309,7 @@ export class FishingScene extends Phaser.Scene {
   private async heroTurn(round: number): Promise<boolean> {
     const L = this.lures.hero;
     this.shotBoat(1.12);
-    this.cam.x = BOAT_X + BOAT.hero + 140;
+    this.cam.x = bx(BOAT.hero) + 140;
     // (a little higher: the rod's tip in the shot)
     this.cam.y = WATER - 120;
     this.arm = -0.85;
@@ -1224,7 +1332,7 @@ export class FishingScene extends Phaser.Scene {
     this.heroPose = null;
     this.arm = -0.5;
     const startX = L.x;
-    const endX = BOAT_X + BOAT.motor + 80;
+    const endX = bx(BOAT.motor) + 80;
     const gaps = Array.from({ length: bites }, () => 1100 + Math.random() * 700);
     const total = gaps.reduce((a, b) => a + b, 0) + 900;
     const t0 = this.clock;
@@ -1373,7 +1481,7 @@ export class FishingScene extends Phaser.Scene {
     this.camK = 4;
     while (L.mode === 'fly') {
       this.cam = {
-        x: Math.max(BOAT_X + BOAT.hero + 200, L.x - 120),
+        x: Math.max(bx(BOAT.hero) + 200, L.x - 120),
         y: Math.min(WATER - 80, L.y + 60),
         zoom: 0.92,
       };
@@ -1427,7 +1535,7 @@ export class FishingScene extends Phaser.Scene {
     this.camK = 3;
     // the fight: in towards the boat, thrashing, the rod bending
     const x0 = L.x;
-    const xEnd = BOAT_X + BOAT.motor + 90;
+    const xEnd = bx(BOAT.motor) + 90;
     const dur = 2300;
     const t0 = this.clock;
     let leapt = false;
@@ -1446,9 +1554,9 @@ export class FishingScene extends Phaser.Scene {
       if (Math.random() < 0.2) this.bubbles(fish.x, fish.y, 1);
       if (Math.random() < 0.06) this.ripple(L.x + thrash, WATER, 0.6);
       this.cam = {
-        x: (BOAT_X + BOAT.hero + L.x) / 2 + 60,
+        x: (bx(BOAT.hero) + L.x) / 2 + 60,
         y: WATER - 70,
-        zoom: Phaser.Math.Clamp(1280 / (L.x - BOAT_X - BOAT.hero + 520), 0.7, 1.15),
+        zoom: Phaser.Math.Clamp(1280 / (L.x - bx(BOAT.hero) + 520), 0.7, 1.15),
       };
       // halfway: it LEAPS clean out of the water
       if (!leapt && u > 0.42) {
@@ -1559,7 +1667,7 @@ export class FishingScene extends Phaser.Scene {
     });
     // into the cooler
     this.cooler.setTexture('fl-cooler-open');
-    const cool = this.onBoat(BOAT.cooler, BOAT.deck - 30);
+    const cool = this.onBoat(BOAT.cooler, BOAT.feet - 30);
     const f0 = { x: fish.x, y: fish.y };
     const s0 = fish.scale;
     const arc2 = { t: 0 };
@@ -1624,7 +1732,7 @@ export class FishingScene extends Phaser.Scene {
         fish.setFrame(['sw0', 'sw2', 'sw4'][Math.floor(t * 12) % 3]);
         L.x = fish.x;
         this.cam = {
-          x: (BOAT_X + BOAT.hero + fish.x) / 2 + 60,
+          x: (bx(BOAT.hero) + fish.x) / 2 + 60,
           y: WATER - 110,
           zoom: 0.95,
         };
@@ -1642,7 +1750,7 @@ export class FishingScene extends Phaser.Scene {
     const r = this.rod.king;
     this.camK = 2.4;
     this.shotBoat(1.15);
-    this.cam.x = BOAT_X + BOAT.king + 180;
+    this.cam.x = bx(BOAT.king) + 180;
     this.hangLure('king');
     await this.callout("KING BOB'S CAST", 'king', 800);
     // his cast: back, and a flick
@@ -1675,7 +1783,7 @@ export class FishingScene extends Phaser.Scene {
     this.camK = 3.5;
     while (L.mode === 'fly') {
       this.cam = {
-        x: Math.max(BOAT_X + BOAT.king + 300, L.x - 150),
+        x: Math.max(bx(BOAT.king) + 300, L.x - 150),
         y: Math.min(WATER - 80, L.y + 60),
         zoom: 0.95,
       };
@@ -1686,7 +1794,7 @@ export class FishingScene extends Phaser.Scene {
     r.reelRate = 2.6;
     const got = Math.random() < KING_CATCH;
     const x0 = L.x;
-    const xEnd = BOAT_X + BOAT.motor + 70;
+    const xEnd = bx(BOAT.motor) + 70;
     const dur = 2400;
     const t0 = this.clock;
     let nib = 0;
@@ -1734,7 +1842,7 @@ export class FishingScene extends Phaser.Scene {
       this.splash(L.x, WATER, 14, 1);
       fish.setDepth(8.4);
       this.to(r, 'a', -1.9, 250);
-      const b = this.onBoat(BOAT.king - 92, BOAT.deck - 26);
+      const b = this.onBoat(BOAT.king - 98, BOAT.feet - 26);
       const f0 = { x: fish.x, y: fish.y };
       const o = { t: 0 };
       this.cam = { x: (b.x + f0.x) / 2, y: WATER - 140, zoom: 1.05 };
@@ -1775,7 +1883,7 @@ export class FishingScene extends Phaser.Scene {
   private async youWin() {
     const view = this.cameras.main.worldView;
     this.shotBoat(1.12);
-    this.cam.x = BOAT_X + (BOAT.hero + BOAT.king) / 2;
+    this.cam.x = bx((BOAT.hero + BOAT.king) / 2);
     this.cam.y = WATER - 110;
     this.heroPose = 'j0';
     this.dom.querySelector<HTMLElement>('.fsh-meter')!.hidden = true;
@@ -1798,7 +1906,7 @@ export class FishingScene extends Phaser.Scene {
 
   private async kingWins() {
     this.shotBoat(1.25);
-    this.cam.x = BOAT_X + BOAT.king + 40;
+    this.cam.x = bx(BOAT.king) + 40;
     sfx.laugh();
     await this.kingSays('HA HA HA! Nobody beats the King!', 1900);
     const practice = !!this.fd.result?.practice;

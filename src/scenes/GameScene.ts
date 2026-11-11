@@ -1024,7 +1024,8 @@ export class GameScene extends Phaser.Scene {
     const fade = 1 - smooth(0.5, 0.96, u);
     const rot = (0.045 * Math.sin(u * Math.PI * 2.2 + 0.5) + 0.018 * Math.sin(u * Math.PI * 5.3)) * fade;
     // height above the ground: rises like a drone, dips, settles
-    const lift = (55 * Math.sin(Math.min(1, u * 1.25) * Math.PI) + 18 * Math.sin(u * Math.PI * 3.1)) * fade;
+    // (under the sea it glides level: no drone bob up and down)
+    const lift = this.level.data.water !== undefined ? 0 : (55 * Math.sin(Math.min(1, u * 1.25) * Math.PI) + 18 * Math.sin(u * Math.PI * 3.1)) * fade;
     const base = Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W);
     const zoom = base * zoomK;
     const vw = this.scale.width / zoom;

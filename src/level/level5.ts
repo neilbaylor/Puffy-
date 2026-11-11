@@ -62,19 +62,11 @@ export function buildLevel5(): LevelData {
     return { wall, right, x1 };
   };
 
-  // the fly-over (from the gate back to the pier): along the level in open water, the surface just
-  // in view above and the sea bed below; over each descent it only dips a little, to show the way down
+  // the fly-over (from the gate back to the pier): one smooth glide along the level at a single depth in
+  // open water (the surface just in view above, the sea bed below), then up to the hero on the pier
   L.flyPath = [
-    [252, b(11)],
-    [229, b(13)],
-    [207, b(13)],
-    [186, b(11.5)],
-    [156, b(6)],
-    [128, b(11.5)],
-    [104, b(12)],
-    [84, b(11.5)],
-    [65, b(7)],
-    [42, b(11.5)],
+    [252, b(11.5)],
+    [137, b(11.5)],
     [22, b(11.5)],
   ];
 

@@ -21,7 +21,11 @@ const F = (base: string, shade: string, light: string): Fill => ({
  * The boat's picture (world px): its size; where the waterline is; the deck (where the gunwale is, and
  * where folk stand on the stern); where King Bob's bowl, the cooler and the hero go; the outboards.
  */
-export const BOAT = { w: 900, h: 450, water: 362, deck: 258, king: 540, cooler: 622, hero: 706, motor: 848, transom: 816 } as const;
+export const BOAT = { w: 900, h: 450, water: 362, deck: 258, feet: 243, king: 540, cooler: 622, hero: 706, motor: 848, transom: 816 } as const;
+/** Seen a little from above: how far the far side's gunwale sits over the near one (the deck shows between). */
+const DECK_D = 30;
+/** And how far up the deck everything standing on it is drawn (its middle). */
+const ON_DECK = BOAT.deck - BOAT.feet;
 
 const WHITE = F('#fbfbf7', '#d9dde0', '#ffffff');
 const NAVY = F('#1f3a68', '#13264a', '#3c5c94');
@@ -107,6 +111,53 @@ export function drawBoat(ctx: Ctx) {
   const W = BOAT.water;
   const r = rng(77);
 
+  // ── the deck, seen from a little above: the far side's gunwale and inner wall, the non-skid deck ──
+  const far: Pt[] = SHEER.map(([x, y]) => [x + 4, y - DECK_D * Math.min(1, Math.max(0, (x - 18) / 230))]);
+  ctx.fillStyle = '#dfe5e9';
+  ctx.beginPath();
+  [...far, ...SHEER.slice().reverse()].forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+  ctx.closePath();
+  ctx.fill();
+  // (the inside of the far side: white, a shadow along its foot)
+  ctx.fillStyle = '#f6f8f9';
+  ctx.beginPath();
+  [...far, ...far.map(([x, y]): Pt => [x, y + 11]).reverse()].forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+  ctx.closePath();
+  ctx.fill();
+  line(
+    ctx,
+    far.map(([x, y]) => [x, y + 12]),
+    3,
+    'rgba(60,80,100,0.18)',
+  );
+  // non-skid: a fine diamond pattern on the deck
+  ctx.save();
+  ctx.beginPath();
+  [...far.map(([x, y]): Pt => [x, y + 12]), ...SHEER.slice().reverse()].forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+  ctx.closePath();
+  ctx.clip();
+  ctx.fillStyle = 'rgba(120,135,150,0.22)';
+  for (let x = 30; x < BOAT.transom; x += 9) for (let y = d - DECK_D; y < d; y += 6) ctx.fillRect(x + ((y / 6) % 2) * 4.5, y, 2, 2);
+  ctx.restore();
+  // the far gunwale's teak cap, and the inside of the transom
+  line(ctx, far, 5, '#6b3f1c');
+  line(ctx, far, 3.4, TEAK.base);
+  st.shape(
+    ctx,
+    [
+      [BOAT.transom - 4, d - DECK_D],
+      [BOAT.transom + 4, d - DECK_D],
+      [BOAT.transom + 4, d],
+      [BOAT.transom - 2, d],
+    ],
+    F('#eef1f3', '#cfd5da', '#ffffff'),
+    1001,
+    { lw: 0.8, plain: true },
+  );
+
+  // everything standing on the deck is drawn up on its middle
+  ctx.save();
+  ctx.translate(2, -ON_DECK);
   // ── up top first: the outrigger, antennas, the hardtop with its radar, the rod rack ──
   const roofY = d - 172;
   // the outrigger, a long pole reaching up and forward over the bow, its line hanging off it
@@ -329,6 +380,8 @@ export function drawBoat(ctx: Ctx) {
   st.shape(ctx, roundRectPts(232, d - 72, 14, 34, 6), NAVY, 1028, { lw: 0.9 });
   // a life ring on the leaning post's side
   lifeRing(ctx, 444, d - 66, 13);
+
+  ctx.restore();
 
   // ── the bow rail: stainless, sweeping up to the bow ──
   const rail = quad([30, 160], [140, 218], [262, d - 26], 14);
@@ -980,4 +1033,392 @@ export function drawDrop(ctx: Ctx, r: number) {
   ctx.beginPath();
   ctx.arc(r * 0.7, r * 0.7, r * 0.3, 0, Math.PI * 2);
   ctx.fill();
+}
+
+/** The dock the show's host stands on (w × h, its deck along the top; the pilings go on down into the water). */
+export const DOCK = { w: 760, h: 300, deck: 70 } as const;
+export function drawDock(ctx: Ctx) {
+  const W = DOCK.w;
+  const top = DOCK.deck;
+  const WOOD = F('#b88752', '#8a5e33', '#dcb07c');
+  const DARK = F('#8a5e33', '#5f3e1f', '#b88752');
+  // pilings, down into the water
+  for (let x = 30; x < W; x += 120) {
+    st.shape(ctx, roundRectPts(x - 13, top - 20, 26, DOCK.h - top + 10, 8), DARK, 1500 + x, { lw: 1.1, light: [x - 8, top] });
+    // (a rope wrapped round some of them)
+    if (x % 240 === 30)
+      for (let k = 0; k < 3; k++)
+        line(
+          ctx,
+          [
+            [x - 13, top + 30 + k * 6],
+            [x + 13, top + 34 + k * 6],
+          ],
+          2.4,
+          '#e8d9b0',
+        );
+    // weed and wet at the waterline
+    ctx.fillStyle = 'rgba(40,90,60,0.35)';
+    ctx.fillRect(x - 13, top + 118, 26, 14);
+  }
+  // the deck: planks seen a little from above, then the beam along the front
+  st.shape(
+    ctx,
+    [
+      [0, top - 26],
+      [W, top - 26],
+      [W, top],
+      [0, top],
+    ],
+    WOOD,
+    1510,
+    { lw: 1.1, light: [100, top - 26] },
+  );
+  ctx.strokeStyle = 'rgba(95,62,31,0.55)';
+  ctx.lineWidth = 1.2;
+  for (let x = 14; x < W; x += 28) {
+    ctx.beginPath();
+    ctx.moveTo(x, top - 26);
+    ctx.lineTo(x - 4, top);
+    ctx.stroke();
+  }
+  st.shape(ctx, roundRectPts(0, top, W, 18, 3), DARK, 1511, { lw: 1.1 });
+  for (let x = 20; x < W; x += 60) {
+    ctx.fillStyle = '#4b5560';
+    ctx.beginPath();
+    ctx.arc(x, top + 9, 2.4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // a bollard with a coil of rope, and an old lamp post
+  st.shape(ctx, roundRectPts(600, top - 46, 22, 26, 6), F('#3d4a57', '#25303a', '#64748a'), 1512, { lw: 1 });
+  st.shape(ctx, ellipsePts(611, top - 46, 15, 5, 0, 20), F('#3d4a57', '#25303a', '#64748a'), 1513, { lw: 1 });
+  for (let k = 0; k < 3; k++) st.shape(ctx, ellipsePts(560, top - 30 - k * 4, 22 - k * 3, 6, 0, 24), F('#e8d9b0', '#c2ad7c', '#fff4d6'), 1514 + k, { lw: 0.8, plain: true });
+  st.shape(ctx, roundRectPts(96, top - 196, 8, 172, 3), F('#2f3a44', '#1c242b', '#55626e'), 1520, { lw: 1 });
+  st.shape(
+    ctx,
+    [
+      [86, top - 196],
+      [114, top - 196],
+      [108, top - 222],
+      [92, top - 222],
+    ],
+    F('#fff3b0', '#e8c860', '#ffffff'),
+    1521,
+    { lw: 1 },
+  );
+  st.shape(
+    ctx,
+    [
+      [82, top - 222],
+      [118, top - 222],
+      [100, top - 236],
+    ],
+    F('#2f3a44', '#1c242b', '#55626e'),
+    1522,
+    { lw: 1 },
+  );
+  // the show's sign, on two posts
+  for (const x of [190, 330]) st.shape(ctx, roundRectPts(x - 4, top - 110, 8, 86, 2), DARK, 1530 + x, { lw: 0.9 });
+  st.shape(ctx, roundRectPts(160, top - 160, 200, 62, 10), F('#f4e2b8', '#d9c08a', '#fff8e4'), 1532, { lw: 1.2 });
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#c0392b';
+  ctx.font = '400 13px "Lilita One", "Arial Black", sans-serif';
+  ctx.fillText('THE WONDERFUL WORLD OF', 260, top - 138, 184);
+  ctx.fillStyle = '#1f3a68';
+  ctx.font = '400 26px "Lilita One", "Arial Black", sans-serif';
+  ctx.fillText('SPORTS', 260, top - 110);
+  ctx.restore();
+}
+
+/**
+ * The show's host: a round, cheery old-school TV sports man in a mustard check blazer and a red bow
+ * tie, a slick of hair, a big moustache, holding a chrome ball microphone on a curly lead. Frames:
+ * t0/t1 talking (mouth shut/open), p0/p1 pointing off to the right (towards the boat).
+ */
+export const HOST = { w: 140, h: 190 } as const;
+export const HOST_FRAMES = ['t0', 't1', 'p0', 'p1'] as const;
+export function drawHost(ctx: Ctx, f: string) {
+  const open = f.endsWith('1');
+  const point = f.startsWith('p');
+  const SKIN = F('#ffd6ad', '#e8aa7a', '#fff0dc');
+  const BLAZER = F('#d9a441', '#a87a24', '#f2cc78');
+  const PANTS = F('#6b4a2e', '#4a311d', '#8e6a48');
+  const HAIR = F('#4a2f1c', '#2e1c10', '#7a5236');
+  const cx = 62;
+  // legs and shoes
+  for (const dx of [-14, 12]) {
+    st.shape(ctx, roundRectPts(cx + dx - 9, 142, 18, 36, 6), PANTS, 1600 + dx, { lw: 1 });
+    st.shape(ctx, ellipsePts(cx + dx + 4, 180, 15, 7, 0, 20), F('#2a2421', '#151210', '#4c423c'), 1602 + dx, { lw: 1 });
+  }
+  // the body: a round blazer, the shirt and the bow tie
+  const body = ellipsePts(cx, 118, 40, 38, 0, 40);
+  st.shape(ctx, body, BLAZER, 1610, { lw: 1.2, light: [cx - 14, 96] });
+  ctx.save();
+  ctx.beginPath();
+  body.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+  ctx.closePath();
+  ctx.clip();
+  // the check pattern
+  ctx.strokeStyle = 'rgba(120,70,20,0.35)';
+  ctx.lineWidth = 2;
+  for (let x = cx - 44; x < cx + 44; x += 10) {
+    ctx.beginPath();
+    ctx.moveTo(x, 78);
+    ctx.lineTo(x, 160);
+    ctx.stroke();
+  }
+  for (let y = 82; y < 160; y += 10) {
+    ctx.beginPath();
+    ctx.moveTo(cx - 44, y);
+    ctx.lineTo(cx + 44, y);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = 'rgba(190,60,40,0.3)';
+  ctx.lineWidth = 1;
+  for (let x = cx - 39; x < cx + 44; x += 20) {
+    ctx.beginPath();
+    ctx.moveTo(x, 78);
+    ctx.lineTo(x, 160);
+    ctx.stroke();
+  }
+  ctx.restore();
+  st.shape(
+    ctx,
+    [
+      [cx - 14, 84],
+      [cx + 14, 84],
+      [cx, 118],
+    ],
+    F('#ffffff', '#e6e6e6', '#ffffff'),
+    1611,
+    { lw: 1 },
+  );
+  st.shape(
+    ctx,
+    [
+      [cx - 14, 84],
+      [cx - 6, 120],
+      [cx - 22, 100],
+    ],
+    BLAZER,
+    1612,
+    { lw: 0.9 },
+  );
+  st.shape(
+    ctx,
+    [
+      [cx + 14, 84],
+      [cx + 6, 120],
+      [cx + 22, 100],
+    ],
+    BLAZER,
+    1613,
+    { lw: 0.9 },
+  );
+  st.shape(
+    ctx,
+    [
+      [cx, 90],
+      [cx - 11, 84],
+      [cx - 11, 96],
+    ],
+    F('#d6302a', '#a8201b', '#ff6a5e'),
+    1614,
+    { lw: 0.8 },
+  );
+  st.shape(
+    ctx,
+    [
+      [cx, 90],
+      [cx + 11, 84],
+      [cx + 11, 96],
+    ],
+    F('#d6302a', '#a8201b', '#ff6a5e'),
+    1615,
+    { lw: 0.8 },
+  );
+  // a pocket square
+  st.shape(
+    ctx,
+    [
+      [cx + 18, 108],
+      [cx + 30, 106],
+      [cx + 28, 112],
+      [cx + 20, 113],
+    ],
+    F('#ffffff', '#e6e6e6', '#ffffff'),
+    1616,
+    { lw: 0.6, plain: true },
+  );
+  // the free arm: down by his side, or pointing off to the right
+  if (point) {
+    st.shape(
+      ctx,
+      [
+        [cx + 30, 100],
+        [cx + 72, 82],
+        [cx + 76, 92],
+        [cx + 34, 112],
+      ],
+      BLAZER,
+      1620,
+      { lw: 1 },
+    );
+    st.shape(ctx, ellipsePts(cx + 80, 85, 8, 7, -0.4, 16), SKIN, 1621, { lw: 1 });
+    st.shape(ctx, roundRectPts(cx + 84, 80, 16, 5, 2.5), SKIN, 1622, { lw: 0.8 });
+  } else {
+    st.shape(
+      ctx,
+      [
+        [cx + 32, 102],
+        [cx + 44, 130],
+        [cx + 36, 136],
+        [cx + 26, 112],
+      ],
+      BLAZER,
+      1623,
+      { lw: 1 },
+    );
+    st.shape(ctx, ellipsePts(cx + 41, 138, 7, 7, 0, 14), SKIN, 1624, { lw: 1 });
+  }
+  // the head: big and round
+  const hx = cx - 2;
+  const hy = 48;
+  st.shape(ctx, ellipsePts(hx, hy, 34, 33, 0, 40), SKIN, 1630, { lw: 1.2, light: [hx - 12, hy - 14] });
+  // ears
+  st.shape(ctx, ellipsePts(hx - 34, hy + 4, 6, 9, 0, 14), SKIN, 1631, { lw: 0.9 });
+  // the hair: slicked back, a big glossy wave over the top
+  st.shape(
+    ctx,
+    [
+      [hx - 34, hy - 2],
+      [hx - 36, hy - 22],
+      [hx - 20, hy - 38],
+      [hx + 4, hy - 42],
+      [hx + 26, hy - 40],
+      [hx + 36, hy - 28],
+      [hx + 22, hy - 26],
+      [hx + 4, hy - 22],
+      [hx - 18, hy - 20],
+      [hx - 28, hy - 8],
+    ],
+    HAIR,
+    1632,
+    { lw: 1.1, light: [hx - 8, hy - 40] },
+  );
+  line(
+    ctx,
+    [
+      [hx - 18, hy - 32],
+      [hx + 6, hy - 37],
+      [hx + 26, hy - 34],
+    ],
+    2,
+    'rgba(255,255,255,0.45)',
+  );
+  // eyes and big raised brows (he's very excited)
+  for (const dx of [-12, 12]) {
+    st.shape(ctx, ellipsePts(hx + dx + 6, hy - 4, 6, 8, 0, 18), F('#ffffff', '#ececec', '#ffffff'), 1640 + dx, { lw: 0.9, plain: true });
+    ctx.fillStyle = '#2a1a12';
+    ctx.beginPath();
+    ctx.arc(hx + dx + 8, hy - 3, 3.2, 0, Math.PI * 2);
+    ctx.fill();
+    line(
+      ctx,
+      [
+        [hx + dx, hy - 18],
+        [hx + dx + 7, hy - 21],
+        [hx + dx + 13, hy - 18],
+      ],
+      3,
+      '#3a2418',
+    );
+  }
+  // the nose, the mouth (open when talking), the moustache over it
+  st.shape(ctx, ellipsePts(hx + 12, hy + 8, 6, 5, 0, 14), F('#ffc49a', '#e39a6c', '#ffe2c8'), 1650, { lw: 0.9 });
+  if (open) {
+    st.shape(ctx, ellipsePts(hx + 10, hy + 22, 11, 8, 0, 24), F('#7a1f1f', '#5a1414', '#a8302c'), 1651, { lw: 1 });
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(hx + 2, hy + 15, 16, 4);
+    st.shape(ctx, ellipsePts(hx + 10, hy + 27, 6, 3, 0, 12), F('#ff8a8a', '#e06060', '#ffb0b0'), 1652, { lw: 0, noLine: true, plain: true });
+  } else
+    line(
+      ctx,
+      [
+        [hx + 1, hy + 20],
+        [hx + 10, hy + 24],
+        [hx + 19, hy + 20],
+      ],
+      2.4,
+      '#3a2418',
+    );
+  st.shape(
+    ctx,
+    [
+      [hx - 6, hy + 16],
+      [hx + 4, hy + 11],
+      [hx + 10, hy + 14],
+      [hx + 16, hy + 11],
+      [hx + 26, hy + 16],
+      [hx + 16, hy + 18],
+      [hx + 10, hy + 16],
+      [hx + 4, hy + 18],
+    ],
+    HAIR,
+    1653,
+    { lw: 0.9 },
+  );
+  // the microphone hand up by his chin: a chrome ball on a black handle, its curly lead hanging down
+  const mx = hx + 34;
+  const my = hy + 30;
+  ctx.strokeStyle = '#1b1b1f';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(mx + 4, my + 34);
+  for (let i = 0; i < 26; i++) ctx.lineTo(mx + 6 + Math.sin(i * 1.4) * 4, my + 36 + i * 3.2);
+  ctx.stroke();
+  st.shape(
+    ctx,
+    [
+      [mx - 3, my + 4],
+      [mx + 5, my + 4],
+      [mx + 7, my + 36],
+      [mx + 1, my + 36],
+    ],
+    F('#2a2a30', '#141418', '#55555e'),
+    1660,
+    { lw: 1 },
+  );
+  st.shape(ctx, ellipsePts(mx + 1, my - 4, 11, 11, 0, 24), F('#d9dee3', '#9aa3ab', '#ffffff'), 1661, { lw: 1.1, light: [mx - 4, my - 10] });
+  ctx.strokeStyle = 'rgba(70,80,90,0.55)';
+  ctx.lineWidth = 0.8;
+  for (let k = -8; k <= 8; k += 4) {
+    ctx.beginPath();
+    ctx.moveTo(mx + 1 + k, my - 14);
+    ctx.lineTo(mx + 1 + k, my + 6);
+    ctx.moveTo(mx - 10, my - 4 + k);
+    ctx.lineTo(mx + 12, my - 4 + k);
+    ctx.stroke();
+  }
+  // (the channel's flag on the mic)
+  st.shape(ctx, roundRectPts(mx - 7, my + 8, 16, 11, 2), F('#c0392b', '#962a1f', '#e8685e'), 1662, { lw: 0.8 });
+  ctx.fillStyle = '#fff';
+  ctx.font = '900 7px Nunito, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('WWS', mx + 1, my + 16);
+  // the hand round it
+  st.shape(ctx, ellipsePts(mx + 2, my + 22, 8, 7, 0, 16), SKIN, 1663, { lw: 1 });
+  st.shape(
+    ctx,
+    [
+      [cx - 10, 100],
+      [mx - 4, my + 26],
+      [mx + 4, my + 30],
+      [cx - 4, 112],
+    ],
+    BLAZER,
+    1664,
+    { lw: 1 },
+  );
 }
