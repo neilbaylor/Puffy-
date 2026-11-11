@@ -261,3 +261,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.256: Kai dodges + charges (4 hits), green bad bubbles, smooth dive + kelp, L5 camera/fly-over/nuggies, shop pill, L1 opening line, no repeat Wow.
 - v0.257: King Bob's fishing contest (World 3 boss), Part 5 gate fix, fly-over in open water, bigger player card table.
 - v0.258: King Bob's contest as a TV fishing show (bug, ticker, lower third), readable BITE!, refined boat.
+- v0.259: Player card greeting clear of Sign out.
