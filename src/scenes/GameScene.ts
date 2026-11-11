@@ -288,7 +288,7 @@ export class GameScene extends Phaser.Scene {
   create() {
     this.bossSongReady = false;
     this.saidWow = false;
-    this.kaiSeen = false;
+    this.kaiSeen = 0;
     this.levelId = this.data0.level ?? 1;
     const data = (levelInfo(this.levelId).build ?? buildLevel1)();
     this.wideZones = data.wide ?? [];
@@ -883,11 +883,12 @@ export class GameScene extends Phaser.Scene {
   }
   private swanGlint = false;
   /** The first Kai fish you see: the hero's amazed. (Once a play.) */
-  private kaiSeen = false;
+  /** How many times the hero's met Kai fish this play (he turns up three times). */
+  private kaiSeen = 0;
   spottedKai() {
-    if (this.kaiSeen || !this.players[0]?.alive) return;
-    this.kaiSeen = true;
-    this.say(this.players[0], 'Kai Fish! Those are rare!', 2600);
+    if (!this.players[0]?.alive) return;
+    const lines = ['Kai Fish! Those are rare!', 'Kai fish is back!', 'Kai fish again!'];
+    this.say(this.players[0], lines[Math.min(this.kaiSeen++, lines.length - 1)], 2600);
   }
 
   /** The jetpack's flames, under its nozzles (wherever the King is). */

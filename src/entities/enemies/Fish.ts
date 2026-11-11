@@ -39,6 +39,8 @@ export class BadFish extends Enemy {
   private shotT = -1;
   private fired = false;
   private swimT = Math.random() * 6;
+  /** Kai: the hero's already said something about this one. */
+  private spotted = false;
   /** Till the next blink, and how long the eyes stay shut (s). */
   private blinkIn = 1 + Math.random() * 3;
   private blinkFor = 0;
@@ -82,7 +84,10 @@ export class BadFish extends Enemy {
     const sees = !!p && Math.abs(dx) < st.see[0] && Math.abs(dy) < st.see[1] && p.swimming;
     this.swimT += dt;
     // (the first Kai you see: "Kai Fish! Those are rare")
-    if (this.kind === 'kai' && sees) this.gs.spottedKai();
+    if (this.kind === 'kai' && sees && !this.spotted) {
+      this.spotted = true;
+      this.gs.spottedKai();
+    }
 
     // ── firing: tail to you, wind up, flick, settle ──
     if (this.shotT >= 0) {
@@ -229,8 +234,8 @@ export class BadFish extends Enemy {
       targets: this,
       y: this.y - 160,
       alpha: 0,
-      delay: 150,
-      duration: 1500,
+      delay: 60,
+      duration: 850,
       ease: 'Sine.easeIn',
       onComplete: () => this.destroy(),
     });

@@ -762,13 +762,11 @@ export class BattleUI {
       <div class="panel battle-results${iWon ? ' won' : ''}${winner ? '' : ' draw'}">
         ${confetti}
         <div class="br-stage" style="--sc:${SLOT_COLORS[top[0]?.slot ?? 0]}">
-          <span class="br-trophy" aria-hidden="true">${winner ? '🏆' : '🤝'}</span>
           <div class="br-heroes${top.length > 1 ? ' many' : ''}">${top.map((p) => `<canvas class="br-winner" width="200" height="200" style="--sc:${SLOT_COLORS[p.slot]}"></canvas>`).join('')}</div>
           <span class="br-ribbon">${winner ? 'Winner' : 'Draw'}</span>
           ${winner ? `<span class="br-wname">${esc(winner.name)}</span>` : ''}
         </div>
         <div class="br-body">
-          <p class="eyebrow">Battle over</p>
           <h2>${title}</h2>
           <p class="br-sub">${sub}</p>
           <ol class="br-list">${ranked
@@ -783,7 +781,7 @@ export class BattleUI {
             )
             .join('')}</ol>
           <div class="br-foot">
-            <span class="br-next">Back to the lobby in <b>${Math.max(1, Math.ceil(r.timer))}</b></span>
+            <span class="br-next">Next game starting soon</span>
             <button class="btn btn-alt" data-act="leave">Leave</button>
           </div>
         </div>
@@ -792,13 +790,6 @@ export class BattleUI {
     el.querySelectorAll<HTMLCanvasElement>('.br-winner').forEach((cv, i) => slotPortrait(cv, top[i].hero, top[i].slot, 'idle0', null, top[i].wear ?? ''));
     el.querySelectorAll<HTMLCanvasElement>('.br-face').forEach((cv, i) => slotPortrait(cv, ranked[i].hero, ranked[i].slot, 'idle0', null, ranked[i].wear ?? ''));
     el.querySelector('[data-act=leave]')!.addEventListener('click', () => this.leave());
-    // (the seconds till the lobby, counting down)
-    const left = el.querySelector<HTMLElement>('.br-next b')!;
-    const until = performance.now() + Math.max(1, r.timer) * 1000;
-    const tick = window.setInterval(() => {
-      if (!el.isConnected) return clearInterval(tick);
-      left.textContent = String(Math.max(1, Math.ceil((until - performance.now()) / 1000)));
-    }, 250);
     this.host.setScreen(el);
     if (iWon) sfx.cheer();
   }
