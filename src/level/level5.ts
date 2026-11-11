@@ -97,10 +97,11 @@ export function buildLevel5(): LevelData {
   L.spawn('bigfish', 33, b(12));
   L.spawn('tree', 15, b(2), { h: 210 });
   L.spawn('tree', 30, b(2), { h: 240 });
-  L.auraArc(28, 3, b(6), 1);
+  L.aura(29, b(6));
+  L.rootbeer(34, b(7.5));
 
   // ── A gap in the shelf: up to the light ──────────────────────
-  L.auraArc(40, 4, b(17), 1);
+  L.auraArc(40.5, 3, b(17), 1);
   L.rootbeer(42.5, b(18.5));
   L.spawn('tree', 43, b(2), { h: 200 });
 
@@ -123,13 +124,13 @@ export function buildLevel5(): LevelData {
   L.spawn('bigfish', 70, 39);
   L.spawn('kai', 76, 51);
   L.aura(75, 42);
-  L.aura(77, 58);
 
   // ── A reef wall; checkpoint ──────────────────────────────────
   L.ground(85, 101, b(3));
   shelf(85, 101);
   L.rock(89, 91, b(4), b(11));
-  L.auraArc(88, 4, b(13), 0.6);
+  L.auraArc(88, 3, b(13), 0.6);
+  L.rootbeer(94.5, b(14.5));
   L.spawn('fish', 95, b(9));
   L.spawn('checkpoint', 98, b(3));
   L.spawn('tree', 94, b(3), { h: 180 });
@@ -155,10 +156,10 @@ export function buildLevel5(): LevelData {
   L.spawn('bigfish', 115, b(5));
   L.spawn('fish', 123, b(10));
   L.spawn('bigfish', 126, b(11));
-  L.auraArc(106, 3, b(9), 0.5);
+  L.aura(102.5, b(9));
   L.aura(114, b(10));
   L.rootbeer(118.5, b(12.5));
-  L.auraArc(122, 3, b(10), 0.6);
+  L.aura(122.5, b(10.5));
 
   // ── DESCENT 2 (the long one): right down to the very bottom ──
   // (each side 22 tiles across: room to dodge, the walls just in view either side)
@@ -187,7 +188,7 @@ export function buildLevel5(): LevelData {
   L.spawn('fish', 165, 9);
   L.spawn('bigfish', 176, 22);
   L.aura(167, 30);
-  L.aura(169, 44);
+  L.rootbeer(171, 47);
   L.aura(166, 56);
 
   // ── Out at the top: Kai once more, nuggies, up the slope ─────
@@ -197,7 +198,7 @@ export function buildLevel5(): LevelData {
   L.spawn('tree', 185, b(3), { h: 200 });
   L.spawn('kai', 187, b(9));
   // (nuggies between Kai and the tennis: get some back before the crabs)
-  L.auraArc(189, 4, b(10), 1);
+  L.auraArc(189, 3, b(10.5), 1);
   L.auraArc(194, 3, b(14), 0.8);
   L.ground(189, 192, b(6));
   L.ground(193, 196, b(9));
@@ -209,7 +210,8 @@ export function buildLevel5(): LevelData {
   L.spawn('tennis', 207, b(12), { w: 18 });
   L.aura(207, b(18));
   L.spawn('tennis', 229, b(12), { w: 18 });
-  L.auraArc(217, 3, b(16), 1);
+  L.aura(218, b(16));
+  L.rootbeer(238, b(15.5));
   L.rootbeer(229, b(18.5));
 
   // ── Down a step to the gate ──────────────────────────────────

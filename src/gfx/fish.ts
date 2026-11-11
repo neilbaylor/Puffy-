@@ -504,11 +504,11 @@ function drawStone(ctx: Ctx, st: Style, sw: number, _flap: number, p: number) {
   brow(st, ctx, hx - 12, hy - 20, 10, 9709);
 }
 
-/** A small bubble: a pale see-through ball, a bright rim and a glint. */
+/** A small bubble (from the tail as he fires: green, like his shots), a bright rim and a glint. */
 function bubble(ctx: Ctx, x: number, y: number, r: number) {
   ctx.save();
-  ctx.fillStyle = 'rgba(210,245,255,0.35)';
-  ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+  ctx.fillStyle = 'rgba(150,230,80,0.55)';
+  ctx.strokeStyle = 'rgba(225,255,190,0.95)';
   ctx.lineWidth = Math.max(0.6, r * 0.28);
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
@@ -525,7 +525,7 @@ function bubble(ctx: Ctx, x: number, y: number, r: number) {
 export type BubbleFrame = 'b0' | 'b1';
 export const BUBBLE_FRAMES: BubbleFrame[] = ['b0', 'b1'];
 export const BUBBLE_SIZE = 22;
-export function drawBubbleShot(ctx: Ctx, ox: number, oy: number, f: BubbleFrame, st: Style = STYLES.polished) {
+export function drawBubbleShot(ctx: Ctx, ox: number, oy: number, f: BubbleFrame, _st: Style = STYLES.polished) {
   const c = BUBBLE_SIZE / 2;
   const x = ox + c;
   const y = oy + c;
@@ -533,16 +533,17 @@ export function drawBubbleShot(ctx: Ctx, ox: number, oy: number, f: BubbleFrame,
   const [rx, ry] = f === 'b0' ? [8.6, 7.6] : [7.6, 8.6];
   ctx.save();
   const g = ctx.createRadialGradient(x - 3, y - 3, 1, x, y, 9);
-  g.addColorStop(0, 'rgba(255,255,255,0.55)');
-  g.addColorStop(0.6, 'rgba(170,230,255,0.35)');
-  g.addColorStop(1, 'rgba(90,190,235,0.55)');
+  // (green, a bad bubble: not like the sea's own white ones)
+  g.addColorStop(0, 'rgba(240,255,215,0.75)');
+  g.addColorStop(0.55, 'rgba(150,230,80,0.6)');
+  g.addColorStop(1, 'rgba(70,160,40,0.85)');
   ctx.fillStyle = g;
   ctx.beginPath();
   ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.lineWidth = 1.1;
-  ctx.strokeStyle = st.ink;
-  ctx.globalAlpha = 0.75;
+  ctx.strokeStyle = '#2f6a1c';
+  ctx.globalAlpha = 0.85;
   ctx.stroke();
   ctx.globalAlpha = 1;
   // a bright glint and a little curved shine

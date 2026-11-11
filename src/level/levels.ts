@@ -29,7 +29,15 @@ export interface LevelInfo {
 }
 
 export const LEVELS: LevelInfo[] = [
-  { id: 1, world: 'World 1', title: 'Puff Ball Planet', part: 'Part 1', build: buildLevel1, hoops: true },
+  {
+    id: 1,
+    world: 'World 1',
+    title: 'Puff Ball Planet',
+    part: 'Part 1',
+    build: buildLevel1,
+    hoops: true,
+    speech: 'I have to save this planet from these evil Puffs!',
+  },
   { id: 2, world: 'World 1', title: 'Puff Ball Planet', part: 'Part 2', build: buildLevel2, hoops: true },
   {
     id: 3,

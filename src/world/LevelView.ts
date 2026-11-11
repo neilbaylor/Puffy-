@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { DEPTH, TILE } from '../config';
 import { rng } from '../gfx/draw';
 import type { Pt } from '../gfx/handdrawn';
-import { PROP_RES, TERRAIN_RES, addCanvas, ensureSeaArt, hires } from '../gfx/textures';
+import { PROP_RES, TERRAIN_RES, addCanvas, ensureSeaArt, hires, kelpBends } from '../gfx/textures';
 import { GRASS_FILLS, KELP_H, SEA_PROPS, SWAY_N, drawPier } from '../gfx/sea';
 import { DEFAULT_PALETTE, PALETTES, drawCloudPlatform, drawPuffTree, drawTerrainPiece, roundPoly, traceCells, type TerrainKind, type WorldPalette } from '../gfx/world';
 import { drawPine } from '../gfx/mountain';
@@ -160,6 +160,14 @@ export class LevelView {
   /** Under the sea: plants that sway by bending (their sway frames, a frame at a time, and a touch of tilt between). */
   private waving: { img: Phaser.GameObjects.Image; pre: string; speed: number; ph: number }[] = [];
 
+  /**
+   * Under the sea, the tall kelp (WebGL): one picture of the strand, bent smoothly every frame along
+   * a column of points, more the higher up (no flip-book frames to step between).
+   */
+  private ropes: { rope: Phaser.GameObjects.Rope; speed: number; ph: number }[] = [];
+  /** How many points up a strand of kelp (its bend's smoothness). */
+  private static readonly KELP_PTS = 16;
+
   /** Trees, flowers and grass that sway in the breeze. */
   private sway: { img: Phaser.GameObjects.Image; amp: number; speed: number; ph: number }[] = [];
 
@@ -220,6 +228,15 @@ export class LevelView {
       w.img.setFrame(w.pre + i);
       // (a hair of tilt following the same sway smooths the step from frame to frame)
       w.img.setRotation(Math.sin((c / SWAY_N) * Math.PI * 2) * 0.03 * (w.img.flipX ? -1 : 1));
+    }
+    for (const r of this.ropes) {
+      const rope = r.rope;
+      if (rope.x < left - 80 || rope.x > right + 80) continue;
+      // (the same sway the frames were drawn with: the tip 16 across at full bend, the foot still)
+      const bend = Math.sin((t * r.speed + r.ph) * Math.PI * 2) * 16 * PROP_RES * (rope.flipX ? -1 : 1);
+      const pts = rope.points as Phaser.Math.Vector2[];
+      for (const q of pts) q.x = bend * Math.pow(Phaser.Math.Clamp(-q.y / (KELP_H * PROP_RES), 0, 1), 1.8);
+      rope.setDirty();
     }
     for (const s of this.sway) {
       if (s.img.x < left - 80 || s.img.x > right + 80) continue;
@@ -537,6 +554,19 @@ export class LevelView {
         if (this.paletteAt(s.x * TILE).sea) {
           // (under the sea: a tall strand of kelp, bending to and fro in the current)
           const k = h / KELP_H;
+          if (kelpBends(this.scene)) {
+            // (points from the top of the picture down to its bottom, the stem's foot at 0)
+            const R = PROP_RES;
+            const N = LevelView.KELP_PTS;
+            const pts = Array.from({ length: N }, (_, j) => new Phaser.Math.Vector2(0, (-(KELP_H + 20) + (j * (KELP_H + 24)) / (N - 1)) * R));
+            const rope = this.scene.add
+              .rope(s.x * TILE + TILE / 2, (s.y + 1) * TILE + 4, 'sea-kelp', 'k0', pts, false)
+              .setScale((0.85 + 0.15 * k) / R, k / R)
+              .setDepth(DEPTH.decor - 0.5);
+            if (i % 2 === 1) rope.flipX = true;
+            this.ropes.push({ rope, speed: 0.42 + (i % 3) * 0.06, ph: i * 0.37 });
+            return;
+          }
           const img = this.scene.add
             .image(s.x * TILE + TILE / 2, (s.y + 1) * TILE + 4, 'sea-kelp', 'k0')
             .setOrigin(0.5, (KELP_H + 20) / (KELP_H + 24))

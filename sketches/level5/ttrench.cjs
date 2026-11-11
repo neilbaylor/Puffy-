@@ -46,7 +46,7 @@ const D = process.argv[3] === '1' ? [36, 46.5, 55, 68, 75.5, 85, 34] : [103, 132
         btn.left = false; btn.right = true; btn.jump = false;
         if (hx > far) { phase = 'climb'; btn.right = false; }
       } else if (phase === 'climb') {
-        btn.jump = f % 16 < 2;
+        btn.jump = f % 10 < 2;
         btn.right = hx < rmid - 1; btn.left = hx > rmid + 1;
         if (h > 62 + 4.5) { btn.right = true; btn.left = false; }
         if (hx > exit) { phase = 'out'; topAt = f; log.push(['climb s', ((f - bottomAt) / 60).toFixed(1)]); }

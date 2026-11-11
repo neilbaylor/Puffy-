@@ -1965,6 +1965,16 @@ kbd {
   font-variant-numeric: tabular-nums;
 }
 .shop-rb .rb-ico { width: 1em; height: 1.35em; vertical-align: -0.3em; }
+/* (on the Shop's pink, a light pill: the brown bottle shows up on it, the count in gold outlined) */
+.shop-page .bl-sub.shop-rb {
+  background: #fffaf0;
+  border: 3px solid var(--ink);
+  color: var(--ink);
+  -webkit-text-stroke: 0;
+  box-shadow: 0 3px 0 #0000002e;
+}
+.shop-page .shop-rb .rb-ico { width: 1.15em; height: 1.55em; vertical-align: -0.38em; }
+.shop-page .shop-rb .shop-count { color: var(--gold); -webkit-text-stroke: 5px var(--ink); paint-order: stroke fill; }
 /* already yours: "Wear it" in the gold of the other gold buttons */
 .shop-item .btn.shop-wear { background: var(--gold-btn); }
 /* the price dropping off the pill */

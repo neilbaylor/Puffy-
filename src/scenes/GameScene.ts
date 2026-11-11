@@ -287,8 +287,10 @@ export class GameScene extends Phaser.Scene {
 
   create() {
     this.bossSongReady = false;
-    this.saidWow = false;
+    // (back at a checkpoint after fainting: they've already said Wow at the Giant)
+    if (!this.data0.retry) this.saidWow = false;
     this.kaiSeen = 0;
+    this.slowMo = 1;
     this.levelId = this.data0.level ?? 1;
     const data = (levelInfo(this.levelId).build ?? buildLevel1)();
     this.wideZones = data.wide ?? [];
@@ -816,7 +818,7 @@ export class GameScene extends Phaser.Scene {
     this.introU = 0;
     const info = levelInfo(this.levelId);
     this.game.events.emit('level-intro', { world: info.world, title: info.title, part: info.part });
-    const tw = this.tweens.add({ targets: this.intro, u: 1, duration: this.level.data.flyPath ? (this.level.data.water !== undefined ? 11500 : 9000) : 6400, ease: 'Linear', onComplete: () => this.endIntro() });
+    const tw = this.tweens.add({ targets: this.intro, u: 1, duration: this.level.data.flyPath ? (this.level.data.water !== undefined ? 6200 : 9000) : 6400, ease: 'Linear', onComplete: () => this.endIntro() });
     // skipping just fast-forwards the same flight (still lands smoothly)
     this.introSkip = () => tw.setTimeScale(5);
     this.game.events.once('skip-intro', this.introSkip);
@@ -871,17 +873,23 @@ export class GameScene extends Phaser.Scene {
     const vy = p ? p.body.velocity.y : 999;
     const slow = !!p && vy > -210 && vy < 120;
     const target = slow ? 3.2 : 1;
-    const w = this.physics.world;
-    w.timeScale += (target - w.timeScale) * Math.min(1, dt * (slow ? 10 : 6));
-    if (!p && Math.abs(w.timeScale - 1) < 0.02) w.timeScale = 1;
+    if (!p) this.swanGlint = false;
+    if (!p && this.slowMo === 1) return;
+    this.slowMo += (target - this.slowMo) * Math.min(1, dt * (slow ? 10 : 6));
+    if (!p && Math.abs(this.slowMo - 1) < 0.02) this.slowMo = 1;
+    // (slowed by a smaller physics step every frame, not by stepping less often — world.timeScale
+    // skips frames, and the hero moved in jerks)
+    const w = this.physics.world as unknown as { fps: number; _frameTime: number };
+    w._frameTime = 1 / w.fps / this.slowMo;
     if (slow && !this.swanGlint) {
       this.swanGlint = true;
       this.fx.sparkle(p!.x + p!.facing * 6, p!.y - 6, 10);
       sfx.whoosh();
     }
-    if (!p) this.swanGlint = false;
   }
   private swanGlint = false;
+  /** The swan dive's slow-motion: how many times slower the physics runs (1 = normal). */
+  private slowMo = 1;
   /** The first Kai fish you see: the hero's amazed. (Once a play.) */
   /** How many times the hero's met Kai fish this play (he turns up three times). */
   private kaiSeen = 0;
@@ -1120,11 +1128,11 @@ export class GameScene extends Phaser.Scene {
       const tx = (minX + maxX) / 2 + this.lookAhead;
       // keep the hero's feet ~62% down the screen: above the touch controls
       let feet = sumBottom / tracked.length;
-      // (swimming: you sit higher on the screen, so the sea bed below — and what's on it — shows)
-      // (sinking down a trench: higher still, so you can see what's coming up from below)
+      // (swimming: you sit a bit lower than middle, so it's mostly open water round you and just a
+      // strip of sea bed below; sinking down a trench: up near the top, so you see what's coming)
       const sinking = tracked.every((p) => p.swimming) && Math.min(...tracked.map((p) => p.body.velocity.y)) > 80;
       this.sinkK += ((sinking ? 1 : 0) - this.sinkK) * (snap ? 1 : 1 - Math.exp(-dt * 1.2));
-      let tTop = feet - vh * (tracked.every((p) => p.swimming) ? 0.42 - 0.16 * this.sinkK : 0.62);
+      let tTop = feet - vh * (tracked.every((p) => p.swimming) ? 0.58 - 0.3 * this.sinkK : 0.62);
       if (this.level.data.vertical) {
         // a climb: mid-jump the camera holds the height of the ledge you jumped from (no bobbing up
         // and down on every hop); it moves up once you land higher, and follows you down if you

@@ -16,8 +16,8 @@ export type FishBaddie = 'fish' | 'bigfish' | 'kai';
 const STATS: Record<FishBaddie, { art: 'badguy' | 'badguybig' | 'kai'; hp: number; speed: number; see: [number, number]; every: [number, number]; shot: number; size: number[]; keep: [number, number] }> = {
   fish: { art: 'badguy', hp: 1, speed: 55, see: [360, 230], every: [2.4, 3.6], shot: 135, size: [1.4], keep: [120, 260] },
   bigfish: { art: 'badguybig', hp: 2, speed: 42, see: [360, 230], every: [1.9, 2.8], shot: 135, size: [1.7, 1.7, 1.7], keep: [120, 260] },
-  // Kai: rare and quick — he comes right at you and fires often; two hits, and he gets away
-  kai: { art: 'kai', hp: 3, speed: 110, see: [460, 280], every: [1.2, 1.9], shot: 185, size: [1.45], keep: [70, 170] },
+  // Kai: rare and quick — he dodges your rockets, charges at you and fires often; four hits, and he gets away
+  kai: { art: 'kai', hp: 4, speed: 110, see: [460, 280], every: [1.2, 1.9], shot: 185, size: [1.45], keep: [70, 170] },
 };
 
 /**
@@ -41,6 +41,15 @@ export class BadFish extends Enemy {
   private swimT = Math.random() * 6;
   /** Kai: the hero's already said something about this one. */
   private spotted = false;
+  /** Kai: a dodge under way (s left, and which way up/down), and till he can dodge again. */
+  private dodgeT = 0;
+  private dodgeDir = 1;
+  private dodgeCool = 0;
+  /** Kai: till his next charge; the charge (−1 = not charging; wind-up, then the dash). */
+  private chargeIn = 2.5 + Math.random() * 1.5;
+  private chargeT = -1;
+  private chargeVx = 0;
+  private chargeVy = 0;
   /** Till the next blink, and how long the eyes stay shut (s). */
   private blinkIn = 1 + Math.random() * 3;
   private blinkFor = 0;
@@ -88,6 +97,8 @@ export class BadFish extends Enemy {
       this.spotted = true;
       this.gs.spottedKai();
     }
+
+    if (this.kind === 'kai' && this.kaiMoves(dt, sees, dx, dy)) return;
 
     // ── firing: tail to you, wind up, flick, settle ──
     if (this.shotT >= 0) {
@@ -156,6 +167,90 @@ export class BadFish extends Enemy {
     this.blinkFor -= dt;
     this.setFrame(this.blinkFor > 0 ? blinkFor(fi) : `sw${fi}`);
     this.setRotation(Phaser.Math.Clamp(b.velocity.y / 300, -0.25, 0.25) * this.dir);
+  }
+
+  /**
+   * Kai's own moves (true = he's busy with one this frame): he darts up or down out of the way of a
+   * rocket coming at him (not every time, and not twice in a row too quickly), and every few seconds
+   * he shakes, then charges straight at you.
+   */
+  private kaiMoves(dt: number, sees: boolean, dx: number, dy: number): boolean {
+    const b = this.body;
+    const level = this.gs.level;
+    const rockFree = (vy: number) => !level.isSolidAt(this.x, this.y + Math.sign(vy) * (this.displayHeight * 0.5 + 40));
+    this.dodgeCool -= dt;
+    // ── dodging ──
+    if (this.dodgeT > 0) {
+      this.dodgeT -= dt;
+      const vy = this.dodgeDir * 330;
+      b.setVelocity(b.velocity.x * Math.exp(-dt * 5), rockFree(vy) ? vy : 0);
+      this.animate(dt);
+      return true;
+    }
+    if (sees && this.dodgeCool <= 0 && this.chargeT < 0.5) {
+      for (const rk of this.gs.liveRockets) {
+        const ahead = (this.x - rk.x) * rk.dir;
+        if (ahead < 0 || ahead > 300 || Math.abs(rk.y - this.y) > this.displayHeight * 0.6 + 14) continue;
+        this.dodgeCool = 0.9;
+        // (he sees most of them coming — and two rockets close together, he can't dodge both)
+        if (Math.random() < 0.4) break;
+        let d = rk.y > this.y ? -1 : 1;
+        if (!rockFree(d)) d = -d;
+        const water = level.data.water ?? -1e9;
+        if (d < 0 && this.y - 90 < water + this.displayHeight) d = 1;
+        this.dodgeDir = d;
+        this.dodgeT = 0.32;
+        this.shotT = -1;
+        this.chargeT = -1;
+        sfx.whoosh();
+        this.gs.amb.sea?.bubbles(this.x, this.y, 4);
+        return true;
+      }
+    }
+    // ── charging ──
+    if (this.chargeT >= 0) {
+      this.chargeT += dt;
+      const t = this.chargeT;
+      if (t < 0.45) {
+        // (the wind-up: backs off a touch, shaking)
+        b.setVelocity(-this.chargeVx * 0.12, -this.chargeVy * 0.12);
+        this.x += Math.sin(t * 90) * 1.2;
+      } else if (t < 1.15) {
+        b.setVelocity(this.chargeVx, this.chargeVy);
+        if (t - dt < 0.45) sfx.whoosh();
+        if (Math.random() < 0.3) this.gs.amb.sea?.bubbles(this.x - this.dir * 30, this.y, 1);
+        const ahead = this.x + Math.sign(this.chargeVx) * (this.displayWidth * 0.5 + 6);
+        const water = level.data.water ?? -1e9;
+        if (level.isSolidAt(ahead, this.y) || !rockFree(this.chargeVy) || (this.chargeVy < 0 && this.y < water + this.displayHeight * 0.6)) this.chargeT = 1.15;
+      } else {
+        this.chargeT = -1;
+        this.chargeIn = 2.2 + Math.random() * 1.6;
+        this.fireT = Math.max(this.fireT, 0.8);
+        return false;
+      }
+      this.animate(dt);
+      return true;
+    }
+    if (sees && this.shotT < 0) {
+      this.chargeIn -= dt;
+      if (this.chargeIn <= 0 && Math.abs(dx) < 330) {
+        const a = Math.atan2(dy, dx);
+        this.chargeVx = Math.cos(a) * 340;
+        this.chargeVy = Math.sin(a) * 340;
+        this.face((dx > 0 ? 1 : -1) as 1 | -1);
+        this.chargeT = 0;
+        this.setRotation(0);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** The tail sweep (and Kai's rocket-dodge tilt) for a frame he's busy. */
+  private animate(dt: number) {
+    this.swimT += dt;
+    this.setFrame(`sw${Math.floor(this.swimT * 22) % 6}`);
+    this.setRotation(Phaser.Math.Clamp(this.body.velocity.y / 600, -0.45, 0.45) * this.dir);
   }
 
   /** A bubble (the big ones: three) flicked from the tail at (tx, ty). */

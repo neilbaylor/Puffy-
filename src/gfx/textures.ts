@@ -55,6 +55,8 @@ import {
 
 /** Resolution for world props and terrain (multiple of world px). */
 export const PROP_RES = 2;
+/** The tall kelp bends smoothly (a Rope) where the renderer can draw one: WebGL. */
+export const kelpBends = (scene: Phaser.Scene) => scene.game.renderer.type === Phaser.WEBGL;
 /** The ground (by far the biggest pictures): lower in light mode. */
 export const TERRAIN_RES = LIGHT ? 1.25 : PROP_RES;
 export const BG_RES = LIGHT ? 1 : 1.25;
@@ -752,7 +754,8 @@ export function ensureSeaArt(scene: Phaser.Scene) {
   sheet(scene, 'sea-props', SEA_PROP_W, SEA_PROP_H, SEA_PROPS, (ctx, f) => drawSeaProp(ctx, f), PROP_RES);
   // (the plants' sway, a frame at a time like a bird's wingbeat)
   sheet(scene, 'sea-grass', GRASS_W, GRASS_H, GRASS_FRAMES, (ctx, f) => drawGrassFrame(ctx, f), PROP_RES);
-  sheet(scene, 'sea-kelp', KELP_W, KELP_H + 24, KELP_FRAMES, (ctx, f) => drawKelpFrame(ctx, f), PROP_RES);
+  // (with WebGL the kelp's one straight picture, bent as it's drawn — see LevelView; Canvas can't, so the frames)
+  sheet(scene, 'sea-kelp', KELP_W, KELP_H + 24, kelpBends(scene) ? ['k0'] : KELP_FRAMES, (ctx, f) => drawKelpFrame(ctx, f), PROP_RES);
   sheet(scene, 'sea-jelly', JELLY_W, JELLY_H, JELLY_FRAMES, (ctx, f) => drawJelly(ctx, f), 1.5);
   sheet(scene, 'sea-school', 24, 14, SCHOOL_FRAMES, (ctx, f) => drawSchoolFish(ctx, f), 1.5);
   sheet(scene, 'sea-turtle', TURTLE_W, TURTLE_H, TURTLE_FRAMES, (ctx, f) => drawTurtle(ctx, f), 1.5);

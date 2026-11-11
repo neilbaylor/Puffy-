@@ -741,7 +741,6 @@ export class UI {
         <button class="btn btn-alt acct-out" data-act="out">Sign out</button>
         <div class="results-hero"><canvas width="160" height="160"></canvas></div>
         <div class="results-body">
-          <p class="eyebrow">Your player</p>
           <h2>Hi ${esc(u.name)}!</h2>
           <dl class="stat-list">
             <dt>Root beer <i class="rb-ico"></i></dt><dd>${bank.rootbeerLeft}</dd>
