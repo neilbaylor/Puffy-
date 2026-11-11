@@ -484,12 +484,12 @@ export class LevelView {
       if (this.paletteAt(wx).sea) {
         if (courts.some(([a, b]) => x >= a && x <= b)) continue;
         // under the sea: seaweed that sways, coral, starfish and shells on the sand
-        if (roll < 0.36) {
+        if (roll < 0.17) {
           // sea grass, swaying (each clump a little behind the one before: a wave of current)
           const kind = Math.floor(r() * GRASS_FILLS.length);
           const img = this.scene.add.image(wx, wy + 5, 'sea-grass', `g${kind}_0`).setOrigin(0.5, 54 / 56).setScale((0.75 + r() * 0.45) / PROP_RES).setFlipX(r() < 0.5).setDepth(DEPTH.decor);
           this.waving.push({ img, pre: `g${kind}_`, speed: 0.5 + r() * 0.12, ph: -wx * 0.0011 });
-        } else if (roll < 0.52) {
+        } else if (roll < 0.29) {
           const f = SEA_PROPS[Math.floor(r() * SEA_PROPS.length)];
           this.scene.add.image(wx, wy + 4, 'sea-props', f).setOrigin(0.5, 46 / 48).setScale((0.75 + r() * 0.35) / PROP_RES).setDepth(DEPTH.decor);
         }

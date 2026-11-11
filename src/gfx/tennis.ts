@@ -278,46 +278,98 @@ export const TCRAB_TEAMS = {
   red: { shell: { base: '#ff6a4a', shade: '#cc3e26', light: '#ffb4a0' } as Fill, visor: '#2f6fd6' },
   orange: { shell: { base: '#ffa040', shade: '#d06a18', light: '#ffd4a0' } as Fill, visor: '#e8508a' },
 };
-export type TCrabTeam = keyof typeof TCRAB_TEAMS;
+/** A team, or the umpire (no racket: a striped shirt, a whistle when it blows it). */
+export type TCrabTeam = keyof typeof TCRAB_TEAMS | 'ump';
+const UMP_SHELL: Fill = { base: '#ff8a5a', shade: '#cc5a30', light: '#ffc4a8' };
 
-/** A tennis racket: its handle's end at (x, y), pointing along angle a, `len` long. */
+/**
+ * A tennis racket: its grip's end at (x, y), pointing along angle a, `len` long — a wrapped grip with
+ * a butt cap, an open throat, an oval head (red frame with a shine) strung with a proper grid.
+ */
 function racket(ctx: Ctx, x: number, y: number, a: number, len: number) {
-  const hx = x + Math.cos(a) * len * 0.42;
-  const hy = y + Math.sin(a) * len * 0.42;
-  ST.line(ctx, [[x, y], [hx, hy]], 3600, 2.2, '#2a2a36');
-  const cxh = x + Math.cos(a) * len * 0.72;
-  const cyh = y + Math.sin(a) * len * 0.72;
-  const head = ellipsePts(cxh, cyh, len * 0.3, len * 0.21, a, 28);
-  ST.shape(ctx, head, { base: '#7cf0ff', shade: '#3fbcd0', light: '#d8fbff' }, 3601, { lw: 1.1, plain: true });
-  // strings
+  const L = len;
   ctx.save();
-  path(ctx, head);
-  ctx.clip();
-  ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-  ctx.lineWidth = 0.45;
-  const c = Math.cos(a);
-  const s = Math.sin(a);
-  for (let k = -3; k <= 3; k++) {
-    const o = k * len * 0.07;
+  ctx.translate(x, y);
+  ctx.rotate(a);
+  // the grip, its white tape wound round it, and the butt cap
+  ST.shape(ctx, roundRectPts(-0.5, -2.2, L * 0.37, 4.4, 1.8), { base: '#33303e', shade: '#1a1824', light: '#5c5870' }, 3600, { lw: 0.8, plain: true });
+  ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+  ctx.lineWidth = 0.6;
+  for (let u = 1.5; u < L * 0.35; u += 2.4) {
     ctx.beginPath();
-    ctx.moveTo(cxh - c * len + -s * o, cyh - s * len + c * o);
-    ctx.lineTo(cxh + c * len + -s * o, cyh + s * len + c * o);
+    ctx.moveTo(u, 2);
+    ctx.lineTo(u + 1.6, -2);
     ctx.stroke();
+  }
+  ST.shape(ctx, roundRectPts(-1.6, -2.7, 2.6, 5.4, 1.2), { base: '#e8364a', shade: '#b0202e', light: '#ff8090' }, 3601, { lw: 0.6, plain: true });
+  // the throat: two arms opening out to the head
+  const hx = L * 0.72;
+  const rx = L * 0.28;
+  const ry = L * 0.205;
+  const neck = L * 0.37;
+  for (const s of [-1, 1]) {
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 2.6;
     ctx.beginPath();
-    ctx.moveTo(cxh + c * o - -s * len, cyh + s * o - c * len);
-    ctx.lineTo(cxh + c * o + -s * len, cyh + s * o + c * len);
+    ctx.moveTo(neck - 0.5, s * 1.4);
+    ctx.quadraticCurveTo(hx - rx * 0.75, s * 1.8, hx - rx * 0.86, s * ry * 0.55);
+    ctx.stroke();
+    ctx.strokeStyle = '#e8364a';
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+  }
+  // the strings: a pale bed and a grid, inside the frame
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(hx, 0, rx - 1.2, ry - 1.2, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(225,245,255,0.35)';
+  ctx.fill();
+  ctx.clip();
+  ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+  ctx.lineWidth = 0.4;
+  for (let u = hx - rx; u <= hx + rx; u += 2.1) {
+    ctx.beginPath();
+    ctx.moveTo(u, -ry);
+    ctx.lineTo(u, ry);
+    ctx.stroke();
+  }
+  for (let v = -ry; v <= ry; v += 2.1) {
+    ctx.beginPath();
+    ctx.moveTo(hx - rx, v);
+    ctx.lineTo(hx + rx, v);
     ctx.stroke();
   }
   ctx.restore();
-  // the frame's rim
-  ctx.strokeStyle = '#e8364a';
-  ctx.lineWidth = 1.6;
-  path(ctx, head);
+  // the frame: inked, red, a shine along the top
+  ctx.beginPath();
+  ctx.ellipse(hx, 0, rx, ry, 0, 0, Math.PI * 2);
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 3.2;
   ctx.stroke();
+  ctx.strokeStyle = '#e8364a';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.ellipse(hx, 0, rx, ry, 0, Math.PI * 1.15, Math.PI * 1.6);
+  ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+  // the throat bridge
+  ctx.strokeStyle = INK;
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.moveTo(hx - rx * 0.86, -ry * 0.55);
+  ctx.quadraticCurveTo(hx - rx * 0.7, 0, hx - rx * 0.86, ry * 0.55);
+  ctx.stroke();
+  ctx.strokeStyle = '#e8364a';
+  ctx.lineWidth = 1.1;
+  ctx.stroke();
+  ctx.restore();
 }
 
 export function drawTennisCrab(ctx: Ctx, f: TCrabFrame, team: TCrabTeam) {
-  const T = TCRAB_TEAMS[team];
+  const ump = team === 'ump';
+  const T = ump ? { shell: UMP_SHELL, visor: '#26232a' } : TCRAB_TEAMS[team];
   const shell = T.shell;
   const ground = TCRAB_H - 1;
   const run = f === 'run0' ? 1 : f === 'run1' ? -1 : 0;
@@ -332,7 +384,8 @@ export function drawTennisCrab(ctx: Ctx, f: TCrabFrame, team: TCrabTeam) {
     smash1: [0.55, 50, 32],
     hurt: [-2.9, 42, 24],
   };
-  const [ra, clx, cly] = swing[f] ?? [-1.15, 48, 26];
+  let [ra, clx, cly] = swing[f] ?? [-1.15, 48, 26];
+  if (ump) [ra, clx, cly] = f === 'smash0' ? [0, 40, 33] : [0.4, 44, 40];
   // legs: three each side, scuttling
   for (const s of [-1, 1])
     for (let i = 0; i < 3; i++) {
@@ -343,10 +396,29 @@ export function drawTennisCrab(ctx: Ctx, f: TCrabFrame, team: TCrabTeam) {
   // back claw (small, raised)
   ST.line(ctx, [[cx - 10, cy - 2], [cx - 17, cy - 9]], 3710, 1.8, shell.shade);
   ST.shape(ctx, ellipsePts(cx - 19, cy - 12, 4.5, 3.6, -0.6, 18), shell, 3711, { lw: 0.7 });
-  // racket (behind the front claw)
-  racket(ctx, clx, cly, ra, 30);
+  // racket (behind the front claw; the umpire has none)
+  if (!ump) racket(ctx, clx, cly, ra, 32);
   // the body
   ST.shape(ctx, ellipsePts(cx, cy, 15, 10, 0, 34), shell, 3720, { lw: 1, light: [cx - 5, cy - 7] });
+  // the umpire's striped shirt
+  if (ump) {
+    ctx.save();
+    ctx.beginPath();
+    ellipsePts(cx, cy, 15, 10, 0, 34).forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+    ctx.closePath();
+    ctx.clip();
+    ctx.fillStyle = '#fbfbf6';
+    ctx.fillRect(cx - 16, cy - 4, 32, 16);
+    ctx.fillStyle = '#26232a';
+    for (let x = cx - 15; x < cx + 16; x += 5) ctx.fillRect(x, cy - 4, 2.4, 16);
+    ctx.restore();
+    ST.line(ctx, [[cx - 14, cy - 3.5], [cx + 14, cy - 3.5]], 3725, 0.9);
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, 15, 10, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
   // shell speckles
   ctx.fillStyle = shell.light + 'aa';
   for (const [sx, sy] of [[-6, -3], [3, -5], [8, -1], [-1, 1]] as const) {
@@ -366,9 +438,10 @@ export function drawTennisCrab(ctx: Ctx, f: TCrabFrame, team: TCrabTeam) {
     ctx.arc(cx + 7, cy, 3.6, 0.3, 1.5);
     ctx.stroke();
   }
-  // front arm and claw gripping the racket
+  // front arm and claw gripping the racket (the umpire's: its whistle)
   ST.line(ctx, [[cx + 10, cy - 2], [clx, cly]], 3730, 2, shell.shade);
   ST.shape(ctx, ellipsePts(clx, cly, 5, 4, ra, 18), shell, 3731, { lw: 0.8 });
+  if (ump && f === 'smash0') ST.shape(ctx, roundRectPts(clx - 1, cly - 6, 7, 4, 1.5), { base: '#c8ccd4', shade: '#8a909c', light: '#ffffff' }, 3732, { lw: 0.7 });
   // eye stalks, eyes (shut on a blink, squeezed when hurt), the visor between them
   for (const s of [-1, 1]) {
     const ex = cx + 2 + s * 5;

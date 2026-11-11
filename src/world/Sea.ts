@@ -174,16 +174,19 @@ export class SeaLife {
       const k = 0.15 + Math.random() * 0.2;
       const count = 5 + Math.floor(Math.random() * 5);
       for (let i = 0; i < count; i++) {
-        const img = this.scene.add.image(0, 0, 'sea-school', 's0').setDepth(DEPTH.far + 2).setTint(tint).setAlpha(0.7).setScale(0.45 + k).setFlipX(dir < 0);
-        this.drifters.push({ img, x: dir > 0 ? -0.1 - (i % 4) * 0.025 : 1.1 + (i % 4) * 0.025, y: y + Math.floor(i / 4) * 0.03 + (i % 2) * 0.02, vx: dir * (0.07 + k * 0.05), vy: 0, ph: Math.random() * 6, k, kind: 'fish' });
+        const img = this.scene.add.image(0, 0, 'sea-school', 's0').setDepth(DEPTH.far + 2).setTint(tint).setAlpha(0.55).setScale(0.45 + k).setFlipX(dir < 0);
+        const fx = dir > 0 ? -0.1 - (i % 4) * 0.025 : 1.1 + (i % 4) * 0.025;
+        this.drifters.push({ img, x: view.left * k + fx * view.width, y: y + Math.floor(i / 4) * 0.03 + (i % 2) * 0.02, vx: dir * (40 + k * 30), vy: 0, ph: Math.random() * 6, k, kind: 'fish' });
       }
     }
     this.nextTurtle -= dt;
     if (this.nextTurtle <= 0) {
       this.nextTurtle = 28 + Math.random() * 20;
       const dir = Math.random() < 0.5 ? 1 : -1;
-      const img = this.scene.add.image(0, 0, 'sea-turtle', 't0').setDepth(DEPTH.hills + 2).setAlpha(0.9).setScale(0.55).setFlipX(dir < 0);
-      this.drifters.push({ img, x: dir > 0 ? -0.15 : 1.15, y: 0.3 + Math.random() * 0.25, vx: dir * 0.045, vy: 0, ph: 0, k: 0.4, kind: 'turtle' });
+      // (far off behind the reef: small, hazy with the water between, drifting slowly by)
+      const img = this.scene.add.image(0, 0, 'sea-turtle', 't0').setDepth(DEPTH.far + 3).setAlpha(0.5).setTint(0xa8d4ee).setScale(0.3).setFlipX(dir < 0);
+      const k = 0.2;
+      this.drifters.push({ img, x: view.left * k + (dir > 0 ? -0.1 : 1.1) * view.width, y: 0.25 + Math.random() * 0.2, vx: dir * 18, vy: 0, ph: 0, k, kind: 'turtle' });
     }
     this.drifters = this.drifters.filter((d) => {
       d.ph += dt;
@@ -196,15 +199,17 @@ export class SeaLife {
         if (d.y > 1) d.y = 0.1;
         d.img.setFrame(beat < 0.08 ? 'j1' : beat < 0.2 ? 'j2' : beat < 0.3 ? 'j3' : 'j0');
       } else {
+        // (in the distance: they swim at their own pace, and the view slides past them slowly)
         d.x += d.vx * dt;
         if (d.kind === 'fish') d.img.setFrame(Math.floor(d.ph * 8) % 2 ? 's0' : 's1');
         else d.img.setFrame(Math.floor(d.ph * 1.6) % 2 ? 't0' : 't1');
       }
       // (on screen, sliding by a little with the camera)
       const px = view.left + (((d.x * view.width - view.left * d.k * 0.1) % (view.width * 1.6)) + view.width * 1.6) % (view.width * 1.6) - view.width * 0.3;
-      const sx = d.kind === 'jelly' ? px : view.left + d.x * view.width;
+      const sx = d.kind === 'jelly' ? px : view.left + (d.x - view.left * d.k);
       d.img.setPosition(sx, Math.max(this.surfaceY + 40, view.top + d.y * view.height) + Math.sin(d.ph * 1.3) * 4);
-      const gone = d.kind !== 'jelly' && (d.x < -0.3 || d.x > 1.3);
+      const off = sx - view.left;
+      const gone = d.kind !== 'jelly' && ((d.vx > 0 && off > view.width + 200) || (d.vx < 0 && off < -200) || off < -view.width || off > view.width * 2);
       if (gone) d.img.destroy();
       return !gone;
     });

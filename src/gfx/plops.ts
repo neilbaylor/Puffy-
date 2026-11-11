@@ -77,6 +77,40 @@ export const PLOP_SCALE: Record<PlopKind, number> = { small: 0.68, medium: 1, la
 /** The King's extras drawPlop puts on him (the Plop King's own art turns the cape off: he has a robe instead). */
 export const KING_LOOK = { cape: true, sceptre: true };
 
+/** Dressing a Plop: `ref` puts it in a black-and-white striped referee's shirt (the volleyball referee: not someone to hit). */
+export const PLOP_DRESS = { ref: false };
+
+/** A referee's striped shirt over an oval body (centre cx, cy; radii rx, ry), with a little collar. */
+export function drawRefShirt(ctx: Ctx, st: Style, cx: number, cy: number, rx: number, ry: number, top: number) {
+  const body = ellipsePts(cx, cy, rx, ry, 0, 40);
+  ctx.save();
+  ctx.beginPath();
+  body.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+  ctx.closePath();
+  ctx.clip();
+  ctx.fillStyle = '#fbfbf6';
+  ctx.fillRect(cx - rx, top, rx * 2, cy + ry - top + 2);
+  ctx.fillStyle = '#26232a';
+  const w = rx / 4.2;
+  for (let x = cx - rx + w * 0.5; x < cx + rx; x += w * 2) ctx.fillRect(x, top, w, cy + ry - top + 2);
+  // the shirt's neckline
+  ctx.strokeStyle = st.ink;
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(cx - rx, top);
+  ctx.quadraticCurveTo(cx, top + ry * 0.28, cx + rx, top);
+  ctx.stroke();
+  ctx.restore();
+  // a little black collar V
+  st.shape(ctx, [[cx - 7, top + 1], [cx, top + 7], [cx + 7, top + 1], [cx, top + 3.5]], { base: '#26232a', shade: '#26232a', light: '#555' }, 2099, { lw: 0.7, plain: true });
+  ctx.strokeStyle = st.ink;
+  ctx.lineWidth = 1.3;
+  ctx.beginPath();
+  body.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+  ctx.closePath();
+  ctx.stroke();
+}
+
 export function drawPlop(ctx: Ctx, ox: number, oy: number, f: PlopFrame, st: Style, kind: PlopKind | boolean = 'medium', body?: Fill) {
   if (kind === true) kind = 'king';
   if (kind === false) kind = 'medium';
@@ -132,6 +166,7 @@ export function drawPlop(ctx: Ctx, ox: number, oy: number, f: PlopFrame, st: Sty
   st.shape(ctx, ellipsePts(cx + 1, topY + 2, 26 * sqX, 19 * sqY, 0, 36), BODY, 2031, { lw: 1.3, light: [cx - 8, topY - 7] });
   // bottom tier: a wide squashy oval in front
   st.shape(ctx, ellipsePts(cx, botY, 35 * sqX, 21 * sqY, 0, 40), BODY, 2020, { lw: 1.3, light: [cx - 12, botY - 8] });
+  if (PLOP_DRESS.ref) drawRefShirt(ctx, st, cx, botY, 35 * sqX, 21 * sqY, botY - 9);
 
   // big googly eyes with slit pupils (looking left, the way they face)
   const eyeK = kind === 'small' ? 1.22 : kind === 'large' ? 0.9 : 1;

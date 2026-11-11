@@ -296,7 +296,7 @@ export function drawSeaNear(ctx: Ctx, W: number, H: number, pal: WorldPalette) {
       wrapX(W, (dx) => sea.shape(ctx, ellipsePts(x + dx, y + rr * 0.5, rr * 2, rr * 0.75, 0, 40), fill, 800 + x + row * 999, { lw: 0.7, plain: true, light: [x + dx - rr, y] }));
     }
     // sea grass clumps on the crests (smaller and hazier on the back row)
-    for (let x = 10 + row * 25; x < W; x += 38 + r() * 46) {
+    for (let x = 10 + row * 25; x < W; x += 64 + r() * 70) {
       const y = y0 + 8 + r() * 8;
       const kind = Math.floor(r() * GRASS_FILLS.length);
       const bend = (r() - 0.5) * 0.8;

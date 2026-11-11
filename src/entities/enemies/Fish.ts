@@ -126,6 +126,7 @@ export class BadFish extends Enemy {
     const water = this.gs.level.data.water ?? -1e9;
     if (this.y < water + this.displayHeight * 0.6 && b.velocity.y < 0) b.setVelocityY(20);
     if (this.gs.level.isSolidAt(this.x, this.y + this.displayHeight * 0.5 + 4) && b.velocity.y > 0) b.setVelocityY(-20);
+    if (this.gs.level.isSolidAt(this.x, this.y - this.displayHeight * 0.5 - 4) && b.velocity.y < 0) b.setVelocityY(20);
     // tail sweep: quicker when it's going places
     const rate = 9 + Math.abs(b.velocity.x) / 8;
     const fi = Math.floor(this.swimT * rate) % 6;
@@ -149,7 +150,7 @@ export class BadFish extends Enemy {
     const sy = this.y + 2 * k;
     const a = Math.atan2(ty - sy, tx - sx);
     const spread = big ? [-0.28, 0, 0.28] : [0];
-    for (const da of spread) new FishBubble(this.gs, sx, sy, Math.cos(a + da) * SHOT_SPEED, Math.sin(a + da) * SHOT_SPEED, big ? 1.25 : 1);
+    for (const da of spread) new FishBubble(this.gs, sx, sy, Math.cos(a + da) * SHOT_SPEED, Math.sin(a + da) * SHOT_SPEED, big ? 1.7 : 1.4);
     sfx.bloop();
     this.gs.amb.sea?.bubbles(sx, sy, 4);
   }

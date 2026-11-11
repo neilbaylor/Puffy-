@@ -4,7 +4,7 @@ import { sfx } from '../core/sfx';
 import { ART_RES } from '../gfx/draw';
 import { PLOP_H, PLOP_W } from '../gfx/plops';
 import { SAND, drawCourtBoard, drawRefChair, drawVolleySand } from '../gfx/plopworld';
-import { PLOP_PAD, PLOP_RES, PLOP_TOP, addCanvas, hires } from '../gfx/textures';
+import { PLOP_PAD, PLOP_TOP, addCanvas, hires, makePlopRef } from '../gfx/textures';
 import type { GameScene } from '../scenes/GameScene';
 import { Plop } from './enemies/Plops';
 import type { Player } from './Player';
@@ -72,11 +72,13 @@ export class VolleyMatch {
     const chairY = ground;
     gs.add.image(chairX, chairY, 'refchair').setOrigin(0.5, 50 / 52).setScale(1 / 3).setDepth(DEPTH.decor - 1);
     gs.add.image(cx, ground + 2, 'volleynet').setOrigin(0.5, 108 / 112).setScale(1 / 3).setDepth(DEPTH.enemies + 2);
-    // the referee: a little Plop up on the chair, facing the court
+    // the referee: a little Plop up on the chair, facing the court, in a striped referee's shirt
+    // (so you can tell he's not one to shoot)
+    makePlopRef(gs);
     this.ref = gs.add
-      .sprite(chairX - 1, chairY - 33, 'gplop-small', 'idle')
+      .sprite(chairX - 1, chairY - 33, 'plop-ref', 'idle')
       .setOrigin((50 + PLOP_PAD) / (PLOP_W + PLOP_PAD * 2), (100 + PLOP_TOP) / (PLOP_H + PLOP_TOP))
-      .setScale(0.36 / PLOP_RES)
+      .setScale(0.36 / 1.2)
       .setDepth(DEPTH.decor - 0.9);
     this.refY = this.ref.y;
     // the ball's shadow on the sand (so you can see where it's coming down)
@@ -127,7 +129,7 @@ export class VolleyMatch {
     this.refT = Math.max(0, this.refT - dt);
     this.ref.y = this.refY - (this.refT > 0 ? Math.abs(Math.sin(this.refT * 14)) * 5 : 0);
     if (this.ball.active) this.ref.setFlipX(this.ball.x > this.ref.x);
-    this.ref.setFrame(this.refT > 0 ? (Math.floor(this.refT * 10) % 2 ? 'yell0' : 'yell1') : 'idle');
+    this.ref.setFrame(this.refT > 0 ? (Math.floor(this.refT * 10) % 2 ? 'yell0' : 'yell1') : Math.floor(this.gs.time.now / 100) % 41 === 0 ? 'blink' : 'idle');
   }
 
   update(dt: number) {

@@ -43,7 +43,7 @@ const CHUTE_ACCEL = 460;
  */
 export const WATER_G = 420;
 const SINK_MAX = 115;
-const STROKE = 265;
+const STROKE = 195;
 const STROKE_EVERY = 0.14;
 const SWIM_WALK = 0.95;
 const SWIM_RUN = 0.62;
@@ -624,7 +624,8 @@ export class Player {
   /** Bounce off something you stomped. Holding jump bounces higher. */
   bounce() {
     const high = this.input.poll().jump;
-    this.body.setVelocityY(high ? -this.char.jump : -this.char.jump * 0.62);
+    // (in the water: just a push up, like a strong stroke)
+    this.body.setVelocityY(this.swimming ? -STROKE * 1.25 : high ? -this.char.jump : -this.char.jump * 0.62);
     this.jumping = high;
     this.airJumps = 1; // stomping gives your second jump back
     this.squash = { x: 0.8, y: 1.25 };

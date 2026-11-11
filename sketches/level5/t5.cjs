@@ -44,14 +44,17 @@ const OUT = 'shots/l5';
       f++;
       // keep at mid-water: stroke when below ~ 9 tiles from the bottom
       const h = (g.level.heightPx - pl.bottom) / 32;
-      btn.jump = h < 9 && f % 12 < 2;
+      // (the sea bed's height a little ahead: count solid tiles up from the bottom)
+      const floorAt = (x) => { let k = 0; while (k < 30 && g.level.isSolidAt(x, g.level.heightPx - k * 32 - 16)) k++; return k; };
+      const want = Math.max(floorAt(pl.x + 40), floorAt(pl.x + 110)) + 3.5;
+      btn.jump = (h < want || pl.body.blocked.right) && f % 12 < 2;
       btn.fire = f % 50 < 2;
       minY = Math.min(minY, pl.body.center.y); maxY = Math.max(maxY, pl.body.center.y);
       if (!pl.onGround) maxVy = Math.max(maxVy, pl.body.velocity.y);
       for (const o of g.children.list) if (o.texture?.key === 'fish-bubble' && !seenB.has(o)) { seenB.add(o); shots++; }
       if (f === 400) window.__shot = 1;
       if (f === 900) window.__shot = 2;
-      if (pl.x > 128 * 32 || f > 60 * 60) {
+      if (pl.x > 183 * 32 || f > 60 * 90) {
         g.events.off('preupdate', step);
         done({ frames: f, x: +(pl.x / 32).toFixed(1), surface: g.level.data.water, minY: Math.round(minY), maxY: Math.round(maxY), maxSinkVy: Math.round(maxVy), strokes, bubblesSeen: shots, fishLeft: g.enemies.filter((e) => !e.dead).length, popped: window.__popped, swimming: pl.swimming, fps: Math.round(window.game.loop.actualFps) });
       }

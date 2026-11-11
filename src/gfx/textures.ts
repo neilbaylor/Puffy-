@@ -14,7 +14,7 @@ import { drawHockeyNet, drawPuck, drawRinkLines, drawStick } from './hockey';
 import { MOUNTAIN_LOOKS, drawMountainFar, drawMountainMid, drawMountainNear } from './mountain';
 import './plopLooks'; // (registers Plop Invasion's palettes)
 import { POOWAVE_H, POOWAVE_W, drawPooOnGoat, drawPooPile, drawPooWave, drawStink, drawVolleyNetSide, drawVolleyball } from './plopworld';
-import { PLOP_FRAMES, PLOP_H, PLOP_W, drawPlop, type PlopKind } from './plops';
+import { PLOP_DRESS, PLOP_FRAMES, PLOP_H, PLOP_W, drawPlop, type PlopKind } from './plops';
 import { BUBBLE_FRAMES, BUBBLE_SIZE, FISH_FRAMES, FISH_SIZE, drawBubbleShot, drawFish, type FishKind } from './fish';
 import { drawPoo } from './hazards';
 import { CLAM_FRAMES, CLAM_H, CLAM_W, TCRAB_FRAMES, TCRAB_H, TCRAB_W, drawClam, drawTennisCrab, drawTennisNet } from './tennis';
@@ -341,6 +341,26 @@ export function makeFishBubble(scene: Phaser.Scene) {
   return 'fish-bubble';
 }
 
+/** The volleyball referee: a little Plop in a striped referee's shirt (idle, blink, yell0, yell1), as `plop-ref`. */
+export function makePlopRef(scene: Phaser.Scene) {
+  if (scene.textures.exists('plop-ref')) return;
+  const st = STYLES[ART_STYLE];
+  const frames = ['idle', 'blink', 'yell0', 'yell1'] as const;
+  const fw = Math.round((PLOP_W + PLOP_PAD * 2) * 1.2);
+  const fh = Math.round((PLOP_H + PLOP_TOP) * 1.2);
+  const { c, ctx } = canvas(fw * frames.length, fh);
+  PLOP_DRESS.ref = true;
+  frames.forEach((f, i) => {
+    ctx.save();
+    ctx.translate(i * fw, 0);
+    ctx.scale(1.2, 1.2);
+    drawPlop(ctx, PLOP_PAD, PLOP_TOP, f, st, 'small');
+    ctx.restore();
+  });
+  PLOP_DRESS.ref = false;
+  addCanvas(scene, 'plop-ref', c, (t) => frames.forEach((f, i) => t.add(f, 0, i * fw, 0, fw, fh)), { release: true });
+}
+
 export function makePlops(scene: Phaser.Scene, kind: PlopKind) {
   const key = `gplop-${kind}`;
   if (scene.textures.exists(key)) return;
@@ -634,7 +654,7 @@ const BADDIE_KEYS: Record<string, string[]> = {
   king: ['pking-jet', 'jetflame', 'jetsmoke'],
   baseball: BB_KEYS,
   fish: ['fish-badguy', 'fish-badguybig', 'fish-bubble'],
-  tennis: ['tcrab-red', 'tcrab-orange', 'clam', 'tennisnet'],
+  tennis: ['tcrab-red', 'tcrab-orange', 'tcrab-ump', 'clam', 'tennisnet'],
 };
 
 /** The bad guys each level has (and a battle): only those are drawn, the others freed. */
@@ -675,6 +695,8 @@ export function gameArtJobs(scene: Phaser.Scene, opts: { heroes: readonly string
       name: 'crab tennis',
       run: () => {
         for (const team of ['red', 'orange'] as const) if (!T.exists(`tcrab-${team}`)) sheet(scene, `tcrab-${team}`, TCRAB_W, TCRAB_H, TCRAB_FRAMES, (ctx, f) => drawTennisCrab(ctx, f, team), 2.5);
+        // (the umpire: no racket, a striped shirt)
+        if (!T.exists('tcrab-ump')) sheet(scene, 'tcrab-ump', TCRAB_W, TCRAB_H, ['ready0', 'blink', 'smash0'] as const, (ctx, f) => drawTennisCrab(ctx, f, 'ump'), 2);
         if (!T.exists('clam')) sheet(scene, 'clam', CLAM_W, CLAM_H, CLAM_FRAMES, (ctx, f) => drawClam(ctx, f), 3);
         if (!T.exists('tennisnet')) addCanvas(scene, 'tennisnet', hires(20, 64, 3, (ctx) => drawTennisNet(ctx, 20, 60, 34)));
       },

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { DEPTH, TILE } from '../config';
+import { DEPTH, GRAVITY, TILE } from '../config';
 import { sfx } from '../core/sfx';
 import { COURT, SEAT_UP, TCRAB_H, TCRAB_W, drawCourtBack, drawCourtFront, type TCrabTeam } from '../gfx/tennis';
 import { addCanvas, hires } from '../gfx/textures';
@@ -72,9 +72,9 @@ export class TennisMatch {
     gs.add.image(cx, ground + 4, 'tennisnet').setOrigin(0.5, 1).setScale(1 / 3).setDepth(DEPTH.enemies + 2);
     // the umpire: a little crab up on the chair
     this.ump = gs.add
-      .sprite(cx + 22, ground - SEAT_UP + 2, 'tcrab-orange', 'ready0')
+      .sprite(cx + 22, ground - SEAT_UP + 2, 'tcrab-ump', 'ready0')
       .setOrigin(0.5, 1)
-      .setScale((0.42 * 1) / TCRAB_RES)
+      .setScale(0.42 / 2)
       .setDepth(DEPTH.decor - 0.9);
     this.umpY = this.ump.y;
     this.shadow = gs.add.ellipse(cx, ground - 2, 16, 4, 0x1a3050, 0.25).setDepth(DEPTH.tiles + 0.55);
@@ -128,7 +128,7 @@ export class TennisMatch {
     this.ump.y = this.umpY - (this.umpT > 0 ? Math.abs(Math.sin(this.umpT * 14)) * 5 : 0);
     if (this.ball.active) this.ump.setFlipX(this.ball.x < this.ump.x);
     const blink = Math.floor(this.gs.time.now / 100) % 37 === 0;
-    this.ump.setFrame(this.umpT > 0 ? (Math.floor(this.umpT * 10) % 2 ? 'smash0' : 'ready1') : blink ? 'blink' : 'ready0');
+    this.ump.setFrame(this.umpT > 0 ? (Math.floor(this.umpT * 10) % 2 ? 'smash0' : 'ready0') : blink ? 'blink' : 'ready0');
   }
 
   update(dt: number) {
@@ -390,6 +390,8 @@ export class TennisCrab extends Enemy {
     this.setScale(CRAB_K / TCRAB_RES);
     this.body.setSize(28 * TCRAB_RES, 26 * TCRAB_RES);
     this.body.setOffset((TCRAB_W / 2 - 16) * TCRAB_RES, (TCRAB_H - 27) * TCRAB_RES);
+    // (crabs walk the sea bed: heavy, not floaty like a swimmer)
+    this.body.setGravityY(GRAVITY - gs.physics.world.gravity.y);
   }
 
   alert(hero: Player | null) {
