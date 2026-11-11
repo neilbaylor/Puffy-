@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { DEPTH, GRAVITY, TILE } from '../config';
 import { sfx } from '../core/sfx';
-import { COURT, NET_CELL_H, NET_GROUND, SEAT_UP, TCRAB_H, TCRAB_W, drawCourtBack, drawCourtFront, type TCrabTeam } from '../gfx/tennis';
+import { COURT, NET_CELL_H, NET_GROUND, TCRAB_H, TCRAB_W, drawCourtBack, drawCourtFront, type TCrabTeam } from '../gfx/tennis';
 import { addCanvas, hires } from '../gfx/textures';
 import type { GameScene } from '../scenes/GameScene';
 import { Enemy, type DeathKind } from './enemies/Enemy';
@@ -25,7 +25,7 @@ const CLAM_K = 0.95;
 /**
  * Crabs playing doubles tennis under the sea (World 3's mid-level match, like the soccer in Part 1
  * and the volleyball in Part 3) — with a clam for a ball. They rally it back and forth over the net
- * until one of them spots you: the umpire hops up and down, a "!" over every crab, and whoever has
+ * until one of them spots you: a whistle, a "!" over every crab, and whoever has
  * the clam next SMASHES it at you. They fetch it and keep smashing until you're past, the clam's
  * popped open (shoot it) or the crabs are; then they scuttle after you.
  */
@@ -40,9 +40,6 @@ export class TennisMatch {
   private prevX = 0;
   private prevY = 0;
   private readonly netX: number;
-  private ump: Phaser.GameObjects.Sprite;
-  private umpY = 0;
-  private umpT = 0;
   private shadow: Phaser.GameObjects.Ellipse;
   private readonly left: number;
   private readonly right: number;
@@ -70,13 +67,7 @@ export class TennisMatch {
     gs.add.image(this.left - END, ground, fkey).setOrigin(0, UP / (UP + DOWN)).setScale(1 / 2).setDepth(DEPTH.tiles + 0.5);
     gs.add.image(this.left - END, ground, bkey).setOrigin(0, 1).setScale(1 / 1.5).setDepth(DEPTH.decor - 1);
     gs.add.image(cx, ground, 'tennisnet').setOrigin(0.5, NET_GROUND / NET_CELL_H).setScale(1 / 3).setDepth(DEPTH.enemies + 2);
-    // the umpire: a little crab up on the chair
-    this.ump = gs.add
-      .sprite(cx + 22, ground - SEAT_UP + 2, 'tcrab-ump', 'ready0')
-      .setOrigin(0.5, 1)
-      .setScale(0.42 / 2)
-      .setDepth(DEPTH.decor - 0.9);
-    this.umpY = this.ump.y;
+    // (the umpire's high chair stands empty behind the net: it's in the back picture)
     this.shadow = gs.add.ellipse(cx, ground - 2, 16, 4, 0x1a3050, 0.25).setDepth(DEPTH.tiles + 0.55);
 
     // doubles: two a side, red on the left, orange on the right
@@ -116,23 +107,18 @@ export class TennisMatch {
     return p.home;
   }
 
-  /** The umpire (hops when they spot you) and the clam's shadow on the court. */
-  private updateDecor(dt: number) {
+  /** The clam's shadow on the court. */
+  private updateDecor() {
     const on = this.ball.active && this.ball.x > this.left - 40 && this.ball.x < this.right + 40;
     this.shadow.setVisible(on);
     if (on) {
       const k = Phaser.Math.Clamp(1 - (this.ground - this.ball.y) / 240, 0.3, 1);
       this.shadow.setPosition(this.ball.x, this.ground - 1).setScale(k).setAlpha(0.3 * k);
     }
-    this.umpT = Math.max(0, this.umpT - dt);
-    this.ump.y = this.umpY - (this.umpT > 0 ? Math.abs(Math.sin(this.umpT * 14)) * 5 : 0);
-    if (this.ball.active) this.ump.setFlipX(this.ball.x < this.ump.x);
-    const blink = Math.floor(this.gs.time.now / 100) % 37 === 0;
-    this.ump.setFrame(this.umpT > 0 ? (Math.floor(this.umpT * 10) % 2 ? 'smash0' : 'ready0') : blink ? 'blink' : 'ready0');
   }
 
   update(dt: number) {
-    this.updateDecor(dt);
+    this.updateDecor();
     if (this.state === 'done') return;
     const alive = this.alive;
     if (!this.ball.active) return;
@@ -292,7 +278,6 @@ export class TennisMatch {
     this.dangerousMode = true;
     if (this.state === 'rally') this.state = 'alert';
     sfx.whistle();
-    this.umpT = 1.1;
     for (const p of this.alive) p.alert(hero);
   }
 

@@ -224,7 +224,13 @@ export type BEvent =
   | { k: 'chairswing'; id: string }
   | { k: 'chairhit'; id: string; x: number; y: number; broke: boolean };
 
-const charOf = (hero: string): CharacterDef => CHARACTERS.find((c) => c.id === hero) ?? CHARACTERS[0];
+/**
+ * Battle's own tweaks to a hero (the main game's numbers otherwise): Scruffy's still the quickest,
+ * but not by so much (walk 180 → 172, run 375 → 356; Puffy 165 / 345).
+ */
+const BATTLE_TWEAK: Record<string, Partial<CharacterDef>> = { scruffy: { walkSpeed: 172, runSpeed: 356 } };
+const BATTLE_CHARS = new Map(CHARACTERS.map((c) => [c.id, { ...c, ...BATTLE_TWEAK[c.id] } as CharacterDef]));
+const charOf = (hero: string): CharacterDef => BATTLE_CHARS.get(hero) ?? BATTLE_CHARS.get(CHARACTERS[0].id)!;
 /** Grown, no hero gets taller than this (world px): it still fits under the islands (3 tiles up). */
 export const GROW_MAX_H = 88;
 /**
@@ -966,7 +972,8 @@ export class BattleSim {
   private stepPrizes(ev: BEvent[]) {
     this.dropIn -= DT;
     if (this.dropIn <= 0) {
-      this.dropIn = 8 + Math.random() * 5; // (still worth fighting over)
+      // (still worth fighting over; 15% more often than the old 8–13 s)
+      this.dropIn = (8 + Math.random() * 5) / 1.15;
       if (this.prizes.length < MAX_PRIZES) {
         let roll = Math.random() * PRIZE_ODDS.reduce((t, [, w]) => t + w, 0);
         let kind: PrizeKind = 'bomb';
@@ -1288,7 +1295,8 @@ export class BattleSim {
   private stepHazards(ev: BEvent[]) {
     this.hazardIn -= DT;
     if (this.hazardIn <= 0) {
-      this.hazardIn = 2.2 + Math.random() * 2.3;
+      // (half as often as they were: 2.2–4.5 s → 4.4–9 s)
+      this.hazardIn = 4.4 + Math.random() * 4.6;
       // now and then a shower of two or three
       const n = Math.random() < 0.3 ? 2 + Math.floor(Math.random() * 2) : 1;
       for (let i = 0; i < n; i++) {

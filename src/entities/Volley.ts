@@ -2,9 +2,8 @@ import Phaser from 'phaser';
 import { DEPTH, TILE } from '../config';
 import { sfx } from '../core/sfx';
 import { ART_RES } from '../gfx/draw';
-import { PLOP_H, PLOP_W } from '../gfx/plops';
 import { SAND, drawCourtBoard, drawRefChair, drawVolleySand } from '../gfx/plopworld';
-import { PLOP_PAD, PLOP_TOP, addCanvas, hires, makePlopRef } from '../gfx/textures';
+import { addCanvas, hires } from '../gfx/textures';
 import type { GameScene } from '../scenes/GameScene';
 import { Plop } from './enemies/Plops';
 import type { Player } from './Player';
@@ -40,8 +39,6 @@ export class VolleyMatch {
   private prevX = 0;
   private prevY = 0;
   private readonly netX: number;
-  private ref: Phaser.GameObjects.Sprite;
-  private refY = 0;
   private shadow: Phaser.GameObjects.Ellipse;
   private readonly left: number;
   private readonly right: number;
@@ -72,15 +69,6 @@ export class VolleyMatch {
     const chairY = ground;
     gs.add.image(chairX, chairY, 'refchair').setOrigin(0.5, 50 / 52).setScale(1 / 3).setDepth(DEPTH.decor - 1);
     gs.add.image(cx, ground + 2, 'volleynet').setOrigin(0.5, 108 / 112).setScale(1 / 3).setDepth(DEPTH.enemies + 2);
-    // the referee: a little Plop up on the chair, facing the court, in a striped referee's shirt
-    // (so you can tell he's not one to shoot)
-    makePlopRef(gs);
-    this.ref = gs.add
-      .sprite(chairX - 1, chairY - 33, 'plop-ref', 'idle')
-      .setOrigin((50 + PLOP_PAD) / (PLOP_W + PLOP_PAD * 2), (100 + PLOP_TOP) / (PLOP_H + PLOP_TOP))
-      .setScale(0.36 / 1.2)
-      .setDepth(DEPTH.decor - 0.9);
-    this.refY = this.ref.y;
     // the ball's shadow on the sand (so you can see where it's coming down)
     this.shadow = gs.add.ellipse(cx, ground - 2, 18, 5, 0x5a3a1c, 0.3).setDepth(DEPTH.tiles + 0.55);
 
@@ -117,23 +105,18 @@ export class VolleyMatch {
   }
 
   /** The player is at the ball when it comes down: bump it over (or spike it at you). */
-  /** The referee (hops and yells when the whistle goes) and the ball's shadow on the sand. */
-  private refT = 0;
-  private updateDecor(dt: number) {
+  /** The ball's shadow on the sand. */
+  private updateDecor() {
     const on = this.ball.active && this.ball.x > this.left - 40 && this.ball.x < this.right + 40;
     this.shadow.setVisible(on);
     if (on) {
       const k = Phaser.Math.Clamp(1 - (this.ground - this.ball.y) / 260, 0.3, 1);
       this.shadow.setPosition(this.ball.x, this.ground - 1).setScale(k).setAlpha(0.35 * k);
     }
-    this.refT = Math.max(0, this.refT - dt);
-    this.ref.y = this.refY - (this.refT > 0 ? Math.abs(Math.sin(this.refT * 14)) * 5 : 0);
-    if (this.ball.active) this.ref.setFlipX(this.ball.x > this.ref.x);
-    this.ref.setFrame(this.refT > 0 ? (Math.floor(this.refT * 10) % 2 ? 'yell0' : 'yell1') : Math.floor(this.gs.time.now / 100) % 41 === 0 ? 'blink' : 'idle');
   }
 
   update(dt: number) {
-    this.updateDecor(dt);
+    this.updateDecor();
     if (this.state === 'done') return;
     const alive = this.alive;
     if (!this.ball.active) return;
@@ -314,7 +297,6 @@ export class VolleyMatch {
     this.dangerousMode = true;
     if (this.state === 'rally') this.state = 'alert';
     sfx.whistle();
-    this.refT = 1.1;
     for (const p of this.alive) p.alert(hero);
   }
 

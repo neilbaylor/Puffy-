@@ -654,7 +654,7 @@ const BADDIE_KEYS: Record<string, string[]> = {
   king: ['pking-jet', 'jetflame', 'jetsmoke'],
   baseball: BB_KEYS,
   fish: ['fish-badguy', 'fish-badguybig', 'fish-kai', 'fish-bubble'],
-  tennis: ['tcrab-red', 'tcrab-orange', 'tcrab-ump', 'clam', 'tennisnet'],
+  tennis: ['tcrab-red', 'tcrab-orange', 'clam', 'tennisnet'],
 };
 
 /** The bad guys each level has (and a battle): only those are drawn, the others freed. */
@@ -695,8 +695,6 @@ export function gameArtJobs(scene: Phaser.Scene, opts: { heroes: readonly string
       name: 'crab tennis',
       run: () => {
         for (const team of ['red', 'orange'] as const) if (!T.exists(`tcrab-${team}`)) sheet(scene, `tcrab-${team}`, TCRAB_W, TCRAB_H, TCRAB_FRAMES, (ctx, f) => drawTennisCrab(ctx, f, team), 2.5);
-        // (the umpire: no racket, a striped shirt)
-        if (!T.exists('tcrab-ump')) sheet(scene, 'tcrab-ump', TCRAB_W, TCRAB_H, ['ready0', 'blink', 'smash0'] as const, (ctx, f) => drawTennisCrab(ctx, f, 'ump'), 2);
         if (!T.exists('clam')) sheet(scene, 'clam', CLAM_W, CLAM_H, CLAM_FRAMES, (ctx, f) => drawClam(ctx, f), 3);
         if (!T.exists('tennisnet')) addCanvas(scene, 'tennisnet', hires(NET_W, NET_CELL_H, 3, (ctx) => drawTennisNet(ctx)));
       },

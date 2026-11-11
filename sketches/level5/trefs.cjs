@@ -1,4 +1,4 @@
-// The two referees in the game: the crab umpire on the tennis court (Part 5) and the volleyball referee (Part 3).
+// The referees' chairs (empty now: the referees were taken out in v0.251) on the tennis court (Part 5) and the volleyball court (Part 3).
 const { chromium } = require('playwright');
 (async () => {
   const br = await chromium.launch({ args: ['--use-gl=swiftshader'] });
@@ -32,7 +32,7 @@ const { chromium } = require('playwright');
     const box = await p.evaluate(() => {
       const g = window.game.scene.getScene('Game');
       const m = (g.tennis?.length ? g.tennis : g.volleys)[0];
-      const r = m.ump ?? m.ref;
+      const r = { x: m.netX + 21, y: m.ground - 40 };
       const cam = g.cameras.main;
       const k = 844 / window.game.scale.width;
       return { x: (r.x - cam.worldView.x) * cam.zoom * k, y: (r.y - cam.worldView.y) * cam.zoom * k };
