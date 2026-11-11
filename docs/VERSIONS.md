@@ -251,3 +251,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.246: Level 5: swan dive, crab tennis (two courts), fish blink, swaying sea grass.
 - v0.247: Level 5: deep and shallow water with reef shelves, tennis in the shallows, weaker swim stroke, bigger fish bubbles, nicer rackets, referee shirts.
 - v0.248: Level 5: block field, deep dark trench (sink down, climb back up), tennis net in depth, background octopus, dive gear on the HUD portrait.
+- v0.249: Kai fish (3 times, 2 hits, zooms away), Part 5 for founder, wider softer trench, HUD gear, CHAMPION! held longer.
