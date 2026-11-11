@@ -253,3 +253,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.248: Level 5: block field, deep dark trench (sink down, climb back up), tennis net in depth, background octopus, dive gear on the HUD portrait.
 - v0.249: Kai fish (3 times, 2 hits, zooms away), Part 5 for founder, wider softer trench, HUD gear, CHAMPION! held longer.
 - v0.250: Part 5: a second, shorter descent, Kai 3 hits spread out and fleeing up/down the shafts, more fish and root beer, fly-over through the trenches, underwater start screen.
+- v0.251: No referees on the courts; Battle: Scruffy a bit slower, half the rocks, 15% more bonuses.
