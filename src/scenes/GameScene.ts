@@ -21,6 +21,7 @@ import { SoccerMatch } from '../entities/Soccer';
 import { HockeyMatch } from '../entities/Hockey';
 import { VolleyMatch } from '../entities/Volley';
 import { BaseballGame } from '../entities/Baseball';
+import { TennisMatch } from '../entities/Tennis';
 import { soloSource, sourceById } from '../input/devices';
 import type { EnemyKind } from '../level/builder';
 import { levelInfo } from '../level/levels';
@@ -144,6 +145,8 @@ export class GameScene extends Phaser.Scene {
   private hockey: HockeyMatch[] = [];
   private volleys: VolleyMatch[] = [];
   private ballgames: BaseballGame[] = [];
+  /** Crab tennis under the sea (each court a match). */
+  private tennis: TennisMatch[] = [];
   /** Bad guys waiting to drop in by parachute (they fall when you get near), and the ones in the air. */
   private paraWaiting: { kind: EnemyKind; x: number; y: number }[] = [];
   private paras: { e: Enemy; chute: Phaser.GameObjects.Image; t: number }[] = [];
@@ -252,6 +255,7 @@ export class GameScene extends Phaser.Scene {
     this.hockey = [];
     this.volleys = [];
     this.ballgames = [];
+    this.tennis = [];
     this.paraWaiting = [];
     this.paras = [];
     this.kingAt = null;
@@ -395,6 +399,9 @@ export class GameScene extends Phaser.Scene {
         case 'volley':
           this.volleys.push(new VolleyMatch(this, cx, surface(s.y), Number(s.opts?.w ?? 14)));
           break;
+        case 'tennis':
+          this.tennis.push(new TennisMatch(this, cx, surface(s.y), Number(s.opts?.w ?? 18)));
+          break;
         case 'baseball':
           this.ballgames.push(new BaseballGame(this, s.x * TILE, surface(s.y), Number(s.opts?.w ?? 36)));
           break;
@@ -496,6 +503,11 @@ export class GameScene extends Phaser.Scene {
       this.physics.add.overlap(this.gRockets, v.ball, (r) => {
         (r as Rocket).explode();
         v.popBall();
+      });
+    for (const m of this.tennis)
+      this.physics.add.overlap(this.gRockets, m.ball, (r) => {
+        (r as Rocket).explode();
+        m.popBall();
       });
     this.physics.add.overlap(this.gPlayers, this.gAuras, (h, a) => this.collectAura(this.playerOf(h), a as Aura));
     this.physics.add.overlap(this.gPlayers, this.gRootbeer, (h, r) => this.collectRootbeer(this.playerOf(h), r as RootBeer));
@@ -702,6 +714,7 @@ export class GameScene extends Phaser.Scene {
       p.update(dt);
       if (p.alive && p.body.top > this.level.heightPx + 40) p.faint(true);
     }
+    this.swanSlowMo(dt);
     // (the rock moves on the same clock as the heroes' physics, even on a slow device)
     this.updateChase(Math.min(deltaMs / 1000, 0.1));
 
@@ -737,6 +750,7 @@ export class GameScene extends Phaser.Scene {
     for (const h of this.hockey) h.update(dt);
     for (const v of this.volleys) v.update(dt);
     for (const g of this.ballgames) g.update(dt);
+    for (const m of this.tennis) m.update(dt);
     this.updateParachutes(dt);
     this.updateDrops(dt);
 
@@ -834,15 +848,36 @@ export class GameScene extends Phaser.Scene {
     p.facing = 1;
     this.time.delayedCall(wait, () => {
       if (!p.alive || p.swimming) return;
-      p.squash = { x: 1.25, y: 0.78 };
-      this.time.delayedCall(120, () => {
+      // a deep crouch, then spring up and out
+      p.squash = { x: 1.3, y: 0.7 };
+      this.time.delayedCall(160, () => {
         if (!p.alive || p.swimming) return;
-        p.body.setVelocity(255, -440);
-        p.squash = { x: 0.75, y: 1.3 };
+        p.swan = true;
+        p.body.setVelocity(205, -560);
+        p.squash = { x: 0.72, y: 1.32 };
+        this.fx.dust(p.x, p.bottom, 5);
         sfx.jump();
       });
     });
   }
+
+  /** The swan dive's moment at the top: everything slows right down while the hero's stretched out flat, a glint, then on. */
+  private swanSlowMo(dt: number) {
+    const p = this.players.find((q) => q.swan && !q.swimming);
+    const vy = p ? p.body.velocity.y : 999;
+    const slow = !!p && vy > -210 && vy < 120;
+    const target = slow ? 3.2 : 1;
+    const w = this.physics.world;
+    w.timeScale += (target - w.timeScale) * Math.min(1, dt * (slow ? 10 : 6));
+    if (!p && Math.abs(w.timeScale - 1) < 0.02) w.timeScale = 1;
+    if (slow && !this.swanGlint) {
+      this.swanGlint = true;
+      this.fx.sparkle(p!.x + p!.facing * 6, p!.y - 6, 10);
+      sfx.whoosh();
+    }
+    if (!p) this.swanGlint = false;
+  }
+  private swanGlint = false;
 
   /** The jetpack's flames, under its nozzles (wherever the King is). */
   private placeKingJets() {
@@ -1072,7 +1107,8 @@ export class GameScene extends Phaser.Scene {
       const tx = (minX + maxX) / 2 + this.lookAhead;
       // keep the hero's feet ~62% down the screen: above the touch controls
       let feet = sumBottom / tracked.length;
-      let tTop = feet - vh * 0.62;
+      // (swimming: you sit higher on the screen, so the sea bed below — and what's on it — shows)
+      let tTop = feet - vh * (tracked.every((p) => p.swimming) ? 0.42 : 0.62);
       if (this.level.data.vertical) {
         // a climb: mid-jump the camera holds the height of the ledge you jumped from (no bobbing up
         // and down on every hop); it moves up once you land higher, and follows you down if you

@@ -17,7 +17,8 @@ import { POOWAVE_H, POOWAVE_W, drawPooOnGoat, drawPooPile, drawPooWave, drawStin
 import { PLOP_FRAMES, PLOP_H, PLOP_W, drawPlop, type PlopKind } from './plops';
 import { BUBBLE_FRAMES, BUBBLE_SIZE, FISH_FRAMES, FISH_SIZE, drawBubbleShot, drawFish, type FishKind } from './fish';
 import { drawPoo } from './hazards';
-import { CRAB_FRAMES, CRAB_H, CRAB_W, JELLY_FRAMES, JELLY_H, JELLY_W, SCHOOL_FRAMES, SEA_PROPS, SEA_PROP_H, SEA_PROP_W, SURFACE_H, TURTLE_FRAMES, TURTLE_H, TURTLE_W, drawCrab, drawJelly, drawLightRay, drawSchoolFish, drawSeaBubble, drawSeaFar, drawSeaMid, drawSeaNear, drawSeaProp, drawSeaSky, drawSurface, drawTurtle } from './sea';
+import { CLAM_FRAMES, CLAM_H, CLAM_W, TCRAB_FRAMES, TCRAB_H, TCRAB_W, drawClam, drawTennisCrab, drawTennisNet } from './tennis';
+import { CRAB_FRAMES, CRAB_H, CRAB_W, JELLY_FRAMES, JELLY_H, JELLY_W, SCHOOL_FRAMES, SEA_PROPS, SEA_PROP_H, SEA_PROP_W, SURFACE_H, TURTLE_FRAMES, TURTLE_H, TURTLE_W, drawCrab, drawJelly, drawLightRay, drawSchoolFish, drawSeaBubble, drawSeaFar, drawSeaMid, drawSeaNear, drawSeaProp, drawSeaSky, drawSurface, drawTurtle, GRASS_FRAMES, GRASS_H, GRASS_W, KELP_FRAMES, KELP_H, KELP_W, drawGrassFrame, drawKelpFrame } from './sea';
 import { BB_ALIAS, BB_FIELD_TILES, BB_KEYS, BB_PLAIN, BB_ROSTER, BB_SIZE, PARK, drawBallparkBack, drawBallparkFront, drawBaseball, drawBaseballPlop, drawCappedPlop, drawLineDrive, type BBPlayer, type BaseballRole } from './baseball';
 import { PLOP_COLOURS } from './plops';
 import { gearOf, wardrobe } from '../core/wardrobe';
@@ -633,6 +634,7 @@ const BADDIE_KEYS: Record<string, string[]> = {
   king: ['pking-jet', 'jetflame', 'jetsmoke'],
   baseball: BB_KEYS,
   fish: ['fish-badguy', 'fish-badguybig', 'fish-bubble'],
+  tennis: ['tcrab-red', 'tcrab-orange', 'clam', 'tennisnet'],
 };
 
 /** The bad guys each level has (and a battle): only those are drawn, the others freed. */
@@ -641,7 +643,7 @@ const BADDIES_FOR: Record<string, string[]> = {
   2: ['puffball', 'bigpuff', 'giant', 'goat', 'weapons'],
   3: ['goat', 'weapons', 'plops'],
   4: ['goat', 'weapons', 'plops', 'chutes', 'king', 'baseball'],
-  5: ['fish'],
+  5: ['fish', 'tennis'],
   battle: ['puffball', 'bigpuff', 'giant', 'weapons'],
 };
 
@@ -667,6 +669,16 @@ export function gameArtJobs(scene: Phaser.Scene, opts: { heroes: readonly string
     if (!T.exists(`char-${id}-face`)) out.push({ name: `hero ${id} faces`, run: () => makeCharacter(scene, ch, true) });
   }
   const want = opts.level == null ? [] : (BADDIES_FOR[String(opts.level)] ?? BADDIES_FOR[1]);
+  // (crab tennis under the sea: the two teams of crabs, the clam, the net)
+  if (want.includes('tennis') && !BADDIE_KEYS.tennis.every((k) => T.exists(k)))
+    out.push({
+      name: 'crab tennis',
+      run: () => {
+        for (const team of ['red', 'orange'] as const) if (!T.exists(`tcrab-${team}`)) sheet(scene, `tcrab-${team}`, TCRAB_W, TCRAB_H, TCRAB_FRAMES, (ctx, f) => drawTennisCrab(ctx, f, team), 2.5);
+        if (!T.exists('clam')) sheet(scene, 'clam', CLAM_W, CLAM_H, CLAM_FRAMES, (ctx, f) => drawClam(ctx, f), 3);
+        if (!T.exists('tennisnet')) addCanvas(scene, 'tennisnet', hires(20, 64, 3, (ctx) => drawTennisNet(ctx, 20, 60, 34)));
+      },
+    });
   if (want.includes('fish'))
     for (const k of ['badguy', 'badguybig'] as const) if (!T.exists(`fish-${k}`)) out.push({ name: `fish ${k}`, run: () => { makeFish(scene, k); makeFishBubble(scene); } });
   for (const b of baddiePieces(scene)) if (want.includes(b.name) && !BADDIE_KEYS[b.name].every((k) => T.exists(k))) out.push(b);
@@ -718,6 +730,9 @@ export function ensureSeaArt(scene: Phaser.Scene) {
   const T = scene.textures;
   if (T.exists('sea-surface')) return;
   sheet(scene, 'sea-props', SEA_PROP_W, SEA_PROP_H, SEA_PROPS, (ctx, f) => drawSeaProp(ctx, f), PROP_RES);
+  // (the plants' sway, a frame at a time like a bird's wingbeat)
+  sheet(scene, 'sea-grass', GRASS_W, GRASS_H, GRASS_FRAMES, (ctx, f) => drawGrassFrame(ctx, f), PROP_RES);
+  sheet(scene, 'sea-kelp', KELP_W, KELP_H + 24, KELP_FRAMES, (ctx, f) => drawKelpFrame(ctx, f), PROP_RES);
   sheet(scene, 'sea-jelly', JELLY_W, JELLY_H, JELLY_FRAMES, (ctx, f) => drawJelly(ctx, f), 1.5);
   sheet(scene, 'sea-school', 24, 14, SCHOOL_FRAMES, (ctx, f) => drawSchoolFish(ctx, f), 1.5);
   sheet(scene, 'sea-turtle', TURTLE_W, TURTLE_H, TURTLE_FRAMES, (ctx, f) => drawTurtle(ctx, f), 1.5);

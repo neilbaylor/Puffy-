@@ -3,7 +3,7 @@ import { DEPTH, TILE } from '../config';
 import { rng } from '../gfx/draw';
 import type { Pt } from '../gfx/handdrawn';
 import { PROP_RES, TERRAIN_RES, addCanvas, ensureSeaArt, hires } from '../gfx/textures';
-import { SEA_PROPS, SEA_SWAYS, drawKelp, drawPier } from '../gfx/sea';
+import { GRASS_FILLS, KELP_H, SEA_PROPS, SWAY_N, drawPier } from '../gfx/sea';
 import { DEFAULT_PALETTE, PALETTES, drawCloudPlatform, drawPuffTree, drawTerrainPiece, roundPoly, traceCells, type TerrainKind, type WorldPalette } from '../gfx/world';
 import { drawPine } from '../gfx/mountain';
 import type { Cell, LevelData } from '../level/builder';
@@ -157,6 +157,9 @@ export class LevelView {
     this.scenery = scene.children.list.slice(first).filter((o): o is Phaser.GameObjects.Image => o instanceof Phaser.GameObjects.Image);
   }
 
+  /** Under the sea: plants that sway by bending (their sway frames, a frame at a time, and a touch of tilt between). */
+  private waving: { img: Phaser.GameObjects.Image; pre: string; speed: number; ph: number }[] = [];
+
   /** Trees, flowers and grass that sway in the breeze. */
   private sway: { img: Phaser.GameObjects.Image; amp: number; speed: number; ph: number }[] = [];
 
@@ -210,6 +213,14 @@ export class LevelView {
       }
     }
     const gust = 0.55 + 0.45 * Math.sin(t * 0.33) * Math.sin(t * 0.21 + 1);
+    for (const w of this.waving) {
+      if (w.img.x < left - 80 || w.img.x > right + 80) continue;
+      const c = (t * w.speed + w.ph) * SWAY_N;
+      const i = ((Math.floor(c) % SWAY_N) + SWAY_N) % SWAY_N;
+      w.img.setFrame(w.pre + i);
+      // (a hair of tilt following the same sway smooths the step from frame to frame)
+      w.img.setRotation(Math.sin((c / SWAY_N) * Math.PI * 2) * 0.03 * (w.img.flipX ? -1 : 1));
+    }
     for (const s of this.sway) {
       if (s.img.x < left - 80 || s.img.x > right + 80) continue;
       // a wave of wind rolls across the level (phase follows x)
@@ -430,14 +441,15 @@ export class LevelView {
         const h = Number(s.opts?.h ?? 60);
         const key = `tree-${d.name}-${i}`;
         if (this.paletteAt(s.x * TILE).sea) {
-          // (under the sea: a tall strand of kelp, swaying in the current)
-          if (!this.scene.textures.exists(key)) addCanvas(this.scene, key, hires(64, h + 24, PROP_RES, (ctx) => drawKelp(ctx, 32, h + 20, h, 300 + i * 17)));
+          // (under the sea: a tall strand of kelp, bending to and fro in the current)
+          const k = h / KELP_H;
           const img = this.scene.add
-            .image(s.x * TILE + TILE / 2, (s.y + 1) * TILE + 4, key)
-            .setOrigin(0.5, 1)
-            .setScale(1 / PROP_RES)
+            .image(s.x * TILE + TILE / 2, (s.y + 1) * TILE + 4, 'sea-kelp', 'k0')
+            .setOrigin(0.5, (KELP_H + 20) / (KELP_H + 24))
+            .setScale((0.85 + 0.15 * k) / PROP_RES, k / PROP_RES)
+            .setFlipX(i % 2 === 1)
             .setDepth(DEPTH.decor - 0.5);
-          this.sway.push({ img, amp: 5, speed: 0.9 + (i % 3) * 0.15, ph: i * 1.7 });
+          this.waving.push({ img, pre: 'k', speed: 0.42 + (i % 3) * 0.06, ph: i * 0.37 });
           return;
         }
         if (!this.scene.textures.exists(key))
@@ -456,6 +468,8 @@ export class LevelView {
         this.sway.push({ img, amp: 1.3, speed: 0.8 + (i % 3) * 0.12, ph: i * 1.7 });
       });
     const r = rng(1234);
+    // (no plants on a court: the crabs' tennis courts keep their ground clear)
+    const courts = d.spawns.filter((sp) => sp.type === 'tennis').map((sp) => [sp.x - Number(sp.opts?.w ?? 18) / 2 - 3, sp.x + Number(sp.opts?.w ?? 18) / 2 + 3]);
     for (let x = 1; x < d.width - 1; x++) {
       let y = -1;
       for (let yy = 1; yy < d.height; yy++)
@@ -468,15 +482,16 @@ export class LevelView {
       const wy = y * TILE + 3;
       const roll = r();
       if (this.paletteAt(wx).sea) {
+        if (courts.some(([a, b]) => x >= a && x <= b)) continue;
         // under the sea: seaweed that sways, coral, starfish and shells on the sand
-        if (roll < 0.3) {
-          const f = SEA_PROPS[Math.floor(r() * 3)];
-          const img = this.scene.add.image(wx, wy + 4, 'sea-props', f).setOrigin(0.5, 46 / 48).setScale((0.8 + r() * 0.5) / PROP_RES).setDepth(DEPTH.decor);
-          this.sway.push({ img, amp: 9, speed: 1.1 + r() * 0.5, ph: wx * 0.013 });
-        } else if (roll < 0.5) {
-          const f = SEA_PROPS[3 + Math.floor(r() * (SEA_PROPS.length - 3))];
-          const img = this.scene.add.image(wx, wy + 4, 'sea-props', f).setOrigin(0.5, 46 / 48).setScale((0.75 + r() * 0.35) / PROP_RES).setDepth(DEPTH.decor);
-          if (SEA_SWAYS(f)) this.sway.push({ img, amp: 9, speed: 1.2, ph: wx * 0.013 });
+        if (roll < 0.36) {
+          // sea grass, swaying (each clump a little behind the one before: a wave of current)
+          const kind = Math.floor(r() * GRASS_FILLS.length);
+          const img = this.scene.add.image(wx, wy + 5, 'sea-grass', `g${kind}_0`).setOrigin(0.5, 54 / 56).setScale((0.75 + r() * 0.45) / PROP_RES).setFlipX(r() < 0.5).setDepth(DEPTH.decor);
+          this.waving.push({ img, pre: `g${kind}_`, speed: 0.5 + r() * 0.12, ph: -wx * 0.0011 });
+        } else if (roll < 0.52) {
+          const f = SEA_PROPS[Math.floor(r() * SEA_PROPS.length)];
+          this.scene.add.image(wx, wy + 4, 'sea-props', f).setOrigin(0.5, 46 / 48).setScale((0.75 + r() * 0.35) / PROP_RES).setDepth(DEPTH.decor);
         }
         continue;
       }

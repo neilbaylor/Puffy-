@@ -13,11 +13,12 @@ import { LevelBuilder, type LevelData } from './builder';
  *   36-56   A reef wall to swim over, a rock ledge out in the water
  *   57-72   Checkpoint; a big bad guy fish
  *   73-92   The cave: a rock roof with a way under it and a way over it
- *   93-140  Open water, more fish, the gate on the sea bed
+ *   93-140  CRAB TENNIS: two courts in a row; spot them and they smash the clam at you
+ *   141-180 Open water, more fish, the gate on the sea bed
  */
 export function buildLevel5(): LevelData {
   const H = 19;
-  const L = new LevelBuilder('The Rise of King Bob · Part 1', 'World 3', 141, H);
+  const L = new LevelBuilder('The Rise of King Bob · Part 1', 'World 3', 181, H);
   L.pal = 'sea';
   L.water(15);
 
@@ -66,19 +67,28 @@ export function buildLevel5(): LevelData {
   L.spawn('fish', 82, 13);
   L.aura(88, 13);
 
+  // ── Crab tennis: two courts in a row (they smash the clam at you) ──
+  L.ground(93, 160, 3);
+  L.spawn('tree', 95, 3, { h: 200 });
+  L.spawn('fish', 99, 12);
+  L.spawn('tennis', 107, 3, { w: 18 });
+  L.auraArc(103, 3, 10, 1);
+  L.spawn('tennis', 129, 3, { w: 18 });
+  L.auraArc(117, 3, 9, 2);
+  L.aura(129, 13);
+  L.spawn('tree', 141, 3, { h: 180 });
+
   // ── Open water to the gate ───────────────────────────────────
-  L.ground(93, 140, 3);
-  L.rock(104, 105, 4, 6);
-  L.spawn('tree', 96, 3, { h: 220 });
-  L.spawn('tree', 101, 3, { h: 150 });
-  L.spawn('fish', 100, 10);
-  L.spawn('bigfish', 112, 12);
-  L.spawn('fish', 118, 7);
-  L.auraArc(108, 4, 9, 2);
-  L.spawn('tree', 116, 3, { h: 200 });
-  L.spawn('fish', 126, 11);
-  L.spawn('tree', 129, 3, { h: 170 });
-  L.auraArc(121, 3, 6, 1);
-  L.spawn('goal', 135, 3);
+  L.rock(146, 147, 4, 6);
+  L.spawn('tree', 144, 3, { h: 220 });
+  L.spawn('bigfish', 152, 12);
+  L.spawn('fish', 158, 7);
+  L.auraArc(150, 4, 9, 2);
+  L.ground(161, 180, 3);
+  L.spawn('tree', 163, 3, { h: 200 });
+  L.spawn('fish', 168, 11);
+  L.spawn('tree', 171, 3, { h: 170 });
+  L.auraArc(165, 3, 6, 1);
+  L.spawn('goal', 176, 3);
   return L.build();
 }

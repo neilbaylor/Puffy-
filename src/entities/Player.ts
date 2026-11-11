@@ -125,6 +125,10 @@ export class Player {
   swimming = false;
   /** Diving in off the pier: no control until you're in the water. */
   diving = false;
+  /** A swan dive (the level's opening): up, out flat at the top, then head first into the water. */
+  swan = false;
+  /** The dive's turn (radians, about the hero's middle), easing back to nothing once in the water. */
+  private spin = 0;
   private strokeCd = 0;
   /** A stroke's kick in the swim animation (fades out). */
   private stroke = 0;
@@ -336,6 +340,7 @@ export class Player {
       b.setGravityY(0);
       this.jumping = false;
       this.diving = false;
+      this.swan = false;
       this.squash = { x: 0.85, y: 1.18 };
       this.scene.events.emit('hero-splash', this);
     } else b.setGravityY(GRAVITY - WATER_G);
@@ -489,11 +494,26 @@ export class Player {
       this.tilt += (targetTilt - this.tilt) * Math.min(1, dt * (this.diving ? 8 : 12));
       this.view.setRotation(this.tilt);
       this.view.setScale(this.squash.x * this.S, this.squash.y * this.S);
+      // the swan dive: chest up as you rise, stretched out flat at the top, then turning head first
+      // into the water — turning about the hero's middle (it unwinds once you're in)
+      if (this.swan && !this.swimming) {
+        const vy = b.velocity.y;
+        const target = vy < 0 ? -0.18 + 1.63 * Phaser.Math.Clamp(1 + vy / 520, 0, 1) ** 1.6 : 1.45 + 1.25 * Phaser.Math.Clamp(vy / 430, 0, 1);
+        this.spin += (target * this.facing - this.spin) * Math.min(1, dt * 9);
+      } else if (this.spin !== 0) {
+        this.spin *= Math.exp(-dt * 6);
+        if (Math.abs(this.spin) < 0.02) this.spin = 0;
+      }
+      if (this.spin !== 0) {
+        const oy = 0.55;
+        this.view.setOrigin(0.5, oy).setPosition(b.center.x, b.bottom + 2 - this.view.displayHeight * (1 - oy)).setRotation(this.spin + this.tilt * 0.3);
+      } else if (this.view.originY !== 1) this.view.setOrigin(0.5, 1);
 
       let frame: string;
       if (this.stun > 0) frame = 'hurt';
       else if (this.recoil > 0) frame = 'shoot';
       else if (this.eating > 0) frame = this.eating > 0.12 ? (Math.floor(this.eating * 10) % 2 ? 'eat0' : 'eat1') : 'idle0';
+      else if (this.swan && !this.swimming) frame = 'jump';
       else if (this.swimming && !this.onGround) {
         // (swimming: the swim cycle all the time, quicker on a stroke and when going along)
         this.animTime += dt * (4 + speed / 28 + this.stroke * 22);

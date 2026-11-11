@@ -286,8 +286,8 @@ export function drawSeaMid(ctx: Ctx, W: number, H: number, pal: WorldPalette) {
 
 /** Near layer: the sand of the sea bed in front of the reef, sea grass and the odd shell. */
 export function drawSeaNear(ctx: Ctx, W: number, H: number, pal: WorldPalette) {
-  const sea = inked(pal.farInk);
   const r = rng(71);
+  const sea = inked(pal.farInk);
   const sandBack: Fill = { base: pal.near.shade, shade: pal.near.shade, light: pal.near.base };
   for (const [row, fill, y0, rMin] of [[0, sandBack, 40, 26], [1, pal.near, 62, 30]] as const) {
     for (let x = row * 40; x < W + 60; x += 70 + r() * 40) {
@@ -295,17 +295,18 @@ export function drawSeaNear(ctx: Ctx, W: number, H: number, pal: WorldPalette) {
       const y = y0 + r() * 10;
       wrapX(W, (dx) => sea.shape(ctx, ellipsePts(x + dx, y + rr * 0.5, rr * 2, rr * 0.75, 0, 40), fill, 800 + x + row * 999, { lw: 0.7, plain: true, light: [x + dx - rr, y] }));
     }
-    // sea grass tufts on the crests
-    for (let x = 10 + row * 25; x < W; x += 34 + r() * 40) {
-      const y = y0 + 6 + r() * 8;
-      const n = 3 + Math.floor(r() * 3);
-      const g = pal.canopies[Math.floor(r() * pal.canopies.length)];
+    // sea grass clumps on the crests (smaller and hazier on the back row)
+    for (let x = 10 + row * 25; x < W; x += 38 + r() * 46) {
+      const y = y0 + 8 + r() * 8;
+      const kind = Math.floor(r() * GRASS_FILLS.length);
+      const bend = (r() - 0.5) * 0.8;
+      const sc = row ? 0.6 + r() * 0.2 : 0.45 + r() * 0.15;
+      const seed = 840 + Math.floor(x);
       wrapX(W, (dx) => {
-        for (let k = 0; k < n; k++) {
-          const lean = (k - n / 2) * 3 + (r() - 0.5) * 3;
-          const h = 12 + r() * 14;
-          sea.line(ctx, [[x + dx + k * 2, y], [x + dx + k * 2 + lean * 0.5, y - h * 0.55], [x + dx + k * 2 + lean, y - h]], 840 + k, 1.4, row ? g.base : g.shade);
-        }
+        ctx.save();
+        if (!row) ctx.globalAlpha = 0.8;
+        drawSeaGrass(ctx, x + dx, y, kind, bend, seed, sc);
+        ctx.restore();
       });
     }
   }
@@ -318,37 +319,85 @@ export function drawSeaNear(ctx: Ctx, W: number, H: number, pal: WorldPalette) {
 
 // ───────────────────────────── sea bed props ──
 
-/** Short seaweed (frames weed0–weed2), standing on (x, y): a bunch of wavy ribbons. */
-export function drawSeaweed(ctx: Ctx, x: number, y: number, kind: number, seed: number) {
+/** Sea grass colours: green, red, gold, teal. */
+export const GRASS_FILLS: Fill[] = [
+  { base: '#5ec46a', shade: '#2f8a46', light: '#b4f0a4' },
+  { base: '#ef6f8e', shade: '#b23e62', light: '#ffc0d0' },
+  { base: '#d8b24a', shade: '#9a7420', light: '#fbe6a0' },
+  { base: '#4fc0b0', shade: '#24847a', light: '#a8f0e4' },
+];
+
+/**
+ * A clump of sea grass standing on (x, y): long ribbon blades, each tapering to a point with a pale
+ * vein down its middle, leaning by `bend` (−1…1: the current pushing them, most at the tips).
+ */
+export function drawSeaGrass(ctx: Ctx, x: number, y: number, kind: number, bend: number, seed: number, scale = 1) {
   const r = rng(seed);
-  const fills: Fill[] = [PALETTES.sea.canopies[0], { base: '#e0708a', shade: '#b04a66', light: '#ffb6c6' }, { base: '#c8a040', shade: '#8e6c22', light: '#f0d488' }];
-  const fill = fills[kind % fills.length];
-  const n = 3 + (kind % 2);
-  for (let k = 0; k < n; k++) {
-    const lean = (k - (n - 1) / 2) * 5 + (r() - 0.5) * 3;
-    const h = 22 + r() * 14;
-    const w = 3.2 + r() * 1.5;
+  const fill = GRASS_FILLS[kind % GRASS_FILLS.length];
+  const n = 5;
+  const blades: { lean: number; h: number; w: number; ph: number; dx: number }[] = [];
+  for (let k = 0; k < n; k++) blades.push({ lean: (k - (n - 1) / 2) * 3.4 + (r() - 0.5) * 3, h: (26 + r() * 20) * scale, w: (3 + r() * 1.4) * scale, ph: r() * 6, dx: (k - (n - 1) / 2) * 2.2 * scale });
+  // (the tallest at the back)
+  blades.sort((a, b) => b.h - a.h);
+  for (const [i, bl] of blades.entries()) {
+    const spine: Pt[] = [];
+    for (let j = 0; j <= 12; j++) {
+      const t = j / 12;
+      // (each blade a little behind or ahead of the others in the sway)
+      const sway = bend * (0.85 + 0.3 * Math.sin(bl.ph)) * 14 * scale * Math.pow(t, 1.7);
+      spine.push([x + bl.dx + bl.lean * t + Math.sin(t * 5 + bl.ph) * 2 * t + sway, y - t * bl.h * (1 - Math.abs(bend) * 0.06 * t)]);
+    }
     const left: Pt[] = [];
     const right: Pt[] = [];
-    for (let i = 0; i <= 10; i++) {
-      const t = i / 10;
-      const cx = x + lean * t + Math.sin(t * 7 + k * 2) * 3 * t;
-      const cy = y - t * h;
-      const ww = w * (1 - t * 0.75) * (0.85 + 0.15 * Math.sin(t * 12 + k));
-      left.push([cx - ww, cy]);
-      right.push([cx + ww, cy]);
-    }
-    ST.shape(ctx, [...left, ...right.reverse()], fill, seed + k, { lw: 0.6 });
+    spine.forEach(([px, py], j) => {
+      const t = j / 12;
+      const [qx, qy] = spine[Math.min(12, j + 1)];
+      const [ax, ay] = spine[Math.max(0, j - 1)];
+      const dx = qx - ax;
+      const dy = qy - ay;
+      const len = Math.hypot(dx, dy) || 1;
+      const ww = bl.w * (1 - t) ** 0.8 * (0.9 + 0.2 * Math.sin(t * 9 + bl.ph)) + 0.2;
+      left.push([px + (dy / len) * ww, py - (dx / len) * ww]);
+      right.push([px - (dy / len) * ww, py + (dx / len) * ww]);
+    });
+    const f: Fill = i % 2 ? fill : { base: fill.shade, shade: fill.shade, light: fill.base };
+    ST.shape(ctx, [...left, ...right.reverse()], f, seed + i, { lw: 0.55, plain: true });
+    // the pale vein
+    ctx.strokeStyle = fill.light + 'aa';
+    ctx.lineWidth = 0.7 * scale;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    spine.slice(1, 10).forEach(([px, py], j) => (j ? ctx.lineTo(px, py) : ctx.moveTo(px, py)));
+    ctx.stroke();
   }
 }
 
-/** Kelp: one tall golden-green strand with leaves (drawn standing on (x, y), `h` tall). */
-export function drawKelp(ctx: Ctx, x: number, y: number, h: number, seed: number) {
+/** Sea grass on the sea bed: four colours, each in SWAY_N frames of its sway (`g<kind>_<frame>`), drawn in a 44 × 56 cell standing at (22, 54). */
+export const SWAY_N = 8;
+export const GRASS_W = 44;
+export const GRASS_H = 56;
+export const GRASS_FRAMES = Array.from({ length: GRASS_FILLS.length * SWAY_N }, (_, i) => `g${Math.floor(i / SWAY_N)}_${i % SWAY_N}`);
+/** How far a sway frame leans (−1…1). */
+export const swayBend = (i: number) => Math.sin((i / SWAY_N) * Math.PI * 2);
+export function drawGrassFrame(ctx: Ctx, f: string) {
+  const [k, i] = f.slice(1).split('_').map(Number);
+  drawSeaGrass(ctx, 22, 54, k, swayBend(i) * 0.6, 870 + k * 11);
+}
+/** Kelp for the sway sheet (`k<frame>`): KELP_H tall, in a KELP_W-wide cell, standing at its bottom middle. */
+export const KELP_H = 220;
+export const KELP_W = 84;
+export const KELP_FRAMES = Array.from({ length: SWAY_N }, (_, i) => `k${i}`);
+export function drawKelpFrame(ctx: Ctx, f: string) {
+  drawKelp(ctx, KELP_W / 2, KELP_H + 20, KELP_H, 333, swayBend(+f.slice(1)));
+}
+
+/** Kelp: one tall golden-green strand with leaves (drawn standing on (x, y), `h` tall), bent by `bend` (−1…1). */
+export function drawKelp(ctx: Ctx, x: number, y: number, h: number, seed: number, bend = 0) {
   const r = rng(seed);
   const stem: Fill = { base: '#7fae3c', shade: '#4f7e22', light: '#b8dc7a' };
   const leaf: Fill = { base: '#9cc84a', shade: '#62922a', light: '#d4ee98' };
   const ph = r() * 6;
-  const at = (t: number): Pt => [x + Math.sin(t * 4.2 + ph) * 7 * t, y - t * h];
+  const at = (t: number): Pt => [x + Math.sin(t * 4.2 + ph) * 7 * t + bend * 16 * Math.pow(t, 1.8), y - t * h];
   // the stem
   const n = Math.ceil(h / 6);
   const left: Pt[] = [];
@@ -363,12 +412,12 @@ export function drawKelp(ctx: Ctx, x: number, y: number, h: number, seed: number
   // leaves either side, each with a little air float at its root
   const leaves: [Pt, number][] = [];
   for (let t = 0.14; t < 0.98; t += 0.1 + r() * 0.05) leaves.push([at(t), leaves.length % 2 ? -1 : 1]);
-  for (const [[lx, ly], s] of leaves) ST.shape(ctx, petalPts(lx, ly, 15 + r() * 6, 7, s > 0 ? -0.55 : Math.PI + 0.55), leaf, seed + Math.floor(ly), { lw: 0.6 });
+  for (const [[lx, ly], s] of leaves) ST.shape(ctx, petalPts(lx, ly, 15 + r() * 6, 7, (s > 0 ? -0.55 : Math.PI + 0.55) + bend * 0.35), leaf, seed + Math.floor(ly), { lw: 0.6 });
   ST.shape(ctx, [...left, ...right.reverse()], stem, seed, { lw: 0.7 });
   for (const [[lx, ly], s] of leaves) ST.shape(ctx, ellipsePts(lx + s * 1.5, ly, 2.4, 2.4, 0, 12), { base: '#e0c45a', shade: '#a88a2a', light: '#fff2b0' }, seed + 3, { lw: 0.5, plain: true });
   // a frond on top
   const [tx, ty] = at(1);
-  ST.shape(ctx, petalPts(tx, ty + 2, 14, 7, -Math.PI / 2 - 0.3), leaf, seed + 9, { lw: 0.6 });
+  ST.shape(ctx, petalPts(tx, ty + 2, 14, 7, -Math.PI / 2 - 0.3 + bend * 0.5), leaf, seed + 9, { lw: 0.6 });
 }
 
 /** A starfish (radius rr) lying on the sand. */
@@ -412,11 +461,9 @@ export function drawShell(ctx: Ctx, x: number, y: number, s: number, fill: Fill,
 }
 
 /** Props scattered on the sea bed (LevelView): the frame names and how to draw each into a 40 × 48 cell, standing at (20, 46). */
-export const SEA_PROPS = ['weed0', 'weed1', 'weed2', 'coral0', 'coral1', 'coral2', 'brain', 'fan', 'star0', 'star1', 'shell'] as const;
+export const SEA_PROPS = ['coral0', 'coral1', 'coral2', 'brain', 'fan', 'star0', 'star1', 'shell'] as const;
 export const SEA_PROP_W = 40;
 export const SEA_PROP_H = 48;
-/** Which props sway (the plants). */
-export const SEA_SWAYS = (f: string) => f.startsWith('weed');
 const CORALS: Fill[] = [
   { base: '#ff8fa8', shade: '#d0607e', light: '#ffd0dc' },
   { base: '#ffa860', shade: '#d47a34', light: '#ffd8b0' },
@@ -426,10 +473,6 @@ export function drawSeaProp(ctx: Ctx, f: (typeof SEA_PROPS)[number]) {
   const x = 20;
   const y = 46;
   switch (f) {
-    case 'weed0':
-    case 'weed1':
-    case 'weed2':
-      return drawSeaweed(ctx, x, y, +f[4], 900 + +f[4] * 7);
     case 'coral0':
     case 'coral1':
     case 'coral2':

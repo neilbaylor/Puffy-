@@ -29,17 +29,22 @@ export const SWIM_FRAMES: SwimFrame[] = ['sw0', 'sw1', 'sw2', 'sw3', 'sw4', 'sw5
  */
 export type FireFrame = 'fire0' | 'fire1' | 'fire2';
 export const FIRE_FRAMES: FireFrame[] = ['fire0', 'fire1', 'fire2'];
-export type FishFrame = SwimFrame | FireFrame;
+/** A blink: swim frames sw1 and sw4 with the eyes shut (shown for a moment in place of the nearest swim frame). */
+export type BlinkFrame = 'bl1' | 'bl4';
+export const BLINK_FRAMES: BlinkFrame[] = ['bl1', 'bl4'];
+export type FishFrame = SwimFrame | FireFrame | BlinkFrame;
+/** The blink frame to show in place of swim frame `i` (0–5). */
+export const blinkFor = (i: number): BlinkFrame => (i % 6 < 3 ? 'bl1' : 'bl4');
 /** Every fish's frames: the swim cycle (and for the bad guy fish, firing). */
 export const FISH_FRAMES: Record<FishKind, FishFrame[]> = {
-  badguy: [...SWIM_FRAMES, ...FIRE_FRAMES],
-  badguybig: [...SWIM_FRAMES, ...FIRE_FRAMES],
-  kai: SWIM_FRAMES,
-  fat: SWIM_FRAMES,
-  zippy: SWIM_FRAMES,
-  kingbob: SWIM_FRAMES,
-  slinger: SWIM_FRAMES,
-  stone: SWIM_FRAMES,
+  badguy: [...SWIM_FRAMES, ...BLINK_FRAMES, ...FIRE_FRAMES],
+  badguybig: [...SWIM_FRAMES, ...BLINK_FRAMES, ...FIRE_FRAMES],
+  kai: [...SWIM_FRAMES, ...BLINK_FRAMES],
+  fat: [...SWIM_FRAMES, ...BLINK_FRAMES],
+  zippy: [...SWIM_FRAMES, ...BLINK_FRAMES],
+  kingbob: [...SWIM_FRAMES, ...BLINK_FRAMES],
+  slinger: [...SWIM_FRAMES, ...BLINK_FRAMES],
+  stone: [...SWIM_FRAMES, ...BLINK_FRAMES],
 };
 /**
  * How big each fish is in the game: its frame's units × this = game pixels (a hero's 56-unit frame
@@ -92,7 +97,11 @@ const rot = (pts: Pt[], px: number, py: number, a: number): Pt[] => {
 };
 
 /** Where in the swim cycle a frame is (0…2π; the fire frames hold still at the start). */
-const phaseOf = (f: FishFrame) => (f.startsWith('sw') ? (+f.slice(2) / SWIM_FRAMES.length) * Math.PI * 2 : 0);
+const phaseOf = (f: FishFrame) => (f.startsWith('sw') || f.startsWith('bl') ? (+f.slice(2) / SWIM_FRAMES.length) * Math.PI * 2 : 0);
+
+/** Drawing a blink frame: every eye drawn shut, its lid in the body's colour (`lidFill`, the last body drawn). */
+let shut = false;
+let lidFill: Fill = F('#ff9a3c', '#e2661a', '#ffc98c');
 
 /** A forked tail, pinned at (px, py) on the body, `len` long, the two lobes `spread` apart, swung by `a`. */
 function tail(st: Style, ctx: Ctx, px: number, py: number, len: number, spread: number, a: number, fill: Fill, seed: number, root = 0.32) {
@@ -135,6 +144,12 @@ function fin(st: Style, ctx: Ctx, x: number, y: number, len: number, w: number, 
 
 /** The big drawn eye: a white oval, the pupil a dark crescent on its front side, a glint. */
 function eye(st: Style, ctx: Ctx, x: number, y: number, rx: number, ry: number, seed: number) {
+  if (shut) {
+    // the lid down: the eye in the body's colour, a sleepy curve of lashes across it
+    st.shape(ctx, ellipsePts(x, y, rx, ry, 0, 26), lidFill, seed, { lw: 1, light: [x - rx * 0.4, y - ry * 0.6] });
+    st.line(ctx, [[x - rx * 0.8, y + ry * 0.05], [x - rx * 0.3, y + ry * 0.38], [x + rx * 0.3, y + ry * 0.38], [x + rx * 0.82, y + ry * 0.02]], seed + 1, 1.15);
+    return;
+  }
   st.shape(ctx, ellipsePts(x, y, rx, ry, 0, 26), EYE, seed, { lw: 1 });
   ctx.fillStyle = st.ink;
   ctx.beginPath();
@@ -209,7 +224,8 @@ function patches(ctx: Ctx, body: Pt[], draw: () => void) {
 
 /** Draw fish `kind` in swim frame `f`, its frame's top-left at (ox, oy). */
 export function drawFish(ctx: Ctx, ox: number, oy: number, kind: FishKind, f: FishFrame, st: Style = STYLES.polished) {
-  if (!f.startsWith('sw') && kind !== 'badguy' && kind !== 'badguybig') f = 'sw0';
+  if (f.startsWith('fire') && kind !== 'badguy' && kind !== 'badguybig') f = 'sw0';
+  shut = f.startsWith('bl');
   const p = phaseOf(f);
   const fire = f.startsWith('fire') ? +f.slice(4) : -1;
   const sw = Math.sin(p); // the tail's sweep
@@ -250,6 +266,7 @@ export function drawFish(ctx: Ctx, ox: number, oy: number, kind: FishKind, f: Fi
       drawStone(ctx, st, sw, flap, p);
       break;
   }
+  shut = false;
   ctx.restore();
 }
 
@@ -270,6 +287,7 @@ function drawBadGuy(ctx: Ctx, st: Style, sw: number, fire: number, BODY: Fill) {
   tail(st, ctx, cx - 15 * sx, cy, tailLen, fire === 1 ? 11 : 13, tailA, BODY, 9101);
   const body = ellipsePts(cx, cy, 19 * sx, 16 * sy, 0, 40);
   st.shape(ctx, body, BODY, 9102, { lw: 1.1, light: [cx - 4, cy - 9] });
+  lidFill = BODY;
   if (fire === 1) {
     // the shot leaving the tail: a puff of little bubbles and speed lines at its tip
     const tx = cx - 15 * sx - tailLen - 3;
@@ -291,6 +309,7 @@ function drawKai(ctx: Ctx, st: Style, sw: number, flap: number) {
   fin(st, ctx, cx - 6, cy + 14, 24, 9, 2.1 + flap * 0.18, 0.35, GREY_FIN, 9203);
   const body = ellipsePts(cx, cy, 22, 20, 0, 40);
   st.shape(ctx, body, BODY, 9204, { lw: 1.1, light: [cx - 6, cy - 10] });
+  lidFill = BODY;
   // a dark streak over the top of the head, as in the drawing
   patches(ctx, body, () => {
     ctx.fillStyle = '#3a2d8c';
@@ -313,6 +332,7 @@ function drawFat(ctx: Ctx, st: Style, sw: number, _flap: number) {
   tail(st, ctx, cx - 84, cy + 4, 26, 20, sw * 0.3, BODY, 9301, 0.45);
   const body = ellipsePts(cx, cy, 88, 56, -0.06, 60);
   st.shape(ctx, body, BODY, 9302, { lw: 1.4, light: [cx - 30, cy - 30] });
+  lidFill = BODY;
   eye(st, ctx, cx - 12, cy - 22, 11, 14, 9304);
   brow(st, ctx, cx - 12, cy - 40, 22, 9305);
   // the mouth: a big grumpy hook at the front
@@ -350,6 +370,7 @@ function drawZippy(ctx: Ctx, st: Style, sw: number, flap: number) {
   tail(st, ctx, cx - 9, cy, 14, 9, sw * 0.5, BODY, 9401);
   const body = ellipsePts(cx, cy, 12, 11.5, 0, 32);
   st.shape(ctx, body, BODY, 9402, { lw: 1, light: [cx - 4, cy - 6] });
+  lidFill = BODY;
   eye(st, ctx, cx + 2, cy - 3, 3.6, 4, 9404);
   // a big grin
   st.line(ctx, [[cx + 3, cy + 4], [cx + 6.5, cy + 6.5], [cx + 10, cy + 3.5]], 9405, 0.9);
@@ -365,6 +386,7 @@ function drawKingBob(ctx: Ctx, st: Style, sw: number, _flap: number) {
   tail(st, ctx, cx - 25, cy, 24, 16, sw * 0.36, F(ORANGE, '#e2661a', '#ffc98c'), 9501);
   const body = ellipsePts(cx, cy, 28, 26, 0, 44);
   st.shape(ctx, body, BODY, 9502, { lw: 1.2, light: [cx - 8, cy - 12] });
+  lidFill = BODY;
   // orange patches over the top and along the belly
   patches(ctx, body, () => {
     ctx.fillStyle = ORANGE;
@@ -399,6 +421,7 @@ function drawSlinger(ctx: Ctx, st: Style, sw: number, _flap: number) {
     body.push([cx + Math.cos(a) * rx, cy + Math.sin(a) * ry]);
   }
   st.shape(ctx, body, BODY, 9602, { lw: 1.2, light: [cx - 14, cy - 12] });
+  lidFill = BODY;
   // grey patches: a saddle over the back and two on the belly
   patches(ctx, body, () => {
     ctx.fillStyle = GREY.base;
@@ -426,6 +449,7 @@ function drawStone(ctx: Ctx, st: Style, sw: number, _flap: number, p: number) {
   tail(st, ctx, 22, hy, 16, 9, sw * 0.42, BODY, 9701, 0.4);
   const body: Pt[] = [[20, hy - 4], [48, hy - 11], [80, hy - 15], [86, hy], [80, hy + 15], [48, hy + 11], [20, hy + 4]];
   st.shape(ctx, body, BODY, 9702, { lw: 1.1, light: [40, hy - 8] });
+  lidFill = BODY;
   // the grey band round its middle
   patches(ctx, body, () => {
     ctx.fillStyle = BAND.base;

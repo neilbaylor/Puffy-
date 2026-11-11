@@ -50,6 +50,7 @@ export class SeaLife {
   private nextTurtle = 14;
   private bubbleE: Phaser.GameObjects.Particles.ParticleEmitter;
   private splashE: Phaser.GameObjects.Particles.ParticleEmitter;
+  private columnE: Phaser.GameObjects.Particles.ParticleEmitter;
 
   constructor(
     private scene: Phaser.Scene,
@@ -91,6 +92,18 @@ export class SeaLife {
         gravityY: 1100,
       })
       .setDepth(DEPTH.players + 2);
+    this.columnE = scene.add
+      .particles(0, 0, 'puff', {
+        emitting: false,
+        speedX: { min: -30, max: 30 },
+        speedY: { min: -520, max: -300 },
+        lifespan: { min: 500, max: 800 },
+        scale: { start: 0.55, end: 0.15 },
+        alpha: { start: 1, end: 0 },
+        tint: [0xffffff, 0xe6faff],
+        gravityY: 1100,
+      })
+      .setDepth(DEPTH.players + 2);
   }
 
   private addJelly(x: number, y: number) {
@@ -103,6 +116,8 @@ export class SeaLife {
   /** A splash where something goes into the water at x (a dive). */
   splash(x: number, n = 18) {
     this.splashE.explode(n, x, this.surfaceY + 2);
+    // (and a tall column of spray straight up)
+    this.columnE.explode(14, x, this.surfaceY);
     this.bubbles(x, this.surfaceY + 24, 10);
     // a ring of ripples spreading on the surface
     const g = this.scene.add.graphics().setDepth(DEPTH.players + 1);

@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { DEPTH } from '../../config';
 import { sfx } from '../../core/sfx';
 import { ART_RES } from '../../gfx/draw';
-import { BUBBLE_SIZE, FISH_SCALE, FISH_SIZE } from '../../gfx/fish';
+import { BUBBLE_SIZE, FISH_SCALE, FISH_SIZE, blinkFor } from '../../gfx/fish';
 import type { GameScene } from '../../scenes/GameScene';
 import { Enemy, type DeathKind } from './Enemy';
 
@@ -33,6 +33,9 @@ export class BadFish extends Enemy {
   private shotT = -1;
   private fired = false;
   private swimT = Math.random() * 6;
+  /** Till the next blink, and how long the eyes stay shut (s). */
+  private blinkIn = 1 + Math.random() * 3;
+  private blinkFor = 0;
 
   constructor(gs: GameScene, x: number, y: number, big = false) {
     const art = big ? 'badguybig' : 'badguy';
@@ -125,7 +128,15 @@ export class BadFish extends Enemy {
     if (this.gs.level.isSolidAt(this.x, this.y + this.displayHeight * 0.5 + 4) && b.velocity.y > 0) b.setVelocityY(-20);
     // tail sweep: quicker when it's going places
     const rate = 9 + Math.abs(b.velocity.x) / 8;
-    this.setFrame(`sw${Math.floor(this.swimT * rate) % 6}`);
+    const fi = Math.floor(this.swimT * rate) % 6;
+    // (a blink now and then: now and again a double one)
+    this.blinkIn -= dt;
+    if (this.blinkIn <= 0) {
+      this.blinkFor = 0.13;
+      this.blinkIn = Math.random() < 0.2 ? 0.3 : 1.6 + Math.random() * 3.2;
+    }
+    this.blinkFor -= dt;
+    this.setFrame(this.blinkFor > 0 ? blinkFor(fi) : `sw${fi}`);
     this.setRotation(Phaser.Math.Clamp(b.velocity.y / 300, -0.25, 0.25) * this.dir);
   }
 
