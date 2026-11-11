@@ -764,7 +764,6 @@ export class BattleUI {
         <div class="br-stage" style="--sc:${SLOT_COLORS[top[0]?.slot ?? 0]}">
           <div class="br-heroes${top.length > 1 ? ' many' : ''}">${top.map((p) => `<canvas class="br-winner" width="200" height="200" style="--sc:${SLOT_COLORS[p.slot]}"></canvas>`).join('')}</div>
           <span class="br-ribbon">${winner ? 'Winner' : 'Draw'}</span>
-          ${winner ? `<span class="br-wname">${esc(winner.name)}</span>` : ''}
         </div>
         <div class="br-body">
           <h2>${title}</h2>
