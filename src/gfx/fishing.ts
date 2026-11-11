@@ -17,295 +17,488 @@ const F = (base: string, shade: string, light: string): Fill => ({
   light,
 });
 
-/** The boat's picture (world px): its size, where the waterline is, and where folk stand on the stern deck. */
-export const BOAT = {
-  w: 780,
-  h: 380,
-  top: 60,
-  water: 300,
-  deck: 200,
-  hero: 612,
-  king: 470,
-  cooler: 545,
-  motor: 742,
-} as const;
+/**
+ * The boat's picture (world px): its size; where the waterline is; the deck (where the gunwale is, and
+ * where folk stand on the stern); where King Bob's bowl, the cooler and the hero go; the outboards.
+ */
+export const BOAT = { w: 900, h: 450, water: 362, deck: 258, king: 540, cooler: 622, hero: 706, motor: 848, transom: 816 } as const;
 
 const WHITE = F('#fbfbf7', '#d9dde0', '#ffffff');
 const NAVY = F('#1f3a68', '#13264a', '#3c5c94');
 const RED = F('#c8413a', '#9a2b26', '#e8685e');
 const STEEL = F('#c9d1d8', '#8d98a2', '#f2f6f9');
 const BLACK = F('#2a2d33', '#16181c', '#4c515a');
-const GLASS = F('#5d8fae', '#3c6a88', '#a8d4ec');
+const GLASS = F('#3f6f8f', '#2a5470', '#8fc4e2');
+const TEAK = F('#b5773a', '#8a5426', '#dca36a');
 
-/** The hull's outline (bow at the left, raised; flat transom on the right). */
+/** Points along a quadratic curve (n steps, both ends in). */
+const quad = (a: Pt, c: Pt, b: Pt, n = 16): Pt[] =>
+  Array.from({ length: n + 1 }, (_, i) => {
+    const t = i / n;
+    const u = 1 - t;
+    return [u * u * a[0] + 2 * u * t * c[0] + t * t * b[0], u * u * a[1] + 2 * u * t * c[1] + t * t * b[1]];
+  });
+
+/** The sheer line (the top of the hull, bow to stern): sweeping up to a raised bow. */
+const SHEER: Pt[] = [...quad([18, 186], [150, 250], [310, BOAT.deck], 18), [BOAT.transom, BOAT.deck]];
+/** The hull's outline: the sheer, down the transom, along the keel and up the stem to the bow. */
 function hullPts(): Pt[] {
-  const t = BOAT.top;
-  const pts: Pt[] = [];
-  // the sheer line: from the bow tip, sweeping down to the deck line and flat to the stern
-  for (let i = 0; i <= 20; i++) {
-    const u = i / 20;
-    const x = 10 + u * 230;
-    pts.push([x, t + 70 + (BOAT.deck - 70 - t) * (1 - Math.pow(1 - u, 2.2)) + t * 0]);
-  }
-  pts.push([730, BOAT.deck]);
-  // the transom, raked a touch
-  pts.push([726, BOAT.water + 28]);
-  // the keel, sweeping back up to the bow
-  for (let i = 0; i <= 24; i++) {
-    const u = i / 24;
-    const x = 715 - u * 705;
-    const y = BOAT.water + 30 - Math.pow(u, 3.2) * (BOAT.water + 30 - (t + 72));
-    pts.push([x, y]);
-  }
-  return pts;
+  const W = BOAT.water;
+  return [...SHEER, [BOAT.transom - 10, W + 22], ...quad([700, W + 24], [240, W + 26], [150, W + 14], 10).slice(0), ...quad([150, W + 14], [46, W - 10], [18, 186], 14).slice(1)];
+}
+/** A curve parallel-ish to the sheer, `d` below it (for stripes along the hull). */
+const underSheer = (d: number): Pt[] => SHEER.map(([x, y], i) => [x + (i < 18 ? d * 0.18 : 0), y + d]);
+
+const line = (ctx: Ctx, pts: Pt[], w: number, col: string) => {
+  ctx.strokeStyle = col;
+  ctx.lineWidth = w;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+  ctx.stroke();
+};
+/** A stainless tube: a grey line with a bright highlight down it. */
+const tube = (ctx: Ctx, pts: Pt[], w = 4) => {
+  line(ctx, pts, w + 2, '#4b5560');
+  line(ctx, pts, w, '#c9d1d8');
+  line(
+    ctx,
+    pts.map(([x, y]) => [x - w * 0.18, y - w * 0.18]),
+    w * 0.35,
+    '#ffffff',
+  );
+};
+
+/** A rod standing in a holder: the blank, a reel, its line guides. */
+function rackedRod(ctx: Ctx, x: number, y: number, a: number, len: number, col: string) {
+  const x1 = x + Math.cos(a) * len;
+  const y1 = y + Math.sin(a) * len;
+  line(
+    ctx,
+    [
+      [x, y],
+      [x1, y1],
+    ],
+    3.2,
+    '#22252c',
+  );
+  line(
+    ctx,
+    [
+      [x, y],
+      [x + Math.cos(a) * 18, y + Math.sin(a) * 18],
+    ],
+    4.2,
+    '#c89a5e',
+  );
+  ctx.fillStyle = col;
+  ctx.strokeStyle = '#22252c';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.arc(x + Math.cos(a) * 24 + Math.cos(a + Math.PI / 2) * 6, y + Math.sin(a) * 24 + Math.sin(a + Math.PI / 2) * 6, 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
 }
 
 /** The boat (without the cooler, which is its own sprite: the fish go in it). */
 export function drawBoat(ctx: Ctx) {
-  const t = BOAT.top;
-  const r = rng(77);
   const d = BOAT.deck;
-  // ── the T-top: poles, the roof, the radar, the antenna and its pennant, rods racked behind ──
-  const roofY = t + 4;
-  for (const x of [300, 420]) st.shape(ctx, roundRectPts(x - 3, roofY + 10, 6, d - 40 - roofY, 3), STEEL, 1000 + x, { lw: 0.7, plain: true });
-  // rods in the rack, leaning back
-  for (const [x, a] of [
-    [400, -2.25],
-    [414, -2.1],
-    [428, -1.95],
-  ] as const) {
-    const len = 150;
-    const x1 = x + Math.cos(a) * len;
-    const y1 = roofY + 18 + Math.sin(a) * len;
-    ctx.strokeStyle = '#2b2b30';
-    ctx.lineWidth = 2.4;
-    ctx.beginPath();
-    ctx.moveTo(x, roofY + 18);
-    ctx.lineTo(x1, y1);
-    ctx.stroke();
-    ctx.strokeStyle = '#ffd23f';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x1 + 2, y1 + 34);
-    ctx.stroke();
-  }
-  // the antenna, a long whip with a royal pennant at the top
-  st.line(
+  const W = BOAT.water;
+  const r = rng(77);
+
+  // ── up top first: the outrigger, antennas, the hardtop with its radar, the rod rack ──
+  const roofY = d - 172;
+  // the outrigger, a long pole reaching up and forward over the bow, its line hanging off it
+  tube(
     ctx,
     [
-      [452, roofY + 8],
-      [470, roofY - 52],
+      [318, roofY + 8],
+      [92, 14],
     ],
-    1010,
-    1.1,
+    3,
+  );
+  line(
+    ctx,
+    [
+      [96, 18],
+      [150, 120],
+      [205, roofY + 40],
+    ],
+    0.8,
+    'rgba(255,255,255,0.7)',
+  );
+  // whip antennas raked back, a royal pennant on one
+  line(
+    ctx,
+    [
+      [468, roofY + 4],
+      [520, 8],
+    ],
+    2,
     '#e8e8e8',
+  );
+  line(
+    ctx,
+    [
+      [452, roofY + 4],
+      [480, 34],
+    ],
+    1.6,
+    '#d8d8d8',
   );
   st.shape(
     ctx,
     [
-      [468, roofY - 52],
-      [500, roofY - 44],
-      [468, roofY - 36],
+      [518, 10],
+      [552, 18],
+      [518, 27],
     ],
     F('#e8463f', '#b92f2a', '#ff7d70'),
     1011,
     { lw: 0.7 },
   );
-  st.shape(ctx, roundRectPts(270, roofY, 190, 16, 6), NAVY, 1012, { lw: 1 });
-  // radar dome
-  st.shape(ctx, ellipsePts(330, roofY - 7, 20, 10, 0, 28), WHITE, 1013, {
-    lw: 0.9,
-  });
-  st.shape(ctx, roundRectPts(322, roofY - 2, 16, 4, 2), STEEL, 1014, {
-    lw: 0.5,
-    plain: true,
-  });
-  // a blue light on top
-  st.shape(ctx, ellipsePts(440, roofY - 2, 4, 3, 0, 12), F('#5fd7ff', '#2ea6d6', '#cff4ff'), 1015, { lw: 0.5, plain: true });
-
-  // ── the console: white, a raked tinted windshield, a grab rail; a life ring on its side ──
-  const cy0 = d - 78;
+  drawCrownIcon(ctx, 532, 18, 10);
+  // the rod rack ("rocket launcher") along the back edge of the hardtop: rods leaning back
+  for (const [x, a] of [
+    [446, -1.28],
+    [462, -1.18],
+    [478, -1.08],
+    [494, -0.98],
+  ] as const)
+    rackedRod(ctx, x, roofY + 12, a, 112, x % 32 ? '#e8463f' : '#ffd23f');
+  // the frame: stainless tubes from the console and the leaning post up to the hardtop
+  tube(ctx, [
+    [312, d - 70],
+    [306, roofY + 40],
+    [318, roofY + 12],
+  ]);
+  tube(
+    ctx,
+    [
+      [338, d - 70],
+      [334, roofY + 12],
+    ],
+    3,
+  );
+  tube(ctx, [
+    [452, d - 52],
+    [462, roofY + 40],
+    [470, roofY + 12],
+  ]);
+  tube(
+    ctx,
+    [
+      [430, d - 52],
+      [440, roofY + 12],
+    ],
+    3,
+  );
+  // the hardtop: white fibreglass, a navy edge, the canvas shade under it
   st.shape(
     ctx,
     [
-      [278, d],
-      [282, cy0],
-      [404, cy0 + 2],
-      [412, d],
+      [286, roofY + 8],
+      [296, roofY - 4],
+      [494, roofY - 6],
+      [512, roofY + 6],
+      [500, roofY + 18],
+      [290, roofY + 18],
     ],
     WHITE,
-    1020,
-    { lw: 1 },
+    1012,
+    { lw: 1.1, light: [320, roofY - 8] },
   );
+  ctx.fillStyle = NAVY.base;
+  ctx.fillRect(292, roofY + 10, 212, 6);
+  ctx.fillStyle = 'rgba(20,38,74,0.35)';
+  ctx.fillRect(300, roofY + 18, 190, 5);
+  // radar dome and a blue light
+  st.shape(ctx, ellipsePts(390, roofY - 14, 30, 12, 0, 32), WHITE, 1013, { lw: 1 });
+  st.shape(ctx, roundRectPts(378, roofY - 6, 24, 5, 2), STEEL, 1014, { lw: 0.5, plain: true });
+  st.shape(ctx, ellipsePts(320, roofY - 8, 5, 4, 0, 12), F('#5fd7ff', '#2ea6d6', '#cff4ff'), 1015, { lw: 0.6, plain: true });
+
+  // ── the leaning post: a padded backrest on a stainless frame, a tackle station under it ──
+  st.shape(ctx, roundRectPts(420, d - 48, 48, 48, 6), WHITE, 1016, { lw: 1 });
+  for (let i = 0; i < 3; i++) st.shape(ctx, roundRectPts(426, d - 42 + i * 13, 36, 9, 3), F('#e9edf0', '#c6ccd2', '#ffffff'), 1017 + i, { lw: 0.5, plain: true });
+  st.shape(ctx, roundRectPts(430, d - 92, 34, 40, 10), NAVY, 1020, { lw: 1, light: [440, d - 88] });
+  line(
+    ctx,
+    [
+      [436, d - 84],
+      [458, d - 84],
+    ],
+    1,
+    'rgba(255,255,255,0.5)',
+  );
+
+  // ── the console: white, a wrap-around tinted windscreen, the wheel behind it, a grab rail ──
+  // (the wheel and the screen first: they show through the glass)
+  ctx.fillStyle = '#1b2230';
+  ctx.beginPath();
+  ctx.arc(392, d - 98, 15, 0, Math.PI * 2);
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = '#1b2230';
+  ctx.stroke();
+  ctx.fillRect(388, d - 98, 6, 18);
   st.shape(
     ctx,
     [
-      [286, cy0],
-      [300, cy0 - 34],
-      [376, cy0 - 34],
-      [398, cy0 + 1],
+      [300, d],
+      [306, d - 64],
+      [328, d - 82],
+      [410, d - 82],
+      [418, d],
+    ],
+    WHITE,
+    1021,
+    { lw: 1.1, light: [320, d - 76] },
+  );
+  // the console's side: a navy flash and a hatch
+  ctx.fillStyle = NAVY.base;
+  ctx.beginPath();
+  ctx.moveTo(312, d - 46);
+  ctx.lineTo(414, d - 52);
+  ctx.lineTo(415, d - 42);
+  ctx.lineTo(311, d - 36);
+  ctx.closePath();
+  ctx.fill();
+  st.shape(ctx, roundRectPts(340, d - 30, 40, 24, 4), F('#eef1f3', '#cfd5da', '#ffffff'), 1022, { lw: 0.7, plain: true });
+  st.shape(ctx, ellipsePts(374, d - 18, 2.5, 2.5, 0, 10), STEEL, 1023, { lw: 0.4, plain: true });
+  // the windscreen
+  ctx.save();
+  ctx.globalAlpha = 0.82;
+  st.shape(
+    ctx,
+    [
+      [326, d - 82],
+      [348, d - 122],
+      [404, d - 124],
+      [410, d - 82],
     ],
     GLASS,
-    1021,
-    { lw: 1, light: [300, cy0 - 30] },
+    1024,
+    { lw: 1.1, light: [350, d - 120] },
   );
-  // (the glint across the glass)
-  ctx.strokeStyle = 'rgba(255,255,255,0.55)';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(312, cy0 - 4);
-  ctx.lineTo(326, cy0 - 30);
-  ctx.moveTo(326, cy0 - 4);
-  ctx.lineTo(334, cy0 - 20);
-  ctx.stroke();
-  st.line(
+  ctx.restore();
+  line(
     ctx,
     [
-      [288, cy0 + 6],
-      [404, cy0 + 8],
+      [332, d - 88],
+      [348, d - 116],
     ],
-    1022,
-    1.2,
-    '#9aa4ad',
+    3,
+    'rgba(255,255,255,0.6)',
   );
-  // the life ring: red and white quarters
-  const lx = 345;
-  const ly = d - 36;
-  for (let k = 0; k < 4; k++) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(lx, ly);
-    ctx.arc(lx, ly, 19, (k * Math.PI) / 2, ((k + 1) * Math.PI) / 2);
-    ctx.closePath();
-    ctx.clip();
-    st.shape(ctx, ellipsePts(lx, ly, 18, 18, 0, 36), k % 2 ? WHITE : RED, 1030 + k, { lw: 0, noLine: true, plain: true });
-    ctx.restore();
-  }
-  ctx.fillStyle = '#fff';
-  ctx.beginPath();
-  ctx.arc(lx, ly, 9, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = st.ink;
-  ctx.lineWidth = 1.4;
-  ctx.beginPath();
-  ctx.arc(lx, ly, 18, 0, Math.PI * 2);
-  ctx.arc(lx, ly, 9, 0, Math.PI * 2);
-  ctx.stroke();
-  // a bit of rope round it
-  ctx.strokeStyle = '#e8d9b0';
-  ctx.lineWidth = 1.2;
-  for (let k = 0; k < 4; k++) {
-    const a = (k / 4) * Math.PI * 2 + 0.4;
-    ctx.beginPath();
-    ctx.arc(lx + Math.cos(a) * 13.5, ly + Math.sin(a) * 13.5, 3, a + 1.2, a + Math.PI + 1.9);
-    ctx.stroke();
-  }
-
-  // ── the bow rail ──
-  ctx.strokeStyle = '#aab4bd';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(26, t + 52);
-  ctx.quadraticCurveTo(110, t + 86, 236, d - 30);
-  ctx.stroke();
-  for (const [x, y] of [
-    [40, t + 76],
-    [100, t + 102],
-    [170, t + 128],
-    [228, d - 4],
-  ] as const) {
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + 2, y - 24);
-    ctx.stroke();
-  }
-
-  // ── the outboard: up on the transom (its cowling above the deck, the leg down into the water) ──
-  const mx = BOAT.motor;
-  // the leg and the lower unit (mostly under the water)
-  st.shape(
+  line(
     ctx,
     [
-      [mx - 14, d + 10],
-      [mx + 6, d + 10],
-      [mx + 4, BOAT.water + 46],
-      [mx - 10, BOAT.water + 46],
+      [346, d - 88],
+      [356, d - 106],
     ],
-    BLACK,
-    1040,
-    { lw: 1 },
+    2,
+    'rgba(255,255,255,0.45)',
   );
-  st.shape(ctx, roundRectPts(mx - 30, BOAT.water + 30, 50, 9, 4), BLACK, 1041, {
-    lw: 0.8,
-  });
-  // the propeller
-  st.shape(ctx, ellipsePts(mx - 2, BOAT.water + 54, 4, 15, 0.2, 18), STEEL, 1042, { lw: 0.7 });
-  // the bracket on the transom
-  st.shape(ctx, roundRectPts(mx - 22, d - 6, 18, 34, 4), STEEL, 1043, {
-    lw: 0.8,
-    plain: true,
-  });
-  // the cowling: big, glossy black with an orange stripe and the badge
-  const cowl: Pt[] = [];
-  for (let i = 0; i <= 30; i++) {
-    const a = Math.PI + (i / 30) * Math.PI;
-    cowl.push([mx - 6 + Math.cos(a) * 34, d - 52 + Math.sin(a) * 30]);
+  tube(
+    ctx,
+    [
+      [344, d - 124],
+      [406, d - 126],
+    ],
+    2.5,
+  );
+  // the dash: a chart-plotter glowing
+  st.shape(ctx, roundRectPts(358, d - 80, 26, 14, 3), F('#0f1a2a', '#09111c', '#1d3350'), 1025, { lw: 0.6, plain: true });
+  ctx.fillStyle = '#4fd1ff';
+  ctx.fillRect(361, d - 77, 20, 8);
+  ctx.fillStyle = '#ffd23f';
+  ctx.fillRect(366, d - 74, 6, 2);
+  // the grab rail round the console
+  tube(
+    ctx,
+    [
+      [300, d - 60],
+      [302, d - 72],
+      [316, d - 76],
+    ],
+    2.5,
+  );
+  // the front seat ahead of the console: a white box with a navy cushion
+  st.shape(ctx, roundRectPts(236, d - 34, 60, 34, 5), WHITE, 1026, { lw: 1 });
+  st.shape(ctx, roundRectPts(232, d - 44, 68, 13, 6), NAVY, 1027, { lw: 1, light: [240, d - 44] });
+  st.shape(ctx, roundRectPts(232, d - 72, 14, 34, 6), NAVY, 1028, { lw: 0.9 });
+  // a life ring on the leaning post's side
+  lifeRing(ctx, 444, d - 66, 13);
+
+  // ── the bow rail: stainless, sweeping up to the bow ──
+  const rail = quad([30, 160], [140, 218], [262, d - 26], 14);
+  tube(ctx, rail, 2.6);
+  for (const i of [1, 4, 8, 12]) {
+    const [x, y] = rail[i];
+    const sy = SHEER.reduce((b, p) => (Math.abs(p[0] - x) < Math.abs(b[0] - x) ? p : b))[1];
+    tube(
+      ctx,
+      [
+        [x, y],
+        [x + 1, sy],
+      ],
+      2.2,
+    );
   }
-  cowl.push([mx + 28, d - 20], [mx + 20, d + 10], [mx - 32, d + 10], [mx - 40, d - 20]);
-  st.shape(ctx, cowl, BLACK, 1044, { lw: 1.1, light: [mx - 20, d - 70] });
-  ctx.fillStyle = '#ff8a2a';
-  ctx.fillRect(mx - 39, d - 26, 66, 6);
-  ctx.fillStyle = '#ffffff';
-  ctx.font = '900 11px Nunito, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('BOB 300', mx - 6, d - 36);
-  // a glossy highlight across its top
-  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.arc(mx - 6, d - 52, 26, Math.PI * 1.15, Math.PI * 1.55);
-  ctx.stroke();
+  // stern rail by the motors
+  tube(
+    ctx,
+    [
+      [738, d - 30],
+      [802, d - 30],
+      [808, d],
+    ],
+    2.4,
+  );
+  tube(
+    ctx,
+    [
+      [738, d - 30],
+      [738, d],
+    ],
+    2.2,
+  );
+
+  // ── the swim platform and ladder off the stern, the twin outboards on their bracket ──
+  st.shape(ctx, roundRectPts(BOAT.transom - 6, W - 26, 66, 8, 3), TEAK, 1030, { lw: 0.9 });
+  for (let i = 0; i < 6; i++)
+    line(
+      ctx,
+      [
+        [BOAT.transom + i * 10, W - 25],
+        [BOAT.transom + i * 10, W - 19],
+      ],
+      0.8,
+      '#8a5426',
+    );
+  tube(
+    ctx,
+    [
+      [BOAT.transom + 54, W - 26],
+      [BOAT.transom + 58, W + 30],
+    ],
+    2.2,
+  );
+  tube(
+    ctx,
+    [
+      [BOAT.transom + 46, W - 26],
+      [BOAT.transom + 50, W + 30],
+    ],
+    2.2,
+  );
+  for (const k of [0, 1]) {
+    // (the far motor a touch higher and darker, behind the near one)
+    const mx = BOAT.motor - 18 + k * 18;
+    const dy = k ? 0 : -6;
+    const body = k ? BLACK : F('#1d1f24', '#111216', '#383c44');
+    st.shape(
+      ctx,
+      [
+        [mx - 12, d + 14 + dy],
+        [mx + 6, d + 14 + dy],
+        [mx + 4, W + 44],
+        [mx - 10, W + 44],
+      ],
+      body,
+      1040 + k,
+      { lw: 1 },
+    );
+    st.shape(ctx, roundRectPts(mx - 30, W + 30, 50, 8, 4), body, 1042 + k, { lw: 0.8 });
+    st.shape(
+      ctx,
+      [
+        [mx - 8, W + 44],
+        [mx + 2, W + 44],
+        [mx - 2, W + 60],
+      ],
+      body,
+      1044 + k,
+      { lw: 0.7 },
+    );
+    st.shape(ctx, ellipsePts(mx + 8, W + 50, 3.5, 13, 0.25, 16), STEEL, 1046 + k, { lw: 0.6 });
+    // the cowling: big and glossy, an orange stripe, vents, the badge
+    const cy = d - 52 + dy;
+    const cowl: Pt[] = [];
+    for (let i = 0; i <= 30; i++) {
+      const a = Math.PI + (i / 30) * Math.PI;
+      cowl.push([mx - 4 + Math.cos(a) * 34, cy + Math.sin(a) * 30]);
+    }
+    cowl.push([mx + 30, cy + 32], [mx + 22, d + 16 + dy], [mx - 32, d + 16 + dy], [mx - 40, cy + 32]);
+    st.shape(ctx, cowl, body, 1048 + k, { lw: 1.1, light: [mx - 22, cy - 22] });
+    if (k) {
+      ctx.fillStyle = '#ff8a2a';
+      ctx.fillRect(mx - 39, cy + 26, 68, 5);
+      ctx.fillStyle = '#4c515a';
+      for (let i = 0; i < 4; i++) ctx.fillRect(mx + 4 + i * 5, cy - 6, 2.5, 12);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 11px Nunito, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('BOB 300', mx - 12, cy + 18);
+      drawCrownIcon(ctx, mx - 12, cy + 2, 13);
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(mx - 4, cy, 26, Math.PI * 1.12, Math.PI * 1.55);
+      ctx.stroke();
+    }
+    // the bracket on the transom
+    st.shape(ctx, roundRectPts(mx - 34, d + 8 + dy, 16, 30, 3), STEEL, 1050 + k, { lw: 0.7, plain: true });
+  }
 
   // ── the hull ──
   const hull = hullPts();
-  st.shape(ctx, hull, WHITE, 1050, { lw: 1.3, light: [200, d - 20] });
+  st.shape(ctx, hull, WHITE, 1060, { lw: 1.3, light: [220, d + 10] });
   ctx.save();
   ctx.beginPath();
   hull.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
   ctx.closePath();
   ctx.clip();
+  // the shade on the lower hull, under the spray rail
+  const chine = quad([40, 240], [240, 318], [BOAT.transom, 330], 20);
+  ctx.fillStyle = 'rgba(70,95,125,0.16)';
+  ctx.beginPath();
+  chine.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+  ctx.lineTo(BOAT.transom + 20, W + 40);
+  ctx.lineTo(0, W + 40);
+  ctx.closePath();
+  ctx.fill();
   // the boot stripe and the antifouling under the waterline
   ctx.fillStyle = NAVY.base;
-  ctx.fillRect(0, BOAT.water - 22, BOAT.w, 14);
+  ctx.fillRect(0, W - 16, BOAT.w, 12);
   ctx.fillStyle = RED.base;
-  ctx.fillRect(0, BOAT.water - 8, BOAT.w, 80);
-  ctx.fillStyle = 'rgba(0,0,0,0.12)';
-  ctx.fillRect(0, BOAT.water + 12, BOAT.w, 60);
-  // a navy sheer stripe just under the gunwale, sweeping up to the bow
-  ctx.strokeStyle = NAVY.base;
-  ctx.lineWidth = 7;
+  ctx.fillRect(0, W - 4, BOAT.w, 80);
+  ctx.fillStyle = 'rgba(0,0,0,0.14)';
+  ctx.fillRect(0, W + 10, BOAT.w, 60);
+  // a navy sheer stripe sweeping up to the bow, a gold pinstripe under it
+  ctx.fillStyle = NAVY.base;
   ctx.beginPath();
-  ctx.moveTo(14, t + 80);
-  ctx.quadraticCurveTo(120, d - 4, 260, d + 12);
-  ctx.lineTo(740, d + 12);
-  ctx.stroke();
-  ctx.strokeStyle = '#ffd23f';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(18, t + 90);
-  ctx.quadraticCurveTo(122, d + 4, 262, d + 20);
-  ctx.lineTo(740, d + 20);
-  ctx.stroke();
-  // the hull's shading: a soft shadow under the rub rail
-  const g = ctx.createLinearGradient(0, d, 0, BOAT.water - 22);
-  g.addColorStop(0, 'rgba(40,60,90,0.18)');
-  g.addColorStop(0.3, 'rgba(40,60,90,0)');
-  g.addColorStop(1, 'rgba(40,60,90,0.12)');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, d, BOAT.w, BOAT.water - d);
+  [...underSheer(10), ...underSheer(26).reverse()].forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+  ctx.closePath();
+  ctx.fill();
+  line(ctx, underSheer(31), 2.2, '#ffd23f');
+  // the gloss: a long soft highlight along the topsides
+  const gl = ctx.createLinearGradient(0, d + 34, 0, d + 52);
+  gl.addColorStop(0, 'rgba(255,255,255,0)');
+  gl.addColorStop(0.5, 'rgba(255,255,255,0.75)');
+  gl.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = gl;
+  ctx.fillRect(200, d + 34, 560, 18);
   ctx.restore();
-  // (the outline again, over the stripes)
+  // the spray rail itself
+  line(ctx, chine, 2, 'rgba(255,255,255,0.9)');
+  line(
+    ctx,
+    chine.map(([x, y]) => [x, y + 2.2]),
+    1.2,
+    'rgba(60,80,110,0.4)',
+  );
+  // the outline again, over the stripes
   ctx.strokeStyle = st.ink;
   ctx.lineWidth = 2.6;
   ctx.lineJoin = 'round';
@@ -313,56 +506,119 @@ export function drawBoat(ctx: Ctx) {
   hull.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
   ctx.closePath();
   ctx.stroke();
-  // the rub rail along the gunwale
-  ctx.strokeStyle = '#59636d';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  for (let i = 0; i <= 20; i++) {
-    const [x, y] = hull[i];
-    if (i) ctx.lineTo(x, y + 2);
-    else ctx.moveTo(x, y + 2);
-  }
-  ctx.lineTo(730, d + 2);
-  ctx.stroke();
-  // her name, with a little crown
-  ctx.fillStyle = NAVY.base;
-  ctx.font = '900 30px "Luckiest Guy", "Nunito", sans-serif';
+  // the teak cap rail along the gunwale, the rub rail under it
+  line(
+    ctx,
+    SHEER.map(([x, y]) => [x, y + 7]),
+    3,
+    '#5b6670',
+  );
+  line(ctx, SHEER, 7, '#6b3f1c');
+  line(ctx, SHEER, 5, TEAK.base);
+  line(
+    ctx,
+    SHEER.map(([x, y]) => [x, y - 1.2]),
+    1.4,
+    TEAK.light,
+  );
+  // her name (sporty, leaning forward) with a little crown, and a gold shadow
+  ctx.save();
+  ctx.translate(352, d + 78);
+  ctx.transform(1, 0, -0.18, 1, 0, 0);
+  ctx.font = '400 38px "Lilita One", "Arial Black", sans-serif';
   ctx.textAlign = 'left';
-  ctx.fillText('REEL ROYAL', 300, d + 64);
-  drawCrownIcon(ctx, 278, d + 50, 16);
-  // portholes up at the bow
-  for (const x of [120, 156]) {
-    const y = d + 28 - (x < 140 ? 6 : 2);
-    st.shape(ctx, ellipsePts(x, y, 7, 7, 0, 18), STEEL, 1060 + x, {
-      lw: 0.8,
-      plain: true,
-    });
-    st.shape(ctx, ellipsePts(x, y, 4.5, 4.5, 0, 14), GLASS, 1061 + x, {
-      lw: 0.4,
-      plain: true,
-    });
+  ctx.fillStyle = '#d9a316';
+  ctx.fillText('REEL ROYAL', 2, 2);
+  ctx.fillStyle = NAVY.base;
+  ctx.fillText('REEL ROYAL', 0, 0);
+  ctx.restore();
+  drawCrownIcon(ctx, 330, d + 64, 22);
+  // the anchor at the bow, a nav light, portholes
+  anchor(ctx, 66, 238);
+  st.shape(ctx, ellipsePts(32, 196, 4, 3, 0, 10), F('#e8463f', '#b92f2a', '#ff9a90'), 1070, { lw: 0.6, plain: true });
+  for (const [x, y] of [
+    [124, 262],
+    [160, 270],
+  ] as const) {
+    st.shape(ctx, ellipsePts(x, y, 8, 8, 0, 20), STEEL, 1071 + x, { lw: 0.9, plain: true });
+    st.shape(ctx, ellipsePts(x, y, 5, 5, 0, 16), GLASS, 1072 + x, { lw: 0.4, plain: true });
   }
-  // fenders hanging over the side on ropes
-  for (const x of [222, 640]) {
-    st.line(
+  // fenders on ropes over the side
+  for (const x of [262, 700]) {
+    line(
       ctx,
       [
-        [x, d + 2],
-        [x + 1, d + 18],
+        [x, d - 2],
+        [x + 1, d + 30],
       ],
-      1070 + x,
-      1,
+      1.2,
       '#e8d9b0',
     );
-    st.shape(ctx, roundRectPts(x - 7, d + 18, 14, 40, 7), F('#2f7fd6', '#1f5ea6', '#7ab6f2'), 1071 + x, { lw: 0.9 });
+    st.shape(ctx, roundRectPts(x - 9, d + 30, 18, 44, 9), WHITE, 1080 + x, { lw: 1 });
+    st.shape(ctx, roundRectPts(x - 9, d + 30, 18, 9, 4), NAVY, 1081 + x, { lw: 0.6, plain: true });
+    st.shape(ctx, roundRectPts(x - 9, d + 65, 18, 9, 4), NAVY, 1082 + x, { lw: 0.6, plain: true });
   }
-  // a cleat or two
-  for (const x of [250, 690])
-    st.shape(ctx, roundRectPts(x - 9, d - 5, 18, 5, 2), STEEL, 1080 + x, {
-      lw: 0.6,
-      plain: true,
-    });
   void r;
+}
+
+/** A red-and-white life ring (radius R) with its rope. */
+function lifeRing(ctx: Ctx, lx: number, ly: number, R: number) {
+  for (let k = 0; k < 4; k++) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(lx, ly);
+    ctx.arc(lx, ly, R + 1, (k * Math.PI) / 2, ((k + 1) * Math.PI) / 2);
+    ctx.closePath();
+    ctx.clip();
+    ctx.fillStyle = k % 2 ? '#fbfbf7' : RED.base;
+    ctx.beginPath();
+    ctx.arc(lx, ly, R, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.fillStyle = '#20406e';
+  ctx.beginPath();
+  ctx.arc(lx, ly, R * 0.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = st.ink;
+  ctx.lineWidth = 1.3;
+  ctx.beginPath();
+  ctx.arc(lx, ly, R, 0, Math.PI * 2);
+  ctx.moveTo(lx + R * 0.5, ly);
+  ctx.arc(lx, ly, R * 0.5, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+/** A little steel anchor on the bow, centred at (x, y). */
+function anchor(ctx: Ctx, x: number, y: number) {
+  ctx.strokeStyle = '#5b6670';
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(x, y - 9);
+  ctx.lineTo(x, y + 9);
+  ctx.moveTo(x - 6, y - 4);
+  ctx.lineTo(x + 6, y - 4);
+  ctx.moveTo(x - 9, y + 3);
+  ctx.quadraticCurveTo(x, y + 14, x + 9, y + 3);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(x, y - 12, 3, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+/** The soft shadow of the hull under the water (w × h). */
+export function drawHullShadow(ctx: Ctx, w: number, h: number) {
+  const g = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+  g.addColorStop(0, 'rgba(5,30,60,0.55)');
+  g.addColorStop(1, 'rgba(5,30,60,0)');
+  ctx.fillStyle = g;
+  ctx.save();
+  ctx.scale(1, h / w);
+  ctx.beginPath();
+  ctx.arc(w / 2, w / 2, w / 2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
 
 /** A little gold crown (for the boat's name and the pennant), centred at (x, y), w wide. */

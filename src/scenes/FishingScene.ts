@@ -3,8 +3,8 @@ import { characterById } from '../data/characters';
 import type { Session } from '../core/session';
 import { fadeOutMusic, playHoops } from '../core/music';
 import { sfx } from '../core/sfx';
-import { ART_RES, CHAR_H, CHAR_W, carryHand } from '../gfx/draw';
-import { CAST_ANGLES, HERO_SHEET_M, addCanvas, hires, makeCastSheet, makeFishFrames } from '../gfx/textures';
+import { ART_RES, CHAR_H, CHAR_W, carryHand, drawCharacter } from '../gfx/draw';
+import { CAST_ANGLES, HERO_SHEET_M, addCanvas, fishingWear, hires, makeCastSheet, makeFishFrames } from '../gfx/textures';
 import {
   BOAT,
   BOBBER,
@@ -21,6 +21,7 @@ import {
   drawDrop,
   drawFarSeaStrip,
   drawFishShadow,
+  drawHullShadow,
   drawIsland,
   drawRay,
   drawRipple,
@@ -28,7 +29,7 @@ import {
   drawStarburst,
   drawWaveTile,
 } from '../gfx/fishing';
-import { FISH_SIZE, type FishKind } from '../gfx/fish';
+import { FISH_SIZE, drawFish, type FishKind } from '../gfx/fish';
 import { stingerReveal, stingerTitle } from '../ui/stinger';
 import { gamepadSources } from '../input/gamepad';
 import { isKeyDown } from '../input/keyboard';
@@ -64,7 +65,7 @@ const KING_CATCH = 0.5;
 /** A hero's size here: world px per art unit. */
 const HERO_K = 2.15;
 /** How long the BITE button can be hit for (ms). */
-const BITE_MS = 820;
+const BITE_MS = 850;
 /** The rods: length (world px), and how far the handle reaches behind the hands. */
 const ROD_LEN = 178;
 const ROD_BUTT = 34;
@@ -264,6 +265,7 @@ export class FishingScene extends Phaser.Scene {
         });
     };
     add('fl-boat', BOAT.w, BOAT.h, 1.5, (ctx) => drawBoat(ctx));
+    add('fl-hullshadow', 256, 64, 1, (ctx) => drawHullShadow(ctx, 256, 64));
     add('fl-cooler', COOLER.w, COOLER.h, 2, (ctx) => drawCooler(ctx, false));
     add('fl-cooler-open', COOLER.w, COOLER.h, 2, (ctx) => drawCooler(ctx, true));
     add('fl-bowl-back', BOWL.w, BOWL.h, 2, (ctx) => drawBowlBack(ctx));
@@ -375,6 +377,12 @@ export class FishingScene extends Phaser.Scene {
       .image(0, 0, 'fl-boat')
       .setScale(1 / 1.5)
       .setDepth(4);
+    // (the hull's shadow down in the water under it)
+    this.add
+      .image(BOAT_X + BOAT.w * 0.46, WATER + 64, 'fl-hullshadow')
+      .setDisplaySize(BOAT.w * 1.05, 150)
+      .setDepth(1.25)
+      .setAlpha(0.8);
     this.cooler = this.add
       .image(0, 0, 'fl-cooler')
       .setScale(1 / 2)
@@ -450,20 +458,23 @@ export class FishingScene extends Phaser.Scene {
     this.dom.className = 'hoops fishing';
     this.dom.innerHTML = `
       <div class="fsh-board" hidden>
-        <div class="fsh-row" data-who="hero"><span class="fsh-name">You</span><span class="fsh-dots"></span><b class="fsh-total">0</b></div>
-        <div class="fsh-row" data-who="king"><span class="fsh-name">King Bob</span><span class="fsh-dots"></span><b class="fsh-total">0</b></div>
-        <div class="fsh-round"></div>
+        <div class="tv-head"><i class="tv-logo"></i><span class="tv-title"><small>KING BOB'S</small>FISH-OFF</span><span class="tv-live"><i></i>LIVE</span></div>
+        <div class="fsh-row" data-who="hero"><img class="tv-face" alt=""><span class="fsh-name">${ch.name.toUpperCase()}</span><span class="fsh-dots"></span><b class="fsh-total">0</b></div>
+        <div class="fsh-row" data-who="king"><img class="tv-face" alt=""><span class="fsh-name">KING BOB</span><span class="fsh-dots"></span><b class="fsh-total">0</b></div>
+        <div class="tv-foot"><span class="fsh-round"></span><span class="tv-best"></span></div>
       </div>
+      <div class="tv-ticker" hidden><b>REEL ROYAL TV</b><div class="tv-crawl"><span></span></div></div>
       <div class="hoops-meters fsh-meter" hidden>
         <div class="hm" data-m="power"><b>Cast</b><div class="hm-bar"><i class="hm-zone"></i><i class="hm-mark"></i></div></div>
         <p class="hm-hint">${usingTouch() ? 'Tap' : 'Press Space or click'} to stop the marker in the green!</p>
       </div>
-      <button class="fsh-bite" hidden aria-label="Bite: strike now"><b>BITE!</b></button>
+      <button class="fsh-bite" hidden aria-label="Bite: strike now"><svg class="fb-ring" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="45" pathLength="100"></circle></svg><b>BITE!</b></button>
       <div class="fsh-callout"></div>
-      <div class="fsh-catch" hidden><small></small><b></b><span></span></div>
+      <div class="fsh-catch" hidden><em></em><div class="lt"><small></small><b></b><span></span></div></div>
       <button class="hoops-skip" hidden>Skip ›</button>`;
     document.getElementById('ui')!.appendChild(this.dom);
     window.addEventListener('pointerdown', this.tapListener);
+    this.drawPortraits();
     const bite = this.dom.querySelector<HTMLButtonElement>('.fsh-bite')!;
     bite.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
@@ -599,7 +610,7 @@ export class FishingScene extends Phaser.Scene {
 
   /** Frame the boat (the stern, King Bob and the sea just off it). */
   private shotBoat(zoom = 1) {
-    this.cam = { x: BOAT_X + 560, y: WATER - 70, zoom };
+    this.cam = { x: BOAT_X + BOAT.hero - 110, y: WATER - 70, zoom };
   }
   /** Frame the hero's line: from the boat out to the bobber. */
   private shotLine(who: Who = 'hero') {
@@ -964,7 +975,69 @@ export class FishingScene extends Phaser.Scene {
       row.querySelector('.fsh-dots')!.innerHTML = Array.from({ length: n }, (_, i) => `<i class="${i < s.length ? (s[i] ? 'got' : 'miss') : ''}${i >= ROUNDS ? ' sd' : ''}"></i>`).join('');
       row.querySelector('.fsh-total')!.textContent = String(s.filter(Boolean).length);
     }
-    board.querySelector('.fsh-round')!.textContent = round > ROUNDS ? 'Sudden death' : `Round ${round} of ${ROUNDS}`;
+    board.querySelector('.fsh-round')!.textContent = round > ROUNDS ? 'SUDDEN DEATH' : `ROUND ${round} OF ${ROUNDS}`;
+    const b = this.best;
+    board.querySelector('.tv-best')!.innerHTML = b ? `BIGGEST <b>${b.lb.toFixed(1)} lb</b> ${b.who === 'king' ? 'King Bob' : 'You'}` : 'BIGGEST <b>—</b>';
+    this.tickerOn();
+  }
+
+  /** The biggest fish caught so far (for the scoreboard's footer and the ticker). */
+  private best: { who: Who; name: string; lb: number } | null = null;
+  /** News for the ticker: the latest catches first. */
+  private news: string[] = [];
+  /** A catch: onto the board (if it's the biggest) and the ticker. */
+  private logCatch(who: Who, name: string, lb: number) {
+    if (!this.best || lb > this.best.lb) this.best = { who, name, lb };
+    const by = who === 'king' ? 'KING BOB' : characterById(this.fd.charId).name.toUpperCase();
+    this.news.unshift(`${by} LANDS A ${lb.toFixed(1)} LB ${name.toUpperCase()}!`);
+    this.news.length = Math.min(this.news.length, 3);
+    this.tickerOn(true);
+  }
+  /** The news crawl along the bottom (redone when there's news). */
+  private tickerOn(fresh = false) {
+    const t = this.dom.querySelector<HTMLElement>('.tv-ticker')!;
+    const span = t.querySelector<HTMLElement>('.tv-crawl span')!;
+    if (!t.hidden && !fresh) return;
+    t.hidden = false;
+    const items = [
+      ...this.news,
+      'WATER 72°F',
+      'WIND NE 6 KNOTS',
+      'SEAS 1–2 FT',
+      'KING BOB: 312 CONTESTS, 312 WINS',
+      'PRO TIP: STOP THE MARKER IN THE GREEN FOR MORE BITES',
+      'THE BITES DON’T WAIT — STRIKE FAST!',
+    ];
+    span.textContent = items.join('   ◆   ') + '   ◆   ';
+    span.style.animation = 'none';
+    void span.offsetWidth;
+    span.style.animation = '';
+  }
+
+  /** The faces on the scoreboard: the hero (as they are on the boat) and King Bob, drawn small. */
+  private drawPortraits() {
+    const ch = characterById(this.fd.charId);
+    const mk = (w: number, h: number, fn: (ctx: CanvasRenderingContext2D) => void) => {
+      const c = document.createElement('canvas');
+      c.width = w * 2;
+      c.height = h * 2;
+      const ctx = c.getContext('2d')!;
+      ctx.scale(2, 2);
+      fn(ctx);
+      return c.toDataURL();
+    };
+    const hero = mk(40, 40, (ctx) => {
+      // (the head and shoulders: the top of the frame)
+      ctx.translate(-8, 2);
+      drawCharacter(ctx, 0, 0, ch, 'idle0', undefined, fishingWear());
+    });
+    const king = mk(40, 40, (ctx) => {
+      ctx.scale(0.5, 0.5);
+      ctx.translate(-14, -8);
+      drawFish(ctx, 0, 0, 'kingbob', 'sw0');
+    });
+    this.dom.querySelector<HTMLImageElement>('[data-who=hero] .tv-face')!.src = hero;
+    this.dom.querySelector<HTMLImageElement>('[data-who=king] .tv-face')!.src = king;
   }
   private total(who: Who) {
     return this.score[who].filter(Boolean).length;
@@ -1094,8 +1167,8 @@ export class FishingScene extends Phaser.Scene {
 
   /** King Bob says something (a bubble over his bowl). */
   private async kingSays(text: string, ms: number) {
-    // (up to the left of his bowl, the tail pointing in at him: clear of the scoreboard and the hero)
-    const at = this.onBoat(BOAT.king - 52, BOAT.deck - BOWL.h + 34);
+    // (up to the right of his bowl, the tail pointing in at him: clear of the scoreboard in the corner)
+    const at = this.onBoat(BOAT.king + 48, BOAT.deck - BOWL.h + 30);
     const t = this.add
       .text(0, 0, text, { fontFamily: 'Nunito, sans-serif', fontSize: '17px', fontStyle: '900', color: '#3a2418', align: 'center', wordWrap: { width: 200 } })
       .setOrigin(0.5)
@@ -1103,13 +1176,13 @@ export class FishingScene extends Phaser.Scene {
       .setResolution(3);
     const w = t.width + 26;
     const h = t.height + 16;
-    const bx = at.x - w / 2 - 26;
+    const bx = at.x + w / 2 + 18;
     const by = at.y - h / 2 - 34;
     t.setPosition(bx, by);
     const g = this.add.graphics().setDepth(10.9);
     g.fillStyle(0xffffff, 1).lineStyle(3, 0x3a2418, 1);
     g.fillRoundedRect(bx - w / 2, by - h / 2, w, h, 12).strokeRoundedRect(bx - w / 2, by - h / 2, w, h, 12);
-    const tx = bx + w / 2 - 22;
+    const tx = bx - w / 2 + 16;
     const ty = by + h / 2 - 2;
     g.fillTriangle(tx - 10, ty, tx + 6, ty, at.x, at.y);
     g.lineBetween(tx - 10, ty + 1, at.x, at.y).lineBetween(tx + 6, ty + 1, at.x, at.y);
@@ -1151,7 +1224,7 @@ export class FishingScene extends Phaser.Scene {
     this.heroPose = null;
     this.arm = -0.5;
     const startX = L.x;
-    const endX = BOAT_X + BOAT.hero + 150;
+    const endX = BOAT_X + BOAT.motor + 80;
     const gaps = Array.from({ length: bites }, () => 1100 + Math.random() * 700);
     const total = gaps.reduce((a, b) => a + b, 0) + 900;
     const t0 = this.clock;
@@ -1354,7 +1427,7 @@ export class FishingScene extends Phaser.Scene {
     this.camK = 3;
     // the fight: in towards the boat, thrashing, the rod bending
     const x0 = L.x;
-    const xEnd = BOAT_X + BOAT.hero + 190;
+    const xEnd = BOAT_X + BOAT.motor + 90;
     const dur = 2300;
     const t0 = this.clock;
     let leapt = false;
@@ -1435,7 +1508,9 @@ export class FishingScene extends Phaser.Scene {
     sfx.kaching();
     this.camK = 3;
     const card = this.dom.querySelector<HTMLElement>('.fsh-catch')!;
-    card.querySelector('small')!.textContent = c.rare ? 'WOW! A rare one!' : 'You caught a';
+    card.querySelector('em')!.textContent = c.rare ? 'RARE CATCH!' : 'FISH ON THE BOARD!';
+    card.querySelector('small')!.textContent = `${characterById(this.fd.charId).name} lands a`;
+    this.logCatch('hero', c.name, lb);
     card.querySelector('b')!.textContent = c.name;
     card.querySelector('span')!.textContent = `${lb.toFixed(1)} lb`;
     card.classList.toggle('rare', !!c.rare);
@@ -1611,7 +1686,7 @@ export class FishingScene extends Phaser.Scene {
     r.reelRate = 2.6;
     const got = Math.random() < KING_CATCH;
     const x0 = L.x;
-    const xEnd = BOAT_X + BOAT.king + 210;
+    const xEnd = BOAT_X + BOAT.motor + 70;
     const dur = 2400;
     const t0 = this.clock;
     let nib = 0;
@@ -1683,7 +1758,9 @@ export class FishingScene extends Phaser.Scene {
       r.bend = 0;
       sfx.laugh();
       void this.kingSays(['HA HA! Another one!', 'Too easy!', 'The King always delivers!', 'Look at THIS beauty!'][Math.floor(Math.random() * 4)], 1500);
-      await this.callout(`KING BOB CAUGHT<small>a ${c.name}</small>`, 'king', 1400);
+      const lb = Math.round((c.lb[0] + Math.random() * (c.lb[1] - c.lb[0])) * 10) / 10;
+      this.logCatch('king', c.name, lb);
+      await this.callout(`KING BOB CAUGHT<small>a ${c.name} · ${lb.toFixed(1)} lb</small>`, 'king', 1400);
     } else {
       sfx.groan();
       await this.callout('NOTHING<small>for King Bob</small>', 'good', 1100);
@@ -1708,8 +1785,8 @@ export class FishingScene extends Phaser.Scene {
         sfx.pop();
       });
     sfx.cheer();
-    void this.kingSays('WHAT?! Impossible!', 2000);
-    await this.callout(`YOU WIN!<small>${this.total('hero')} – ${this.total('king')}</small>`, 'good big', 2600);
+    await this.callout(`YOU WIN!<small>${this.total('hero')} – ${this.total('king')}</small>`, 'good big', 2400);
+    await this.kingSays('WHAT?! Impossible!', 1700);
     fadeOutMusic(500);
     const result: ResultState = {
       ...this.fd.result,
@@ -1723,7 +1800,7 @@ export class FishingScene extends Phaser.Scene {
     this.shotBoat(1.25);
     this.cam.x = BOAT_X + BOAT.king + 40;
     sfx.laugh();
-    void this.kingSays('HA HA HA! Nobody beats the King!', 2200);
+    await this.kingSays('HA HA HA! Nobody beats the King!', 1900);
     const practice = !!this.fd.result?.practice;
     const hadLife = practice || loseLife();
     const next = practice ? '' : hadLife ? ' · back to your last checkpoint' : ' · no lives left';
