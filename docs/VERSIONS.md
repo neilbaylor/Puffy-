@@ -248,3 +248,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.243: Shop: "Take them off" (sunglasses), "Stop Riding" (skateboard).
 - v0.244: Shop: "Wear them" for the sunglasses.
 - v0.245: Level 5 test (under the sea) for the account neil: swimming, dive off the pier, bad guy fish shooting bubbles.
+- v0.246: Level 5: swan dive, crab tennis (two courts), fish blink, swaying sea grass.
