@@ -18,7 +18,7 @@ interface Drifter {
   ph: number;
   /** Parallax: how much it moves with the camera (0 = stuck to the screen, 1 = with the world). */
   k: number;
-  kind: 'jelly' | 'fish' | 'turtle';
+  kind: 'jelly' | 'fish' | 'turtle' | 'octo';
 }
 
 interface Crab {
@@ -48,7 +48,12 @@ export class SeaLife {
   private crabs: Crab[] = [];
   private nextSchool = 3;
   private nextTurtle = 14;
+  /** The turtle and the octopus take turns. */
+  private octoNext = true;
   private bubbleE: Phaser.GameObjects.Particles.ParticleEmitter;
+  private darkImg: Phaser.GameObjects.Image | null = null;
+  /** How dark it is now, 0…1. */
+  private darkK = 0;
   private splashE: Phaser.GameObjects.Particles.ParticleEmitter;
   private columnE: Phaser.GameObjects.Particles.ParticleEmitter;
 
@@ -58,7 +63,10 @@ export class SeaLife {
     readonly surfaceY: number,
     private widthPx: number,
     private groundBelow: (x: number, y: number, max: number) => number | null,
+    /** Down a trench it gets dark: from this world y (none) to this one (as dark as it gets). */
+    private dark?: [number, number],
   ) {
+    if (dark) this.darkImg = scene.add.image(0, 0, 'sea-dark').setDepth(DEPTH.fx + 2).setVisible(false);
     // the sky over the water (a row of the same picture across the level), a plain colour above it
     for (let x = -512; x < widthPx + 1024; x += 1024) this.sky.push(scene.add.image(x, surfaceY + 6, 'sea-sky').setOrigin(0, 1).setDisplaySize(1024, 160).setDepth(DEPTH.near + 4));
     this.skyTop = scene.add.rectangle(-600, surfaceY - 160 * 1 + 8, widthPx + 1800, 2000, 0x5fc0f6).setOrigin(0, 1).setDepth(DEPTH.near + 4);
@@ -141,9 +149,19 @@ export class SeaLife {
     this.bubbleE.explode(n, x, Math.max(y, this.surfaceY + 8));
   }
 
-  update(view: View, dt: number) {
+  update(view: View, dt: number, focus: { x: number; y: number } | null = null) {
     this.t += dt;
     const t = this.t;
+    // ── down a trench: darker the deeper you go, a pool of light round you ──
+    if (this.dark && this.darkImg) {
+      const fx = focus?.x ?? view.left + view.width / 2;
+      const fy = focus?.y ?? view.top + view.height / 2;
+      const [d0, d1] = this.dark;
+      const k = Phaser.Math.Clamp((fy - d0) / (d1 - d0), 0, 1);
+      this.darkK = k * k * (3 - 2 * k);
+      const size = Math.max(view.width, view.height) * 2.3;
+      this.darkImg.setVisible(this.darkK > 0.01).setPosition(fx, fy).setDisplaySize(size, size).setAlpha(this.darkK * 0.96);
+    }
     // ── the surface: a row of the waterline, rocking gently ──
     const sw = 512;
     const drift = t * 14 + Math.sin(t * 0.8) * 10;
@@ -162,7 +180,7 @@ export class SeaLife {
         .setPosition(x, this.surfaceY)
         .setScale(3.2 + Math.sin(t * 0.3 + r.ph) * 0.6, Math.max(64, len) / 128)
         .setRotation(0.22 + Math.sin(t * 0.2 + r.ph) * 0.04)
-        .setAlpha(r.a * (0.6 + 0.4 * Math.sin(t * 0.7 + r.ph)));
+        .setAlpha(r.a * (0.6 + 0.4 * Math.sin(t * 0.7 + r.ph)) * (1 - this.darkK));
     }
     // ── jellyfish, schools of fish, the odd turtle ──
     this.nextSchool -= dt;
@@ -180,8 +198,17 @@ export class SeaLife {
       }
     }
     this.nextTurtle -= dt;
-    if (this.nextTurtle <= 0) {
-      this.nextTurtle = 28 + Math.random() * 20;
+    if (this.nextTurtle <= 0 && this.octoNext) {
+      // (an octopus, far off: drifting along, pulsing, its arms trailing)
+      this.octoNext = false;
+      this.nextTurtle = 22 + Math.random() * 16;
+      const dir = Math.random() < 0.5 ? 1 : -1;
+      const img = this.scene.add.image(0, 0, 'sea-octo', 'o0').setDepth(DEPTH.far + 3).setAlpha(0.5).setTint(0xb8d0f0).setScale(0.42).setFlipX(dir < 0);
+      const k = 0.18;
+      this.drifters.push({ img, x: view.left * k + (dir > 0 ? -0.1 : 1.1) * view.width, y: 0.2 + Math.random() * 0.3, vx: dir * 14, vy: 0, ph: 0, k, kind: 'octo' });
+    } else if (this.nextTurtle <= 0) {
+      this.octoNext = true;
+      this.nextTurtle = 22 + Math.random() * 16;
       const dir = Math.random() < 0.5 ? 1 : -1;
       // (far off behind the reef: small, hazy with the water between, drifting slowly by)
       const img = this.scene.add.image(0, 0, 'sea-turtle', 't0').setDepth(DEPTH.far + 3).setAlpha(0.5).setTint(0xa8d4ee).setScale(0.3).setFlipX(dir < 0);
@@ -202,7 +229,11 @@ export class SeaLife {
         // (in the distance: they swim at their own pace, and the view slides past them slowly)
         d.x += d.vx * dt;
         if (d.kind === 'fish') d.img.setFrame(Math.floor(d.ph * 8) % 2 ? 's0' : 's1');
-        else d.img.setFrame(Math.floor(d.ph * 1.6) % 2 ? 't0' : 't1');
+        else if (d.kind === 'octo') {
+          // (each squeeze of its mantle pushes it up a little; it sinks back between)
+          d.img.setFrame(`o${Math.floor(d.ph * 2.2) % 4}`);
+          d.y += (Math.floor(d.ph * 2.2) % 4 === 1 ? -0.02 : 0.006) * dt;
+        } else d.img.setFrame(Math.floor(d.ph * 1.6) % 2 ? 't0' : 't1');
       }
       // (on screen, sliding by a little with the camera)
       const px = view.left + (((d.x * view.width - view.left * d.k * 0.1) % (view.width * 1.6)) + view.width * 1.6) % (view.width * 1.6) - view.width * 0.3;

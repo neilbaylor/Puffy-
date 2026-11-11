@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { DEPTH, GRAVITY, TILE } from '../config';
 import { sfx } from '../core/sfx';
-import { COURT, SEAT_UP, TCRAB_H, TCRAB_W, drawCourtBack, drawCourtFront, type TCrabTeam } from '../gfx/tennis';
+import { COURT, NET_CELL_H, NET_GROUND, SEAT_UP, TCRAB_H, TCRAB_W, drawCourtBack, drawCourtFront, type TCrabTeam } from '../gfx/tennis';
 import { addCanvas, hires } from '../gfx/textures';
 import type { GameScene } from '../scenes/GameScene';
 import { Enemy, type DeathKind } from './enemies/Enemy';
@@ -69,7 +69,7 @@ export class TennisMatch {
     if (!gs.textures.exists(bkey)) addCanvas(gs, bkey, hires(w + END * 2, BACK_UP, 1.5, (ctx) => drawCourtBack(ctx, w)), undefined, { release: true });
     gs.add.image(this.left - END, ground, fkey).setOrigin(0, UP / (UP + DOWN)).setScale(1 / 2).setDepth(DEPTH.tiles + 0.5);
     gs.add.image(this.left - END, ground, bkey).setOrigin(0, 1).setScale(1 / 1.5).setDepth(DEPTH.decor - 1);
-    gs.add.image(cx, ground + 4, 'tennisnet').setOrigin(0.5, 1).setScale(1 / 3).setDepth(DEPTH.enemies + 2);
+    gs.add.image(cx, ground, 'tennisnet').setOrigin(0.5, NET_GROUND / NET_CELL_H).setScale(1 / 3).setDepth(DEPTH.enemies + 2);
     // the umpire: a little crab up on the chair
     this.ump = gs.add
       .sprite(cx + 22, ground - SEAT_UP + 2, 'tcrab-ump', 'ready0')

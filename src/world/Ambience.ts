@@ -264,13 +264,13 @@ export class Ambience {
     /** First solid ground below a point (or null) — for shadows and butterflies. */
     private groundBelow: (x: number, y: number, max: number) => number | null,
     /** Under the sea: the water's surface (world y) and the level's width. */
-    water?: { surface: number; width: number },
+    water?: { surface: number; width: number; dark?: [number, number] },
   ) {
     makeTextures(scene);
     this.arctic = levelId === 2;
     this.stinky = levelId === 3 || levelId === 4;
     this.glow = scene.add.image(0, 0, 'amb-glow').setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.clouds - 1).setAlpha(0.55);
-    this.sea = water ? new SeaLife(scene, water.surface, water.width, groundBelow) : null;
+    this.sea = water ? new SeaLife(scene, water.surface, water.width, groundBelow, water.dark) : null;
     if (this.sea) this.glow.setVisible(false);
     // (no light shafts or vignette any more: each was a whole extra screenful to draw every frame,
     // for an effect you could hardly see)
@@ -312,7 +312,7 @@ export class Ambience {
 
     // ── under the sea: fish, jellyfish, light from the surface (no birds or butterflies) ──
     if (this.sea) {
-      this.sea.update(view, dt);
+      this.sea.update(view, dt, targets[0] ? { x: targets[0].x, y: targets[0].bottom - 20 } : null);
       return;
     }
 

@@ -271,6 +271,60 @@ export class LevelView {
     return !!t && (SOLID_TILES.includes(t.index) || ONE_WAY_TILES.includes(t.index));
   }
 
+  private solid(x: number, y: number) {
+    const c = this.cell(x, y);
+    return c === 'ground' || c === 'rock';
+  }
+
+  /**
+   * The deep rock under the sea, tile column by tile column (a trench cuts down through it, so a
+   * plain block won't do): each run of `kind` tiles below `top`, filled; a lighter rim and an
+   * inked edge along each face onto open water. All shapes (no pictures: no extra memory).
+   */
+  private deepRuns(g: Phaser.GameObjects.Graphics, kind: TerrainKind, col: number, gx0: number, gx1: number, top: number) {
+    const H = this.data.height;
+    const rim = Phaser.Display.Color.IntegerToColor(col).lighten(14).color;
+    const ink = 0x3a2a3a;
+    const c0 = Math.floor(gx0 / TILE);
+    const c1 = Math.ceil(gx1 / TILE) - 1;
+    const r0 = Math.max(0, Math.floor(top / TILE));
+    for (let c = c0; c <= c1; c++) {
+      const xa = Math.max(gx0, c * TILE);
+      const xb = Math.min(gx1, (c + 1) * TILE);
+      if (xb <= xa) continue;
+      for (let r = r0; r < H; ) {
+        if (this.cell(c, r) !== kind) {
+          r++;
+          continue;
+        }
+        let e = r;
+        while (e + 1 < H && this.cell(c, e + 1) === kind) e++;
+        const ya = Math.max(top, r * TILE);
+        const yb = (e + 1) * TILE + (e + 1 >= H ? 200 : 0);
+        g.fillStyle(col, 1).fillRect(xa, ya, xb - xa, yb - ya);
+        for (let k = r; k <= e; k++) {
+          const y = Math.max(top, k * TILE);
+          const h = (k + 1) * TILE - y;
+          if (h <= 0) continue;
+          if (xa === c * TILE && !this.solid(c - 1, k)) {
+            g.fillStyle(rim, 1).fillRect(xa + 2.5, y, 5, h);
+            g.fillStyle(ink, 1).fillRect(xa, y, 2.5, h);
+          }
+          if (xb === (c + 1) * TILE && !this.solid(c + 1, k)) {
+            g.fillStyle(rim, 1).fillRect(xb - 7.5, y, 5, h);
+            g.fillStyle(ink, 1).fillRect(xb - 2.5, y, 2.5, h);
+          }
+        }
+        if (r * TILE > top && !this.solid(c, r - 1)) {
+          g.fillStyle(rim, 1).fillRect(xa, r * TILE + 2.5, xb - xa, 5);
+          g.fillStyle(ink, 1).fillRect(xa, r * TILE, xb - xa, 2.5);
+        }
+        if (e + 1 < H && !this.solid(c, e + 1)) g.fillStyle(ink, 1).fillRect(xa, (e + 1) * TILE - 2.5, xb - xa, 2.5);
+        r = e + 1;
+      }
+    }
+  }
+
   private cell(x: number, y: number): Cell {
     return this.data.cells[y]?.[x] ?? null;
   }
@@ -321,7 +375,7 @@ export class LevelView {
             if (last && cut < y1 + PAD) {
               // the deep rock is the palette's deep soil colour (no pixel read-back: that stalls the GPU);
               // fade the bottom of the chunk into it so the plain block below is seamless
-              const hex = kind === 'ground' ? pal.soilDeep : pal.rock.shade;
+              const hex = kind === 'ground' ? (pal.sea ? '#a5825c' : pal.soilDeep) : pal.rock.shade;
               const fillCol = Phaser.Display.Color.HexStringToColor(hex).color;
               DEEP_FILL.set(key, fillCol);
               const cctx = c.getContext('2d')!;
@@ -364,6 +418,12 @@ export class LevelView {
             const g = this.deepG;
             const gx0 = Math.max(cx0, x0 + 3);
             const gx1 = Math.min(cx0 + cw, x1 - 3);
+            // (under the sea, with a trench going down through the deep rock: only the solid tiles,
+            // an inked edge and a lighter rim along every face onto the water)
+            if (this.data.water !== undefined) {
+              this.deepRuns(g, kind, fillCol, gx0, gx1, cut - 6);
+              return;
+            }
             g.fillStyle(fillCol, 1).fillRect(gx0, cut - 6, gx1 - gx0, this.heightPx + 200 - cut);
             g.fillStyle(0x3a2a3a, 1);
             if (gx0 === x0 + 3) g.fillRect(x0 + 1, cut - 6, 2.5, this.heightPx + 200 - cut);

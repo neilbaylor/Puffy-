@@ -781,3 +781,53 @@ export function drawPier(ctx: Ctx, w: number, h: number) {
   }
   ctx.restore();
 }
+
+/** An octopus drifting along (frames o0–o3: its mantle squeezes, its arms trail and curl), 64 × 76, head at the top. */
+export const OCTO_W = 64;
+export const OCTO_H = 76;
+export const OCTO_FRAMES = ['o0', 'o1', 'o2', 'o3'] as const;
+export function drawOctopus(ctx: Ctx, f: (typeof OCTO_FRAMES)[number]) {
+  const i = +f[1];
+  const ph = (i / 4) * Math.PI * 2;
+  const squeeze = 0.5 + 0.5 * Math.cos(ph);
+  const skin: Fill = { base: '#e88aa8', shade: '#b8587a', light: '#ffc8da' };
+  const cx = 32;
+  const hy = 22;
+  // the arms: eight wavy tapering ribbons, curling at the tips
+  for (let k = 0; k < 8; k++) {
+    const s = (k - 3.5) / 3.5;
+    const x0 = cx + s * 12 * (0.8 + 0.2 * squeeze);
+    const y0 = hy + 12;
+    const left: Pt[] = [];
+    const right: Pt[] = [];
+    for (let j = 0; j <= 14; j++) {
+      const t = j / 14;
+      const wave = Math.sin(t * 5 + ph + k) * 4 * t;
+      const spread = s * (6 + 16 * t) * (1.15 - squeeze * 0.4);
+      const curl = t > 0.8 ? Math.sin((t - 0.8) * 12 + k) * 4 * s : 0;
+      const x = x0 + spread + wave + curl;
+      const y = y0 + t * (34 + squeeze * 6) - (t > 0.85 ? (t - 0.85) * 18 : 0);
+      const w = 3.4 * (1 - t * 0.85);
+      left.push([x - w, y]);
+      right.push([x + w, y]);
+    }
+    ST.shape(ctx, [...left, ...right.reverse()], k % 2 ? skin : { base: skin.shade, shade: skin.shade, light: skin.base }, 1300 + k, { lw: 0.6, plain: true });
+  }
+  // the mantle (head): a bulb, squeezing as it swims
+  const head = ellipsePts(cx, hy, 15 * (1.05 - squeeze * 0.12), 18 * (0.9 + squeeze * 0.15), 0, 36);
+  ST.shape(ctx, head, skin, 1310, { lw: 1, light: [cx - 6, hy - 10] });
+  ctx.fillStyle = skin.light + 'aa';
+  for (const [sx, sy, r] of [[-5, -8, 2], [4, -11, 1.4], [6, -3, 1.6]] as const) {
+    ctx.beginPath();
+    ctx.arc(cx + sx, hy + sy, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // eyes
+  for (const s of [-1, 1]) {
+    ST.shape(ctx, ellipsePts(cx + s * 6, hy + 7, 3.4, 3.8, 0, 16), { base: '#ffffff', shade: '#e6e6e6', light: '#ffffff' }, 1320, { lw: 0.6, plain: true });
+    ctx.fillStyle = INK;
+    ctx.beginPath();
+    ctx.ellipse(cx + s * 6 + 0.5, hy + 7.6, 1.3, 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}

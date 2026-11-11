@@ -9,7 +9,7 @@ import { BattleUI } from './battleUi';
 import { loadArt } from './artLoader';
 import { LIGHT } from '../core/light';
 import { savedResCap } from '../core/res';
-import { dropHeroSheets, gameArtJobs } from '../gfx/textures';
+import { dropHeroSheets, gameArtJobs, seaWear, swimLevel } from '../gfx/textures';
 import { SHOP, wardrobe } from '../core/wardrobe';
 import { groundPaintJobs } from '../world/LevelView';
 import { gamepadSources } from '../input/gamepad';
@@ -948,12 +948,14 @@ export class UI {
    * (two frames, at the game's pace) plus the odd blink, glance and breath.
    * Runs until `alive()` says the screen has gone.
    */
-  private liveHero(cv: HTMLCanvasElement, hero: CharacterDef, alive: () => boolean) {
+  private liveHero(cv: HTMLCanvasElement, hero: CharacterDef, alive: () => boolean, level?: number) {
     let pose: 'idle0' | 'idle1' = 'idle0';
     let face: Face | undefined;
     cv.classList.add('live');
+    // (under the sea: in the dive gear, not on the skateboard)
+    const wear = swimLevel(level) ? seaWear() : wardrobe.wearKey;
     // (sized to fill the spot, the same size on both frames so it doesn't jump)
-    const draw = () => drawPortrait(cv, hero, pose, face, 'idle0');
+    const draw = () => drawPortrait(cv, hero, pose, face, 'idle0', wear);
     draw();
     new FaceLife((f) => ((face = f), draw()), alive, { mouth: true });
     const iv = window.setInterval(() => {
@@ -1362,7 +1364,7 @@ export class UI {
         </div>
       </div>
     </div>`);
-    this.liveHero(el.querySelector('canvas')!, characterById(r.charId), () => this.screen === el);
+    this.liveHero(el.querySelector('canvas')!, characterById(r.charId), () => this.screen === el, r.level ?? this.level);
     el.querySelector('[data-act=again]')!.addEventListener('click', () => this.playBoss(boss.level));
     el.querySelector('[data-act=home]')!.addEventListener('click', () => this.quitToStart());
     this.setScreen(el);
@@ -1432,7 +1434,9 @@ export class UI {
     const session = this.session;
     let pose: 'idle0' | 'idle1' = 'idle0';
     let face: Face | undefined;
-    const draw = () => drawPortrait(cv, hero, pose, face, 'idle0');
+    // (under the sea: in the dive gear)
+    const wear = swimLevel((this.gameScene as { levelId?: number } | null)?.levelId) ? seaWear() : wardrobe.wearKey;
+    const draw = () => drawPortrait(cv, hero, pose, face, 'idle0', wear);
     draw();
     const alive = () => !this.hud.hidden && this.session === session;
     this.hudFace = new FaceLife((f) => ((face = f), draw()), alive, { mouth: false, calm: true });
@@ -1606,7 +1610,7 @@ export class UI {
         </div>
       </div>
     </div>`);
-    this.liveHero(el.querySelector('canvas')!, characterById(r.charId), () => this.screen === el);
+    this.liveHero(el.querySelector('canvas')!, characterById(r.charId), () => this.screen === el, r.level ?? this.level);
     // the default (and the big button) is on to the next level, when there is one
     const goNext = () => {
       if (!next) return this.quitToStart();

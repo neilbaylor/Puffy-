@@ -174,6 +174,8 @@ export class GameScene extends Phaser.Scene {
   }
   /** Under the sea: the camera's top limit (it eases down to just over the surface once you've dived in). */
   private camMin = 0;
+  /** 0…1: framing a long sink (you higher on the screen). */
+  private sinkK = 0;
   private auras: Aura[] = [];
   private rootbeers: RootBeer[] = [];
   private pendingAura: { at: number; p: Player }[] = [];
@@ -320,11 +322,11 @@ export class GameScene extends Phaser.Scene {
     }
     this.lookNext = 0;
     if (!this.scene.isActive('Menu') && !this.scene.isActive('Battle')) freeLooksExcept(this, themesFor(this.levelId));
-    this.bg = new Background(this, heightPx - VIEW_H, false, !!data.vertical, data.water !== undefined);
+    this.bg = new Background(this, (data.bgBottom ?? heightPx) - VIEW_H, false, !!data.vertical, data.water !== undefined);
     this.amb = new Ambience(this, this.levelId, (x, y, max) => {
       for (let d = 0; d <= max; d += 6) if (this.level.isSolidAt(x, y + d)) return Math.floor((y + d) / TILE) * TILE;
       return null;
-    }, data.water !== undefined ? { surface: data.water, width: widthPx } : undefined);
+    }, data.water !== undefined ? { surface: data.water, width: widthPx, dark: data.dark } : undefined);
     this.applyTheme();
     this.fx = new Fx(this);
 
@@ -728,7 +730,8 @@ export class GameScene extends Phaser.Scene {
     const wakeL = this.view.left - 48;
     this.enemies = this.enemies.filter((e) => e.active);
     // (a climb: the ones far above or below you sleep till you get near their height)
-    const vertical = !!this.level.data.vertical;
+    // (and under the sea: the fish down a trench sleep till you're near their depth)
+    const vertical = !!this.level.data.vertical || this.level.data.water !== undefined;
     for (const e of this.enemies) {
       if (!e.awake && !e.dead && e.body.left < wakeR && e.body.right > wakeL && (!vertical || (e.body.bottom > this.view.top - 160 && e.body.top < this.view.top + this.view.height + 160))) e.wake();
       e.update(dt);
@@ -1108,7 +1111,10 @@ export class GameScene extends Phaser.Scene {
       // keep the hero's feet ~62% down the screen: above the touch controls
       let feet = sumBottom / tracked.length;
       // (swimming: you sit higher on the screen, so the sea bed below — and what's on it — shows)
-      let tTop = feet - vh * (tracked.every((p) => p.swimming) ? 0.42 : 0.62);
+      // (sinking down a trench: higher still, so you can see what's coming up from below)
+      const sinking = tracked.every((p) => p.swimming) && Math.min(...tracked.map((p) => p.body.velocity.y)) > 80;
+      this.sinkK += ((sinking ? 1 : 0) - this.sinkK) * (snap ? 1 : 1 - Math.exp(-dt * 1.2));
+      let tTop = feet - vh * (tracked.every((p) => p.swimming) ? 0.42 - 0.16 * this.sinkK : 0.62);
       if (this.level.data.vertical) {
         // a climb: mid-jump the camera holds the height of the ledge you jumped from (no bobbing up
         // and down on every hop); it moves up once you land higher, and follows you down if you

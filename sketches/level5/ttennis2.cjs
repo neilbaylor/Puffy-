@@ -23,10 +23,10 @@ const OUT = 'shots/l5';
     const orig = g.hitPlayer.bind(g);
     g.hitPlayer = (q, fx) => { if (!q.invulnerable || window.__count) window.__hits++; orig(q, fx); };
     // a little way out from court 1 (still out of their sight), hovering at mid height
-    pl.body.reset(90 * 32, g.level.heightPx - 7 * 32);
+    pl.body.reset(128 * 32, g.level.heightPx - 77 * 32);
     window.__btn = { left: false, right: false, jump: false, fire: false, run: false };
     pl.input = { ...pl.input, id: 'bot', poll: () => ({ ...window.__btn }) };
-    g.events.on('preupdate', () => { const h = (g.level.heightPx - pl.bottom) / 32; window.__btn.jump = h < 6.5 && !window.__btn.jump; });
+    g.events.on('preupdate', () => { const h = (g.level.heightPx - pl.bottom) / 32; window.__btn.jump = h < 76.5 && !window.__btn.jump; });
   });
   await p.waitForTimeout(2500);
   await p.screenshot({ path: `${OUT}/tennis-watch.png` });
@@ -45,7 +45,7 @@ const OUT = 'shots/l5';
     const g = window.game.scene.getScene('Game');
     const pl = g.players[0];
     const m = g.tennis[1];
-    pl.body.reset(118 * 32, g.level.heightPx - 6 * 32);
+    pl.body.reset(150 * 32, g.level.heightPx - 77 * 32);
     let f = 0;
     const step = () => {
       f++;

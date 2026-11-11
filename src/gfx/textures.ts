@@ -17,8 +17,8 @@ import { POOWAVE_H, POOWAVE_W, drawPooOnGoat, drawPooPile, drawPooWave, drawStin
 import { PLOP_DRESS, PLOP_FRAMES, PLOP_H, PLOP_W, drawPlop, type PlopKind } from './plops';
 import { BUBBLE_FRAMES, BUBBLE_SIZE, FISH_FRAMES, FISH_SIZE, drawBubbleShot, drawFish, type FishKind } from './fish';
 import { drawPoo } from './hazards';
-import { CLAM_FRAMES, CLAM_H, CLAM_W, TCRAB_FRAMES, TCRAB_H, TCRAB_W, drawClam, drawTennisCrab, drawTennisNet } from './tennis';
-import { CRAB_FRAMES, CRAB_H, CRAB_W, JELLY_FRAMES, JELLY_H, JELLY_W, SCHOOL_FRAMES, SEA_PROPS, SEA_PROP_H, SEA_PROP_W, SURFACE_H, TURTLE_FRAMES, TURTLE_H, TURTLE_W, drawCrab, drawJelly, drawLightRay, drawSchoolFish, drawSeaBubble, drawSeaFar, drawSeaMid, drawSeaNear, drawSeaProp, drawSeaSky, drawSurface, drawTurtle, GRASS_FRAMES, GRASS_H, GRASS_W, KELP_FRAMES, KELP_H, KELP_W, drawGrassFrame, drawKelpFrame } from './sea';
+import { CLAM_FRAMES, CLAM_H, CLAM_W, NET_CELL_H, NET_W, TCRAB_FRAMES, TCRAB_H, TCRAB_W, drawClam, drawTennisCrab, drawTennisNet } from './tennis';
+import { CRAB_FRAMES, CRAB_H, CRAB_W, JELLY_FRAMES, JELLY_H, JELLY_W, SCHOOL_FRAMES, SEA_PROPS, SEA_PROP_H, SEA_PROP_W, SURFACE_H, TURTLE_FRAMES, TURTLE_H, TURTLE_W, drawCrab, drawJelly, drawLightRay, drawSchoolFish, drawSeaBubble, drawSeaFar, drawSeaMid, drawSeaNear, drawSeaProp, drawSeaSky, drawSurface, drawTurtle, GRASS_FRAMES, GRASS_H, GRASS_W, KELP_FRAMES, KELP_H, KELP_W, OCTO_FRAMES, OCTO_H, OCTO_W, drawGrassFrame, drawKelpFrame, drawOctopus } from './sea';
 import { BB_ALIAS, BB_FIELD_TILES, BB_KEYS, BB_PLAIN, BB_ROSTER, BB_SIZE, PARK, drawBallparkBack, drawBallparkFront, drawBaseball, drawBaseballPlop, drawCappedPlop, drawLineDrive, type BBPlayer, type BaseballRole } from './baseball';
 import { PLOP_COLOURS } from './plops';
 import { gearOf, wardrobe } from '../core/wardrobe';
@@ -698,7 +698,7 @@ export function gameArtJobs(scene: Phaser.Scene, opts: { heroes: readonly string
         // (the umpire: no racket, a striped shirt)
         if (!T.exists('tcrab-ump')) sheet(scene, 'tcrab-ump', TCRAB_W, TCRAB_H, ['ready0', 'blink', 'smash0'] as const, (ctx, f) => drawTennisCrab(ctx, f, 'ump'), 2);
         if (!T.exists('clam')) sheet(scene, 'clam', CLAM_W, CLAM_H, CLAM_FRAMES, (ctx, f) => drawClam(ctx, f), 3);
-        if (!T.exists('tennisnet')) addCanvas(scene, 'tennisnet', hires(20, 64, 3, (ctx) => drawTennisNet(ctx, 20, 60, 34)));
+        if (!T.exists('tennisnet')) addCanvas(scene, 'tennisnet', hires(NET_W, NET_CELL_H, 3, (ctx) => drawTennisNet(ctx)));
       },
     });
   if (want.includes('fish'))
@@ -759,7 +759,23 @@ export function ensureSeaArt(scene: Phaser.Scene) {
   sheet(scene, 'sea-school', 24, 14, SCHOOL_FRAMES, (ctx, f) => drawSchoolFish(ctx, f), 1.5);
   sheet(scene, 'sea-turtle', TURTLE_W, TURTLE_H, TURTLE_FRAMES, (ctx, f) => drawTurtle(ctx, f), 1.5);
   sheet(scene, 'sea-crab', CRAB_W, CRAB_H, CRAB_FRAMES, (ctx, f) => drawCrab(ctx, f), 2);
+  sheet(scene, 'sea-octo', OCTO_W, OCTO_H, OCTO_FRAMES, (ctx, f) => drawOctopus(ctx, f), 1);
   addCanvas(scene, 'sea-bubble', hires(16, 16, 2, (ctx) => drawSeaBubble(ctx)));
+  // the dark of the deep, with a soft pool of light round the hero (their diving lamp)
+  addCanvas(
+    scene,
+    'sea-dark',
+    hires(256, 256, 1, (ctx) => {
+      const g = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+      g.addColorStop(0, 'rgba(3,12,28,0)');
+      g.addColorStop(0.07, 'rgba(3,12,28,0.04)');
+      g.addColorStop(0.2, 'rgba(3,12,28,0.85)');
+      g.addColorStop(0.3, 'rgba(3,12,28,1)');
+      g.addColorStop(1, 'rgba(3,12,28,1)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, 256, 256);
+    }),
+  );
   addCanvas(scene, 'sea-ray', hires(64, 256, 0.5, (ctx) => drawLightRay(ctx)), undefined, { release: true });
   addCanvas(scene, 'sea-sky', hires(1024, 160, BG_RES, (ctx) => drawSeaSky(ctx, 1024, 160)), undefined, { release: true });
   addCanvas(scene, 'sea-surface', hires(512, SURFACE_H, PROP_RES, (ctx) => drawSurface(ctx, 512)), undefined, { release: true });

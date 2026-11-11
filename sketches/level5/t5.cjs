@@ -54,7 +54,7 @@ const OUT = 'shots/l5';
       for (const o of g.children.list) if (o.texture?.key === 'fish-bubble' && !seenB.has(o)) { seenB.add(o); shots++; }
       if (f === 400) window.__shot = 1;
       if (f === 900) window.__shot = 2;
-      if (pl.x > 183 * 32 || f > 60 * 90) {
+      if (pl.x > 186 * 32 || f > 60 * 200) {
         g.events.off('preupdate', step);
         done({ frames: f, x: +(pl.x / 32).toFixed(1), surface: g.level.data.water, minY: Math.round(minY), maxY: Math.round(maxY), maxSinkVy: Math.round(maxVy), strokes, bubblesSeen: shots, fishLeft: g.enemies.filter((e) => !e.dead).length, popped: window.__popped, swimming: pl.swimming, fps: Math.round(window.game.loop.actualFps) });
       }

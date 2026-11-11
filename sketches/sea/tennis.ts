@@ -1,6 +1,6 @@
 // Crab tennis + sea grass sway + fish blink preview.
 import { PALETTES, drawSky } from '../../src/gfx/world';
-import { COURT, drawCourtBack, drawCourtFront, drawTennisNet, TCRAB_FRAMES, TCRAB_W, TCRAB_H, drawTennisCrab, drawClam, CLAM_W } from '../../src/gfx/tennis';
+import { COURT, drawCourtBack, drawCourtFront, drawTennisNet, NET_GROUND, TCRAB_FRAMES, TCRAB_W, TCRAB_H, drawTennisCrab, drawClam, CLAM_W } from '../../src/gfx/tennis';
 import { GRASS_FRAMES, drawGrassFrame, GRASS_W, KELP_FRAMES, KELP_W, KELP_H, drawKelpFrame, drawSeaNear } from '../../src/gfx/sea';
 import { drawFish } from '../../src/gfx/fish';
 const mk = (w: number, h: number, s = 1) => {
@@ -26,7 +26,7 @@ const mk = (w: number, h: number, s = 1) => {
     ctx.save(); ctx.translate(x, gy + 6 - TCRAB_H * 0.8); ctx.scale(flip ? -0.8 : 0.8, 0.8); ctx.translate(-30, 0); drawTennisCrab(ctx, f, team); ctx.restore();
   }
   ctx.save(); ctx.translate(cx - 70, gy - 80); ctx.scale(0.7, 0.7); drawClam(ctx, 'shut'); ctx.restore();
-  ctx.save(); ctx.translate(cx - 10, gy + 4 - 60); drawTennisNet(ctx, 20, 60, 34); ctx.restore();
+  ctx.save(); ctx.translate(cx - 22, gy - NET_GROUND); drawTennisNet(ctx); ctx.restore();
 }
 {
   const ctx = mk(TCRAB_FRAMES.length * (TCRAB_W + 4), (TCRAB_H + 4) * 2 + 30, 2);

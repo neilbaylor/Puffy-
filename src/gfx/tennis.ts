@@ -233,37 +233,85 @@ export function drawCourtBack(ctx: Ctx, courtW: number) {
 }
 
 /**
- * The net, nearly side on (just a little from in front, like the volleyball net): a driftwood post
- * at each side (the far one a touch higher and smaller), a rope mesh between them, white tape along
- * the top with cork floats. Drawn in a w × h cell, the near post's foot at (w/2 + 3, h), the tape
- * netH above it.
+ * The net, running across the court from the far sideline to the near one, seen from the low angle
+ * the court's drawn at (like the volleyball net): the far post at the back of the court (a touch
+ * smaller), the near post at the front, the net between them a slanting panel of mesh — white tape
+ * along the top with cork floats, a band along the bottom. In a NET_W × NET_H cell: the court's
+ * ground line (the far sideline) at y = NET_GROUND, the near post's foot NET_DEEP further down.
  */
-export function drawTennisNet(ctx: Ctx, w: number, h: number, netH: number) {
-  const cx = w / 2;
-  const near = { x: cx + 3, y: h };
-  const far = { x: cx - 3, y: h - 4 };
-  // mesh between the posts (a band)
+export const NET_W = 44;
+export const NET_CELL_H = 96;
+export const NET_GROUND = 52;
+export const NET_DEEP = 34;
+export function drawTennisNet(ctx: Ctx) {
+  const cx = NET_W / 2;
+  const kF = 0.84;
+  const far = { x: cx - 7, y: NET_GROUND - 1 };
+  const near = { x: cx + 7, y: NET_GROUND + NET_DEEP };
+  const netH = 30;
+  const topF = far.y - netH * kF;
+  const topN = near.y - netH;
+  const botF = far.y - 2;
+  const botN = near.y - 3;
+  const post = (x: number, foot: number, top: number, k: number, seed: number) => {
+    ST.shape(ctx, roundRectPts(x - 2.4 * k, top - 4 * k, 4.8 * k, foot - top + 4 * k, 2 * k), WOOD, seed, { lw: 0.85 * k, light: [x - 2, top] });
+    // rope lashings, a knot of cork on the top
+    for (let y = top + 6 * k; y < foot - 4; y += 9 * k) ST.line(ctx, [[x - 2.6 * k, y], [x + 2.6 * k, y + 2 * k]], seed + y, 0.8 * k, '#e8d6a8');
+    ST.shape(ctx, ellipsePts(x, top - 4.5 * k, 3 * k, 2.4 * k, 0, 14), { base: '#e0a050', shade: '#b0702a', light: '#ffd8a0' }, seed + 3, { lw: 0.6, plain: true });
+  };
+  // behind: the far post
+  post(far.x, far.y, topF, kF, 3500);
+  // the mesh: a slanting panel between the posts
   ctx.save();
-  path(ctx, [[far.x, far.y - netH + 2], [near.x, near.y - netH], [near.x, near.y - 2], [far.x, far.y - 2]]);
-  ctx.fillStyle = 'rgba(30,40,40,0.35)';
+  path(ctx, [[far.x, topF], [near.x, topN], [near.x, botN], [far.x, botF]]);
+  ctx.fillStyle = 'rgba(16,20,28,0.28)';
   ctx.fill();
   ctx.clip();
-  ctx.strokeStyle = 'rgba(240,230,200,0.8)';
-  ctx.lineWidth = 0.6;
-  for (let y = h - netH; y < h; y += 3.2) {
+  ctx.strokeStyle = 'rgba(20,24,32,0.75)';
+  ctx.lineWidth = 0.4;
+  // (rows run along the net, from far post to near; columns drop straight down)
+  for (let j = 1; j < 14; j++) {
+    const t = j / 14;
     ctx.beginPath();
-    ctx.moveTo(far.x - 2, y);
-    ctx.lineTo(near.x + 2, y + 2);
+    ctx.moveTo(far.x, topF + (botF - topF) * t);
+    ctx.lineTo(near.x, topN + (botN - topN) * t);
+    ctx.stroke();
+  }
+  for (let x = far.x + 1.6; x < near.x; x += 1.9) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, NET_CELL_H);
     ctx.stroke();
   }
   ctx.restore();
-  // posts
-  ST.shape(ctx, roundRectPts(far.x - 2, far.y - netH - 5, 4, netH + 5, 1.5), { base: WOOD.shade, shade: WOOD.shade, light: WOOD.base }, 3500, { lw: 0.7 });
-  ST.shape(ctx, roundRectPts(near.x - 2.5, near.y - netH - 6, 5, netH + 6, 2), WOOD, 3501, { lw: 0.8 });
-  // the tape along the top, cork floats on it
-  ST.line(ctx, [[far.x, far.y - netH + 1], [near.x, near.y - netH]], 3502, 1.4, '#ffffff');
-  for (const [fx, fy] of [[far.x + 0.5, far.y - netH + 1], [near.x - 0.5, near.y - netH]] as const)
-    ST.shape(ctx, ellipsePts(fx, fy, 2.6, 2, 0, 14), { base: '#e0a050', shade: '#b0702a', light: '#ffd8a0' }, 3503, { lw: 0.5, plain: true });
+  // the tapes: white along the top (with cork floats), a darker band along the bottom
+  ctx.lineCap = 'round';
+  for (const [y0, y1, col, lw] of [[topF, topN, '#ffffff', 2.4], [botF, botN, '#2a5a4a', 1.4]] as const) {
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = lw + 1.1;
+    ctx.beginPath();
+    ctx.moveTo(far.x, y0);
+    ctx.lineTo(near.x, y1);
+    ctx.stroke();
+    ctx.strokeStyle = col;
+    ctx.lineWidth = lw;
+    ctx.stroke();
+  }
+  for (const t of [0.3, 0.65]) {
+    const fx = far.x + (near.x - far.x) * t;
+    const fy = topF + (topN - topF) * t;
+    ST.shape(ctx, ellipsePts(fx, fy, 2.2 + t, 1.7 + t * 0.6, 0, 14), { base: '#e0a050', shade: '#b0702a', light: '#ffd8a0' }, 3510 + t * 10, { lw: 0.5, plain: true });
+  }
+  // the centre strap holding the middle down
+  ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+  ctx.lineWidth = 1;
+  const mx = (far.x + near.x) / 2;
+  ctx.beginPath();
+  ctx.moveTo(mx, (topF + topN) / 2 + 1);
+  ctx.lineTo(mx, (botF + botN) / 2);
+  ctx.stroke();
+  // in front: the near post
+  post(near.x, near.y, topN, 1, 3520);
 }
 
 // ───────────────────────────── the crabs ──

@@ -33,6 +33,10 @@ export interface LevelData {
   flyPath?: [number, number][];
   /** Under the sea (World 3): the water's surface (world px from the top). Below it you swim. */
   water?: number;
+  /** Under the sea: going down a trench it gets dark — from this world y (none) to this one (as dark as it gets). */
+  dark?: [number, number];
+  /** Where the backgrounds sit as if it were the bottom of the level (world y): a level with a deep trench under it. */
+  bgBottom?: number;
   width: number;
   height: number;
   tiles: number[][];
@@ -52,6 +56,20 @@ export class LevelBuilder {
   flyPath: [number, number][] | undefined;
   /** Under the sea: the surface's world y (see LevelData.water). */
   waterY: number | undefined;
+  darkY: [number, number] | undefined;
+  bgBottomY: number | undefined;
+
+  /** Going down it gets dark: from height h0 (none) down to h1 (as dark as it gets). */
+  darkness(h0: number, h1: number) {
+    this.darkY = [this.top(h0) * TILE, this.top(h1) * TILE];
+    return this;
+  }
+
+  /** The backgrounds sit as if the level's bottom were at height h (a deep trench below the main sea bed). */
+  bgBottom(h: number) {
+    this.bgBottomY = this.top(h) * TILE;
+    return this;
+  }
 
   /** The level's under the sea: the water's surface is at the top of ground height h. */
   water(h: number) {
@@ -206,6 +224,8 @@ export class LevelBuilder {
       vertical: this.vertical || undefined,
       flyPath: this.flyPath,
       water: this.waterY,
+      dark: this.darkY,
+      bgBottom: this.bgBottomY,
       width: this.width,
       height: this.height,
       tiles: this.cells.map((row) => row.map((c) => (c ? idx[c] : T.EMPTY))),
