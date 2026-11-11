@@ -259,3 +259,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.254: Battle results: no name under the winner's hero.
 - v0.255: Bigger 'Next game starting soon' on the battle results card.
 - v0.256: Kai dodges + charges (4 hits), green bad bubbles, smooth dive + kelp, L5 camera/fly-over/nuggies, shop pill, L1 opening line, no repeat Wow.
+- v0.257: King Bob's fishing contest (World 3 boss), Part 5 gate fix, fly-over in open water, bigger player card table.
