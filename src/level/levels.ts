@@ -18,6 +18,8 @@ export interface LevelInfo {
   hoops?: boolean;
   /** Ends with a wrestling match against Queen Plop in the Poo Palace. */
   wrestle?: boolean;
+  /** Ends in King Bob's fishing contest (the FishingScene). */
+  fishing?: boolean;
   /** What the hero says when the level starts (after the fly-over). */
   speech?: string;
   /** The label on its Part button on the start screen (default: `part`). */
@@ -88,6 +90,7 @@ const WIP: LevelInfo[] = [
     button: 'Part 5',
     build: buildLevel5,
     speech: 'Here goes nothing!',
+    fishing: true,
     wip: true,
     testers: ['neil', 'founder'],
   },

@@ -373,9 +373,17 @@ export class GameScene extends Phaser.Scene {
         case 'king':
           this.kingAt = { x: cx, y: surface(s.y) };
           break;
-        case 'goal':
+        case 'goal': {
           this.goal = new Goal(this, cx, surface(s.y));
+          // (under the sea you swim past it at any height: it reaches right up to the surface)
+          const water = this.level.data.water;
+          if (water !== undefined) {
+            const gy = surface(s.y);
+            this.goal.zone.setSize(80, gy - water).setPosition(cx, (gy + water) / 2);
+            (this.goal.zone.body as Phaser.Physics.Arcade.StaticBody).setSize(80, gy - water).updateFromGameObject();
+          }
           break;
+        }
         case 'tree':
           break;
         case 'hockey':
@@ -2065,7 +2073,7 @@ export class GameScene extends Phaser.Scene {
       seconds: Math.round((Date.now() - run.startedAt) / 1000),
     };
     // no basketball at the end of this one (yet): the level's done at the gate
-    const boss = levelInfo(this.levelId).wrestle ? 'Wrestle' : levelInfo(this.levelId).hoops ? 'Hoops' : null;
+    const boss = levelInfo(this.levelId).wrestle ? 'Wrestle' : levelInfo(this.levelId).fishing ? 'Fishing' : levelInfo(this.levelId).hoops ? 'Hoops' : null;
     if (!boss) {
       this.time.delayedCall(2200, () => this.game.events.emit('level-complete', { ...res, level: this.levelId } satisfies ResultState));
       return;

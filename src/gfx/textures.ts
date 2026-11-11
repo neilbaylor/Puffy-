@@ -280,6 +280,44 @@ export function makeCarrySheet(scene: Phaser.Scene, ch: (typeof CHARACTERS)[numb
 }
 
 
+/** The arm angles of a hero's fishing-rod frames (c0…c8): from wound right back over the head to reaching forward. */
+export const CAST_ANGLES = [-2.6, -2.25, -1.9, -1.55, -1.2, -0.85, -0.5, -0.15, 0.2] as const;
+/** What a hero has on out fishing: their gear, less the skateboard (they're on a boat). */
+export const fishingWear = () => wardrobe.wearKey.split(',').filter((w) => w && w !== 'board').join(',');
+/**
+ * A hero holding a fishing rod in both hands (King Bob's contest): no bazooka, both arms out along
+ * each of CAST_ANGLES (c0…c8), standing; and two reeling frames (r0, r1: the rod forward, a little
+ * bob). The rod itself is drawn by the scene, from the hands. Made when needed.
+ */
+export function makeCastSheet(scene: Phaser.Scene, ch: (typeof CHARACTERS)[number]) {
+  const key = `char-${ch.id}-cast`;
+  if (scene.textures.exists(key)) return key;
+  const wear = fishingWear();
+  const frames = [...CAST_ANGLES.map((_, i) => `c${i}`), 'r0', 'r1', 'j0'];
+  carry.on = true;
+  try {
+    const up = gearUp(wear);
+    sheet(scene, key, CHAR_W + HERO_M * 2, CHAR_H + up, frames, (ctx, f) => {
+      const i = f.startsWith('c') ? +f.slice(1) : -1;
+      carry.a = i >= 0 ? CAST_ANGLES[i] : f === 'j0' ? CAST_ANGLES[5] : f === 'r0' ? -0.5 : -0.42;
+      drawCharacter(ctx, HERO_M, up, ch, f === 'r1' ? 'idle1' : f === 'j0' ? 'jump' : 'idle0', undefined, wear);
+    });
+  } finally {
+    carry.on = false;
+    carry.a = -1.75;
+  }
+  return key;
+}
+
+/** Fish sheets at a chosen resolution and only the frames wanted (the fishing contest's catches, King Bob). */
+export function makeFishFrames(scene: Phaser.Scene, key: string, kind: FishKind, frames: readonly string[], res: number) {
+  if (scene.textures.exists(key)) return key;
+  const { w, h } = FISH_SIZE[kind];
+  const st = STYLES[ART_STYLE];
+  sheet(scene, key, w, h, frames, (ctx, f) => drawFish(ctx, 0, 0, kind, f as never, st), res);
+  return key;
+}
+
 /** The bad guys' weapons: blaster, chainsaw, ball and chain, and the blaster's pom-poms (only what's missing). */
 export function makeWeaponArt(scene: Phaser.Scene) {
   const st = STYLES[ART_STYLE];

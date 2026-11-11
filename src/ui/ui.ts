@@ -29,6 +29,7 @@ const BOSSES = [
   { level: 2, name: 'King Puff Ball Basketball 2', scene: 'Hoops' },
   { level: 3, name: 'Queen Plop Wrestling', scene: 'Wrestle' },
   { level: 4, name: 'Plop King Wrestling', scene: 'Wrestle' },
+  { level: 5, name: 'King Bob Fishing', scene: 'Fishing' },
 ] as const;
 import { resetLives } from '../core/lives';
 import { bank } from '../core/bank';
@@ -265,7 +266,7 @@ export class UI {
     // (what you wear changed — the Shop, or your account brought a hat from another device: the
     // hero's pictures are drawn again next time they're needed; not mid-game, they're in use)
     wardrobe.onChange(() => {
-      if (['Game', 'Wrestle', 'Hoops', 'Battle'].some((k) => this.game.scene.isActive(k))) return;
+      if (['Game', 'Wrestle', 'Hoops', 'Battle', 'Fishing'].some((k) => this.game.scene.isActive(k))) return;
       dropHeroSheets(this.game.textures);
       // (in the Shop: the start screen under it is redrawn once you close it, not on every buy — that
       // was a lot of drawing right as the till started counting)
@@ -422,6 +423,20 @@ export class UI {
       this.bossIntro = true;
     };
     game.events.on('hoops-play', pauseOnly);
+    // King Bob's fishing contest: like basketball (no HUD; it just freezes while the phone's upright)
+    game.events.on('fishing-start', (s: Phaser.Scene) => {
+      this.introEl?.remove();
+      this.introEl = null;
+      this.gameScene = s;
+      this.setScreen(null);
+      introStarts();
+      this.banner.hidden = true;
+      this.touch.hide();
+      requestAnimationFrame(() => {
+        if (window.innerHeight > window.innerWidth && isTouchDevice() && game.scene.isActive('Fishing')) game.scene.pause('Fishing');
+      });
+    });
+    game.events.on('fishing-play', pauseOnly);
     game.events.on('hoops-start', (s: Phaser.Scene) => {
       this.gameScene = s;
       this.setScreen(null);
@@ -476,8 +491,10 @@ export class UI {
       if (upright && this.rotate.hidden && this.gameScene && !this.screen && !this.introEl) this.pause();
       // basketball has no pause menu: it just freezes while the phone is upright
       const sc = this.game.scene;
-      if (upright && sc.isActive('Hoops')) sc.pause('Hoops');
-      else if (!upright && sc.isPaused('Hoops')) sc.resume('Hoops');
+      for (const k of ['Hoops', 'Fishing']) {
+        if (upright && sc.isActive(k)) sc.pause(k);
+        else if (!upright && sc.isPaused(k)) sc.resume(k);
+      }
       this.rotate.hidden = !(portrait && isTouchDevice());
       // the page behind matches the prompt, so no strip of sky shows under it (iOS home screen)
       document.documentElement.classList.toggle('rotating', !this.rotate.hidden);
@@ -746,7 +763,7 @@ export class UI {
             <dt>Root beer <i class="rb-ico"></i></dt><dd>${bank.rootbeerLeft}</dd>
             <dt>Nuggies eaten <i class="aura-ico"></i></dt><dd>${Math.max(u.nuggies, bank.nuggies)}</dd>
             <dt>Bad guys beaten</dt><dd>${Math.max(u.kills, bank.kills)}</dd>
-            <dt>Current level</dt><dd>${esc(levelName(latestLevel()))}</dd>
+            <dt>Current level</dt><dd>${esc(levelInfo(latestLevel()).button ?? levelInfo(latestLevel()).part)}</dd>
           </dl>
         </div>
         <div class="row acct-done-row">
@@ -1322,6 +1339,7 @@ export class UI {
     this.game.scene.stop('Menu');
     this.game.scene.stop('Hoops');
     this.game.scene.stop('Wrestle');
+    this.game.scene.stop('Fishing');
     this.game.scene.stop('Game');
     this.game.scene.start(boss.scene, bossData(this.session, hero.id, level));
   }
@@ -1338,7 +1356,12 @@ export class UI {
     const boss = BOSSES.find((b) => b.level === r.level) ?? BOSSES[0];
     const queen = boss.scene === 'Wrestle' && boss.level === 3;
     const plopKing = boss.level === 4;
-    const title = plopKing
+    const kingBob = boss.level === 5;
+    const title = kingBob
+      ? won
+        ? 'You out-fished King Bob!'
+        : 'King Bob wins!'
+      : plopKing
       ? won
         ? 'The Plop King is done for!'
         : 'The Plop King wins!'
@@ -1380,7 +1403,7 @@ export class UI {
     const build = level !== null ? levelInfo(level).build : undefined;
     // (straight on from a results card over a boss's arena: no ground on show there, so the last
     // level's is let go first — memory stays flat — and the arena's scene works the pictures out)
-    const host = ['Hoops', 'Wrestle'].map((k) => this.game.scene.getScene(k)).find((sc) => sc?.sys.isActive());
+    const host = ['Hoops', 'Wrestle', 'Fishing'].map((k) => this.game.scene.getScene(k)).find((sc) => sc?.sys.isActive());
     if (level !== null && this.game.scene.isActive('Menu')) ground = scene.groundJobs?.(level) ?? [];
     else if (build && host) {
       const data = build();
@@ -1418,6 +1441,7 @@ export class UI {
     this.game.scene.stop('Menu');
     this.game.scene.stop('Hoops');
     this.game.scene.stop('Wrestle');
+    this.game.scene.stop('Fishing');
     this.game.scene.stop('Game');
     this.game.scene.start('Game', { session, checkpoint, level: this.level } satisfies GameData);
   }
@@ -1529,6 +1553,7 @@ export class UI {
     stopMusic();
     this.game.scene.stop('Hoops');
     this.game.scene.stop('Wrestle');
+    this.game.scene.stop('Fishing');
     this.game.scene.stop('Game');
     this.gameScene = null;
     this.hud.hidden = true;

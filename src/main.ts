@@ -7,6 +7,7 @@ import { MenuScene } from './scenes/MenuScene';
 import { HoopsScene } from './scenes/HoopsScene';
 import { BattleScene } from './scenes/BattleScene';
 import { WrestleScene } from './scenes/WrestleScene';
+import { FishingScene } from './scenes/FishingScene';
 import { UI } from './ui/ui';
 import { LIGHT, LIGHT_KEY } from './core/light';
 import { savedResCap, saveResCap } from './core/res';
@@ -107,7 +108,7 @@ function start(refreshMs: number) {
     input: { activePointers: 4 },
     physics: { default: 'arcade', arcade: { gravity: { x: 0, y: 1600 }, debug: false } },
     fps: { target: 60, limit: fpsLimitFor(refreshMs), smoothStep: true },
-    scene: [BootScene, MenuScene, GameScene, HoopsScene, BattleScene, WrestleScene],
+    scene: [BootScene, MenuScene, GameScene, HoopsScene, BattleScene, WrestleScene, FishingScene],
   });
 
   const resize = () => {
@@ -138,7 +139,7 @@ function start(refreshMs: number) {
    * resolution (a little softer, much smoother), and check again (at most twice). Remembered for
    * this version (see core/res).
    */
-  const PLAY = ['Game', 'Hoops', 'Wrestle', 'Battle'];
+  const PLAY = ['Game', 'Hoops', 'Wrestle', 'Battle', 'Fishing'];
   const watchSpeed = (rounds: number) => {
     const deltas: number[] = [];
     let since = 0;

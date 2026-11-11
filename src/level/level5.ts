@@ -62,22 +62,20 @@ export function buildLevel5(): LevelData {
     return { wall, right, x1 };
   };
 
-  // the fly-over (from the gate back to the pier) dips down into each trench on the way
+  // the fly-over (from the gate back to the pier): along the level in open water, the surface just
+  // in view above and the sea bed below; over each descent it only dips a little, to show the way down
   L.flyPath = [
-    [252, b(9)],
-    [229, b(15)],
-    [207, b(15)],
-    [186, b(9)],
-    [168, 44],
-    [160, 14],
-    [148, 30],
-    [138, b(4)],
-    [116, b(9)],
-    [93, b(9)],
-    [76, 44],
-    [57, 46],
-    [44, b(10)],
-    [24, b(9)],
+    [252, b(11)],
+    [229, b(13)],
+    [207, b(13)],
+    [186, b(11.5)],
+    [156, b(6)],
+    [128, b(11.5)],
+    [104, b(12)],
+    [84, b(11.5)],
+    [65, b(7)],
+    [42, b(11.5)],
+    [22, b(11.5)],
   ];
 
   // ── The pier, open water ─────────────────────────────────────
