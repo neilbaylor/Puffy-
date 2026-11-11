@@ -816,7 +816,7 @@ export class GameScene extends Phaser.Scene {
     this.introU = 0;
     const info = levelInfo(this.levelId);
     this.game.events.emit('level-intro', { world: info.world, title: info.title, part: info.part });
-    const tw = this.tweens.add({ targets: this.intro, u: 1, duration: this.level.data.flyPath ? 9000 : 6400, ease: 'Linear', onComplete: () => this.endIntro() });
+    const tw = this.tweens.add({ targets: this.intro, u: 1, duration: this.level.data.flyPath ? (this.level.data.water !== undefined ? 11500 : 9000) : 6400, ease: 'Linear', onComplete: () => this.endIntro() });
     // skipping just fast-forwards the same flight (still lands smoothly)
     this.introSkip = () => tw.setTimeScale(5);
     this.game.events.once('skip-intro', this.introSkip);
@@ -1048,7 +1048,8 @@ export class GameScene extends Phaser.Scene {
     // landing on the hero at the bottom
     let cx = x;
     const path = this.level.data.flyPath;
-    if (this.level.data.vertical && path?.length) {
+    // (a climb's path, or under the sea one that dips down into the trenches)
+    if (path?.length) {
       const pts: [number, number][] = path.map(([tx, h]) => [tx * TILE, heightPx - h * TILE]);
       pts.push([endX, heroTop + (this.scale.height / base) / 2]);
       // (time on each leg by its length, sideways counting for less: it sweeps across, lingers going down)

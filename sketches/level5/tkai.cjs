@@ -20,11 +20,12 @@ const { chromium } = require('playwright');
     const pl = g.players[0];
     pl.invulnUntil = 1e12;
     const T = 32, H = g.level.heightPx;
-    pl.body.reset(70 * T, H - (62 + 12) * T);
+    pl.body.reset(73 * T, H - 44 * T);
     const btn = { left: false, right: false, jump: false, fire: false, run: false };
     pl.input = { ...pl.input, id: 'bot', poll: () => ({ ...btn }) };
     let f = 0, said = null, fleeAt = -1, hits = 0;
     const kai = g.enemies.find((e) => e.kind === 'kai' && e.x < 100 * T);
+    const ky0 = kai.y;
     const hp0 = kai.hp;
     const step = () => {
       f++;
@@ -37,7 +38,7 @@ const { chromium } = require('playwright');
       if (kai.dead && fleeAt < 0) { fleeAt = f; window.__k = 2; }
       if ((fleeAt > 0 && f > fleeAt + 30) || f > 60 * 40) {
         g.events.off('preupdate', step);
-        done({ said, hp0, kaiDead: kai.dead, fleeFrames: fleeAt, kaiX: Math.round(kai.x / T), alpha: kai.alpha });
+        done({ said, hp0, kaiDead: kai.dead, fleeFrames: fleeAt, kaiX: Math.round(kai.x / T), kaiRose: Math.round((ky0 - kai.y) / T), alpha: kai.alpha });
       }
     };
     g.events.on('preupdate', step);
@@ -45,7 +46,7 @@ const { chromium } = require('playwright');
   console.log('kai', JSON.stringify(r));
   await p.screenshot({ path: 'shots/l5/kai-flee.png' });
   // the trench: hover in the middle of the left side, half way down; then at the bottom
-  for (const [x, h, name] of [[104, 40, 'trench-mid'], [104, 6, 'trench-low']]) {
+  for (const [x, h, name] of [[55, 50, 'd1-mid'], [143, 40, 'trench-mid'], [143, 6, 'trench-low']]) {
     await p.evaluate(([x, h]) => { const g = window.game.scene.getScene('Game'); const pl = g.players[0]; pl.body.reset(x * 32, g.level.heightPx - h * 32); pl.input = { ...pl.input, poll: () => ({ left: false, right: false, run: false, fire: false, jump: (g.level.heightPx - pl.bottom) / 32 < h && Math.random() < 0.2 }) }; }, [x, h]);
     await p.waitForTimeout(2200);
     await p.screenshot({ path: `shots/l5/${name}.png` });

@@ -237,7 +237,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private startX(id: number) {
-    return id === 2 ? 86 * 32 : id === 3 ? 0 : 0;
+    return id === 2 ? 86 * 32 : id === 5 ? 14 * 32 : 0;
   }
   private top: number | null = null;
   /** The ground height the camera last followed (kept over a long gap). */
@@ -491,12 +491,15 @@ export class MenuScene extends Phaser.Scene {
     // counting them as the bottom of the level made the camera dive into every gap)
     const ys: number[] = [];
     for (let k = -0.4; k <= 0.4001; k += 0.1) {
-      const y = this.level.surfaceY(cx + vw * k);
+      // (under the sea: the sea bed, not the reef shelf at the surface)
+      const y = this.level.data.water !== undefined ? this.level.seaFloorY(cx + vw * k) : this.level.surfaceY(cx + vw * k);
       if (y < H - 1) ys.push(y);
     }
     const surf = ys.length ? ys.reduce((a, y) => a + y, 0) / ys.length : this.lastSurf;
     this.lastSurf = surf;
-    const want = Phaser.Math.Clamp(surf - vh * 0.7, Math.min(0, H - vh), H - vh);
+    // (under the sea: well down in the water, the sea bed along the bottom, no sky)
+    const water = this.level.data.water;
+    const want = water !== undefined ? Phaser.Math.Clamp(surf - vh * 0.8, water + 30, H - vh) : Phaser.Math.Clamp(surf - vh * 0.7, Math.min(0, H - vh), H - vh);
     this.top = this.top === null || this.x < this.x0 + 1 ? want : this.top + (want - this.top) * (1 - Math.exp(-dt * 1.5));
     const top = this.top + 26 * Math.sin(t * 0.17 + 0.7) + 9 * Math.sin(t * 0.41);
     cam.setZoom(zoom * (1.04 + 0.04 * Math.sin(t * 0.13 + 2)));

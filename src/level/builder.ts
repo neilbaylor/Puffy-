@@ -37,6 +37,8 @@ export interface LevelData {
   dark?: [number, number];
   /** Where the backgrounds sit as if it were the bottom of the level (world y): a level with a deep trench under it. */
   bgBottom?: number;
+  /** Under the sea: each descent (world px): from its left edge to its right, the wall in between (down on the left, back up on the right). */
+  descents?: { x0: number; wall: number; x1: number }[];
   width: number;
   height: number;
   tiles: number[][];
@@ -57,6 +59,7 @@ export class LevelBuilder {
   /** Under the sea: the surface's world y (see LevelData.water). */
   waterY: number | undefined;
   darkY: [number, number] | undefined;
+  readonly descents: { x0: number; wall: number; x1: number }[] = [];
   bgBottomY: number | undefined;
 
   /** Going down it gets dark: from height h0 (none) down to h1 (as dark as it gets). */
@@ -226,6 +229,7 @@ export class LevelBuilder {
       water: this.waterY,
       dark: this.darkY,
       bgBottom: this.bgBottomY,
+      descents: this.descents.length ? this.descents : undefined,
       width: this.width,
       height: this.height,
       tiles: this.cells.map((row) => row.map((c) => (c ? idx[c] : T.EMPTY))),

@@ -257,6 +257,19 @@ export class LevelView {
     return deep || this.heightPx;
   }
 
+  /**
+   * Under the sea: the sea bed under the water at world x — past any reef shelf hanging at the
+   * surface, and no deeper than the main sea bed (bgBottom), so a trench doesn't count.
+   */
+  seaFloorY(worldX: number): number {
+    const x = Math.floor(worldX / TILE);
+    const H = this.data.height;
+    let y = Math.ceil((this.data.water ?? 0) / TILE);
+    while (y < H && this.solid(x, y)) y++;
+    while (y < H && !this.solid(x, y)) y++;
+    return Math.min(y * TILE, this.data.bgBottom ?? this.heightPx);
+  }
+
   surfaceY(worldX: number): number {
     const x = Math.floor(worldX / TILE);
     for (let y = 0; y < this.data.height; y++) {
@@ -309,10 +322,12 @@ export class LevelView {
           if (xa === c * TILE && !this.solid(c - 1, k)) {
             g.fillStyle(rim, 1).fillRect(xa + 2.5, y, 5, h);
             g.fillStyle(ink, 1).fillRect(xa, y, 2.5, h);
+            this.wallDecor(xa, y + h / 2, -1, c, k);
           }
           if (xb === (c + 1) * TILE && !this.solid(c + 1, k)) {
             g.fillStyle(rim, 1).fillRect(xb - 7.5, y, 5, h);
             g.fillStyle(ink, 1).fillRect(xb - 2.5, y, 2.5, h);
+            this.wallDecor(xb, y + h / 2, 1, c, k);
           }
         }
         if (r * TILE > top && !this.solid(c, r - 1)) {
@@ -323,6 +338,25 @@ export class LevelView {
         r = e + 1;
       }
     }
+  }
+
+  /**
+   * Something growing on a trench wall now and then (a face onto the water at wall x, height y,
+   * `out` the way it faces: −1 left, 1 right): coral or sea grass sticking out, or a starfish.
+   */
+  private wallDecor(x: number, y: number, out: number, c: number, k: number) {
+    const h = Math.imul(c * 73856093 + k * 19349663, 2654435761) >>> 0;
+    if (h % 7 > 1) return;
+    const pick = (h >>> 8) % 6;
+    const img =
+      pick < 3
+        ? this.scene.add.image(x, y, 'sea-grass', `g${(h >>> 12) % 4}_${(h >>> 16) % 8}`).setOrigin(0.5, 54 / 56).setRotation((out * Math.PI) / 2).setScale(0.7 / PROP_RES)
+        : pick < 5
+          ? this.scene.add.image(x, y, 'sea-props', SEA_PROPS[(h >>> 12) % 5]).setOrigin(0.5, 46 / 48).setRotation((out * Math.PI) / 2).setScale(0.8 / PROP_RES)
+          : this.scene.add.image(x + out * 4, y, 'sea-props', (h >>> 12) % 2 ? 'star0' : 'star1').setRotation((h % 628) / 100).setScale(0.9 / PROP_RES);
+    img.setDepth(DEPTH.tiles + 0.5);
+    this.scenery?.push(img);
+    if (this.tint !== 0xffffff) img.setTint(this.tint);
   }
 
   private cell(x: number, y: number): Cell {

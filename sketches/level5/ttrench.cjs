@@ -1,6 +1,8 @@
 // The trench: from the block field, sink down the left side (timed), under the wall, climb back up the right.
 const { chromium } = require('playwright');
 const HERO = process.argv[2] || 'muscles';
+// which descent: [start x, left shaft edge, left shaft middle, wall's far side, right shaft middle, exit x, floor h]
+const D = process.argv[3] === '1' ? [36, 46.5, 55, 68, 75.5, 85, 34] : [103, 132.5, 143, 158, 167, 179, 2];
 (async () => {
   const br = await chromium.launch({ args: ['--use-gl=swiftshader'] });
   const ctx = await br.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 1 });
@@ -17,12 +19,13 @@ const HERO = process.argv[2] || 'muscles';
   await p.evaluate(() => window.game.events.emit('skip-intro'));
   await p.waitForFunction(() => window.game.scene.getScene('Game').players[0].swimming, null, { timeout: 20000 });
   await p.evaluate(() => document.querySelector('.ctl-tip')?.remove());
-  const res = p.evaluate(() => new Promise((done) => {
+  const res = p.evaluate((D) => new Promise((done) => {
     const g = window.game.scene.getScene('Game');
     const pl = g.players[0];
     pl.invulnUntil = 1e12;
     const T = 32, H = g.level.heightPx;
-    pl.body.reset(64 * T, H - (62 + 9) * T);
+    const [sx, edge, mid, far, rmid, exit, fl] = D;
+    pl.body.reset(sx * T, H - (62 + 9) * T);
     const btn = { left: false, right: true, jump: false, fire: false, run: false };
     pl.input = { ...pl.input, id: 'bot', poll: () => ({ ...btn }) };
     let f = 0, phase = 'field', sinkStart = 0, bottomAt = 0, topAt = 0, shot = 0;
@@ -35,18 +38,18 @@ const HERO = process.argv[2] || 'muscles';
         // weave: keep ~2 tiles over whatever's below or ahead
         const want = Math.max(floorAt(pl.x + 40), floorAt(pl.x + 100)) + 2.5;
         btn.jump = (h < Math.min(want, 62 + 13) || pl.body.blocked.right) && f % 12 < 2;
-        if (hx > 94.5) { phase = 'sink'; sinkStart = f; btn.right = false; btn.jump = false; log.push(['sink from h', h.toFixed(1)]); }
+        if (hx > edge) { phase = 'sink'; sinkStart = f; btn.right = false; btn.jump = false; log.push(['sink from h', h.toFixed(1)]); }
       } else if (phase === 'sink') {
-        btn.right = hx < 96.5; btn.left = hx > 98;
-        if (h < 3.4) { phase = 'under'; bottomAt = f; log.push(['bottom after s', ((f - sinkStart) / 60).toFixed(1)]); }
+        btn.right = hx < mid - 1; btn.left = hx > mid + 1;
+        if (h < fl + 1.4) { phase = 'under'; bottomAt = f; log.push(['bottom after s', ((f - sinkStart) / 60).toFixed(1)]); }
       } else if (phase === 'under') {
         btn.left = false; btn.right = true; btn.jump = false;
-        if (hx > 106.5) { phase = 'climb'; btn.right = false; }
+        if (hx > far) { phase = 'climb'; btn.right = false; }
       } else if (phase === 'climb') {
         btn.jump = f % 16 < 2;
-        btn.right = hx < 107; btn.left = hx > 108.5;
+        btn.right = hx < rmid - 1; btn.left = hx > rmid + 1;
         if (h > 62 + 4.5) { btn.right = true; btn.left = false; }
-        if (hx > 113) { phase = 'out'; topAt = f; log.push(['climb s', ((f - bottomAt) / 60).toFixed(1)]); }
+        if (hx > exit) { phase = 'out'; topAt = f; log.push(['climb s', ((f - bottomAt) / 60).toFixed(1)]); }
       }
       if (phase === 'sink' && f - sinkStart === 90) window.__s = 1;
       if (phase === 'sink' && f - sinkStart === 240) window.__s = 2;
@@ -58,7 +61,7 @@ const HERO = process.argv[2] || 'muscles';
       }
     };
     g.events.on('preupdate', step);
-  }));
+  }), D);
   for (let i = 1; i <= 4; i++) {
     await p.waitForFunction((i) => window.__s === i, i, { timeout: 120000 }).catch(() => {});
     await p.screenshot({ path: `shots/l5/trench-${i}.png` });

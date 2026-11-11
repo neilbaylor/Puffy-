@@ -15,9 +15,9 @@ export type FishBaddie = 'fish' | 'bigfish' | 'kai';
  */
 const STATS: Record<FishBaddie, { art: 'badguy' | 'badguybig' | 'kai'; hp: number; speed: number; see: [number, number]; every: [number, number]; shot: number; size: number[]; keep: [number, number] }> = {
   fish: { art: 'badguy', hp: 1, speed: 55, see: [360, 230], every: [2.4, 3.6], shot: 135, size: [1.4], keep: [120, 260] },
-  bigfish: { art: 'badguybig', hp: 3, speed: 42, see: [360, 230], every: [1.9, 2.8], shot: 135, size: [1.7, 1.7, 1.7], keep: [120, 260] },
+  bigfish: { art: 'badguybig', hp: 2, speed: 42, see: [360, 230], every: [1.9, 2.8], shot: 135, size: [1.7, 1.7, 1.7], keep: [120, 260] },
   // Kai: rare and quick — he comes right at you and fires often; two hits, and he gets away
-  kai: { art: 'kai', hp: 2, speed: 110, see: [460, 280], every: [1.2, 1.9], shot: 185, size: [1.45], keep: [70, 170] },
+  kai: { art: 'kai', hp: 3, speed: 110, see: [460, 280], every: [1.2, 1.9], shot: 185, size: [1.45], keep: [70, 170] },
 };
 
 /**
@@ -178,7 +178,16 @@ export class BadFish extends Enemy {
     this.body.enable = false;
     sfx.whoosh();
     this.gs.fx.popText(this.x, this.y - 30, 'ZOOM!', '#7cf0ff', 16);
-    this.setFlipX(false).setRotation(-0.1);
+    // (off up the level — unless rock's in the way, as down a trench: then straight up out of it,
+    // or on down if you're coming down after him)
+    const level = this.gs.level;
+    let clear = true;
+    for (let d = 40; d <= 640 && clear; d += 30) if (level.isSolidAt(this.x + d, this.y)) clear = false;
+    // (which side of a descent he's on: the way down, or the way back up)
+    const d = level.data.descents?.find((q) => this.x > q.x0 && this.x < q.x1);
+    const vy = clear && !d ? -60 : d && this.x < d.wall ? 1500 : -1500;
+    const vx = clear && !d ? 1500 : 0;
+    this.setFlipX(false).setRotation(vx ? -0.1 : vy < 0 ? -Math.PI / 2 : Math.PI / 2);
     let t = 0;
     const trail = this.gs.time.addEvent({
       delay: 40,
@@ -191,8 +200,8 @@ export class BadFish extends Enemy {
     });
     this.gs.tweens.add({
       targets: this,
-      x: this.x + 1500,
-      y: this.y - 60,
+      x: this.x + vx,
+      y: this.y + vy,
       alpha: { from: 1, to: 0, ease: 'Quad.easeIn' } as unknown as number,
       duration: 1300,
       ease: 'Cubic.easeIn',
