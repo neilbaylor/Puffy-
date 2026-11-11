@@ -256,3 +256,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.251: No referees on the courts; Battle: Scruffy a bit slower, half the rocks, 15% more bonuses.
 - v0.252: New end-of-battle cards; bigger KO badges on tablet and desktop.
 - v0.253: Kai's three lines, quicker fish fade, results card tweaks.
+- v0.254: Battle results: no name under the winner's hero.
