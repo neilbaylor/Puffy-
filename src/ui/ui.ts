@@ -229,7 +229,10 @@ export class UI {
   /** The online battle screens (made the first time you tap Battle). */
   private battleUi: BattleUI | null = null;
   private get battle() {
-    return (this.battleUi ??= this.makeBattleUi());
+    this.battleUi ??= this.makeBattleUi();
+    // (for the test scripts: sketches/battle/tresults.cjs shows each end-of-battle card)
+    (window as unknown as { __battle?: BattleUI }).__battle = this.battleUi;
+    return this.battleUi;
   }
   private makeBattleUi() {
     return new BattleUI({

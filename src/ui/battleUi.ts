@@ -731,26 +731,74 @@ export class BattleUI {
     this.host.touch(false);
     this.hud?.remove();
     this.hud = null;
+    const myId = this.net?.myId;
     const ranked = r.players.filter((p) => p.playing).sort((a, b) => b.kos - a.kos || a.deaths - b.deaths);
     const winner = r.players.find((p) => p.id === r.winner);
-    const iWon = !!winner && winner.id === this.net?.myId;
+    const iWon = !!winner && winner.id === myId;
+    const me = ranked.find((p) => p.id === myId);
+    const myRank = me ? ranked.indexOf(me) + 1 : 0;
     // a tie on KOs went to whoever was knocked out least: say so
     const tieBroken = !!winner && ranked.filter((p) => p.kos === winner.kos).length > 1;
+    // a draw: the ones level at the top share the stage
+    const top = winner ? [winner] : ranked.filter((p) => ranked[0] && p.kos === ranked[0].kos && p.deaths === ranked[0].deaths).slice(0, 3);
+    const nth = (n: number) => `${n}${n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th'}`;
+    const kos = (n: number) => `${n} KO${n === 1 ? '' : 's'}`;
+    const title = winner ? (iWon ? 'You win!' : `${esc(winner.name)} wins!`) : 'It’s a draw!';
+    const sub = winner
+      ? iWon
+        ? tieBroken
+          ? 'Level on KOs — you were knocked out the fewest times!'
+          : `Most KOs in the arena: ${kos(winner.kos)}!`
+        : me
+          ? `You came ${nth(myRank)} with ${kos(me.kos)}${tieBroken ? ' · same KOs: fewest knock-outs wins' : ''}`
+          : tieBroken
+            ? 'Same KOs: knocked out the fewest times'
+            : `${kos(winner.kos)}!`
+      : 'Nobody could split you!';
+    const confetti = iWon
+      ? `<div class="br-confetti" aria-hidden="true">${Array.from({ length: 22 }, (_, i) => `<i style="--x:${(i * 37) % 100}%;--d:${(i % 7) * 0.13}s;--c:${['#ff5a5f', '#ffc533', '#4fc3f7', '#7ed957', '#c58cff', '#ff9acb'][i % 6]};--r:${(i * 53) % 360}deg"></i>`).join('')}</div>`
+      : '';
     const el = h(`<div class="screen modal">
-      <div class="panel battle-results">
-        <p class="eyebrow">Battle over</p>
-        <h2>${winner ? (iWon ? 'You win!' : `${esc(winner.name)} wins!`) : 'It’s a draw!'}</h2>
-        ${tieBroken ? '<p class="br-why">Same number of KOs: knocked out the fewest times</p>' : ''}
-        ${winner ? `<canvas class="br-winner" width="160" height="160" style="--sc:${SLOT_COLORS[winner.slot]}"></canvas>` : ''}
-        <ol class="br-list">${ranked
-          .map((p) => `<li style="--sc:${SLOT_COLORS[p.slot]}"><i></i><span>${esc(p.name)}${p.id === this.net?.myId ? ' (you)' : ''}</span><b>${p.kos} KO${p.kos === 1 ? '' : 's'}</b></li>`)
-          .join('')}</ol>
-        <p class="br-next">Back to the lobby in a moment…</p>
-        <div class="row"><button class="btn btn-alt" data-act="leave">Leave</button></div>
+      <div class="panel battle-results${iWon ? ' won' : ''}${winner ? '' : ' draw'}">
+        ${confetti}
+        <div class="br-stage" style="--sc:${SLOT_COLORS[top[0]?.slot ?? 0]}">
+          <span class="br-trophy" aria-hidden="true">${winner ? '🏆' : '🤝'}</span>
+          <div class="br-heroes${top.length > 1 ? ' many' : ''}">${top.map((p) => `<canvas class="br-winner" width="200" height="200" style="--sc:${SLOT_COLORS[p.slot]}"></canvas>`).join('')}</div>
+          <span class="br-ribbon">${winner ? 'Winner' : 'Draw'}</span>
+          ${winner ? `<span class="br-wname">${esc(winner.name)}</span>` : ''}
+        </div>
+        <div class="br-body">
+          <p class="eyebrow">Battle over</p>
+          <h2>${title}</h2>
+          <p class="br-sub">${sub}</p>
+          <ol class="br-list">${ranked
+            .map(
+              (p, i) => `<li class="${p.id === myId ? 'me' : ''}" style="--sc:${SLOT_COLORS[p.slot]}">
+                <em class="br-rank r${Math.min(i + 1, 4)}">${i + 1}</em>
+                <canvas class="br-face" width="72" height="72"></canvas>
+                <span class="br-name">${esc(p.name)}${p.id === myId ? '<u>You</u>' : ''}</span>
+                <span class="br-out">${tieBroken ? `KO’d ${p.deaths}×` : ''}</span>
+                <b>${p.kos}<small>KO${p.kos === 1 ? '' : 's'}</small></b>
+              </li>`,
+            )
+            .join('')}</ol>
+          <div class="br-foot">
+            <span class="br-next">Back to the lobby in <b>${Math.max(1, Math.ceil(r.timer))}</b></span>
+            <button class="btn btn-alt" data-act="leave">Leave</button>
+          </div>
+        </div>
       </div>
     </div>`);
-    if (winner) slotPortrait(el.querySelector<HTMLCanvasElement>('.br-winner')!, winner.hero, winner.slot, 'idle0', null, winner.wear ?? '');
+    el.querySelectorAll<HTMLCanvasElement>('.br-winner').forEach((cv, i) => slotPortrait(cv, top[i].hero, top[i].slot, 'idle0', null, top[i].wear ?? ''));
+    el.querySelectorAll<HTMLCanvasElement>('.br-face').forEach((cv, i) => slotPortrait(cv, ranked[i].hero, ranked[i].slot, 'idle0', null, ranked[i].wear ?? ''));
     el.querySelector('[data-act=leave]')!.addEventListener('click', () => this.leave());
+    // (the seconds till the lobby, counting down)
+    const left = el.querySelector<HTMLElement>('.br-next b')!;
+    const until = performance.now() + Math.max(1, r.timer) * 1000;
+    const tick = window.setInterval(() => {
+      if (!el.isConnected) return clearInterval(tick);
+      left.textContent = String(Math.max(1, Math.ceil((until - performance.now()) / 1000)));
+    }, 250);
     this.host.setScreen(el);
     if (iWon) sfx.cheer();
   }
