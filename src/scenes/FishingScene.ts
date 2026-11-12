@@ -105,7 +105,7 @@ const CATCHES: {
   { kind: 'stone', name: 'Stone Fish', lb: [2.2, 4.6], odds: 19, k: 0.95 },
   { kind: 'slinger', name: 'Slinger', lb: [3.1, 6.4], odds: 16, k: 0.9 },
   { kind: 'fat', name: 'Fat Fish', lb: [9, 16], odds: 6, k: 0.6, rare: true },
-  { kind: 'kai', name: 'Kai Fish', lb: [1.4, 3.2], odds: 4, k: 1.25, rare: true },
+  { kind: 'kai', name: 'Kai Fish', lb: [1.4, 3.2], odds: 18, k: 1.25 },
 ];
 const pickCatch = () => {
   let r = Math.random() * CATCHES.reduce((a, c) => a + c.odds, 0);
