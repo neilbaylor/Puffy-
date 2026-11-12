@@ -264,3 +264,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.259: Player card greeting clear of Sign out.
 - v0.260: Fishing: TV announcer opening, bigger 3/4 boat, bigger King Bob, tougher King, new BITE!; smooth Part 5 fly-over.
 - v0.261: King Bob Fishing in everyone's Bosses menu (testing).
+- v0.262: Fishing cast: power and aim meters like basketball.
