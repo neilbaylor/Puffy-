@@ -14,8 +14,8 @@ const W = Number(process.argv[2] || 844), H = Number(process.argv[3] || 390);
   await p.waitForTimeout(500);
   await p.click('[data-boss="5"]');
   await p.waitForFunction(() => window.__fishing?.scene?.isActive?.(), null, { timeout: 120000 });
-  for (let i = 0; i < 14; i++) {
-    await p.waitForTimeout(1600);
+  for (let i = 0; i < 22; i++) {
+    await p.waitForTimeout(1000);
     await p.screenshot({ path: `shots/fishing/intro-${String(i).padStart(2, '0')}.png` });
   }
   console.log(errs.join('\n') || 'no errors');

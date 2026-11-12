@@ -60,7 +60,7 @@ const WORLD_W = 3600;
 const WORLD_TOP = -360;
 const WORLD_BOTTOM = 880;
 /** The world's left edge: the show's dock is out there, over to the left of the boat. */
-const WORLD_L = -1700;
+const WORLD_L = -3000;
 /** The boat picture's left edge (world), and how big it's drawn (world px per picture unit). */
 const BOAT_X = 20;
 const BS = 1.18;
@@ -72,7 +72,7 @@ const BOWL_K = 1.32;
 /** The boat sits a touch bow-up. */
 const TRIM = 0.014;
 /** The dock (world): its left edge, and its deck's height (where the host stands). */
-const DOCK_X = -1450;
+const DOCK_X = -2700;
 const DOCK_TOP = WATER - 58;
 const HOST_X = DOCK_X + 470;
 const ROUNDS = 6;
@@ -371,9 +371,9 @@ export class FishingScene extends Phaser.Scene {
       .setScale(0.6)
       .setFlipX(true)
       .setAlpha(0.9);
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < 9; i++) {
       const c = this.add
-        .image(-200 + i * 620 + Math.random() * 200, 40 + Math.random() * 220, `fl-cloud${i % 3}`)
+        .image(WORLD_L * 0.4 + i * 680 + Math.random() * 200, 40 + Math.random() * 220, `fl-cloud${i % 3}`)
         .setDepth(0.13)
         .setScrollFactor(0.4, 0.8)
         .setScale(0.7 + Math.random() * 0.6)
@@ -778,7 +778,7 @@ export class FishingScene extends Phaser.Scene {
     for (const w of this.waves) w.tilePositionX += s * 22 * (w.getData('sp') as number);
     for (const c of this.clouds) {
       c.x += s * 6;
-      if (c.x > WORLD_W + 600) c.x = -500;
+      if (c.x > WORLD_W + 600) c.x = WORLD_L * 0.4 - 300;
     }
     this.rays.forEach((r, i) => r.setRotation(Math.sin(t * 0.3 + i) * 0.08));
     for (const f of this.schools) {
@@ -1320,12 +1320,29 @@ export class FishingScene extends Phaser.Scene {
     // ── and off over the water to the boat ──
     tv.classList.add('off');
     this.time.delayedCall(700, () => (tv.hidden = true));
-    this.camK = 0.95;
-    this.shotBoat(1.2);
-    this.cam.x = bx(BOAT.king) + 60;
-    await this.iwait(2100);
+    // (a long, slow swoop out over the water: pulling up and back on the way, settling in on King Bob)
+    const from = { ...this.cam };
+    const to = { x: bx(BOAT.king) + 90, y: WATER - 205, zoom: 1.2 };
+    this.camK = 14;
+    const glide = { t: 0 };
+    const tw = this.tweens.add({
+      targets: glide,
+      t: 1,
+      duration: 4400,
+      ease: 'Sine.easeInOut',
+      onUpdate: () => {
+        const t = glide.t;
+        const arc = Math.sin(t * Math.PI);
+        this.cam = { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t - arc * 90, zoom: (from.zoom + (to.zoom - from.zoom) * t) * (1 - arc * 0.4) };
+        if (this.skipping) tw.timeScale = 6;
+      },
+    });
+    while (!tw.isFinished() && !tw.isDestroyed()) await this.wait(30);
     this.hostPoint = false;
-    await this.kingSays('Nobody out-fishes the King!', 1900);
+    this.camK = 2.5;
+    await this.iwait(300);
+    await this.kingSays("You'll NEVER beat me at fishing!", 2200);
+    await this.kingFlip();
     this.camK = 2.2;
     this.shotBoat(1);
     await this.iwait(700);
@@ -2164,6 +2181,44 @@ export class FishingScene extends Phaser.Scene {
     fadeOutMusic(500);
     const result: ResultState = { ...this.fd.result, hoops: score, level: this.fd.level ?? 5 };
     this.game.events.emit('level-complete', result);
+  }
+
+  /** King Bob, showing off: up out of his bowl in a flip, and back into it with a splash. */
+  private async kingFlip() {
+    const k = this.kingSpr;
+    const rim = this.bowlAt(0, -BOWL.h + 22);
+    const splash = () => {
+      for (let i = 0; i < 10; i++) {
+        const d = this.add.image(rim.x + (Math.random() - 0.5) * 50, rim.y, 'fl-drop').setScale(0.45 + Math.random() * 0.4).setDepth(8.7);
+        this.tweens.add({ targets: d, x: d.x + (Math.random() - 0.5) * 110, y: d.y - 30 - Math.random() * 50, duration: 280, ease: 'Quad.easeOut', yoyo: true, onComplete: () => d.destroy() });
+      }
+    };
+    this.kingFree = true;
+    k.setDepth(8.6);
+    const x0 = k.x;
+    const y0 = k.y;
+    sfx.whoosh();
+    splash();
+    const o = { t: 0 };
+    await this.tw({
+      targets: o,
+      t: 1,
+      duration: 1000,
+      ease: 'Linear',
+      onUpdate: () => {
+        const t = o.t;
+        // (up, a full flip at the top, back down where he came from)
+        k.setPosition(x0 + Math.sin(t * Math.PI) * 14, y0 - Math.sin(t * Math.PI) * 150);
+        k.setRotation(-Phaser.Math.Easing.Sine.InOut(t) * Math.PI * 2);
+      },
+    });
+    k.setRotation(0).setDepth(4.35);
+    this.kingFree = false;
+    splash();
+    sfx.splash();
+    // (a little bob as he lands back in)
+    this.tweens.add({ targets: k, scaleY: k.scaleY * 0.88, scaleX: k.scaleX * 1.08, duration: 120, yoyo: true });
+    await this.wait(700);
   }
 
   /** King Bob wriggles, leaps out of his bowl in a great arc over the stern, splashes into the sea and swims off. */
