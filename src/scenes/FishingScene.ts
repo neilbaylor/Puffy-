@@ -83,7 +83,7 @@ const KING_CATCH = 0.62;
 /** A hero's size here: world px per art unit. */
 const HERO_K = 2.38;
 /** How long the BITE button can be hit for (ms). */
-const BITE_MS = 850;
+const BITE_MS = 620;
 /** The rods: length (world px), and how far the handle reaches behind the hands. */
 const ROD_LEN = 178;
 const ROD_BUTT = 34;
@@ -180,6 +180,13 @@ export class FishingScene extends Phaser.Scene {
   /** The show's host, on the dock: talking (his mouth going), pointing off at the boat. */
   private host!: Phaser.GameObjects.Image;
   private hostTalk = false;
+  /** The hero leaning (radians, + forward): back on the wind-up, into the cast, back as they heave a fish in. */
+  private heroLean = 0;
+  /** The rod tip's path through the whip (a fading streak), and the lure's trail through the air. */
+  private tipTrail: { x: number; y: number; t: number }[] = [];
+  private lureTrail: { x: number; y: number }[] = [];
+  /** A fish out of the water on the end of the line: its mouth, swinging (verlet) from the rod tip. */
+  private swing: { x: number; y: number; px: number; py: number; len: number; target: number; t: number } | null = null;
   private hostPoint = false;
   private hostMouthT = 0;
   private hostOpen = false;
@@ -611,7 +618,7 @@ export class FishingScene extends Phaser.Scene {
     const kc = this.bowlAt(2, -(BOWL.h - BOWL.cy) + 10 + Math.sin(this.clock / 700) * 3);
     this.kingSpr.setPosition(kc.x, kc.y).setRotation(a + Math.sin(this.clock / 900) * 0.05);
     const h = this.onBoat(BOAT.hero, BOAT.feet + 2);
-    this.hero.setPosition(h.x, h.y).setRotation(a);
+    this.hero.setPosition(h.x, h.y).setRotation(a + this.heroLean);
   }
 
   /** The hero's hands (world), from the frame shown. */
@@ -621,8 +628,8 @@ export class FishingScene extends Phaser.Scene {
     const [hx, hy] = carryHand(id, frameA);
     const dx = (hx + HERO_SHEET_M - (CHAR_W + HERO_SHEET_M * 2) / 2) * k;
     const dy = (hy - CHAR_H) * k;
-    const c = Math.cos(this.rock + TRIM);
-    const s = Math.sin(this.rock + TRIM);
+    const c = Math.cos(this.rock + TRIM + this.heroLean);
+    const s = Math.sin(this.rock + TRIM + this.heroLean);
     return {
       x: this.hero.x + dx * c - dy * s,
       y: this.hero.y + dx * s + dy * c,
@@ -832,6 +839,10 @@ export class FishingScene extends Phaser.Scene {
       L.x += L.vx * s;
       L.y += L.vy * s;
       L.spin += s * 9;
+      if (who === 'hero') {
+        this.lureTrail.push({ x: L.x, y: L.y });
+        if (this.lureTrail.length > 14) this.lureTrail.shift();
+      }
       L.img.setPosition(L.x, L.y).setRotation(L.spin);
       if (L.y >= WATER - 6 && L.vy > 0) this.landLure(L);
     } else if (L.mode === 'float' || L.mode === 'hooked') {
@@ -854,6 +865,23 @@ export class FishingScene extends Phaser.Scene {
   private drawRods() {
     const g = this.rods;
     g.clear();
+    // the rod tip's streak through the whip, fading fast
+    this.tipTrail = this.tipTrail.filter((q) => this.clock - q.t < 240);
+    for (let i = 1; i < this.tipTrail.length; i++) {
+      const a = this.tipTrail[i - 1];
+      const b = this.tipTrail[i];
+      const k = 1 - (this.clock - b.t) / 240;
+      g.lineStyle(9 * k, 0xffffff, 0.55 * k);
+      g.lineBetween(a.x, a.y, b.x, b.y);
+    }
+    // the lure's trail through the air
+    if (this.lures.hero?.mode === 'fly')
+      this.lureTrail.forEach((q, i) => {
+        const k = (i + 1) / this.lureTrail.length;
+        g.fillStyle(0xffffff, 0.5 * k);
+        g.fillCircle(q.x, q.y, 1.5 + 3 * k);
+      });
+    else this.lureTrail.length = 0;
     for (const who of ['king', 'hero'] as const) {
       const r = this.rod[who];
       const len = who === 'hero' ? ROD_LEN : KING_ROD_LEN;
@@ -1163,11 +1191,14 @@ export class FishingScene extends Phaser.Scene {
   /** The BITE! button: up somewhere over the water, fading fast. Resolves true if it was hit in time. */
   private async biteButton(): Promise<boolean> {
     const b = this.dom.querySelector<HTMLElement>('.fsh-bite')!;
-    // (somewhere over the sea, clear of the scoreboard and the hero)
-    const x = 38 + Math.random() * 44;
-    const y = 30 + Math.random() * 38;
+    // (anywhere over the sea, clear of the scoreboard; and it drifts off while it's there)
+    const x = 30 + Math.random() * 58;
+    const y = 26 + Math.random() * 48;
     b.style.left = `${x}%`;
     b.style.top = `${y}%`;
+    const da = Math.random() * Math.PI * 2;
+    b.style.setProperty('--dx', `${Math.cos(da) * 50}px`);
+    b.style.setProperty('--dy', `${Math.sin(da) * 35}px`);
     b.style.setProperty('--life', `${BITE_MS}ms`);
     b.hidden = false;
     b.classList.remove('go', 'hit');
@@ -1450,27 +1481,39 @@ export class FishingScene extends Phaser.Scene {
   }
 
   /** The cast: wind back, a beat, whip forward (the lure leaves the tip at the release), and the line pays out. */
-  /** `wobble`: an aim off the green (−1…1) pulls the cast up high or flat. */
+  /**
+   * The cast. A wind-up: the hero leans back and takes the rod right back over their shoulder (the lure
+   * swinging out behind on its line, the rod loading up). A beat. Then the whip: they lunge into it, the
+   * rod tip leaves a streak, the blank bends back against the swing, and the lure lets go with a zing of
+   * the reel — off over the sea on a long arc, a trail behind it, the camera after it — and splashes
+   * down; the bobber bobs up. `wobble`: an aim off the green (−1…1) throws the cast up high or flat.
+   */
   private async heroCast(power: number, wobble = 0) {
     const L = this.lures.hero;
     const r = this.rod.hero;
-    // wind back over the shoulder
+    // ── the wind-up ──
     this.camK = 2.5;
-    r.bend = 0.12;
-    await this.to(this as unknown as Record<string, number>, 'arm', -2.6, 420, 'Sine.easeInOut');
-    r.bend = 0;
-    await this.wait(120);
-    // the whip: forward hard; the rod loads (the tip lags behind), and lets go about halfway
+    this.cam = { ...this.cam, zoom: this.cam.zoom * 1.06 };
+    r.bend = 0.18;
+    // (tweens straight on: `to` would stop the lean along with everything else on the scene)
+    this.tweens.killTweensOf(this);
+    this.tweens.add({ targets: this, heroLean: -0.12, duration: 520, ease: 'Sine.easeInOut' });
+    this.tweens.add({ targets: this, arm: -2.6, duration: 520, ease: 'Sine.easeInOut' });
+    await this.wait(530);
+    // (a beat at the top, the rod loaded)
+    r.bend = 0.1;
+    await this.wait(150);
+    // ── the whip ──
     sfx.whoosh();
-    const tw = this.tweens.add({
-      targets: this,
-      arm: 0.1,
-      duration: 260,
-      ease: 'Cubic.easeIn',
-    });
-    r.bend = -0.5;
-    while (this.arm < -1.0) await this.wait(8);
-    // release: off it goes, out over the sea
+    this.tipTrail = [];
+    this.tweens.add({ targets: this, heroLean: 0.1, duration: 240, ease: 'Cubic.easeIn' });
+    const tw = this.tweens.add({ targets: this, arm: 0.15, duration: 240, ease: 'Cubic.easeIn' });
+    r.bend = -0.6;
+    while (this.arm < -1.0) {
+      this.tipTrail.push({ x: r.tip.x, y: r.tip.y, t: this.clock });
+      await this.wait(8);
+    }
+    // ── let go: off it goes, out over the sea ──
     const a = -0.68 - power * 0.1 + wobble * 0.22;
     const v = 560 + power * 820;
     L.mode = 'fly';
@@ -1479,30 +1522,34 @@ export class FishingScene extends Phaser.Scene {
     L.vx = Math.cos(a) * v;
     L.vy = Math.sin(a) * v;
     L.spin = 0;
-    r.reelRate = -3;
-    while (!tw.isFinished() && !tw.isDestroyed()) await this.wait(16);
-    r.bend = 0.3;
-    this.tweens.add({
-      targets: r,
-      bend: 0,
-      duration: 700,
-      ease: 'Elastic.easeOut',
-    });
-    this.to(this as unknown as Record<string, number>, 'arm', -0.5, 500);
-    // follow the lure through the air
-    this.camK = 4;
+    this.lureTrail = [];
+    this.sparkle(r.tip.x, r.tip.y, 6);
+    sfx.stroke();
+    r.reelRate = -7;
+    while (!tw.isFinished() && !tw.isDestroyed()) {
+      this.tipTrail.push({ x: r.tip.x, y: r.tip.y, t: this.clock });
+      await this.wait(8);
+    }
+    // the follow-through: the rod springs back, the hero settles
+    r.bend = 0.4;
+    this.tweens.add({ targets: r, bend: 0, duration: 900, ease: 'Elastic.easeOut' });
+    this.tweens.add({ targets: this, heroLean: 0, duration: 600, ease: 'Sine.easeOut' });
+    this.tweens.add({ targets: this, arm: -0.5, duration: 600, ease: 'Sine.easeInOut' });
+    // follow the lure through the air (the line paying out, the reel slowing)
+    this.camK = 3.2;
     while (L.mode === 'fly') {
-      this.cam = {
-        x: Math.max(bx(BOAT.hero) + 200, L.x - 120),
-        y: Math.min(WATER - 80, L.y + 60),
-        zoom: 0.92,
-      };
+      r.reelRate *= 0.97;
+      this.cam = { x: Math.max(bx(BOAT.hero) + 220, L.x - 40 + L.vx * 0.12), y: Math.min(WATER - 90, L.y + 70), zoom: 0.9 };
       await this.wait(16);
     }
+    // splashdown: the bobber goes under and bobs back up
     r.reelRate = 0;
+    L.dip = 14;
+    this.tweens.add({ targets: L, dip: 0, duration: 900, ease: 'Elastic.easeOut' });
+    this.splash(L.x, WATER, 10, 0.7);
     this.camK = 2;
     this.shotLine('hero');
-    await this.wait(450);
+    await this.wait(500);
   }
 
   private bubbles(x: number, y: number, n: number) {
@@ -1545,67 +1592,94 @@ export class FishingScene extends Phaser.Scene {
     this.splash(L.x, WATER, 12, 0.9);
     this.callout('FISH ON!', 'good', 900);
     this.camK = 3;
-    // the fight: in towards the boat, thrashing, the rod bending
-    const x0 = L.x;
+    // ── the fight: it makes runs away from the boat (the reel screams, line goes out, the rod bends right
+    // over); in between you pump the rod and wind, gaining line. It thrashes about under the hook. ──
     const xEnd = bx(BOAT.motor) + 90;
-    const dur = 2300;
-    const t0 = this.clock;
+    const fp = { x: fish.x, y: fish.y, vx: 0, vy: 0 };
     let leapt = false;
-    let frameT = 0;
-    while (this.clock - t0 < dur) {
-      const u = (this.clock - t0) / dur;
-      const thrash = Math.sin(this.clock / 70) * 18 * (1 - u * 0.5);
-      L.x = x0 + (xEnd - x0) * Phaser.Math.Easing.Sine.InOut(u);
-      L.dip = 14 + Math.sin(this.clock / 90) * 6;
-      r.bend = 0.75 + Math.sin(this.clock / 80) * 0.18;
-      this.arm = -1.25 + Math.sin(this.clock / 110) * 0.12;
-      fish.setPosition(L.x + thrash, WATER + 60 + Math.cos(this.clock / 85) * 10);
-      fish.setFlipX(Math.sin(this.clock / 260) > 0).setRotation(Math.sin(this.clock / 60) * 0.35);
-      frameT += 16;
-      fish.setFrame(['sw0', 'sw2', 'sw4'][Math.floor(frameT / 60) % 3]);
-      if (Math.random() < 0.2) this.bubbles(fish.x, fish.y, 1);
-      if (Math.random() < 0.06) this.ripple(L.x + thrash, WATER, 0.6);
-      this.cam = {
-        x: (bx(BOAT.hero) + L.x) / 2 + 60,
-        y: WATER - 70,
-        zoom: Phaser.Math.Clamp(1280 / (L.x - bx(BOAT.hero) + 520), 0.7, 1.15),
-      };
-      // halfway: it LEAPS clean out of the water
-      if (!leapt && u > 0.42) {
+    const runs = 2 + Math.floor(Math.random() * 2);
+    for (let leg = 0; leg < runs * 2; leg++) {
+      const run = leg % 2 === 0;
+      const dur = run ? 520 + Math.random() * 260 : 760 + Math.random() * 240;
+      const from = L.x;
+      // (a run takes back some line; a pump-and-wind gains more than that)
+      const left = Math.max(0, L.x - xEnd);
+      const to = run ? Math.min(L.x + 70 + Math.random() * 70, WORLD_W - 200) : L.x - Math.max(left / (runs - Math.floor(leg / 2)), 120);
+      const t0 = this.clock;
+      if (run) {
+        sfx.stroke();
+        this.ripple(L.x, WATER, 0.9);
+      }
+      while (this.clock - t0 < dur) {
+        const u = (this.clock - t0) / dur;
+        L.x = from + (Math.max(xEnd, to) - from) * (run ? Phaser.Math.Easing.Quadratic.Out(u) : Phaser.Math.Easing.Sine.InOut(u));
+        // the rod: bent right over on a run; pumped up and wound on in between
+        if (run) {
+          r.reelRate = -5;
+          r.bend = 0.95 + Math.sin(this.clock / 50) * 0.05;
+          this.arm = -1.15 + Math.sin(this.clock / 45) * 0.04;
+          this.heroLean = 0.05;
+        } else {
+          const pump = Math.sin(u * Math.PI * 2);
+          r.reelRate = 4.5;
+          r.bend = 0.6 + Math.max(0, pump) * 0.25;
+          this.arm = -0.9 - Math.max(0, pump) * 0.55;
+          this.heroLean = -0.06 * Math.max(0, pump);
+        }
+        L.dip = 14 + Math.sin(this.clock / 80) * 6;
+        // the fish follows the hook a little behind it, darting, deeper or shallower
+        const tx = L.x + (run ? 30 : -10) + Math.sin(this.clock / 90) * 14;
+        const ty = WATER + 55 + Math.sin(this.clock / 230) * 18;
+        fp.vx += ((tx - fp.x) * 30 - fp.vx * 6) * 0.016;
+        fp.vy += ((ty - fp.y) * 30 - fp.vy * 6) * 0.016;
+        fp.x += fp.vx * 0.016;
+        fp.y += fp.vy * 0.016;
+        fish.setPosition(fp.x, fp.y);
+        fish.setFlipX(run ? false : true).setRotation(Math.sin(this.clock / 55) * 0.3);
+        fish.setFrame(['sw0', 'sw2', 'sw4'][Math.floor(this.clock / (run ? 45 : 70)) % 3]);
+        if (Math.random() < 0.25) this.bubbles(fish.x, fish.y, 1);
+        // (near the surface it throws up a wake)
+        if (fp.y < WATER + 50 && Math.random() < 0.25) this.ripple(fp.x, WATER, 0.5);
+        this.cam = { x: (bx(BOAT.hero) + L.x) / 2 + 60, y: WATER - 70, zoom: Phaser.Math.Clamp(1280 / (L.x - bx(BOAT.hero) + 560), 0.68, 1.12) };
+        await this.wait(16);
+      }
+      // (once, mid-fight, it leaps clean out of the water)
+      if (!leapt && leg === 1) {
         leapt = true;
         await this.leap(fish, L);
+        fp.x = fish.x;
+        fp.y = fish.y;
+        fp.vx = fp.vy = 0;
       }
-      await this.wait(16);
     }
-    // the last pull: up and over the side, swinging on the line
+    // ── the heave: the hero hauls back, the fish comes out of the water with a splash and swings on the line ──
     sfx.whoosh();
     sfx.splash();
-    this.splash(L.x, WATER, 16, 1.1);
-    this.arm = -1.2;
-    r.bend = 0.3;
-    r.reelRate = 0;
+    this.splash(L.x, WATER, 18, 1.15);
+    r.reelRate = 2;
     L.mode = 'gone';
     L.img.setVisible(false);
     fish.setDepth(8.4).setFlipX(false);
-    this.arm = -0.85;
-    // (hung by the mouth, nose up: its middle half its length under the hook)
-    const hang = () => ({ x: r.tip.x, y: r.tip.y + 18 + w * c.k * 0.62 });
+    this.tweens.killTweensOf(this);
+    this.tweens.add({ targets: this, arm: -0.85, duration: 380, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: this, heroLean: -0.12, duration: 300, ease: 'Quad.easeOut', yoyo: true, hold: 200 });
+    this.tweens.add({ targets: r, bend: 0.25, duration: 500, ease: 'Sine.easeOut' });
+    // (the mouth: a swinging weight on the line; thrown up and in by the heave, the line wound shorter)
+    const m0 = this.mouthOf(fish);
+    const hangLen = 30;
+    this.swing = { x: m0.x, y: m0.y, px: m0.x + 9, py: m0.y + 16, len: Math.hypot(m0.x - r.tip.x, m0.y - r.tip.y), target: hangLen, t: this.clock };
     this.camK = 3.2;
     this.cam = { x: this.hero.x + 70, y: this.hero.y - 150, zoom: 1.6 };
-    const from = { x: fish.x, y: fish.y };
-    const arc = { t: 0 };
-    await this.tw({
-      targets: arc,
-      t: 1,
-      duration: 650,
-      ease: 'Quad.easeOut',
-      onUpdate: () => {
-        const to = hang();
-        fish.setPosition(from.x + (to.x - from.x) * arc.t, from.y + (to.y - from.y) * arc.t - Math.sin(arc.t * Math.PI) * 120);
-        this.dangle.hero = this.mouthOf(fish);
-        fish.setRotation(arc.t * Math.PI * 2 - (Math.PI / 2) * arc.t);
-      },
-    });
+    const tLift = this.clock;
+    while (this.clock - tLift < 900) {
+      this.swingStep(fish, w * c.k);
+      if (Math.random() < 0.3) {
+        const d = this.add.image(fish.x, fish.y, 'fl-drop').setScale(0.45).setDepth(8.5);
+        this.tweens.add({ targets: d, x: d.x + (Math.random() - 0.5) * 60, y: d.y + 140, alpha: 0, duration: 600, ease: 'Quad.easeIn', onComplete: () => d.destroy() });
+      }
+      await this.wait(16);
+    }
+    r.reelRate = 0;
     // the show: held up on the line in a burst of light
     this.heroPose = 'j0';
     this.arm = -0.85;
@@ -1640,10 +1714,9 @@ export class FishingScene extends Phaser.Scene {
     card.classList.add('show');
     const tShow = this.clock;
     while (this.clock - tShow < 2300) {
-      const p = hang();
-      const sw = Math.sin(this.clock / 140) * 0.35;
-      fish.setPosition(p.x + Math.sin(this.clock / 260) * 4, p.y).setRotation(-Math.PI / 2 + sw);
-      this.dangle.hero = this.mouthOf(fish);
+      // (still swinging on the line, wriggling now and then)
+      if (Math.random() < 0.03 && this.swing) this.swing.px -= (Math.random() - 0.5) * 10;
+      this.swingStep(fish, w * c.k);
       fish.setFrame(['sw0', 'sw2', 'sw4'][Math.floor(this.clock / 90) % 3]);
       burst.setPosition(fish.x, fish.y);
       this.cam = {
@@ -1677,7 +1750,9 @@ export class FishingScene extends Phaser.Scene {
       duration: 300,
       onComplete: () => burst.destroy(),
     });
-    // into the cooler
+    // off the hook and into the cooler
+    this.dangle.hero = null;
+    this.swing = null;
     this.cooler.setTexture('fl-cooler-open');
     const cool = this.onBoat(BOAT.cooler, BOAT.feet - 30);
     const f0 = { x: fish.x, y: fish.y };
@@ -1715,6 +1790,43 @@ export class FishingScene extends Phaser.Scene {
     this.camK = 2.2;
     this.shotBoat(1);
     await this.wait(500);
+  }
+
+  /**
+   * A fish swinging on the end of the line out of the water: its mouth a weight on a rope from the
+   * rod tip (gravity, a little drag), the fish hanging from it nose-up along the line, wriggling.
+   */
+  private swingStep(fish: Phaser.GameObjects.Sprite, len: number) {
+    const sw = this.swing;
+    if (!sw) return;
+    const tip = this.rod.hero.tip;
+    // (on the scene clock, in 60 Hz steps: the same swing however fast or slow the frames come)
+    const steps = Phaser.Math.Clamp(Math.round((this.clock - sw.t) / 16.7), 0, 8);
+    sw.t += steps * 16.7;
+    for (let i = 0; i < steps; i++) {
+      // the line wound in to its hanging length
+      sw.len += (sw.target - sw.len) * 0.12;
+      const vx = (sw.x - sw.px) * 0.985;
+      const vy = (sw.y - sw.py) * 0.985;
+      sw.px = sw.x;
+      sw.py = sw.y;
+      sw.x += vx;
+      sw.y += vy + 0.45;
+      const dx = sw.x - tip.x;
+      const dy = sw.y - tip.y;
+      const d = Math.hypot(dx, dy) || 1;
+      // (a line, not a stick: it only pulls when it's tight)
+      if (d > sw.len) {
+        sw.x = tip.x + (dx / d) * sw.len;
+        sw.y = tip.y + (dy / d) * sw.len;
+      }
+    }
+    // (nose to the line; its body hanging on down from the mouth)
+    const a = Math.atan2(tip.y - sw.y, tip.x - sw.x) + Math.sin(this.clock / 70) * 0.18;
+    const half = len * 0.5;
+    fish.setPosition(sw.x - Math.cos(a) * half * 0.88, sw.y - Math.sin(a) * half * 0.88).setRotation(a);
+    fish.setFrame(['sw0', 'sw2', 'sw4'][Math.floor(this.clock / 80) % 3]);
+    this.dangle.hero = { x: sw.x, y: sw.y };
   }
 
   /** Where a fish's mouth is (its nose: the art faces right, flipped faces left), for the line. */
