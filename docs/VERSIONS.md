@@ -272,3 +272,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.267: Fishing: host pace eased back; King Bob's flip splash + laugh.
 - v0.268: Fishing: King Bob catches less; the camera keeps everyone whole in shot.
 - v0.269: Fishing: only the good fish bite (no Bad Guy Fish or Kai).
+- v0.270: Fishing: Kai Fish is back as a rare catch.
