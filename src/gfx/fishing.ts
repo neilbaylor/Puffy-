@@ -1136,7 +1136,7 @@ export function drawDock(ctx: Ctx) {
  * tie, a slick of hair, a big moustache, holding a chrome ball microphone on a curly lead. Frames:
  * t0/t1 talking (mouth shut/open), p0/p1 pointing off to the right (towards the boat).
  */
-export const HOST = { w: 140, h: 190 } as const;
+export const HOST = { w: 168, h: 190 } as const; // (wide enough for the pointing hand)
 export const HOST_FRAMES = ['t0', 't1', 'p0', 'p1', 's0', 's1'] as const;
 export function drawHost(ctx: Ctx, f: string) {
   const open = f.endsWith('1');
