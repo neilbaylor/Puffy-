@@ -33,7 +33,7 @@ const W = Number(process.argv[4] || 844), H = Number(process.argv[5] || 390);
       const d = f.dom;
       const m = f.meter;
       return {
-        meter: !!m, inZone: m ? m.pos > m.zone[0] + 0.01 && m.pos < m.zone[1] - 0.01 : false,
+        meter: !!m, phase: m ? m.el.dataset.m : '', inZone: m ? m.pos > m.zone[0] + 0.01 && m.pos < m.zone[1] - 0.01 : false,
         bite: !d.querySelector('.fsh-bite').hidden,
         hero: f.lures.hero.mode, king: f.lures.king.mode,
         card: d.querySelector('.fsh-catch').classList.contains('show'),
@@ -44,7 +44,7 @@ const W = Number(process.argv[4] || 844), H = Number(process.argv[5] || 390);
     if (s.done) { await p.waitForTimeout(1500); await shot('end'); break; }
     if (s.callout && s.callout !== last) { last = s.callout; console.log('  callout:', s.callout, JSON.stringify(s.score)); }
     if (s.callout.startsWith('ROUND 1')) await shot('round');
-    if (s.meter) { await shot('meter'); if (s.inZone) { await p.mouse.click(W * 0.3, H * 0.5); await p.waitForTimeout(150); } continue; }
+    if (s.meter) { await shot(s.phase === 'aim' ? 'meter2' : 'meter'); if (s.inZone) { await p.mouse.click(W * 0.3, H * 0.5); await p.waitForTimeout(150); } continue; }
     if (s.hero === 'fly') await shot('cast');
     if (s.bite) { await shot('bite'); await p.locator('.fsh-bite').click({ force: true, timeout: 500 }).catch(() => {}); continue; }
     if (s.hero === 'hooked') await shot('fishon');

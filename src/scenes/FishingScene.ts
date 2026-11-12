@@ -510,7 +510,8 @@ export class FishingScene extends Phaser.Scene {
       </div>
       <div class="tv-ticker" hidden><b>REEL ROYAL TV</b><div class="tv-crawl"><span></span></div></div>
       <div class="hoops-meters fsh-meter" hidden>
-        <div class="hm" data-m="power"><b>Cast</b><div class="hm-bar"><i class="hm-zone"></i><i class="hm-mark"></i></div></div>
+        <div class="hm" data-m="power"><b>Power</b><div class="hm-bar"><i class="hm-zone"></i><i class="hm-mark"></i></div></div>
+        <div class="hm" data-m="aim"><b>Aim</b><div class="hm-bar"><i class="hm-zone"></i><i class="hm-mark"></i></div></div>
         <p class="hm-hint">${usingTouch() ? 'Tap' : 'Press Space or click'} to stop the marker in the green!</p>
       </div>
       <button class="fsh-bite" hidden aria-label="Bite: strike now"><svg class="fb-ring" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="45" pathLength="100"></circle></svg><b>BITE!</b></button>
@@ -1124,13 +1125,13 @@ export class FishingScene extends Phaser.Scene {
     el: HTMLElement;
   } = null;
   /** The cast meter: the marker runs back and forth; stop it in the green. Gives where it stopped and how far off the green. */
-  private async lockMeter(speed: number, zoneW: number) {
+  private async lockMeter(phase: 'power' | 'aim', speed: number, zoneW: number) {
     const box = this.dom.querySelector<HTMLElement>('.fsh-meter')!;
     box.hidden = false;
-    const el = box.querySelector<HTMLElement>('[data-m=power]')!;
+    const el = box.querySelector<HTMLElement>(`[data-m=${phase}]`)!;
     el.classList.add('active');
     el.classList.remove('locked');
-    const c = 0.35 + Math.random() * 0.5;
+    const c = 0.25 + Math.random() * 0.6;
     const zone: [number, number] = [c - zoneW / 2, c + zoneW / 2];
     const z = el.querySelector<HTMLElement>('.hm-zone')!;
     z.style.left = `${zone[0] * 100}%`;
@@ -1148,11 +1149,15 @@ export class FishingScene extends Phaser.Scene {
     el.classList.add('locked');
     sfx.select();
     const off = m.pos < zone[0] ? zone[0] - m.pos : m.pos > zone[1] ? m.pos - zone[1] : 0;
-    this.time.delayedCall(500, () => {
-      box.hidden = true;
-      el.classList.remove('locked');
+    // (how far off and which way: − short of the green, + past it)
+    return { pos: m.pos, off, side: m.pos < zone[0] ? -1 : m.pos > zone[1] ? 1 : 0 };
+  }
+  /** Both meters done: put them away. */
+  private hideMeters() {
+    this.time.delayedCall(450, () => {
+      this.dom.querySelector<HTMLElement>('.fsh-meter')!.hidden = true;
+      this.dom.querySelectorAll('.fsh-meter .hm').forEach((e) => e.classList.remove('locked', 'active'));
     });
-    return { pos: m.pos, off };
   }
 
   /** The BITE! button: up somewhere over the water, fading fast. Resolves true if it was hit in time. */
@@ -1315,12 +1320,18 @@ export class FishingScene extends Phaser.Scene {
     this.arm = -0.85;
     this.hangLure('hero');
     await this.callout('YOUR CAST', 'you', 900);
-    // the meter: a little quicker and a little narrower as the contest goes on
+    // the meters, as at basketball: power (how far it goes), then aim; a little quicker and a little
+    // narrower as the contest goes on. The nearer both are to the green, the more bites (3 to 6).
     const n = Math.min(round, ROUNDS) - 1;
-    const { pos, off } = await this.lockMeter(1.05 + n * 0.08, Math.max(0.1, 0.17 - n * 0.012));
-    const bites = off === 0 ? 6 : off <= 0.05 ? 5 : off <= 0.12 ? 4 : 3;
-    const power = 0.25 + pos * 0.75;
-    await this.heroCast(power);
+    const speed = 1.05 + n * 0.08;
+    const zw = Math.max(0.1, 0.17 - n * 0.012);
+    const p = await this.lockMeter('power', speed, zw);
+    const aim = await this.lockMeter('aim', speed * 1.1, zw);
+    this.hideMeters();
+    const miss = p.off + aim.off;
+    const bites = miss === 0 ? 6 : miss <= 0.06 ? 5 : miss <= 0.16 ? 4 : 3;
+    const power = 0.25 + p.pos * 0.75;
+    await this.heroCast(power, aim.side * Math.min(1, aim.off * 5));
     this.callout(
       bites === 6 ? 'PERFECT CAST!<small>6 bites</small>' : bites === 5 ? 'GREAT CAST!<small>5 bites</small>' : bites === 4 ? 'GOOD CAST<small>4 bites</small>' : 'WEAK CAST<small>3 bites</small>',
       bites >= 5 ? 'good' : bites === 3 ? 'bad' : '',
@@ -1439,7 +1450,8 @@ export class FishingScene extends Phaser.Scene {
   }
 
   /** The cast: wind back, a beat, whip forward (the lure leaves the tip at the release), and the line pays out. */
-  private async heroCast(power: number) {
+  /** `wobble`: an aim off the green (−1…1) pulls the cast up high or flat. */
+  private async heroCast(power: number, wobble = 0) {
     const L = this.lures.hero;
     const r = this.rod.hero;
     // wind back over the shoulder
@@ -1459,7 +1471,7 @@ export class FishingScene extends Phaser.Scene {
     r.bend = -0.5;
     while (this.arm < -1.0) await this.wait(8);
     // release: off it goes, out over the sea
-    const a = -0.68 - power * 0.1;
+    const a = -0.68 - power * 0.1 + wobble * 0.22;
     const v = 560 + power * 820;
     L.mode = 'fly';
     L.x = r.tip.x;
