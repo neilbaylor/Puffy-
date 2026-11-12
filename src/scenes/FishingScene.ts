@@ -747,13 +747,18 @@ export class FishingScene extends Phaser.Scene {
   private shotLine(who: Who = 'hero') {
     const L = this.lures[who];
     const x0 = bx(who === 'hero' ? BOAT.hero : BOAT.king) - 160;
-    const span = Math.max(500, L.x - x0 + 220);
-    const zoom = Phaser.Math.Clamp(1280 / span, 0.6, 1.05);
-    this.cam = {
-      x: (x0 + L.x + 120) / 2,
-      y: WATER - 60 + (1 - zoom) * 60,
-      zoom,
-    };
+    this.cam = this.frameOut(x0, L.x, 0.62, 1.05, WATER - 60);
+  }
+  /**
+   * A shot from the boat (x0) out to something on the water (x1): both in it when they fit; when it's
+   * too far for that (past `minZoom`), the far end in shot and the boat off the side — sliding back to
+   * take the boat in as it comes nearer.
+   */
+  private frameOut(x0: number, x1: number, minZoom: number, maxZoom: number, y: number) {
+    const span = Math.max(500, x1 - x0 + 220);
+    const zoom = Phaser.Math.Clamp(1280 / span, minZoom, maxZoom);
+    const vw = 1280 / zoom;
+    return { x: Math.max((x0 + x1 + 120) / 2, x1 + 230 - vw / 2), y: y + (1 - zoom) * 60, zoom };
   }
 
   // ───────────────────────────────────────────── frame loop ──
@@ -899,7 +904,7 @@ export class FishingScene extends Phaser.Scene {
       L.img.setPosition(L.x, L.y).setRotation(Math.atan2(dy, dx) - Math.PI / 2);
     } else if (L.mode === 'fly') {
       L.vy += 900 * s;
-      const drag = Math.exp(-0.32 * s);
+      const drag = Math.exp(-0.25 * s);
       L.vx *= drag;
       L.vy *= drag;
       L.x += L.vx * s;
@@ -1300,25 +1305,25 @@ export class FishingScene extends Phaser.Scene {
     tv.classList.remove('off');
     this.cam = { x: HOST_X + 70, y: DOCK_TOP - 92, zoom: 1.75 };
     this.fitCamera(true);
-    await this.iwait(1300);
+    await this.iwait(1100);
     void stingerReveal();
-    await this.iwait(600);
+    await this.iwait(300);
     // (a slow push in on him while he talks)
     this.camK = 0.4;
     this.cam = { x: HOST_X + 50, y: DOCK_TOP - 96, zoom: 2.0 };
     const name = characterById(this.fd.charId).name;
-    await this.hostSays("On today's Wonderful World of Sports, we bring you some HUGE fishing action!", 3600);
-    await this.hostSays(`King Bob versus ${name}!`, 2200);
-    await this.hostSays('What a duel this should be.', 2000);
+    await this.hostSays("On today's Wonderful World of Sports, we bring you some HUGE fishing action!", 3000);
+    await this.hostSays(`King Bob versus ${name}!`, 1700);
+    await this.hostSays('What a duel this should be.', 1500);
     this.hostPoint = true;
-    await this.hostSays("Let's head down to the boat to check it out!", 2400);
+    await this.hostSays("Let's head down to the boat to check it out!", 2000);
     // ── and off over the water to the boat ──
     tv.classList.add('off');
     this.time.delayedCall(700, () => (tv.hidden = true));
     this.camK = 0.95;
     this.shotBoat(1.2);
     this.cam.x = bx(BOAT.king) + 60;
-    await this.iwait(2600);
+    await this.iwait(2100);
     this.hostPoint = false;
     await this.kingSays('Nobody out-fishes the King!', 1900);
     this.camK = 2.2;
@@ -1365,7 +1370,8 @@ export class FishingScene extends Phaser.Scene {
     cc.classList.add('show');
     this.hostTalk = true;
     const t0 = this.clock;
-    const typeMs = Math.min(ms - 500, text.length * 38);
+    // (typed out quickly, then a moment to read it)
+    const typeMs = Math.min(ms - 700, text.length * 26);
     while (this.clock - t0 < ms && !this.skipping) {
       const n = Math.min(text.length, Math.ceil(((this.clock - t0) / typeMs) * text.length));
       if (cc.textContent!.length !== n) cc.textContent = text.slice(0, n).toUpperCase();
@@ -1445,9 +1451,12 @@ export class FishingScene extends Phaser.Scene {
     const gaps = Array.from({ length: bites }, () => 1100 + Math.random() * 700);
     const total = gaps.reduce((a, b) => a + b, 0) + 900;
     const t0 = this.clock;
+    // (the bites come while the bobber's still well out: it's wound only about halfway in through them,
+    // and the rest of the way quickly at the end)
+    const outU = 0.5;
     const reelTo = () => {
       const u = Math.min(1, (this.clock - t0) / total);
-      L.x = startX + (endX - startX) * u;
+      L.x = startX + (endX - startX) * u * outU;
     };
     const reelFor = async (ms: number) => {
       const end = this.clock + ms;
@@ -1537,8 +1546,19 @@ export class FishingScene extends Phaser.Scene {
       }
       await reelFor(260);
     }
-    // the last of it in, no fish
+    // the last of it in, no fish: wound in briskly
     await reelFor(Math.max(0, total - (this.clock - t0)));
+    {
+      const from = L.x;
+      const t1 = this.clock;
+      r.reelRate = 2.2;
+      while (this.clock - t1 < 1100) {
+        L.x = from + (endX - from) * Phaser.Math.Easing.Sine.InOut((this.clock - t1) / 1100);
+        this.shotLine('hero');
+        this.heroPose = Math.floor(this.clock / 90) % 2 ? 'r1' : 'r0';
+        await this.wait(16);
+      }
+    }
     r.reelRate = 0;
     this.heroPose = null;
     await this.callout('NO FISH<small>this time</small>', 'bad', 1000);
@@ -1581,8 +1601,9 @@ export class FishingScene extends Phaser.Scene {
       await this.wait(8);
     }
     // ── let go: off it goes, out over the sea ──
-    const a = -0.68 - power * 0.1 + wobble * 0.22;
-    const v = 560 + power * 820;
+    // (well out over the sea: about 1300 px past the rod tip at the least, 1800 at full power)
+    const a = -0.68 - power * 0.1 + wobble * 0.15;
+    const v = 1000 + power * 360;
     L.mode = 'fly';
     L.x = r.tip.x;
     L.y = r.tip.y;
@@ -1707,7 +1728,7 @@ export class FishingScene extends Phaser.Scene {
         if (Math.random() < 0.25) this.bubbles(fish.x, fish.y, 1);
         // (near the surface it throws up a wake)
         if (fp.y < WATER + 50 && Math.random() < 0.25) this.ripple(fp.x, WATER, 0.5);
-        this.cam = { x: (bx(BOAT.hero) + L.x) / 2 + 60, y: WATER - 70, zoom: Phaser.Math.Clamp(1280 / (L.x - bx(BOAT.hero) + 560), 0.68, 1.12) };
+        this.cam = this.frameOut(bx(BOAT.hero) - 160, L.x, 0.66, 1.12, WATER - 70);
         await this.wait(16);
       }
       // (once, mid-fight, it leaps clean out of the water)
@@ -1955,7 +1976,7 @@ export class FishingScene extends Phaser.Scene {
     });
     r.bend = -0.4;
     while (r.a < -1.2) await this.wait(8);
-    const v = 700 + Math.random() * 500;
+    const v = 1000 + Math.random() * 380;
     const a = -0.72;
     L.mode = 'fly';
     L.x = r.tip.x;
@@ -2001,7 +2022,7 @@ export class FishingScene extends Phaser.Scene {
         this.ripple(L.x, WATER, 0.6);
         this.time.delayedCall(140, () => (L.dip = 0));
       }
-      if (got && !fish && u > 0.65) {
+      if (got && !fish && u > 0.4) {
         // he strikes: fish on
         sfx.splash();
         this.splash(L.x, WATER, 10, 0.8);

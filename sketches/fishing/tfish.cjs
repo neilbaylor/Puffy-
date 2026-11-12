@@ -26,6 +26,7 @@ const W = Number(process.argv[4] || 844), H = Number(process.argv[5] || 390);
   await p.waitForTimeout(1200);
   await shot('intro');
   let last = '';
+  let prevH = '', prevK = '';
   while (Date.now() - t0 < 600000) {
     const s = await p.evaluate(() => {
       const f = window.__fishing;
@@ -35,13 +36,16 @@ const W = Number(process.argv[4] || 844), H = Number(process.argv[5] || 390);
       return {
         meter: !!m, phase: m ? m.el.dataset.m : '', inZone: m ? m.pos > m.zone[0] + 0.01 && m.pos < m.zone[1] - 0.01 : false,
         bite: !d.querySelector('.fsh-bite').hidden,
-        hero: f.lures.hero.mode, king: f.lures.king.mode,
+        hero: f.lures.hero.mode, king: f.lures.king.mode, lx: Math.round(f.lures.hero.x - f.hero.x), kx: Math.round(f.lures.king.x - f.hero.x),
         card: d.querySelector('.fsh-catch').classList.contains('show'),
         callout: d.querySelector('.fsh-callout').classList.contains('show') ? d.querySelector('.fsh-callout').textContent : '',
         score: f.score, intro: f.inIntro,
       };
     });
     if (s.done) { await p.waitForTimeout(1500); await shot('end'); break; }
+    if (prevH === 'fly' && s.hero === 'float') console.log('  hero cast landed', s.lx, 'px past the hero');
+    if (prevK === 'fly' && s.king === 'float') console.log('  king cast landed', s.kx, 'px past the hero');
+    prevH = s.hero; prevK = s.king;
     if (s.callout && s.callout !== last) { last = s.callout; console.log('  callout:', s.callout, JSON.stringify(s.score)); }
     if (s.callout.startsWith('ROUND 1')) await shot('round');
     if (s.meter) { await shot(s.phase === 'aim' ? 'meter2' : 'meter'); if (s.inZone) { await p.mouse.click(W * 0.3, H * 0.5); await p.waitForTimeout(150); } continue; }
