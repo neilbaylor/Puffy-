@@ -79,7 +79,7 @@ const ROUNDS = 6;
 /** The share of bites you tap in time that end up a fish on the line. */
 const CATCH = 0.17;
 /** King Bob lands about this share of his casts. */
-const KING_CATCH = 0.62;
+const KING_CATCH = 0.46;
 /** A hero's size here: world px per art unit. */
 const HERO_K = 2.38;
 /** How long the BITE button can be hit for (ms). */
@@ -677,7 +677,8 @@ export class FishingScene extends Phaser.Scene {
     const cam = this.cameras.main;
     this.baseZoom = Math.max(this.scale.width / 1280, this.scale.height / 720);
     const z = this.baseZoom * this.cam.zoom;
-    const { tx, ty } = this.clearOfBoard(z);
+    const c0 = this.clearOfBoard(z);
+    const { tx, ty } = this.keepInView(c0.tx, c0.ty, z);
     const k = snap ? 1 : 1 - Math.exp(-Math.min(0.1, this.game.loop.delta / 1000) * this.camK);
     const zoom = cam.zoom + (z - cam.zoom) * k;
     cam.setZoom(zoom);
@@ -736,12 +737,38 @@ export class FishingScene extends Phaser.Scene {
     }
     return { tx, ty };
   }
+  /**
+   * Whoever's in the shot is all in it: if the hero (head to toe, a hop included) or King Bob's bowl (and
+   * a bubble's room over it) is in the shot across but cut off at the top or the bottom, the shot moves
+   * up or down just enough. (Not on the dock: they're not in that shot.)
+   */
+  private keepInView(tx: number, ty: number, z: number) {
+    const vw = this.scale.width / z;
+    const vh = this.scale.height / z;
+    const m = 14;
+    const bowl = this.bowlAt(0, 0);
+    const heroH = HERO_K * CHAR_H * characterById(this.fd.charId).scale;
+    const boxes: [number, number, number, number][] = [
+      [this.hero.x - 40, this.hero.y - heroH - 16, this.hero.x + 40, this.hero.y + 8],
+      [bowl.x - 75 * BOWL_K, bowl.y - BOWL.h * BOWL_K - (this.kingFree ? 0 : 20), bowl.x + 75 * BOWL_K, bowl.y + 6],
+    ];
+    for (const [x0, y0, x1, y1] of boxes) {
+      const left = tx - vw / 2;
+      if (x1 < left || x0 > left + vw) continue;
+      // (taller than the shot: keep the top, it's the face)
+      const top = ty - vh / 2;
+      if (y0 < top + m) ty -= top + m - y0;
+      else if (y1 > ty + vh / 2 - m && y1 - y0 < vh - 2 * m) ty += y1 - (ty + vh / 2 - m);
+    }
+    return { tx, ty };
+  }
+
   /** (the camera's left alone: the win and the cut scenes frame things themselves) */
   private noClear = false;
 
   /** Frame the boat (the stern, King Bob and the sea just off it). */
   private shotBoat(zoom = 1) {
-    this.cam = { x: bx(BOAT.hero) - 110, y: WATER - 70, zoom };
+    this.cam = { x: bx(BOAT.hero) - 110, y: WATER - 100, zoom };
   }
   /** Frame the hero's line: from the boat out to the bobber. */
   private shotLine(who: Who = 'hero') {
@@ -2126,7 +2153,7 @@ export class FishingScene extends Phaser.Scene {
     this.arm = -0.85;
     this.heroPose = 'j0';
     this.camK = 2.6;
-    this.cam = { x: this.hero.x - 10, y: this.hero.y - 90, zoom: 1.9 };
+    this.cam = { x: this.hero.x - 10, y: this.hero.y - 105, zoom: 1.9 };
     await this.wait(500);
     this.tweens.add({ targets: this, heroHop: 30, duration: 240, ease: 'Quad.easeOut', yoyo: true, repeat: 6, repeatDelay: 140 });
     sfx.cheer();

@@ -26,6 +26,7 @@ const W = Number(process.argv[4] || 844), H = Number(process.argv[5] || 390);
   await p.waitForTimeout(1200);
   await shot('intro');
   let last = '';
+  let nco = 0;
   let prevH = '', prevK = '';
   while (Date.now() - t0 < 600000) {
     const s = await p.evaluate(() => {
@@ -46,7 +47,7 @@ const W = Number(process.argv[4] || 844), H = Number(process.argv[5] || 390);
     if (prevH === 'fly' && s.hero === 'float') console.log('  hero cast landed', s.lx, 'px past the hero');
     if (prevK === 'fly' && s.king === 'float') console.log('  king cast landed', s.kx, 'px past the hero');
     prevH = s.hero; prevK = s.king;
-    if (s.callout && s.callout !== last) { last = s.callout; console.log('  callout:', s.callout, JSON.stringify(s.score)); }
+    if (s.callout && s.callout !== last) { last = s.callout; console.log('  callout:', s.callout, JSON.stringify(s.score)); await p.waitForTimeout(700); await shot('co' + String(++nco).padStart(2, '0')); }
     if (s.callout.startsWith('ROUND 1')) await shot('round');
     if (s.meter) { await shot(s.phase === 'aim' ? 'meter2' : 'meter'); if (s.inZone) { await p.mouse.click(W * 0.3, H * 0.5); await p.waitForTimeout(150); } continue; }
     if (s.hero === 'fly') await shot('cast');
