@@ -271,3 +271,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.266: Fishing opening: long swoop to the boat; King Bob's taunt and flip.
 - v0.267: Fishing: host pace eased back; King Bob's flip splash + laugh.
 - v0.268: Fishing: King Bob catches less; the camera keeps everyone whole in shot.
+- v0.269: Fishing: only the good fish bite (no Bad Guy Fish or Kai).

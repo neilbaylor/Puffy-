@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.268)
+## Where things stand (v0.269)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -192,6 +192,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Level 4 (Plop Invasion · Part 2) planning: mostly climbing up (~60%), 2 parachute drops (~25 s each, Plops parachuting at different speeds: slow big patched dome / middling / fast streamer; shoot them: POP), a baseball game in the middle, boss later. Concept art in src/gfx/skydive.ts (drawCanopy, drawHeroChute(ch, pose, 'pack'|'burst'|'opening'|'open'|'steer'|'land', lean), drawPlopChute(kind, 'slow'|'mid'|'fast'|'popped')), sheets in sketches/level4/ (sheet.ts renders them via esbuild + ../l4art/shot.cjs). Engine work needed: vertical terrain chunking (4096 px), climbing camera, vertical background, parachute player state, vertical fly-over.
 - v0.267: host captions 35 ms/char, lines 3400/2050/1850/2250 ms, lead-in 1250+500 (the user found 26 ms rushed, 38 slow). kingFlip lands with splash(34, 560) + spray burst + foam ring, then sfx.laugh + 'HA HA HA!' bubble.
 - v0.266: Fishing opening: DOCK_X -2700 (WORLD_L -3000); host → boat is a 4.4 s tweened swoop (arc up, zoom out 40% mid-way; Skip speeds it ×6), then King Bob 'You'll NEVER beat me at fishing!' + kingFlip() (out of the bowl in a roll and back, splash). Test: sketches/fishing/tflip.cjs.
+- v0.269: Fishing CATCHES = zippy 30, stone 19, slinger 16, fat 6 (rare). User: don't catch bad guy fish — 'badguy' and 'kai' (L5 enemies) removed.
 - v0.268: KING_CATCH 0.46 (was 0.62; user: King Bob catches too many; bots: 0/4 and 3/7). Camera: fitCamera runs keepInView(tx,ty,z) after clearOfBoard — if the hero box (feet to HERO_K·CHAR_H·scale + 16 up) or the bowl box (+20 bubble room while he's in it) is across in shot but cut off top/bottom, ty shifts just enough (the top wins when it can't all fit). shotBoat y WATER-100 (was -70), celebration y hero.y-105 (was -90). tfish.cjs now also shoots each callout (<tag>-coNN.png).
 - v0.265: Fishing casts v = 1000 + power·360 (drag 0.25, aim wobble ±0.15) → ~1300–1800 px; King 1000–1380. Reel during bites only covers outU 0.5 of the way in, then a 1.1 s wind-in. frameOut(x0, x1, minZoom, maxZoom, y) keeps the far end in shot. Host intro: typing 26 ms/char, lines 3000/1700/1500/2000 ms, lead-in 1100+300, glide 2100.
 - v0.264: Fishing win = youWin(): celebration (heroHop, confetti cannons) → host cut (hostShock, fl-host-s0/s1) → boat → kingSays next time → kingLeaves() (kingFree: placeBoat stops carrying him; arc over the stern, splash, swim off) → level-complete (~18 s). Camera: clearOfBoard(z) nudges the target so hero/bowl boxes avoid the measured .fsh-board rect (measureBoard on render/resize); noClear during the cut scenes. Results cards: no sea wear when r.hoops && level is the fishing one. Test: sketches/fishing/twin2.cjs.
