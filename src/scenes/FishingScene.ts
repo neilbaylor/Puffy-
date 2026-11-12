@@ -77,7 +77,7 @@ const DOCK_TOP = WATER - 58;
 const HOST_X = DOCK_X + 470;
 const ROUNDS = 6;
 /** The share of bites you tap in time that end up a fish on the line. */
-const CATCH = 0.17;
+const CATCH = 0.26;
 /** King Bob lands about this share of his casts. */
 const KING_CATCH = 0.46;
 /** A hero's size here: world px per art unit. */
