@@ -91,7 +91,7 @@ const KING_ROD_LEN = 150;
 
 /**
  * What you can catch: the fish, what it's called, its weight range (lb), how common, and how big it's shown.
- * (Only the good fish: the bad guys from the sea level — the Bad Guy Fish and Kai — never bite.)
+ * (No Bad Guy Fish: the sea level's bad guy never bites.)
  */
 const CATCHES: {
   kind: FishKind;
@@ -105,6 +105,7 @@ const CATCHES: {
   { kind: 'stone', name: 'Stone Fish', lb: [2.2, 4.6], odds: 19, k: 0.95 },
   { kind: 'slinger', name: 'Slinger', lb: [3.1, 6.4], odds: 16, k: 0.9 },
   { kind: 'fat', name: 'Fat Fish', lb: [9, 16], odds: 6, k: 0.6, rare: true },
+  { kind: 'kai', name: 'Kai Fish', lb: [1.4, 3.2], odds: 4, k: 1.25, rare: true },
 ];
 const pickCatch = () => {
   let r = Math.random() * CATCHES.reduce((a, c) => a + c.odds, 0);
