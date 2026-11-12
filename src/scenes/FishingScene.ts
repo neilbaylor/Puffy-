@@ -188,6 +188,11 @@ export class FishingScene extends Phaser.Scene {
   /** A fish out of the water on the end of the line: its mouth, swinging (verlet) from the rod tip. */
   private swing: { x: number; y: number; px: number; py: number; len: number; target: number; t: number } | null = null;
   private hostPoint = false;
+  private hostShock = false;
+  /** King Bob out of his bowl (the win: he leaps into the sea), so the boat no longer carries him. */
+  private kingFree = false;
+  /** The hero hopping for joy (px up). */
+  private heroHop = 0;
   private hostMouthT = 0;
   private hostOpen = false;
   private heroKey = '';
@@ -285,6 +290,11 @@ export class FishingScene extends Phaser.Scene {
     this.inIntro = false;
     this.hostTalk = false;
     this.hostPoint = false;
+    this.hostShock = false;
+    this.noClear = false;
+    this.kingFree = false;
+    this.heroHop = 0;
+    this.boardBox = null;
   }
 
   // ───────────────────────────────────────────── setup ──
@@ -544,6 +554,9 @@ export class FishingScene extends Phaser.Scene {
       this.dom.remove();
     });
     (window as unknown as { __fishing: FishingScene }).__fishing = this;
+    const onResize = () => setTimeout(() => this.measureBoard(), 150);
+    window.addEventListener('resize', onResize);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => window.removeEventListener('resize', onResize));
     this.game.events.emit('fishing-start', this);
     this.fitCamera(true);
     void this.run();
@@ -615,10 +628,12 @@ export class FishingScene extends Phaser.Scene {
     this.bowlBack.setPosition(b.x, b.y).setRotation(a);
     this.bowlFront.setPosition(b.x, b.y).setRotation(a);
     // King Bob in his water, swaying a little
-    const kc = this.bowlAt(2, -(BOWL.h - BOWL.cy) + 10 + Math.sin(this.clock / 700) * 3);
-    this.kingSpr.setPosition(kc.x, kc.y).setRotation(a + Math.sin(this.clock / 900) * 0.05);
+    if (!this.kingFree) {
+      const kc = this.bowlAt(2, -(BOWL.h - BOWL.cy) + 10 + Math.sin(this.clock / 700) * 3);
+      this.kingSpr.setPosition(kc.x, kc.y).setRotation(a + Math.sin(this.clock / 900) * 0.05);
+    }
     const h = this.onBoat(BOAT.hero, BOAT.feet + 2);
-    this.hero.setPosition(h.x, h.y).setRotation(a + this.heroLean);
+    this.hero.setPosition(h.x, h.y - this.heroHop).setRotation(a + this.heroLean);
   }
 
   /** The hero's hands (world), from the frame shown. */
@@ -662,17 +677,67 @@ export class FishingScene extends Phaser.Scene {
     const cam = this.cameras.main;
     this.baseZoom = Math.max(this.scale.width / 1280, this.scale.height / 720);
     const z = this.baseZoom * this.cam.zoom;
+    const { tx, ty } = this.clearOfBoard(z);
     const k = snap ? 1 : 1 - Math.exp(-Math.min(0.1, this.game.loop.delta / 1000) * this.camK);
     const zoom = cam.zoom + (z - cam.zoom) * k;
     cam.setZoom(zoom);
     const vw = this.scale.width / zoom;
     const vh = this.scale.height / zoom;
-    const cx = cam.midPoint.x + (this.cam.x - cam.midPoint.x) * k;
-    const cy = cam.midPoint.y + (this.cam.y - cam.midPoint.y) * k;
-    const x = Phaser.Math.Clamp(snap ? this.cam.x : cx, WORLD_L + 20 + vw / 2, WORLD_W + 380 - vw / 2);
-    const y = Phaser.Math.Clamp(snap ? this.cam.y : cy, WORLD_TOP + vh / 2, WORLD_BOTTOM - vh / 2);
+    const cx = cam.midPoint.x + (tx - cam.midPoint.x) * k;
+    const cy = cam.midPoint.y + (ty - cam.midPoint.y) * k;
+    const x = Phaser.Math.Clamp(snap ? tx : cx, WORLD_L + 20 + vw / 2, WORLD_W + 380 - vw / 2);
+    const y = Phaser.Math.Clamp(snap ? ty : cy, WORLD_TOP + vh / 2, WORLD_BOTTOM - vh / 2);
     cam.centerOn(x, y);
   }
+
+  /** The scoreboard's corner (CSS px from the top left: its right and bottom edges), measured when it changes. */
+  private boardBox: { r: number; b: number } | null = null;
+  private measureBoard() {
+    const board = this.dom?.querySelector<HTMLElement>('.fsh-board');
+    if (!board || board.hidden) return (this.boardBox = null);
+    const r = board.getBoundingClientRect();
+    this.boardBox = { r: r.right + 10, b: r.bottom + 8 };
+  }
+  /**
+   * The shot's centre, moved so neither the hero nor King Bob's bowl sits under the scoreboard in the
+   * top left: the camera slides over (or up, if that's less) just enough. Not in the cut scenes; and
+   * never so far that a lure out on the water goes off the far side.
+   */
+  private clearOfBoard(z: number) {
+    let tx = this.cam.x;
+    let ty = this.cam.y;
+    const bb = this.boardBox;
+    if (!bb || this.inIntro || this.noClear) return { tx, ty };
+    const f = this.scale.width / Math.max(1, window.innerWidth);
+    const vw = this.scale.width / z;
+    const vh = this.scale.height / z;
+    const bw = (bb.r * f) / z;
+    const bh = (bb.b * f) / z;
+    const bowl = this.bowlAt(0, 0);
+    const boxes = [
+      [this.hero.x - 46, this.hero.y - 138, this.hero.x + 46, this.hero.y],
+      [bowl.x - 75 * BOWL_K, bowl.y - BOWL.h * BOWL_K, bowl.x + 75 * BOWL_K, bowl.y],
+    ];
+    for (let pass = 0; pass < 2; pass++)
+      for (const [x0, y0, x1] of boxes) {
+        const left = tx - vw / 2;
+        const top = ty - vh / 2;
+        if (x1 < left || x0 > left + vw) continue;
+        if (x0 >= left + bw || y0 >= top + bh) continue;
+        const dx = left + bw - x0;
+        const dy = top + bh - y0;
+        if (dx <= dy * 1.4) tx -= dx;
+        else ty -= dy;
+      }
+    // (keep a lure that's out on the water in the shot)
+    for (const who of ['hero', 'king'] as const) {
+      const L = this.lures[who];
+      if (L && L.mode !== 'held' && L.mode !== 'gone') tx = Math.max(tx, L.x + 50 - vw / 2);
+    }
+    return { tx, ty };
+  }
+  /** (the camera's left alone: the win and the cut scenes frame things themselves) */
+  private noClear = false;
 
   /** Frame the boat (the stern, King Bob and the sea just off it). */
   private shotBoat(zoom = 1) {
@@ -725,7 +790,7 @@ export class FishingScene extends Phaser.Scene {
       this.hostOpen = this.hostTalk && !this.hostOpen;
       this.hostMouthT = 80 + Math.random() * 110;
     }
-    this.host.setTexture(`fl-host-${this.hostPoint ? 'p' : 't'}${this.hostOpen ? 1 : 0}`);
+    this.host.setTexture(`fl-host-${this.hostShock ? 's' : this.hostPoint ? 'p' : 't'}${this.hostOpen ? 1 : 0}`);
     this.host.y = DOCK_TOP - 12 + (this.hostTalk ? Math.sin(this.clock / 130) * 1.5 : 0);
 
     // the anglers
@@ -733,7 +798,8 @@ export class FishingScene extends Phaser.Scene {
     const cf = this.castFrame();
     this.hero.setFrame(this.heroPose ?? cf.frame);
     const kf = Math.floor(t * 5) % 6;
-    this.kingSpr.setFrame(Math.floor(t * 0.7) % 5 === 0 && t % 1.4 < 0.15 ? 'bl1' : `sw${kf}`);
+    // (swimming off: his tail going like mad)
+    this.kingSpr.setFrame(this.kingFree ? `sw${Math.floor(t * 16) % 6}` : Math.floor(t * 0.7) % 5 === 0 && t % 1.4 < 0.15 ? 'bl1' : `sw${kf}`);
     this.updateRods(s);
     for (const who of ['hero', 'king'] as const) this.updateLure(who, s);
     this.drawRods();
@@ -1077,6 +1143,7 @@ export class FishingScene extends Phaser.Scene {
       row.querySelector('.fsh-total')!.textContent = String(s.filter(Boolean).length);
     }
     board.classList.toggle('many', n > ROUNDS);
+    requestAnimationFrame(() => this.measureBoard());
     board.querySelector('.fsh-round')!.textContent = round > ROUNDS ? 'SUDDEN DEATH' : `ROUND ${round} OF ${ROUNDS}`;
     const b = this.best;
     board.querySelector('.tv-best')!.innerHTML = b ? `BIGGEST <b>${b.lb.toFixed(1)} lb</b> ${b.who === 'king' ? 'KING BOB' : 'YOU'}` : 'BIGGEST <b>—</b>';
@@ -2004,28 +2071,143 @@ export class FishingScene extends Phaser.Scene {
 
   // ───────────────────────────────────────────── the end ──
 
+  /**
+   * You've won. Taking its time: the camera in close on the hero, hopping for joy in the confetti —
+   * YOU WIN. Then a cut to the dock: the show's host, on the old telly, gobsmacked ("in a shocking turn
+   * of events…"). Back out over the water to the boat, where King Bob vows "I'll get you next time!",
+   * leaps out of his bowl into the sea, and swims away. Then the results.
+   */
   private async youWin() {
-    const view = this.cameras.main.worldView;
-    this.shotBoat(1.12);
-    this.cam.x = bx((BOAT.hero + BOAT.king) / 2);
-    this.cam.y = WATER - 110;
-    this.heroPose = 'j0';
+    const ch = characterById(this.fd.charId);
+    const score = `${this.total('hero')} – ${this.total('king')}`;
+    this.noClear = true;
     this.dom.querySelector<HTMLElement>('.fsh-meter')!.hidden = true;
-    for (let i = 0; i < 4; i++)
-      this.time.delayedCall(i * 350, () => {
-        this.confettiFx.pop(view.x + view.width * (0.2 + Math.random() * 0.6), view.y + view.height * (0.15 + Math.random() * 0.3), 90, 900);
+    // ── 1. in close on the hero: hopping for joy, the confetti going off ──
+    this.tweens.killTweensOf(this);
+    this.heroLean = 0;
+    this.arm = -0.85;
+    this.heroPose = 'j0';
+    this.camK = 2.6;
+    this.cam = { x: this.hero.x - 10, y: this.hero.y - 90, zoom: 1.9 };
+    await this.wait(500);
+    this.tweens.add({ targets: this, heroHop: 30, duration: 240, ease: 'Quad.easeOut', yoyo: true, repeat: 6, repeatDelay: 140 });
+    sfx.cheer();
+    for (let i = 0; i < 6; i++)
+      this.time.delayedCall(i * 430, () => {
+        const v = this.cameras.main.worldView;
+        this.confettiFx.cannon(v.x + 10, v.bottom - 10, -1.05 + Math.random() * 0.2, 40, { power: 1100 + Math.random() * 300 });
+        this.confettiFx.cannon(v.right - 10, v.bottom - 10, -Math.PI + 1.05 - Math.random() * 0.2, 40, { power: 1100 + Math.random() * 300 });
         sfx.pop();
       });
-    sfx.cheer();
-    await this.callout(`YOU WIN!<small>${this.total('hero')} – ${this.total('king')}</small>`, 'good big', 2400);
-    await this.kingSays('WHAT?! Impossible!', 1700);
+    await this.callout(`YOU WIN!<small>${score}</small>`, 'good big', 2800);
+    await this.wait(600);
+    this.heroPose = null;
+
+    // ── 2. cut to the dock: the host, on the old telly, can't believe it ──
+    const tv = this.dom.querySelector<HTMLElement>('.tv-old')!;
+    const board = this.dom.querySelector<HTMLElement>('.fsh-board')!;
+    const ticker = this.dom.querySelector<HTMLElement>('.tv-ticker')!;
+    this.cameras.main.flash(220, 255, 250, 235);
+    tv.hidden = false;
+    tv.classList.remove('off');
+    board.hidden = true;
+    ticker.hidden = true;
+    this.cam = { x: HOST_X + 50, y: DOCK_TOP - 96, zoom: 2.0 };
+    this.fitCamera(true);
+    this.camK = 0.35;
+    this.cam = { x: HOST_X + 40, y: DOCK_TOP - 100, zoom: 2.25 };
+    await this.wait(700);
+    this.hostShock = true;
+    await this.hostSays('Folks... in a SHOCKING turn of events...', 3000);
+    await this.hostSays(`${ch.name} has WON! ${ch.name} has beaten King Bob!`, 3200);
+    await this.wait(400);
+    this.hostShock = false;
+
+    // ── 3. back out to the boat: King Bob ──
+    tv.classList.add('off');
+    this.time.delayedCall(700, () => (tv.hidden = true));
+    board.hidden = false;
+    ticker.hidden = false;
+    this.camK = 0.9;
+    // (King Bob's the one to see now: keep him out from under the scoreboard, and room over him for his bubble)
+    this.noClear = false;
+    this.cam = { x: bx(BOAT.king) + 150, y: WATER - 215, zoom: 1.3 };
+    await this.wait(2700);
+    await this.kingSays("I'll get you next time!", 2600);
+    await this.wait(300);
+
+    // ── 4. out of his bowl, into the sea, and away ──
+    this.noClear = true;
+    await this.kingLeaves();
+    await this.wait(900);
     fadeOutMusic(500);
-    const result: ResultState = {
-      ...this.fd.result,
-      hoops: `${this.total('hero')} – ${this.total('king')}`,
-      level: this.fd.level ?? 5,
-    };
+    const result: ResultState = { ...this.fd.result, hoops: score, level: this.fd.level ?? 5 };
     this.game.events.emit('level-complete', result);
+  }
+
+  /** King Bob wriggles, leaps out of his bowl in a great arc over the stern, splashes into the sea and swims off. */
+  private async kingLeaves() {
+    const k = this.kingSpr;
+    const sx = k.scaleX;
+    const sy = k.scaleY;
+    // a wriggle, squashed down in his water…
+    this.tweens.add({ targets: k, scaleX: sx * 1.12, scaleY: sy * 0.82, duration: 200, ease: 'Sine.easeOut', yoyo: true, repeat: 1 });
+    await this.wait(820);
+    // …and out!
+    this.kingFree = true;
+    k.setDepth(8.6).setScale(sx, sy);
+    const x0 = k.x;
+    const y0 = k.y;
+    const rim = this.bowlAt(0, -BOWL.h + 22);
+    sfx.whoosh();
+    for (let i = 0; i < 12; i++) {
+      const d = this.add.image(rim.x + (Math.random() - 0.5) * 40, rim.y, 'fl-drop').setScale(0.5 + Math.random() * 0.4).setDepth(8.7);
+      this.tweens.add({ targets: d, x: d.x + (Math.random() - 0.3) * 120, y: d.y - 40 - Math.random() * 60, duration: 300, ease: 'Quad.easeOut', yoyo: true, onComplete: () => d.destroy() });
+    }
+    const land = { x: bx(BOAT.transom) + 240, y: WATER + 8 };
+    const peak = Math.min(y0, land.y) - 230;
+    const o = { t: 0 };
+    this.camK = 2.6;
+    await this.tw({
+      targets: o,
+      t: 1,
+      duration: 1250,
+      ease: 'Linear',
+      onUpdate: () => {
+        const t = o.t;
+        const u = 1 - t;
+        const cx = (x0 + land.x) / 2;
+        k.setPosition(u * u * x0 + 2 * u * t * cx + t * t * land.x, u * u * y0 + 2 * u * t * peak + t * t * land.y);
+        // (a flip on the way over, nose down into the water at the end)
+        k.setRotation(-0.5 + t * (Math.PI * 2 + 1.4));
+        this.cam = { x: k.x + 40, y: Math.min(k.y, WATER - 120), zoom: 1.1 };
+      },
+    });
+    // splash!
+    sfx.splash();
+    this.splash(land.x, WATER, 20, 1.2);
+    k.setDepth(5.5);
+    // and away under the water, a stream of bubbles behind him
+    const o2 = { t: 0 };
+    const sx0 = k.x;
+    let lastB = 0;
+    await this.tw({
+      targets: o2,
+      t: 1,
+      duration: 2600,
+      ease: 'Sine.easeIn',
+      onUpdate: () => {
+        const t = o2.t;
+        k.setPosition(sx0 + t * 1150, WATER + 30 + Math.min(1, t * 4) * 70 + Math.sin(t * 12) * 8);
+        k.setRotation(Math.sin(t * 14) * 0.12).setAlpha(t > 0.8 ? (1 - t) / 0.2 : 1);
+        if (this.clock - lastB > 70) {
+          lastB = this.clock;
+          this.bubbles(k.x - 40, k.y, 2);
+        }
+        if (t < 0.55) this.cam = { x: k.x - 60, y: WATER - 60, zoom: 1.05 };
+      },
+    });
+    k.setVisible(false);
   }
 
   private async kingWins() {

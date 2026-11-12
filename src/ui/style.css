@@ -3377,6 +3377,7 @@ html.light .start .logo span { transform: rotate(-2deg); }
 .fsh-catch.rare em { background: #ffd23f; color: #0b2140; }
 .fsh-catch.rare b { color: #c0392b; }
 @media (max-height: 500px) {
+  .fsh-board { zoom: 0.86; }
   .fsh-row { padding: 2px 0 2px 5px; }
   .tv-face { width: 24px; height: 24px; }
   .fsh-row { grid-template-columns: 24px minmax(0, 1fr) auto 30px; }

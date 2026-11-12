@@ -1137,10 +1137,12 @@ export function drawDock(ctx: Ctx) {
  * t0/t1 talking (mouth shut/open), p0/p1 pointing off to the right (towards the boat).
  */
 export const HOST = { w: 140, h: 190 } as const;
-export const HOST_FRAMES = ['t0', 't1', 'p0', 'p1'] as const;
+export const HOST_FRAMES = ['t0', 't1', 'p0', 'p1', 's0', 's1'] as const;
 export function drawHost(ctx: Ctx, f: string) {
   const open = f.endsWith('1');
   const point = f.startsWith('p');
+  // (s0/s1: shocked — eyes wide, brows up, mouth an O, a hand flung up)
+  const shock = f.startsWith('s');
   const SKIN = F('#ffd6ad', '#e8aa7a', '#fff0dc');
   const BLAZER = F('#d9a441', '#a87a24', '#f2cc78');
   const PANTS = F('#6b4a2e', '#4a311d', '#8e6a48');
@@ -1251,8 +1253,12 @@ export function drawHost(ctx: Ctx, f: string) {
     1616,
     { lw: 0.6, plain: true },
   );
-  // the free arm: down by his side, or pointing off to the right
-  if (point) {
+  // the free arm: down by his side, pointing off to the right, or flung up in shock
+  if (shock) {
+    st.shape(ctx, [[cx + 30, 100], [cx + 50, 56], [cx + 60, 60], [cx + 38, 112]], BLAZER, 1625, { lw: 1 });
+    st.shape(ctx, ellipsePts(cx + 56, 48, 8, 9, 0.3, 16), SKIN, 1626, { lw: 1 });
+    for (const [fx, fy] of [[cx + 50, 38], [cx + 56, 36], [cx + 62, 38], [cx + 66, 44]] as const) st.shape(ctx, roundRectPts(fx - 2, fy - 4, 4.5, 9, 2.2), SKIN, 1627 + fx, { lw: 0.7, plain: true });
+  } else if (point) {
     st.shape(
       ctx,
       [
@@ -1317,13 +1323,17 @@ export function drawHost(ctx: Ctx, f: string) {
     2,
     'rgba(255,255,255,0.45)',
   );
-  // eyes and big raised brows (he's very excited)
+  // eyes and big raised brows (he's very excited; shocked: wide open, the pupils pinpricks)
   for (const dx of [-12, 12]) {
-    st.shape(ctx, ellipsePts(hx + dx + 6, hy - 4, 6, 8, 0, 18), F('#ffffff', '#ececec', '#ffffff'), 1640 + dx, { lw: 0.9, plain: true });
+    st.shape(ctx, ellipsePts(hx + dx + 6, hy - 4, shock ? 8 : 6, shock ? 10 : 8, 0, 18), F('#ffffff', '#ececec', '#ffffff'), 1640 + dx, { lw: 0.9, plain: true });
     ctx.fillStyle = '#2a1a12';
     ctx.beginPath();
-    ctx.arc(hx + dx + 8, hy - 3, 3.2, 0, Math.PI * 2);
+    ctx.arc(hx + dx + (shock ? 6 : 8), hy - 3, shock ? 2 : 3.2, 0, Math.PI * 2);
     ctx.fill();
+    if (shock) {
+      line(ctx, [[hx + dx - 1, hy - 24], [hx + dx + 6, hy - 30], [hx + dx + 13, hy - 25]], 3, '#3a2418');
+      continue;
+    }
     line(
       ctx,
       [
@@ -1337,7 +1347,11 @@ export function drawHost(ctx: Ctx, f: string) {
   }
   // the nose, the mouth (open when talking), the moustache over it
   st.shape(ctx, ellipsePts(hx + 12, hy + 8, 6, 5, 0, 14), F('#ffc49a', '#e39a6c', '#ffe2c8'), 1650, { lw: 0.9 });
-  if (open) {
+  if (shock) {
+    st.shape(ctx, ellipsePts(hx + 10, hy + 25, open ? 8 : 6, open ? 11 : 8, 0, 24), F('#7a1f1f', '#5a1414', '#a8302c'), 1654, { lw: 1 });
+    // (and a lock of his hair sprung loose)
+    line(ctx, [[hx - 2, hy - 38], [hx - 8, hy - 52], [hx + 2, hy - 58]], 3, '#4a2f1c');
+  } else if (open) {
     st.shape(ctx, ellipsePts(hx + 10, hy + 22, 11, 8, 0, 24), F('#7a1f1f', '#5a1414', '#a8302c'), 1651, { lw: 1 });
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(hx + 2, hy + 15, 16, 4);

@@ -1390,7 +1390,8 @@ export class UI {
         </div>
       </div>
     </div>`);
-    this.liveHero(el.querySelector('canvas')!, characterById(r.charId), () => this.screen === el, r.level ?? this.level);
+    // (the fishing contest ends on a boat: no dive gear)
+    this.liveHero(el.querySelector('canvas')!, characterById(r.charId), () => this.screen === el, r.hoops && levelInfo(r.level ?? this.level).fishing ? undefined : (r.level ?? this.level));
     el.querySelector('[data-act=again]')!.addEventListener('click', () => this.playBoss(boss.level));
     el.querySelector('[data-act=home]')!.addEventListener('click', () => this.quitToStart());
     this.setScreen(el);
@@ -1640,7 +1641,8 @@ export class UI {
         </div>
       </div>
     </div>`);
-    this.liveHero(el.querySelector('canvas')!, characterById(r.charId), () => this.screen === el, r.level ?? this.level);
+    // (the fishing contest ends on a boat: no dive gear)
+    this.liveHero(el.querySelector('canvas')!, characterById(r.charId), () => this.screen === el, r.hoops && levelInfo(r.level ?? this.level).fishing ? undefined : (r.level ?? this.level));
     // the default (and the big button) is on to the next level, when there is one
     const goNext = () => {
       if (!next) return this.quitToStart();
