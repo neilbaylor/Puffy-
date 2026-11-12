@@ -268,3 +268,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.263: Fishing: harder BITE!, fight runs + heave + swinging catch, nicer cast.
 - v0.264: Fishing win ending (celebration, shocked host, King Bob leaps out and swims off); camera keeps players clear of the scoreboard.
 - v0.265: Fishing: longer casts, bites out on the water; brisker announcer opening.
+- v0.266: Fishing opening: long swoop to the boat; King Bob's taunt and flip.
