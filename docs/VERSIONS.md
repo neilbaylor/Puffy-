@@ -266,3 +266,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.261: King Bob Fishing in everyone's Bosses menu (testing).
 - v0.262: Fishing cast: power and aim meters like basketball.
 - v0.263: Fishing: harder BITE!, fight runs + heave + swinging catch, nicer cast.
+- v0.264: Fishing win ending (celebration, shocked host, King Bob leaps out and swims off); camera keeps players clear of the scoreboard.
