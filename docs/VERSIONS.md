@@ -275,3 +275,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.270: Fishing: Kai Fish is back as a rare catch.
 - v0.271: Fishing: Kai Fish as common as the other fish.
 - v0.272: Fishing: Kai Fish still says RARE CATCH!
+- v0.273: Fishing intro: the announcer's pointing hand no longer cut off.

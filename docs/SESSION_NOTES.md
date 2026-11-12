@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.272)
+## Where things stand (v0.273)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -192,6 +192,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Level 4 (Plop Invasion · Part 2) planning: mostly climbing up (~60%), 2 parachute drops (~25 s each, Plops parachuting at different speeds: slow big patched dome / middling / fast streamer; shoot them: POP), a baseball game in the middle, boss later. Concept art in src/gfx/skydive.ts (drawCanopy, drawHeroChute(ch, pose, 'pack'|'burst'|'opening'|'open'|'steer'|'land', lean), drawPlopChute(kind, 'slow'|'mid'|'fast'|'popped')), sheets in sketches/level4/ (sheet.ts renders them via esbuild + ../l4art/shot.cjs). Engine work needed: vertical terrain chunking (4096 px), climbing camera, vertical background, parachute player state, vertical fly-over.
 - v0.267: host captions 35 ms/char, lines 3400/2050/1850/2250 ms, lead-in 1250+500 (the user found 26 ms rushed, 38 slow). kingFlip lands with splash(34, 560) + spray burst + foam ring, then sfx.laugh + 'HA HA HA!' bubble.
 - v0.266: Fishing opening: DOCK_X -2700 (WORLD_L -3000); host → boat is a 4.4 s tweened swoop (arc up, zoom out 40% mid-way; Skip speeds it ×6), then King Bob 'You'll NEVER beat me at fishing!' + kingFlip() (out of the bowl in a roll and back, splash). Test: sketches/fishing/tflip.cjs.
+- v0.273: HOST texture w 140 → 168: the pointing hand (p0/p1, finger to cx+100) was clipped at the texture edge. Origin is 62/HOST.w so he stays put.
 - v0.272: Kai keeps rare: true (the RARE CATCH! card) at odds 18 — user: as common as the others, but still says rare catch.
 - v0.271: Kai odds 18, not rare (user: same as the others). CATCHES: zippy 30, stone 19, kai 18, slinger 16, fat 6 (rare).
 - v0.270: Kai back in CATCHES (odds 4, rare) — user: Kai is ok to catch. Only 'badguy' is left out.
