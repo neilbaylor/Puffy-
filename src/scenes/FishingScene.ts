@@ -1305,18 +1305,18 @@ export class FishingScene extends Phaser.Scene {
     tv.classList.remove('off');
     this.cam = { x: HOST_X + 70, y: DOCK_TOP - 92, zoom: 1.75 };
     this.fitCamera(true);
-    await this.iwait(1100);
+    await this.iwait(1250);
     void stingerReveal();
-    await this.iwait(300);
+    await this.iwait(500);
     // (a slow push in on him while he talks)
     this.camK = 0.4;
     this.cam = { x: HOST_X + 50, y: DOCK_TOP - 96, zoom: 2.0 };
     const name = characterById(this.fd.charId).name;
-    await this.hostSays("On today's Wonderful World of Sports, we bring you some HUGE fishing action!", 3000);
-    await this.hostSays(`King Bob versus ${name}!`, 1700);
-    await this.hostSays('What a duel this should be.', 1500);
+    await this.hostSays("On today's Wonderful World of Sports, we bring you some HUGE fishing action!", 3400);
+    await this.hostSays(`King Bob versus ${name}!`, 2050);
+    await this.hostSays('What a duel this should be.', 1850);
     this.hostPoint = true;
-    await this.hostSays("Let's head down to the boat to check it out!", 2000);
+    await this.hostSays("Let's head down to the boat to check it out!", 2250);
     // ── and off over the water to the boat ──
     tv.classList.add('off');
     this.time.delayedCall(700, () => (tv.hidden = true));
@@ -1388,7 +1388,7 @@ export class FishingScene extends Phaser.Scene {
     this.hostTalk = true;
     const t0 = this.clock;
     // (typed out quickly, then a moment to read it)
-    const typeMs = Math.min(ms - 700, text.length * 26);
+    const typeMs = Math.min(ms - 550, text.length * 35);
     while (this.clock - t0 < ms && !this.skipping) {
       const n = Math.min(text.length, Math.ceil(((this.clock - t0) / typeMs) * text.length));
       if (cc.textContent!.length !== n) cc.textContent = text.slice(0, n).toUpperCase();
@@ -2187,10 +2187,26 @@ export class FishingScene extends Phaser.Scene {
   private async kingFlip() {
     const k = this.kingSpr;
     const rim = this.bowlAt(0, -BOWL.h + 22);
-    const splash = () => {
-      for (let i = 0; i < 10; i++) {
-        const d = this.add.image(rim.x + (Math.random() - 0.5) * 50, rim.y, 'fl-drop').setScale(0.45 + Math.random() * 0.4).setDepth(8.7);
-        this.tweens.add({ targets: d, x: d.x + (Math.random() - 0.5) * 110, y: d.y - 30 - Math.random() * 50, duration: 280, ease: 'Quad.easeOut', yoyo: true, onComplete: () => d.destroy() });
+    /** Water thrown up out of the bowl: drops flying up and out, falling back down past the rim. */
+    const splash = (n: number, up: number) => {
+      for (let i = 0; i < n; i++) {
+        const d = this.add.image(rim.x + (Math.random() - 0.5) * 60, rim.y + 4, 'fl-drop').setScale(0.8 + Math.random() * 1.0).setDepth(8.7);
+        const vx = (Math.random() - 0.5) * 260;
+        const vy = -(up * (0.6 + Math.random() * 0.6));
+        const dur = 650 + Math.random() * 300;
+        const x0 = d.x;
+        const y0 = d.y;
+        const o = { t: 0 };
+        this.tweens.add({
+          targets: o,
+          t: 1,
+          duration: dur,
+          onUpdate: () => {
+            const tt = (o.t * dur) / 1000;
+            d.setPosition(x0 + vx * tt, y0 + vy * tt + 0.5 * 1300 * tt * tt);
+          },
+          onComplete: () => d.destroy(),
+        });
       }
     };
     this.kingFree = true;
@@ -2198,7 +2214,7 @@ export class FishingScene extends Phaser.Scene {
     const x0 = k.x;
     const y0 = k.y;
     sfx.whoosh();
-    splash();
+    splash(10, 380);
     const o = { t: 0 };
     await this.tw({
       targets: o,
@@ -2214,11 +2230,23 @@ export class FishingScene extends Phaser.Scene {
     });
     k.setRotation(0).setDepth(4.35);
     this.kingFree = false;
-    splash();
+    // SPLASH: a big burst of his water up out of the bowl, a ring of foam on it
+    splash(34, 560);
     sfx.splash();
-    // (a little bob as he lands back in)
-    this.tweens.add({ targets: k, scaleY: k.scaleY * 0.88, scaleX: k.scaleX * 1.08, duration: 120, yoyo: true });
-    await this.wait(700);
+    // (a burst of spray off the top of the bowl)
+    const spray = this.add.image(rim.x, rim.y - 10, 'fl-burst').setDepth(8.65).setTint(0xcff4ff).setAlpha(0.85).setScale(0.12);
+    this.tweens.add({ targets: spray, scale: 0.6, alpha: 0, duration: 450, ease: 'Quad.easeOut', onComplete: () => spray.destroy() });
+    const ring = this.add.image(rim.x, rim.y + 6, 'fl-ripple').setDepth(4.45).setScale(0.6, 0.5).setAlpha(1);
+    this.tweens.add({ targets: ring, scaleX: 2.2, scaleY: 1.2, alpha: 0, duration: 650, ease: 'Quad.easeOut', onComplete: () => ring.destroy() });
+    this.tweens.add({ targets: k, scaleY: k.scaleY * 0.82, scaleX: k.scaleX * 1.12, duration: 130, yoyo: true });
+    await this.wait(550);
+    // …and he laughs at you
+    sfx.laugh();
+    const sx = k.scaleX;
+    const sy = k.scaleY;
+    this.tweens.add({ targets: k, scaleY: sy * 1.08, scaleX: sx * 0.96, duration: 110, yoyo: true, repeat: 5 });
+    await this.kingSays('HA HA HA!', 1500);
+    k.setScale(sx, sy);
   }
 
   /** King Bob wriggles, leaps out of his bowl in a great arc over the stern, splashes into the sea and swims off. */

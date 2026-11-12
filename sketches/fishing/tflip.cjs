@@ -15,7 +15,7 @@ const { chromium } = require('playwright');
   await p.waitForFunction(() => window.__fishing?.scene?.isActive?.(), null, { timeout: 120000 });
   // wait for the King's line in the opening, then grab frames through the flip
   await p.waitForFunction(() => [...document.querySelectorAll('canvas')].length && window.__fishing.kingFree === false && window.__fishing.hostPoint === false && window.__fishing.inIntro && window.__fishing.camK === 2.5, null, { timeout: 120000, polling: 50 });
-  for (let i = 0; i < 16; i++) { await p.screenshot({ path: `shots/fishing/flip-${String(i).padStart(2, '0')}.png` }); await p.waitForTimeout(150); }
+  for (let i = 0; i < 20; i++) { await p.screenshot({ path: `shots/fishing/flip-${String(i).padStart(2, '0')}.png` }); await p.waitForTimeout(150); }
   console.log(errs.join('\n') || 'no errors');
   await br.close();
 })();
