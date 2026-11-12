@@ -89,7 +89,10 @@ const ROD_LEN = 178;
 const ROD_BUTT = 34;
 const KING_ROD_LEN = 150;
 
-/** What you can catch: the fish, what it's called, its weight range (lb), how common, and how big it's shown. */
+/**
+ * What you can catch: the fish, what it's called, its weight range (lb), how common, and how big it's shown.
+ * (Only the good fish: the bad guys from the sea level — the Bad Guy Fish and Kai — never bite.)
+ */
 const CATCHES: {
   kind: FishKind;
   name: string;
@@ -99,18 +102,9 @@ const CATCHES: {
   rare?: boolean;
 }[] = [
   { kind: 'zippy', name: 'Zippy', lb: [0.6, 1.9], odds: 30, k: 1.7 },
-  { kind: 'badguy', name: 'Bad Guy Fish', lb: [1.1, 2.8], odds: 22, k: 1.4 },
   { kind: 'stone', name: 'Stone Fish', lb: [2.2, 4.6], odds: 19, k: 0.95 },
   { kind: 'slinger', name: 'Slinger', lb: [3.1, 6.4], odds: 16, k: 0.9 },
-  { kind: 'fat', name: 'Fat Fish', lb: [9, 16], odds: 8, k: 0.6, rare: true },
-  {
-    kind: 'kai',
-    name: 'Kai Fish',
-    lb: [1.4, 3.2],
-    odds: 5,
-    k: 1.25,
-    rare: true,
-  },
+  { kind: 'fat', name: 'Fat Fish', lb: [9, 16], odds: 6, k: 0.6, rare: true },
 ];
 const pickCatch = () => {
   let r = Math.random() * CATCHES.reduce((a, c) => a + c.odds, 0);
