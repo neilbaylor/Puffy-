@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.277)
+## Where things stand (v0.278)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -192,6 +192,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Level 4 (Plop Invasion · Part 2) planning: mostly climbing up (~60%), 2 parachute drops (~25 s each, Plops parachuting at different speeds: slow big patched dome / middling / fast streamer; shoot them: POP), a baseball game in the middle, boss later. Concept art in src/gfx/skydive.ts (drawCanopy, drawHeroChute(ch, pose, 'pack'|'burst'|'opening'|'open'|'steer'|'land', lean), drawPlopChute(kind, 'slow'|'mid'|'fast'|'popped')), sheets in sketches/level4/ (sheet.ts renders them via esbuild + ../l4art/shot.cjs). Engine work needed: vertical terrain chunking (4096 px), climbing camera, vertical background, parachute player state, vertical fly-over.
 - v0.267: host captions 35 ms/char, lines 3400/2050/1850/2250 ms, lead-in 1250+500 (the user found 26 ms rushed, 38 slow). kingFlip lands with splash(34, 560) + spray burst + foam ring, then sfx.laugh + 'HA HA HA!' bubble.
 - v0.266: Fishing opening: DOCK_X -2700 (WORLD_L -3000); host → boat is a 4.4 s tweened swoop (arc up, zoom out 40% mid-way; Skip speeds it ×6), then King Bob 'You'll NEVER beat me at fishing!' + kingFlip() (out of the bowl in a roll and back, splash). Test: sketches/fishing/tflip.cjs.
+- v0.278: Shop root beer pill (.shop-page .bl-sub.shop-rb): 'root beer float' — linear-gradient cream #fff3d6 to 22%, amber #f2a541→#d9802a; count white with ink stroke (user: no white badge). Tried gold / pink / blue too (pink blended into the page).
 - v0.277: PART 5 PUBLIC. Level 5 moved from WIP into LEVELS (no wip/testers; unlocked by beating Part 4). WIP = [] (the mechanism stays for the next Part). pickableLevels: testers (dev devices, neil/founder) can pick every Part. BOSSES: King Bob Fishing has no `test` (shown once Part 5's beaten, or to testers); the test-label code in the Bosses menu removed. Fishing catch 'Stone Fish' → 'Stone'. Test: sketches/fishing/tpublic.cjs <beaten> (Parts + bosses for a normal player): 3 → Parts 1–4; 4 → Part 5 too; 5 → King Bob in Bosses.
 - v0.276: Fishing run(): after stingerReveal, iwait(760) (the sweep's length) → push-in starts → iwait(1100) → host speaks (was iwait(500), mid-sweep; user: rushed). From the Part 5 gate: stinger off at ~2.4 s, first caption ~3.5 s. Test: sketches/fishing/tlead.cjs (logs stinger/caption timings).
 - v0.275: Kai hp 4 → 3 (Fish.ts STATS). LevelBuilder.aura(x,h,sure)/auraArc(...,rise,sure): opts.sure skips AURA_CHANCE (GameScene). L5: sure nuggie arcs at every Kai (74.6/48, 139.6/49.5, 184.6/b(7.5)) + the 189 arc now sure. Test: sketches/level5/tkainug.cjs (a shot at each Kai).
