@@ -29,8 +29,7 @@ const BOSSES = [
   { level: 2, name: 'King Puff Ball Basketball 2', scene: 'Hoops' },
   { level: 3, name: 'Queen Plop Wrestling', scene: 'Wrestle' },
   { level: 4, name: 'Plop King Wrestling', scene: 'Wrestle' },
-  // (open to everyone for now, while it's being tested)
-  { level: 5, name: 'King Bob Fishing', scene: 'Fishing', test: 'The Rise of King Bob · Test' },
+  { level: 5, name: 'King Bob Fishing', scene: 'Fishing' },
 ] as const;
 import { resetLives } from '../core/lives';
 import { bank } from '../core/bank';
@@ -1291,12 +1290,12 @@ export class UI {
   /** The Bosses menu: fight the boss of any level you've beaten, straight away (as practice). */
   private showBosses() {
     // (the testers get every boss)
-    const open = BOSSES.filter((b) => progress.beaten >= b.level || isTester() || ('test' in b && b.test));
+    const open = BOSSES.filter((b) => progress.beaten >= b.level || isTester());
     const el = h(`<div class="screen modal bosses">
       <div class="panel boss-panel">
         <h2>Boss Battles</h2>
         <div class="boss-list">${open
-          .map((b) => `<button class="btn boss-btn" data-boss="${b.level}"><b>${b.name}</b><small>${esc('test' in b && b.test ? b.test : levelName(b.level))}</small></button>`)
+          .map((b) => `<button class="btn boss-btn" data-boss="${b.level}"><b>${b.name}</b><small>${esc(levelName(b.level))}</small></button>`)
           .join('')}</div>
         <div class="row"><button class="btn btn-alt" data-act="back">Back</button></div>
       </div>

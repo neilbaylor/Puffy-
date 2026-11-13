@@ -61,6 +61,16 @@ export const LEVELS: LevelInfo[] = [
     speech: 'I guess up we go!',
     wrestle: true,
   },
+  {
+    id: 5,
+    world: 'World 3',
+    title: 'The Rise of King Bob',
+    part: 'Part 1',
+    button: 'Part 5',
+    build: buildLevel5,
+    speech: 'Here goes nothing!',
+    fishing: true,
+  },
 ];
 
 /**
@@ -81,20 +91,7 @@ export const DEV = (() => {
 /** Accounts that get the work-in-progress levels (names, any case), and every boss in the Bosses menu. */
 const TESTERS = ['neil', 'founder'];
 /** Levels still being made: only testers see them. */
-const WIP: LevelInfo[] = [
-  {
-    id: 5,
-    world: 'World 3',
-    title: 'The Rise of King Bob',
-    part: 'Part 1',
-    button: 'Part 5',
-    build: buildLevel5,
-    speech: 'Here goes nothing!',
-    fishing: true,
-    wip: true,
-    testers: ['neil', 'founder'],
-  },
-];
+const WIP: LevelInfo[] = [];
 let tester = false;
 /** A tester's signed in (or this is a dev device). */
 export const isTester = () => tester;
@@ -120,8 +117,8 @@ try {
   setTester(null);
 }
 
-/** The Parts you can pick on the start screen: the ones you've unlocked (and, for testers, the work in progress). */
-export const pickableLevels = () => LEVELS.filter((l) => l.id <= progress.beaten + 1 || l.wip);
+/** The Parts you can pick on the start screen: the ones you've unlocked (testers: every one, and the work in progress). */
+export const pickableLevels = () => LEVELS.filter((l) => l.id <= progress.beaten + 1 || l.wip || tester);
 /** Whether the start screen offers a choice of Parts at all. */
 export const canPickLevel = () => progress.beaten >= 1 || LEVELS.some((l) => l.wip);
 
