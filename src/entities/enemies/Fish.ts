@@ -16,8 +16,8 @@ export type FishBaddie = 'fish' | 'bigfish' | 'kai';
 const STATS: Record<FishBaddie, { art: 'badguy' | 'badguybig' | 'kai'; hp: number; speed: number; see: [number, number]; every: [number, number]; shot: number; size: number[]; keep: [number, number] }> = {
   fish: { art: 'badguy', hp: 1, speed: 55, see: [360, 230], every: [2.4, 3.6], shot: 135, size: [1.4], keep: [120, 260] },
   bigfish: { art: 'badguybig', hp: 2, speed: 42, see: [360, 230], every: [1.9, 2.8], shot: 135, size: [1.7, 1.7, 1.7], keep: [120, 260] },
-  // Kai: rare and quick — he dodges your rockets, charges at you and fires often; four hits, and he gets away
-  kai: { art: 'kai', hp: 4, speed: 110, see: [460, 280], every: [1.2, 1.9], shot: 185, size: [1.45], keep: [70, 170] },
+  // Kai: rare and quick — he dodges your rockets, charges at you and fires often; three hits, and he gets away
+  kai: { art: 'kai', hp: 3, speed: 110, see: [460, 280], every: [1.2, 1.9], shot: 185, size: [1.45], keep: [70, 170] },
 };
 
 /**

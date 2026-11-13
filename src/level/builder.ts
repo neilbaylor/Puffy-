@@ -183,9 +183,9 @@ export class LevelBuilder {
     return this;
   }
 
-  /** A possible aura spot floating at height h (each play, only some spots get aura). */
-  aura(x: number, h: number) {
-    this.spawns.push({ type: 'aura', x, y: this.top(h) });
+  /** A possible aura spot floating at height h (each play, only some spots get aura; `sure`: always). */
+  aura(x: number, h: number, sure = false) {
+    this.spawns.push({ type: 'aura', x, y: this.top(h), ...(sure ? { opts: { sure: true } } : {}) });
     return this;
   }
 
@@ -196,10 +196,10 @@ export class LevelBuilder {
   }
 
   /** A gentle arc of aura spots. */
-  auraArc(x0: number, n: number, h: number, rise = 2) {
+  auraArc(x0: number, n: number, h: number, rise = 2, sure = false) {
     for (let i = 0; i < n; i++) {
       const t = n === 1 ? 0.5 : i / (n - 1);
-      this.aura(x0 + i * 1.2, h + Math.sin(t * Math.PI) * rise);
+      this.aura(x0 + i * 1.2, h + Math.sin(t * Math.PI) * rise, sure);
     }
     return this;
   }

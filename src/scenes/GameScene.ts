@@ -350,7 +350,7 @@ export class GameScene extends Phaser.Scene {
           start = { x: cx, y: surface(s.y) - 24 };
           break;
         case 'aura':
-          if (Math.random() < AURA_CHANCE) this.addAura(new Aura(this, cx, s.y * TILE + TILE / 2));
+          if (s.opts?.sure || Math.random() < AURA_CHANCE) this.addAura(new Aura(this, cx, s.y * TILE + TILE / 2));
           break;
         case 'rootbeer': {
           const id = `${s.x},${s.y}`;

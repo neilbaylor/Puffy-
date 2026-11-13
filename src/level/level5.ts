@@ -113,6 +113,8 @@ export function buildLevel5(): LevelData {
   L.spawn('fish', 73, 46);
   L.spawn('bigfish', 70, 39);
   L.spawn('kai', 76, 51);
+  // (wherever Kai is, nuggies are too: always there, not left to chance)
+  L.auraArc(74.6, 3, 48, 0.8, true);
   L.aura(75, 42);
 
   // ── A reef wall; checkpoint ──────────────────────────────────
@@ -160,6 +162,7 @@ export function buildLevel5(): LevelData {
   L.spawn('fish', 143, 55);
   L.spawn('bigfish', 150, 30);
   L.spawn('kai', 141, 47);
+  L.auraArc(139.6, 3, 49.5, 0.8, true);
   L.aura(143, 52);
   L.aura(138, 30);
   L.aura(149, 10);
@@ -187,8 +190,9 @@ export function buildLevel5(): LevelData {
   shelf(183, 188);
   L.spawn('tree', 185, b(3), { h: 200 });
   L.spawn('kai', 187, b(9));
+  L.auraArc(184.6, 2, b(7.5), 0.4, true);
   // (nuggies between Kai and the tennis: get some back before the crabs)
-  L.auraArc(189, 3, b(10.5), 1);
+  L.auraArc(189, 3, b(10.5), 1, true);
   L.auraArc(194, 3, b(14), 0.8);
   L.ground(189, 192, b(6));
   L.ground(193, 196, b(9));
