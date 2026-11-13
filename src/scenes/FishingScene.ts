@@ -1329,10 +1329,12 @@ export class FishingScene extends Phaser.Scene {
     this.fitCamera(true);
     await this.iwait(1250);
     void stingerReveal();
-    await this.iwait(500);
+    // (the purple sweep clears (760 ms); then a beat on him, mic up, before he speaks)
+    await this.iwait(760);
     // (a slow push in on him while he talks)
     this.camK = 0.4;
     this.cam = { x: HOST_X + 50, y: DOCK_TOP - 96, zoom: 2.0 };
+    await this.iwait(1100);
     const name = characterById(this.fd.charId).name;
     await this.hostSays("On today's Wonderful World of Sports, we bring you some HUGE fishing action!", 3400);
     await this.hostSays(`King Bob versus ${name}!`, 2050);
