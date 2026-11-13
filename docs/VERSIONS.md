@@ -278,3 +278,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.273: Fishing intro: the announcer's pointing hand no longer cut off.
 - v0.274: Fishing: easier to land a fish.
 - v0.275: Part 5: nuggies always by every Kai; Kai takes 3 hits.
+- v0.276: Fishing opening: a beat after the purple sweep before the host speaks.
