@@ -86,6 +86,8 @@ const HERO_K = 2.38;
 const BITE_MS = 620;
 /** A key pressed sooner than this after BITE! shows wasn't a reaction (mashing): a miss. */
 const BITE_REACT_MS = 120;
+/** How far past the BITE! button's edge a tap still hits it (px): its cyan ring (~17) and a fingertip of slop. */
+const BITE_SLOP = 30;
 /** The rods: length (world px), and how far the handle reaches behind the hands. */
 const ROD_LEN = 178;
 const ROD_BUTT = 34;
@@ -244,9 +246,23 @@ export class FishingScene extends Phaser.Scene {
   private bob = 0;
   private skipping = false;
   private inIntro = false;
-  private tapListener = (e: Event) => {
+  private tapListener = (e: PointerEvent) => {
+    // BITE! up: a tap on it — the whole drawn button, its ring and a finger's width round that — is a
+    // hit. Measured here rather than by what the browser says was under the finger: that was only the
+    // white disc as it's drawn that instant (tiny while it pops in, shrinking as it fades), so taps on
+    // the ring or just off the edge counted as misses.
+    const b = this.dom?.querySelector<HTMLElement>('.fsh-bite');
+    if (b && !b.hidden && !this.biteHit && !this.biteMiss) {
+      const r = b.getBoundingClientRect();
+      const reach = b.offsetWidth / 2 + BITE_SLOP;
+      if (Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2)) <= reach) {
+        e.preventDefault();
+        this.biteHit = true;
+        return;
+      }
+    }
     const t = e.target as Element | null;
-    if (t?.closest?.('.hud, .screen, .fsh-bite')) return;
+    if (t?.closest?.('.hud, .screen')) return;
     this.tapped = true;
   };
 
@@ -535,13 +551,13 @@ export class FishingScene extends Phaser.Scene {
       <div class="fsh-catch" hidden><em></em><div class="lt"><small></small><b></b><span></span></div></div>
       <button class="hoops-skip" hidden>Skip ›</button>`;
     document.getElementById('ui')!.appendChild(this.dom);
-    window.addEventListener('pointerdown', this.tapListener);
+    window.addEventListener('pointerdown', this.tapListener, true);
     this.drawPortraits();
     const bite = this.dom.querySelector<HTMLButtonElement>('.fsh-bite')!;
+    // (hits are measured in tapListener; this only keeps the tap from going on to anything else)
     bite.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
       e.preventDefault();
-      this.biteHit = true;
     });
     const skip = this.dom.querySelector<HTMLButtonElement>('.hoops-skip')!;
     skip.addEventListener('pointerdown', (e) => {
@@ -549,7 +565,7 @@ export class FishingScene extends Phaser.Scene {
       if (this.inIntro) this.skipping = true;
     });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      window.removeEventListener('pointerdown', this.tapListener);
+      window.removeEventListener('pointerdown', this.tapListener, true);
       this.dom.remove();
     });
     (window as unknown as { __fishing: FishingScene }).__fishing = this;
