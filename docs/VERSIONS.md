@@ -303,3 +303,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.298: Battle: no freezing on really bad networks; off-screen pointer cheaper to draw.
 - v0.299: Fishing: Fat Fish really big, BITE! stays up after a missed tap, catches tossed back.
 - v0.300: Battle: no stutter the first time someone blinks.
+- v0.301: Battle: your hero's bigger corrections slide into place instead of jumping.
