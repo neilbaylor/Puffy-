@@ -476,6 +476,9 @@ export class GameScene extends Phaser.Scene {
 
     // (restarting at a checkpoint past where a boulder chase starts: that rock's been and gone)
     for (const c of this.chases) if (start.x > c.x0) c.started = true;
+    // (the rock's picture drawn now, while the level starts: drawn when the chase began, it was a
+    // stutter just as the rock burst in)
+    if (this.chases.some((c) => !c.started)) this.makeBigRock();
 
     // ── The hero (single player for now; the code supports more later) ──
     const specs = this.session.players.length ? this.session.players : [{ slot: 0, characterId: 'puffy', inputId: 'solo' }];
@@ -1760,7 +1763,8 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private startChase(c: { x0: number; x1: number; speed: number }, hero: Player) {
+  /** The boulder chase's rock (drawn once, at the level's start). */
+  private makeBigRock() {
     if (!this.textures.exists('bigrock'))
       addCanvas(
         this,
@@ -1776,6 +1780,10 @@ export class GameScene extends Phaser.Scene {
           }
         }),
       );
+  }
+
+  private startChase(c: { x0: number; x1: number; speed: number }, hero: Player) {
+    this.makeBigRock();
     // (too tall to jump over, even with a double jump; the holes at the bottom are cut to fit it)
     const r = 115;
     // (it bursts in from the edge of the screen, half in view)
