@@ -29,6 +29,9 @@ import { mixTint, themeClock, themeMix } from '../world/theme';
 const INTERP_TICKS = 3;
 /** The hearts pictures' resolution (they're small, and the camera zooms in). */
 const HEART_RES = 3;
+/** The off-screen pointer's picture: its box round the badge's centre (world units), and resolution. */
+const ARROW_BOX = { x: 15, y: 15, w: 43, h: 30 };
+const ARROW_RES = 3;
 
 type PrizeView = {
   img: Phaser.GameObjects.Image;
@@ -544,14 +547,8 @@ export class BattleScene extends Phaser.Scene {
 
   /** The off-screen pointer for another player: a badge in their colour with a point, and their name. */
   private makeArrow(name: string, col: string) {
-    const c = Phaser.Display.Color.HexStringToColor(col).color;
-    const g = this.add.graphics();
     // (drawn pointing right; the whole pointer turns to face them)
-    // a white edge round a dark outline round their colour, so it stands out on any background
-    g.fillStyle(0xffffff, 1).fillCircle(0, 0, 14).fillTriangle(9, -12.5, 9, 12.5, 26.5, 0);
-    g.fillStyle(0x3a2418, 1).fillCircle(0, 0, 12).fillTriangle(8.5, -10, 8.5, 10, 23, 0);
-    g.fillStyle(c, 1).fillCircle(0, 0, 9.5).fillTriangle(7.5, -7.5, 7.5, 7.5, 19, 0);
-    g.fillStyle(0xffffff, 0.55).fillCircle(-3, -3.5, 3.2);
+    const g = this.add.image(0, 0, this.arrowTex(col)).setOrigin(ARROW_BOX.x / ARROW_BOX.w, ARROW_BOX.y / ARROW_BOX.h).setScale(1 / ARROW_RES);
     const label = this.add
       .text(0, 0, name, { fontFamily: 'Nunito, sans-serif', fontSize: '15px', fontStyle: '900', color: col, stroke: '#ffffff', strokeThickness: 5 })
       .setOrigin(0.5, 0.5)
@@ -587,7 +584,7 @@ export class BattleScene extends Phaser.Scene {
       const x = Phaser.Math.Clamp(tx, wv.x + mx, wv.right - mx);
       const y = Phaser.Math.Clamp(ty, wv.y + 64 * px, wv.bottom - 70 * px);
       const ang = Math.atan2(ty - y, tx - x);
-      const [g, label] = v.arrow.list as [Phaser.GameObjects.Graphics, Phaser.GameObjects.Text];
+      const [g, label] = v.arrow.list as [Phaser.GameObjects.Image, Phaser.GameObjects.Text];
       g.setRotation(ang);
       // the name sits on the inside, away from the point
       label.setText(this.names.get(id) ?? '');
@@ -1420,6 +1417,45 @@ export class BattleScene extends Phaser.Scene {
         v.shadow.destroy();
         this.hazardViews.delete(id);
       }
+  }
+
+  /**
+   * The off-screen pointer's badge in a player's colour, as a picture (made once per colour, at
+   * ARROW_RES): drawn as shapes, each one showing was cut into triangles all over again every frame.
+   */
+  private arrowTex(col: string) {
+    const key = `barrow-${col}`;
+    if (this.textures.exists(key)) return key;
+    const B = ARROW_BOX;
+    const cv = document.createElement('canvas');
+    cv.width = B.w * ARROW_RES;
+    cv.height = B.h * ARROW_RES;
+    const ctx = cv.getContext('2d')!;
+    ctx.scale(ARROW_RES, ARROW_RES);
+    ctx.translate(B.x, B.y);
+    const shape = (fill: string, r: number, tri: [number, number, number] | null) => {
+      ctx.fillStyle = fill;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fill();
+      if (!tri) return;
+      const [x0, h, x1] = tri;
+      ctx.beginPath();
+      ctx.moveTo(x0, -h);
+      ctx.lineTo(x0, h);
+      ctx.lineTo(x1, 0);
+      ctx.closePath();
+      ctx.fill();
+    };
+    // (the same shapes as always: a white edge round a dark outline round their colour, so it stands
+    // out on any background, and a little shine)
+    shape('#ffffff', 14, [9, 12.5, 26.5]);
+    shape('#3a2418', 12, [8.5, 10, 23]);
+    shape(col, 9.5, [7.5, 7.5, 19]);
+    ctx.translate(-3, -3.5);
+    shape('rgba(255,255,255,0.55)', 3.2, null);
+    addCanvas(this, key, cv);
+    return key;
   }
 
   /** The picture of a hero's hearts with `hp` of them full (made once per count, at HEART_RES). */
