@@ -39,7 +39,8 @@ function keep(t: Track) {
   recent = recent.slice(0, KEEP + 1);
 }
 
-function decode(t: Track): Promise<AudioBuffer | null> {
+/** `atOnce`: mixed down in one go while the loading screen is up (nothing on it moves: no stutter to avoid). */
+function decode(t: Track, atOnce = false): Promise<AudioBuffer | null> {
   const have = decoded.get(t);
   if (have) {
     keep(t);
@@ -60,10 +61,11 @@ function decode(t: Track): Promise<AudioBuffer | null> {
         const n = buf.numberOfChannels;
         // (in slices, letting the game breathe between them: a whole song in one go is a stutter)
         const SLICE = 1 << 18;
+        const booting = () => atOnce && document.body.classList.contains('booting');
         for (let c = 0; c < n; c++) {
           const d = buf.getChannelData(c);
-          for (let s0 = 0; s0 < d.length; s0 += SLICE) {
-            const s1 = Math.min(d.length, s0 + SLICE);
+          for (let s0 = 0, s1 = 0; s0 < d.length; s0 = s1) {
+            s1 = booting() ? d.length : Math.min(d.length, s0 + SLICE);
             for (let i = s0; i < s1; i++) o[i] += d[i] / n;
             await new Promise((r) => setTimeout(r, 0));
           }
@@ -176,7 +178,9 @@ export const preloadHoopsMusic = () => void decode('hoops');
 export const playMenuMusic = () => play('menu', false);
 
 /** The start screen's song decoded ahead of time (during the loading screen), so the first tap is instant. */
-export const preloadMenuMusic = () => decode('menu');
+// (in one go: in slices, each waiting its turn behind the loading screen's drawing, it finished well
+// after everything else, and the loading screen waited for it)
+export const preloadMenuMusic = () => decode('menu', true);
 
 /** Get a level's song ready (decoded) ahead of time, so it starts straight away. */
 export const preloadLevelMusic = (level = 1) => void decode(levelTrack(level));
