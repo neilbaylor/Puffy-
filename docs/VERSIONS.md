@@ -290,3 +290,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.285: Boss Battles buttons: same yellow as the other yellow buttons.
 - v0.286: Every yellow button the same yellow.
 - v0.287: Battle lobby: KO badge a few px higher.
+- v0.288: Battle lobby: KO badge a touch smaller on phones.

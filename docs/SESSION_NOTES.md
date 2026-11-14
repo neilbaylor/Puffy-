@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.287)
+## Where things stand (v0.288)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -192,6 +192,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Level 4 (Plop Invasion · Part 2) planning: mostly climbing up (~60%), 2 parachute drops (~25 s each, Plops parachuting at different speeds: slow big patched dome / middling / fast streamer; shoot them: POP), a baseball game in the middle, boss later. Concept art in src/gfx/skydive.ts (drawCanopy, drawHeroChute(ch, pose, 'pack'|'burst'|'opening'|'open'|'steer'|'land', lean), drawPlopChute(kind, 'slow'|'mid'|'fast'|'popped')), sheets in sketches/level4/ (sheet.ts renders them via esbuild + ../l4art/shot.cjs). Engine work needed: vertical terrain chunking (4096 px), climbing camera, vertical background, parachute player state, vertical fly-over.
 - v0.267: host captions 35 ms/char, lines 3400/2050/1850/2250 ms, lead-in 1250+500 (the user found 26 ms rushed, 38 slow). kingFlip lands with splash(34, 560) + spray burst + foam ring, then sfx.laugh + 'HA HA HA!' bubble.
 - v0.266: Fishing opening: DOCK_X -2700 (WORLD_L -3000); host → boat is a 4.4 s tweened swoop (arc up, zoom out 40% mid-way; Skip speeds it ×6), then King Bob 'You'll NEVER beat me at fishing!' + kingFlip() (out of the bowl in a roll and back, splash). Test: sketches/fishing/tflip.cjs.
+- v0.288: Phones (max-height 500px): KO badge --lastfont 11.5px, padding 2px 8px 3px, border 2.5px — a touch smaller, now clear of the hero's head.
 - v0.287: KO badge a few px higher: --lasttop clamp(11px, 3.2vh, 24px) (was clamp(16px, 4.4vh, 30px)).
 - v0.286: Base .btn background var(--gold-btn) (was flat var(--gold)); .bl-hero.picked and .bl-dice too; .boss-btn's own override dropped (inherits). User: every yellow button the same colour. Not buttons, left flat: .card.picked::after star, stick knob, .bl-last.won badge. Light mode already had still clouds (Background: stillClouds || LIGHT), so v0.284's cloud change doesn't touch it; the pictures-not-shapes changes help it like everyone.
 - v0.285: .boss-btn background var(--gold-btn) (was the base .btn flat var(--gold)), like Bosses/Battle/picked Part. Note: plain .btn is flat gold everywhere else too. Local test server caches dist at start — restart it after every build (a stale one serves index.html for new chunks: 'MIME type text/html').
