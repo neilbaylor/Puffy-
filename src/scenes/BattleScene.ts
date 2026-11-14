@@ -27,6 +27,13 @@ import { mixTint, themeClock, themeMix } from '../world/theme';
 
 /** How far behind the newest snapshot the other players are shown (ticks): smooth, ~100 ms. */
 const INTERP_TICKS = 3;
+/**
+ * Your hero's corrections (the server saw it a little differently): further off than this and it just
+ * jumps there (a respawn, a real teleport); up to this it glides there — small ones fade out in a few
+ * frames, big ones slide over at no more than FIX_GLIDE px/s, about a sixth of a second for the biggest.
+ */
+const FIX_JUMP = 160;
+const FIX_GLIDE = 1000;
 /** The hearts pictures' resolution (they're small, and the camera zooms in). */
 const HEART_RES = 3;
 /** The off-screen pointer's picture: its box round the badge's centre (world units), and resolution. */
@@ -840,7 +847,7 @@ export class BattleScene extends Phaser.Scene {
       this.me = null;
       return;
     }
-    const before = this.me ? { x: this.me.x, y: this.me.y } : null;
+    const before = this.me && this.me.respawn <= 0 ? { x: this.me.x, y: this.me.y } : null;
     const me: BPlayer = { ...mine, lastHitBy: null };
     this.pending = this.pending.filter(([q]) => q > mine.ack);
     const max = characterById(me.hero).maxRockets + (me.power === POWER.rapid ? 3 : 0);
@@ -850,7 +857,7 @@ export class BattleScene extends Phaser.Scene {
     if (before && me.respawn <= 0) {
       this.fix.x += before.x - me.x;
       this.fix.y += before.y - me.y;
-      if (Math.hypot(this.fix.x, this.fix.y) > 90) this.fix = { x: 0, y: 0 }; // too far off: just jump there
+      if (Math.hypot(this.fix.x, this.fix.y) > FIX_JUMP) this.fix = { x: 0, y: 0 }; // too far off: just jump there
     }
     this.me = me;
   }
@@ -942,9 +949,13 @@ export class BattleScene extends Phaser.Scene {
       for (const s of this.shots) if (s.sid !== null) cur.rockets.delete(s.sid);
       for (const s of this.shots) cur.rockets.set(-s.n, { x: s.r.x, y: s.r.y, dir: s.r.dir, kind: s.r.kind, owner: s.r.owner });
     }
-    const k = 1 - Math.exp(-dt * 14);
-    this.fix.x -= this.fix.x * k;
-    this.fix.y -= this.fix.y * k;
+    // (fading out — a big one no faster than FIX_GLIDE, so it slides rather than lurches)
+    const fixLen = Math.hypot(this.fix.x, this.fix.y);
+    if (fixLen > 0.01) {
+      const k = Math.min(1 - Math.exp(-dt * 14), (FIX_GLIDE * dt) / fixLen);
+      this.fix.x -= this.fix.x * k;
+      this.fix.y -= this.fix.y * k;
+    } else this.fix.x = this.fix.y = 0;
     const seen = new Set<string>();
     // (who's holding a chair, and how far into a swing)
     const held = new Map(cur.chairs.filter((c) => c[3]).map((c) => [c[3], c[5]] as const));
