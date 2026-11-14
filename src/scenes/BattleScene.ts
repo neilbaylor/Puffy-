@@ -18,7 +18,7 @@ import { soloSource } from '../input/devices';
 import type { BattleNet, Snapshot } from '../net/battleNet';
 import { ARENA_RAMPS, ARENA_VIEW, buildArena } from '../shared/battle/arena';
 import { SLOT_COLORS, type SnapChair, type SnapEnemy, type SnapHazard, type SnapPlayer } from '../shared/battle/protocol';
-import { ArenaMap, BTN, CHAIR_LIFE, CHAIR_SWING, DT, TILE_PX, ENEMY_BOX, HEARTS, POWER, PRIZE_LIFE, landingY, sizeOf, stepMove, type BEvent, type BPlayer, type EnemyKind, type PrizeKind, type RocketKind } from '../shared/battle/sim';
+import { ArenaMap, BTN, CHAIR_LIFE, CHAIR_SWING, DT, TILE_PX, ENEMY_BOX, HEARTS, POWER, PRIZE_LIFE, boxH, boxW, heroShot, landingY, moveShot, sizeOf, stepMove, type BEvent, type BPlayer, type BRocket, type EnemyKind, type PrizeKind, type RocketKind } from '../shared/battle/sim';
 import { Background } from '../world/Background';
 import { Fx } from '../world/Fx';
 import { LevelView } from '../world/LevelView';
@@ -27,6 +27,8 @@ import { mixTint, themeClock, themeMix } from '../world/theme';
 
 /** How far behind the newest snapshot the other players are shown (ticks): smooth, ~100 ms. */
 const INTERP_TICKS = 3;
+/** The hearts pictures' resolution (they're small, and the camera zooms in). */
+const HEART_RES = 3;
 
 type PrizeView = {
   img: Phaser.GameObjects.Image;
@@ -92,7 +94,7 @@ interface HeroView {
   cheer: number;
   sprite: Phaser.GameObjects.Sprite;
   tag: Phaser.GameObjects.Text;
-  hearts: Phaser.GameObjects.Graphics;
+  hearts: Phaser.GameObjects.Image;
   anim: number;
   tilt: number;
   slot: number;
@@ -201,6 +203,18 @@ export class BattleScene extends Phaser.Scene {
   fx!: Fx;
   private views = new Map<string, HeroView>();
   private rocketViews = new Map<number, Phaser.GameObjects.Image | Phaser.GameObjects.Sprite>();
+  /**
+   * Your own shots, flying on your phone from the moment you press — the server's copies only come
+   * back a moment later (and were drawn a little further behind still, like everyone else's). Each
+   * is tied to its server twin (`sid`) when that turns up, and goes when the twin does (the blast
+   * comes with that). `hit`: when it stopped (a wall, someone) — it waits there for the server.
+   */
+  private shots: { n: number; r: Omit<BRocket, 'id'>; sid: number | null; born: number; hit: number | null }[] = [];
+  private shotN = 0;
+  /** My shots the server had in the last snapshot (a new one there is the twin of my oldest untied shot). */
+  private mineSeen = new Set<number>();
+  /** Everyone and every bad guy as last drawn (what your shots hit, on your screen). */
+  private lastSeen: { players: Map<string, SnapPlayer>; enemies: SnapEnemy[] } | null = null;
   private prizeViews = new Map<number, PrizeView>();
   /** Prizes someone just grabbed (they fly into the grabber; the snapshot may still show them a moment). */
   private grabbed = new Set<number>();
@@ -248,7 +262,9 @@ export class BattleScene extends Phaser.Scene {
     this.drawRamps();
     // (battles use Part 1's looks: all drawn now, during the countdown, not mid-battle)
     ensureLevelLooks(this, 1);
-    this.bg = new Background(this, this.level.heightPx - VIEW_H);
+    // (still clouds: they drift and bob but keep their shape — no new cloud pictures to send to the
+    // graphics chip ~20 times a second, which a battle's phones can do without)
+    this.bg = new Background(this, this.level.heightPx - VIEW_H, true);
     this.fx = new Fx(this);
     this.views.clear();
     this.rocketViews.clear();
@@ -659,7 +675,7 @@ export class BattleScene extends Phaser.Scene {
         .setOrigin(0.5, 1)
         .setDepth(DEPTH.text)
         .setResolution(2);
-      const hearts = this.add.graphics().setDepth(DEPTH.text);
+      const hearts = this.add.image(0, 0, this.heartsTex(HEARTS)).setScale(1 / HEART_RES).setDepth(DEPTH.text);
       const halo = p.id === this.net.myId ? this.add.image(p.x, p.y, 'bhalo').setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.players - 0.05) : undefined;
       const ice = this.add.image(p.x, p.y, 'bice').setOrigin(0.5, 1).setScale(1 / ART_RES).setDepth(DEPTH.players + 0.2).setVisible(false);
       v = { wear, cheer: -1, sprite, tag, hearts, anim: 0, tilt: 0, slot: p.slot, hero: p.hero, size: 1, sparkT: 0, face: new FaceClock(), halo, ice, chairA: null };
@@ -685,7 +701,10 @@ export class BattleScene extends Phaser.Scene {
         this.snaps.push(s);
       }
       if (this.snaps.length > 40) this.snaps.splice(0, this.snaps.length - 40);
-      if (!this.spectate) this.reconcile(fresh[fresh.length - 1]);
+      if (!this.spectate) {
+        this.reconcile(fresh[fresh.length - 1]);
+        this.tieShots(fresh);
+      }
     }
 
     // ── your hero: one step per tick with your buttons, sent to the server too ──
@@ -728,6 +747,9 @@ export class BattleScene extends Phaser.Scene {
     const max = characterById(me.hero).maxRockets + (me.power === POWER.rapid ? 3 : 0);
     const fired = stepMove(me, b, this.map, ev, () => !this.myChair() && this.myRockets() < max);
     for (const e of ev) if (e.k === 'jump') this.jumpFx(me.x, me.y, e.air, true);
+    // (your shot leaves now, on your screen — the same shot the server makes, flying the same way)
+    if (fired) this.shots.push({ n: ++this.shotN, r: heroShot(me, fired), sid: null, born: performance.now(), hit: null });
+    this.flyShots();
     if (fired) {
       const c = characterById(me.hero);
       const k = sizeOf(me);
@@ -739,6 +761,55 @@ export class BattleScene extends Phaser.Scene {
         this.fx.muzzle(me.x + me.facing * 24 * c.scale * k, me.y - (c.muzzleY ?? 18) * k, me.facing, me.x - me.facing * 14 * c.scale * k);
       }
     }
+  }
+
+  /** A tick of your own shots' flight; one that reaches a wall or someone stops there. */
+  private flyShots() {
+    const seen = this.lastSeen;
+    const now = performance.now();
+    for (const s of this.shots) {
+      if (s.hit !== null) continue;
+      if (moveShot(s.r, this.map) || (seen && this.shotHits(s.r, seen))) s.hit = now;
+    }
+  }
+
+  /** Is one of your shots into a bad guy or another hero, as they're drawn on your screen? (the sim's test) */
+  private shotHits(r: Omit<BRocket, 'id'>, seen: { players: Map<string, SnapPlayer>; enemies: SnapEnemy[] }) {
+    for (const e of seen.enemies) {
+      const [w, h] = ENEMY_BOX[e[1]];
+      if (Math.abs(r.x - e[2]) < w / 2 + 6 && r.y > e[3] - h - 3 && r.y < e[3] + 3) return true;
+    }
+    if (r.kind !== 'rocket' && r.kind !== 'fire' && r.age <= 0.2) return false;
+    for (const p of seen.players.values()) {
+      if (p.id === r.owner || p.respawn > 0) continue;
+      const c = characterById(p.hero);
+      const k = sizeOf(p);
+      if (Math.abs(r.x - p.x) < boxW(c, k) / 2 + 6 && r.y > p.y - boxH(c, k) - 3 && r.y < p.y + 3) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Tie your shots to the server's copies as they turn up (each new one of yours to your oldest
+   * untied shot of its kind), and let them go when the server's are gone (blown up). One the server
+   * never made (it said no — too many in the air) goes after a while; one that stopped on your
+   * screen but flew on at the server's (a near miss) gives way to the server's.
+   */
+  private tieShots(fresh: Snapshot[]) {
+    const myId = this.net.myId;
+    for (const snap of fresh) {
+      const now = new Set<number>();
+      for (const r of snap.rockets) {
+        if (r.owner !== myId) continue;
+        now.add(r.id);
+        if (this.mineSeen.has(r.id)) continue;
+        const s = this.shots.find((q) => q.sid === null && q.r.kind === r.kind);
+        if (s) s.sid = r.id;
+      }
+      this.mineSeen = now;
+    }
+    const t = performance.now();
+    this.shots = this.shots.filter((s) => (s.sid !== null ? this.mineSeen.has(s.sid) : t - s.born < 1200) && (s.hit === null || t - s.hit < 600));
   }
 
   /** Take the server's word for your hero, then replay the buttons it hasn't seen yet. */
@@ -821,6 +892,12 @@ export class BattleScene extends Phaser.Scene {
   private render(dt: number) {
     const cur = this.othersAt();
     if (!cur) return;
+    this.lastSeen = { players: cur.players, enemies: cur.enemies };
+    // your own shots: drawn where they are on your phone, instead of the server's copies (behind)
+    if (this.shots.length) {
+      for (const s of this.shots) if (s.sid !== null) cur.rockets.delete(s.sid);
+      for (const s of this.shots) cur.rockets.set(-s.n, { x: s.r.x, y: s.r.y, dir: s.r.dir, kind: s.r.kind, owner: s.r.owner });
+    }
     const k = 1 - Math.exp(-dt * 14);
     this.fix.x -= this.fix.x * k;
     this.fix.y -= this.fix.y * k;
@@ -952,7 +1029,9 @@ export class BattleScene extends Phaser.Scene {
       const top = y - (c.hitH ?? 34) * v.size - 10 - (gu ? (gu + 1) * c.scale * v.size : 0);
       // the name just over the head, the hearts above the name
       v.tag.setText(this.names.get(id) ?? '').setPosition(x, top + 9);
-      this.drawHearts(v.hearts, x, top - 13, p.hp);
+      // (a picture of the hearts, one for each count, moved about — drawn as shapes, every hero's
+      // hearts were rebuilt every frame)
+      v.hearts.setTexture(this.heartsTex(p.hp)).setPosition(x, top - 13);
     }
     for (const [id, v] of this.views)
       if (!seen.has(id)) {
@@ -1299,22 +1378,41 @@ export class BattleScene extends Phaser.Scene {
       }
   }
 
-  private drawHearts(g: Phaser.GameObjects.Graphics, x: number, y: number, hp: number, bombs = 0) {
-    g.clear();
+  /** The picture of a hero's hearts with `hp` of them full (made once per count, at HEART_RES). */
+  private heartsTex(hp: number) {
+    const n = Math.max(0, Math.min(HEARTS, hp));
+    const key = `bhearts${n}`;
+    if (this.textures.exists(key)) return key;
     const w = 9;
-    const x0 = x - (HEARTS * w) / 2 + w / 2 - (bombs ? 5 : 0);
-    // bombs to throw: little black dots after the hearts
-    for (let i = 0; i < Math.min(bombs, 6); i++) {
-      const bx = x0 + HEARTS * w + 2 + (i % 3) * 6;
-      const by = y + 1 - Math.floor(i / 3) * 6;
-      g.fillStyle(0x2b1a12, 1).fillCircle(bx, by, 3).fillStyle(0xffd23f, 1).fillCircle(bx + 2, by - 2.6, 1.1);
-    }
+    const W = HEARTS * w + 8;
+    const H = 14;
+    const cv = document.createElement('canvas');
+    cv.width = W * HEART_RES;
+    cv.height = H * HEART_RES;
+    const ctx = cv.getContext('2d')!;
+    ctx.scale(HEART_RES, HEART_RES);
+    const y = 6;
+    const x0 = W / 2 - (HEARTS * w) / 2 + w / 2;
+    // (the same shapes the hearts always had: two round lobes and a point, an outline under the colour)
+    const heart = (cx: number, dx: number, r: number, t: number, lift: number, tip: number, col: string) => {
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.arc(cx - dx, y - 1, r, 0, Math.PI * 2);
+      ctx.moveTo(cx + dx + r, y - 1);
+      ctx.arc(cx + dx, y - 1, r, 0, Math.PI * 2);
+      ctx.moveTo(cx - t, y - lift);
+      ctx.lineTo(cx + t, y - lift);
+      ctx.lineTo(cx, y + tip);
+      ctx.closePath();
+      ctx.fill();
+    };
     for (let i = 0; i < HEARTS; i++) {
       const cx = x0 + i * w;
-      const full = i < hp;
-      g.fillStyle(0x2b1a12, 0.85).fillCircle(cx - 1.8, y - 1, 3.4).fillCircle(cx + 1.8, y - 1, 3.4).fillTriangle(cx - 5, y, cx + 5, y, cx, y + 5.4);
-      g.fillStyle(full ? 0xff5d7a : 0x6b5a5a, 1).fillCircle(cx - 1.7, y - 1, 2.3).fillCircle(cx + 1.7, y - 1, 2.3).fillTriangle(cx - 3.8, y - 0.4, cx + 3.8, y - 0.4, cx, y + 3.8);
+      heart(cx, 1.8, 3.4, 5, 0, 5.4, 'rgba(43,26,18,0.85)');
+      heart(cx, 1.7, 2.3, 3.8, 0.4, 3.8, i < n ? '#ff5d7a' : '#6b5a5a');
     }
+    addCanvas(this, key, cv);
+    return key;
   }
 
   private jumpFx(x: number, y: number, air: boolean, mine: boolean) {

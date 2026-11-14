@@ -19,6 +19,8 @@ export const HEARTS = 3;
 export const MATCH_SECS = 150;
 export const WIN_KOS = 5;
 export const RESPAWN_SECS = 2.4;
+/** A respawn spot is safe with no bad guy (their shots, falling rocks) nearer than this (px; ~12 tiles). */
+const SAFE_SPAWN = 380;
 
 const GRAVITY = 1600;
 const MAX_FALL = 900;
@@ -238,8 +240,8 @@ export const GROW_MAX_H = 88;
  * GROW_MAX_H, so Big Muscles grows a bit less and can still get under things).
  */
 export const sizeOf = (p: { power: number; hero: string }) => (p.power === POWER.grow ? Math.min(GROW, GROW_MAX_H / (charOf(p.hero).hitH ?? 34)) : 1);
-const boxW = (c: CharacterDef, k = 1) => (c.hitW ?? 22) * k;
-const boxH = (c: CharacterDef, k = 1) => (c.hitH ?? 34) * k;
+export const boxW = (c: CharacterDef, k = 1) => (c.hitW ?? 22) * k;
+export const boxH = (c: CharacterDef, k = 1) => (c.hitH ?? 34) * k;
 
 function approach(v: number, target: number, step: number) {
   return v < target ? Math.min(v + step, target) : Math.max(v - step, target);
@@ -506,6 +508,65 @@ export function landingY(map: ArenaMap, x: number) {
 }
 
 /** The whole match (server side). */
+/**
+ * A hero's shot, just fired (fire: 1 = their weapon, 2 = a bomb): a rocket, or a fireball with the
+ * fire power, or a lobbed bomb. The server makes it; your own phone makes the same one at once, so
+ * your shots go off the moment you press (rather than when the server's word comes back).
+ */
+export function heroShot(p: BPlayer, fire: 1 | 2): Omit<BRocket, 'id'> {
+  const c = charOf(p.hero);
+  const k = sizeOf(p);
+  const s = c.scale * k;
+  const x = p.x + p.facing * 18 * s;
+  const y = p.y - (c.muzzleY ?? 18) * k;
+  const big = p.power === POWER.grow;
+  // a lobbed bomb: bounces about, then a big blast
+  if (fire === 2) return { owner: p.id, kind: 'bomb', x, y, vx: p.facing * 300 + p.vx * 0.35, vy: -430, dir: p.facing, age: 0, speed: 0, radius: 118 * (big ? 1.25 : 1), damage: 2 };
+  // a fireball: lobbed forward, it arcs down and bursts into flames
+  if (p.power === POWER.fire) return { owner: p.id, kind: 'fire', x, y, vx: p.facing * 430 + p.vx * 0.3, vy: -300, dir: p.facing, age: 0, speed: 0, radius: 58, damage: 1 };
+  return { owner: p.id, kind: 'rocket', x, y, vx: p.facing * c.rocketSpeed * 0.45, vy: 0, dir: p.facing, age: 0, speed: c.rocketSpeed, radius: c.blastRadius * (big ? 1.4 : 1), damage: big ? 2 : 1 };
+}
+
+/**
+ * One tick of a shot's flight (rockets speed up and fly straight; bombs arc and bounce; lobbed
+ * things arc). True if it's done — into a wall, landed, out of the arena, or old (what it hits is
+ * the sim's business).
+ */
+export function moveShot(r: Omit<BRocket, 'id'>, map: ArenaMap, ev?: BEvent[]): boolean {
+  r.age += DT;
+  if (r.kind === 'bomb') {
+    r.vy = Math.min(MAX_FALL, r.vy + GRAVITY * DT);
+    const nx = r.x + r.vx * DT;
+    if (map.solidAt(nx + Math.sign(r.vx) * 7, r.y)) r.vx *= -0.5;
+    else r.x = nx;
+    const prevY = r.y;
+    r.y += r.vy * DT;
+    const ty = Math.floor((r.y + 7) / TILE_PX);
+    const tx = Math.floor(r.x / TILE_PX);
+    if (r.vy > 0 && (map.solid(tx, ty) || (map.oneWay(tx, ty) && prevY + 7 <= ty * TILE_PX + 0.5))) {
+      r.y = ty * TILE_PX - 7;
+      if (r.vy > 160) ev?.push({ k: 'bounce', x: r.x, y: r.y });
+      r.vy = r.vy > 160 ? -r.vy * 0.45 : 0;
+      r.vx *= 0.72;
+    }
+    return r.age > 1.6 || r.y > map.heightPx + 60;
+  }
+  if (r.kind === 'fire' || r.kind === 'poo' || r.kind === 'saw') {
+    // lobbed things: an arc, and they burst (or splat) on whatever they land on
+    r.vy = Math.min(MAX_FALL, r.vy + (r.kind === 'saw' ? 900 : 1150) * DT);
+    const prevY = r.y;
+    r.x += r.vx * DT;
+    r.y += r.vy * DT;
+    const tx = Math.floor(r.x / TILE_PX);
+    const ty = Math.floor(r.y / TILE_PX);
+    const landed = r.vy > 0 && map.oneWay(tx, ty) && prevY <= ty * TILE_PX + 0.5;
+    return r.age > 2.4 || r.x < -40 || r.x > map.widthPx + 40 || r.y > map.heightPx + 40 || map.solidAt(r.x, r.y) || landed;
+  }
+  if (r.kind === 'rocket') r.vx += (r.dir * r.speed - r.vx) * Math.min(1, DT * 7);
+  r.x += r.vx * DT;
+  return r.age > ROCKET_LIFE * (r.kind === 'pellet' ? 1.6 : 1) || r.x < -40 || r.x > map.widthPx + 40 || map.solidAt(r.x + r.dir * 6, r.y);
+}
+
 export class BattleSim {
   readonly map: ArenaMap;
   players = new Map<string, BPlayer>();
@@ -559,19 +620,38 @@ export class BattleSim {
     c.age = 0;
   }
 
-  /** Put a hero at a spawn point: the given one, or the one farthest from everyone else. */
+  /**
+   * How close the nearest danger is to a spot (px): bad guys (the big ones' reach counted, ones still
+   * parachuting in too), their shots, and rocks or anvils coming down near it.
+   */
+  private dangerAt(sx: number, sy: number) {
+    let d = Infinity;
+    for (const e of this.enemies) d = Math.min(d, Math.hypot(e.x - sx, e.y - sy) - (e.kind === 'big' ? 110 : e.kind === 'medium' ? 30 : 0));
+    for (const r of this.rockets) if (r.kind === 'pellet' || r.kind === 'poo' || r.kind === 'saw') d = Math.min(d, Math.hypot(r.x - sx, r.y - sy));
+    for (const z of this.hazards) if (z.y < sy + 40) d = Math.min(d, Math.abs(z.x - sx) * 1.5);
+    return d;
+  }
+
+  /**
+   * Put a hero at a spawn point: the given one (the start), or a safe one — no bad guys (or their
+   * shots, or falling rocks) close — as far from everyone else as can be. If nowhere is safe, the
+   * one farthest from trouble.
+   */
   private spawn(p: BPlayer, index?: number) {
     let best = ARENA_SPAWNS[0];
     if (index !== undefined) best = ARENA_STARTS[index % ARENA_STARTS.length];
     else {
-      let bestD = -1;
+      let bestScore = -Infinity;
       for (const s of ARENA_SPAWNS) {
         const sx = (s[0] + 0.5) * TILE_PX;
         const sy = (this.map.h - s[1]) * TILE_PX;
         let d = Infinity;
         for (const o of this.players.values()) if (o !== p && o.respawn <= 0) d = Math.min(d, Math.hypot(o.x - sx, o.y - sy));
-        if (d > bestD) {
-          bestD = d;
+        const danger = this.dangerAt(sx, sy);
+        // (safe spots always beat unsafe ones; among the safe, the farthest from the others)
+        const score = danger >= SAFE_SPAWN ? 1e7 + Math.min(d, 1e6) : danger;
+        if (score > bestScore) {
+          bestScore = score;
           best = s;
         }
       }
@@ -613,7 +693,6 @@ export class BattleSim {
         }
         continue;
       }
-      const c = charOf(p.hero);
       const btn = inputs.get(p.id) ?? 0;
       // holding a chair: FIRE swings it (no rockets)
       const chair = this.chairOf(p.id);
@@ -621,24 +700,10 @@ export class BattleSim {
       const fire = stepMove(p, btn, this.map, ev, () => !chair && this.rocketsOf(p.id) < this.maxShots(p));
       if (swingPress && chair && chair.swing <= 0) this.swingChair(p, chair, ev);
       if (fire) {
-        const k = sizeOf(p);
-        const s = c.scale * k;
-        const rx = p.x + p.facing * 18 * s;
-        const ry = p.y - (c.muzzleY ?? 18) * k;
-        const big = p.power === POWER.grow;
-        if (fire === 2) {
-          // a lobbed bomb: bounces about, then a big blast
-          p.bombs--;
-          this.rockets.push({ id: this.nextRocket++, owner: p.id, kind: 'bomb', x: rx, y: ry, vx: p.facing * 300 + p.vx * 0.35, vy: -430, dir: p.facing, age: 0, speed: 0, radius: 118 * (big ? 1.25 : 1), damage: 2 });
-          ev.push({ k: 'fire', id: p.id, x: rx, y: ry, dir: p.facing, bomb: true });
-        } else if (p.power === POWER.fire) {
-          // a fireball: lobbed forward, it arcs down and bursts into flames
-          this.rockets.push({ id: this.nextRocket++, owner: p.id, kind: 'fire', x: rx, y: ry, vx: p.facing * 430 + p.vx * 0.3, vy: -300, dir: p.facing, age: 0, speed: 0, radius: 58, damage: 1 });
-          ev.push({ k: 'fire', id: p.id, x: rx, y: ry, dir: p.facing });
-        } else {
-          this.rockets.push({ id: this.nextRocket++, owner: p.id, kind: 'rocket', x: rx, y: ry, vx: p.facing * c.rocketSpeed * 0.45, vy: 0, dir: p.facing, age: 0, speed: c.rocketSpeed, radius: c.blastRadius * (big ? 1.4 : 1), damage: big ? 2 : 1 });
-          ev.push({ k: 'fire', id: p.id, x: rx, y: ry, dir: p.facing });
-        }
+        if (fire === 2) p.bombs--;
+        const shot = heroShot(p, fire);
+        this.rockets.push({ id: this.nextRocket++, ...shot });
+        ev.push({ k: 'fire', id: p.id, x: shot.x, y: shot.y, dir: p.facing, ...(fire === 2 ? { bomb: true } : {}) });
       }
     }
     this.stomps(ev);
@@ -650,39 +715,7 @@ export class BattleSim {
     // rockets: speed up, fly straight, blow up on walls, heroes or old age;
     // bombs: arc and bounce, and go off when the fuse runs out (or they hit someone)
     for (const r of this.rockets) {
-      r.age += DT;
-      let boom = false;
-      if (r.kind === 'bomb') {
-        r.vy = Math.min(MAX_FALL, r.vy + GRAVITY * DT);
-        const nx = r.x + r.vx * DT;
-        if (this.map.solidAt(nx + Math.sign(r.vx) * 7, r.y)) r.vx *= -0.5;
-        else r.x = nx;
-        const prevY = r.y;
-        r.y += r.vy * DT;
-        const ty = Math.floor((r.y + 7) / TILE_PX);
-        const tx = Math.floor(r.x / TILE_PX);
-        if (r.vy > 0 && (this.map.solid(tx, ty) || (this.map.oneWay(tx, ty) && prevY + 7 <= ty * TILE_PX + 0.5))) {
-          r.y = ty * TILE_PX - 7;
-          if (r.vy > 160) ev.push({ k: 'bounce', x: r.x, y: r.y });
-          r.vy = r.vy > 160 ? -r.vy * 0.45 : 0;
-          r.vx *= 0.72;
-        }
-        boom = r.age > 1.6 || r.y > this.map.heightPx + 60;
-      } else if (r.kind === 'fire' || r.kind === 'poo' || r.kind === 'saw') {
-        // lobbed things: an arc, and they burst (or splat) on whatever they land on
-        r.vy = Math.min(MAX_FALL, r.vy + (r.kind === 'saw' ? 900 : 1150) * DT);
-        const prevY = r.y;
-        r.x += r.vx * DT;
-        r.y += r.vy * DT;
-        const tx = Math.floor(r.x / TILE_PX);
-        const ty = Math.floor(r.y / TILE_PX);
-        const landed = r.vy > 0 && this.map.oneWay(tx, ty) && prevY <= ty * TILE_PX + 0.5;
-        boom = r.age > 2.4 || r.x < -40 || r.x > this.map.widthPx + 40 || r.y > this.map.heightPx + 40 || this.map.solidAt(r.x, r.y) || landed;
-      } else {
-        if (r.kind === 'rocket') r.vx += (r.dir * r.speed - r.vx) * Math.min(1, DT * 7);
-        r.x += r.vx * DT;
-        boom = r.age > ROCKET_LIFE * (r.kind === 'pellet' ? 1.6 : 1) || r.x < -40 || r.x > this.map.widthPx + 40 || this.map.solidAt(r.x + r.dir * 6, r.y);
-      }
+      let boom = moveShot(r, this.map, ev);
       const enemyShot = r.kind === 'pellet' || r.kind === 'poo' || r.kind === 'saw';
       if (!boom && !enemyShot)
         for (const e of this.enemies) {
