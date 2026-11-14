@@ -115,7 +115,7 @@ html:has(body.booting) body { background: #5fc4ff; }
   font-size: clamp(18px, 3.4vmin, 24px);
   letter-spacing: 0.03em;
   color: var(--ink);
-  background: var(--gold);
+  background: var(--gold-btn);
   border: 3px solid var(--ink);
   border-radius: 16px;
   padding: 10px 26px 9px;
@@ -1601,7 +1601,7 @@ html.rotating body {
 .boss-panel { align-items: center; text-align: center; min-width: min(100%, 380px); }
 .boss-panel h2 { margin: 0; }
 .boss-list { display: grid; gap: 16px; width: 100%; margin: 8px 0 12px; }
-.boss-btn { display: grid; gap: 2px; justify-items: center; background: var(--gold-btn); }
+.boss-btn { display: grid; gap: 2px; justify-items: center; }
 .boss-btn small { font: 800 12px/1.2 var(--body); letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.75; }
 @media (max-height: 500px) {
   /* (phones: two by two, slimmer, so all four and Back fit without scrolling) */
@@ -2197,7 +2197,7 @@ kbd {
   box-shadow: 0 3px 0 var(--ink);
   cursor: pointer;
 }
-.bl-hero.picked { background: var(--gold); }
+.bl-hero.picked { background: var(--gold-btn); }
 .bl-foot { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .bl-status {
   margin: 0;
@@ -2513,7 +2513,7 @@ kbd {
   height: 34px;
   border: 2.5px solid var(--ink);
   border-radius: 10px;
-  background: var(--gold);
+  background: var(--gold-btn);
   font-size: 18px;
   box-shadow: 0 2px 0 var(--ink);
   cursor: pointer;
