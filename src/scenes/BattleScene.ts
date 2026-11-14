@@ -230,6 +230,15 @@ export class BattleScene extends Phaser.Scene {
    * the others jittered.) When it's further off than that, it just jumps.
    */
   private otherClock: { tick: number; at: number } | null = null;
+  /**
+   * On a really bad network (snapshots often coming 80+ ms late) the others are drawn a little further
+   * behind (up to 3 ticks more), so they don't keep freezing while the next snapshot's still on its
+   * way; back to normal, slowly, once it calms down. On a normal network it stays at 0.
+   */
+  private extraDelay = 0;
+  /** How late recent snapshots came (ticks, against the earliest arrivals lately: `lateBase`, ms). */
+  private lateness: number[] = [];
+  private lateBase: number | null = null;
   private me: BPlayer | null = null;
   private pending: [number, number][] = [];
   private seq = 0;
@@ -279,6 +288,9 @@ export class BattleScene extends Phaser.Scene {
     this.makePrizeTextures();
     this.snaps = [];
     this.otherClock = null;
+    this.extraDelay = 0;
+    this.lateness = [];
+    this.lateBase = null;
     this.me = null;
     this.pending = [];
     this.seq = 0;
@@ -707,6 +719,7 @@ export class BattleScene extends Phaser.Scene {
       for (const s of fresh) {
         this.playEvents(s.events);
         this.snaps.push(s);
+        this.noteLateness(s);
       }
       if (this.snaps.length > 40) this.snaps.splice(0, this.snaps.length - 40);
       if (!this.spectate) {
@@ -842,6 +855,20 @@ export class BattleScene extends Phaser.Scene {
     this.me = me;
   }
 
+  /** A snapshot came in: how late was it (see extraDelay)? */
+  private noteLateness(s: Snapshot) {
+    // (when it would have come if every one came as early as the earliest lately; that line creeps
+    // up slowly, so the two clocks drifting apart doesn't count as lateness)
+    const ideal = s.at - s.tick * DT * 1000;
+    this.lateBase = this.lateBase === null ? ideal : Math.min(this.lateBase + 0.02, ideal);
+    this.lateness.push((ideal - this.lateBase) / (DT * 1000));
+    if (this.lateness.length > 60) this.lateness.shift();
+    // (the worst but a few of the last 2 seconds' worth, past what the usual 3 ticks already cover)
+    const sorted = [...this.lateness].sort((a, b) => a - b);
+    const want = Phaser.Math.Clamp(sorted[Math.floor(sorted.length * 0.95)] - 2.5, 0, 3);
+    this.extraDelay += (want - this.extraDelay) * (want > this.extraDelay ? 0.3 : 0.02);
+  }
+
   /** Where everyone else is right now: a smooth blend between two snapshots, a moment ago. */
   private othersAt(): {
     players: Map<string, SnapPlayer>;
@@ -856,7 +883,7 @@ export class BattleScene extends Phaser.Scene {
     if (!n) return null;
     const last = this.snaps[n - 1];
     const now = performance.now();
-    const want = last.tick + ((now - last.at) / 1000) * (1 / DT) - INTERP_TICKS;
+    const want = last.tick + ((now - last.at) / 1000) * (1 / DT) - INTERP_TICKS - this.extraDelay;
     const oc = this.otherClock;
     let clock = want;
     if (oc && Math.abs(want - oc.tick) <= INTERP_TICKS) {
