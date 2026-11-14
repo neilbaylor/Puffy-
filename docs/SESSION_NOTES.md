@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.293)
+## Where things stand (v0.294)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -192,6 +192,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Level 4 (Plop Invasion · Part 2) planning: mostly climbing up (~60%), 2 parachute drops (~25 s each, Plops parachuting at different speeds: slow big patched dome / middling / fast streamer; shoot them: POP), a baseball game in the middle, boss later. Concept art in src/gfx/skydive.ts (drawCanopy, drawHeroChute(ch, pose, 'pack'|'burst'|'opening'|'open'|'steer'|'land', lean), drawPlopChute(kind, 'slow'|'mid'|'fast'|'popped')), sheets in sketches/level4/ (sheet.ts renders them via esbuild + ../l4art/shot.cjs). Engine work needed: vertical terrain chunking (4096 px), climbing camera, vertical background, parachute player state, vertical fly-over.
 - v0.267: host captions 35 ms/char, lines 3400/2050/1850/2250 ms, lead-in 1250+500 (the user found 26 ms rushed, 38 slow). kingFlip lands with splash(34, 560) + spray burst + foam ring, then sfx.laugh + 'HA HA HA!' bubble.
 - v0.266: Fishing opening: DOCK_X -2700 (WORLD_L -3000); host → boat is a 4.4 s tweened swoop (arc up, zoom out 40% mid-way; Skip speeds it ×6), then King Bob 'You'll NEVER beat me at fishing!' + kingFlip() (out of the bowl in a roll and back, splash). Test: sketches/fishing/tflip.cjs.
+- v0.294: battleUi showResults: Leave gets .br-wait (opacity 0.25, pointer-events none) for RESULTS_GUARD_MS 1500 — user kept tapping it while still mashing shoot as the battle ended. Test sketches/battle/tresultguard.cjs.
 - v0.293: HUD portrait (owner OK'd): FaceLife calm (in-game badge only) lookY = -0.9 + k·0.25, k∈0..6 (was rand(-0.9,0.6)); draw.ts portraitCache 48 → 96. Fresh redraws in Part 1's 2nd minute 59 → 12. sketches/thudface.cjs (WARM=ms env to skip the first minute).
 - SMOOTHNESS G2 (no commits): first-time events (enemies, weapons, drops, mini-games, dive, Kai, tennis, bosses) clean apart from popup text/clouds. Biggest recurring gameplay hitch left: HUD hero portrait redraw on each new glance (random lookY −0.9…0.6 + pose flip every 0.6 s → cache miss; ~1 ms draw at 4× + 2.5–3.8 ms high-quality downscale to 72 px; ≈18–40 ms on a phone, ~every 2–3 s). Option (needs owner OK — tiny visible change + ~1.6 MB): quantise HUD glance heights to ~7 steps and grow the portrait cache to ~80. One-offs left: Hoops ball-in-net + lights 22 ms, Wrestle first explosion 13 ms.
 - v0.292: SMOOTHNESS G1. Background clouds: c.next advances on its own beat (c.next + CLOUD_EVERY·k) instead of t + CLOUD_EVERY — all clouds had been repainting in the same frame every 1.5 s (4.4–5.7 ms desktop ≈ 20 ms phone, 19–26×/40 s); now 0–1. GameScene.makeBigRock() at level start when a chase is still ahead (was drawn the frame the chase began). Not changed: popup texts (~0.8 ms each desktop; text rasterising), checkpoint restarts (behind the white fade), Hoops/Wrestle jumbotron repaints (rejected round 2).
