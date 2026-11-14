@@ -786,18 +786,40 @@ export function dropBaddiesExcept(scene: Phaser.Scene, level: number | 'battle')
 const bossArt = new Map<string, Set<string>>();
 const BOSS_SCENES = ['Hoops', 'Wrestle', 'Fishing'];
 
+/** The pictures the objects in `list` (and in their containers) are showing, added to `into`. */
+function shownIn(list: Phaser.GameObjects.GameObject[], into: Set<string>) {
+  for (const o of list) {
+    const t = (o as { texture?: Phaser.Textures.Texture }).texture;
+    if (t) into.add(t.key);
+    const kids = (o as { list?: Phaser.GameObjects.GameObject[] }).list;
+    if (kids) shownIn(kids, into);
+  }
+}
+
 /** Note what each boss scene makes (call once the game's scenes exist). */
 export function trackBossArt(game: Phaser.Game) {
   for (const key of BOSS_SCENES) {
     const sc = game.scene.getScene(key);
     let before: Set<string> | null = null;
-    sc.events.on(Phaser.Scenes.Events.START, () => (before = new Set(game.textures.getTextureKeys())));
+    // (and what it shows, looked at every couple of seconds: a picture another boss made that this
+    // one uses too — Hoops' two arenas share the King, the Plops, the jumbotron — is this one's as well)
+    let used = new Set<string>();
+    let frame = 0;
+    sc.events.on(Phaser.Scenes.Events.START, () => {
+      before = new Set(game.textures.getTextureKeys());
+      used = new Set();
+      frame = 0;
+    });
+    sc.events.on(Phaser.Scenes.Events.UPDATE, () => {
+      if (frame++ % 120 === 1) shownIn(sc.children.list, used);
+    });
     sc.events.on(Phaser.Scenes.Events.SHUTDOWN, () => {
       // (only after a real start: stopping a scene that isn't running says shutdown too)
       if (!before) return;
       const id = `${key}:${(sc.sys.settings.data as { level?: number } | undefined)?.level}`;
       const own = bossArt.get(id) ?? new Set<string>();
       for (const k of game.textures.getTextureKeys()) if (!before.has(k)) own.add(k);
+      for (const [other, keys] of bossArt) if (other !== id) for (const k of keys) if (used.has(k)) own.add(k);
       bossArt.set(id, own);
       before = null;
     });
@@ -812,16 +834,8 @@ export function trackBossArt(game: Phaser.Game) {
 export function freeBossArtExcept(game: Phaser.Game, keep?: string) {
   const S = Phaser.Scenes;
   const up = (sc: Phaser.Scene) => sc.sys.settings.status >= S.START && sc.sys.settings.status <= S.SLEEPING;
-  const inUse = new Set<string>();
-  const walk = (list: Phaser.GameObjects.GameObject[]) => {
-    for (const o of list) {
-      const t = (o as { texture?: Phaser.Textures.Texture }).texture;
-      if (t) inUse.add(t.key);
-      const kids = (o as { list?: Phaser.GameObjects.GameObject[] }).list;
-      if (kids) walk(kids);
-    }
-  };
-  for (const sc of game.scene.getScenes(false)) if (up(sc)) walk(sc.children.list);
+  const inUse = new Set<string>(keep ? bossArt.get(keep) : undefined);
+  for (const sc of game.scene.getScenes(false)) if (up(sc)) shownIn(sc.children.list, inUse);
   for (const [id, keys] of bossArt) {
     if (id === keep || up(game.scene.getScene(id.split(':')[0]))) continue;
     for (const k of keys) if (!inUse.has(k) && !/^bg-|^char-[a-z]+(-face|-sea|-sea-face)?$/.test(k) && game.textures.exists(k)) game.textures.remove(k);
