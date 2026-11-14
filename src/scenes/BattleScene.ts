@@ -687,6 +687,9 @@ export class BattleScene extends Phaser.Scene {
       const c = characterById(p.hero);
       const col = SLOT_COLORS[p.slot % SLOT_COLORS.length];
       const sprite = this.add.sprite(p.x, p.y, this.textureFor(p.hero, p.slot, wear), 'idle0').setOrigin(0.5, 1).setScale(c.scale / ART_RES).setDepth(DEPTH.players);
+      // (and their faces now too, while the curtain's still up: drawn the first time they blinked, it
+      // was a stutter in the middle of the battle)
+      this.textureFor(p.hero, p.slot, wear, true);
       const tag = this.add
         .text(p.x, p.y, this.names.get(p.id) ?? '', { fontFamily: 'Nunito, sans-serif', fontSize: '13px', fontStyle: '900', color: '#ffffff', stroke: col, strokeThickness: 4 })
         .setOrigin(0.5, 1)
