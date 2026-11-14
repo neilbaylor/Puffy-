@@ -175,7 +175,11 @@ class FaceLife {
     }
     // glance somewhere, hold it, look back (often with a blink)
     const looks = [-1, -0.75, -0.4, 0.4, 0.9];
-    this.set({ lookX: looks[Math.floor(Math.random() * looks.length)], lookY: rand(-0.9, 0.6) });
+    // (the in-game badge's glances stop at one of 7 heights, not anywhere: each new face is a full
+    // redraw of the portrait — a hitch every few seconds on a phone — and with set heights almost
+    // every face has been drawn before after the first minute; the start screen's stay free)
+    const lookY = this.calm ? -0.9 + Math.floor(Math.random() * 7) * 0.25 : rand(-0.9, 0.6);
+    this.set({ lookX: looks[Math.floor(Math.random() * looks.length)], lookY });
     const hold = this.calm ? rand(600, 1300) : rand(700, 1800);
     this.after(hold, () => this.set({ lookX: 0, lookY: 0, blink: Math.random() < 0.3 }));
     this.after(hold + 120, () => this.set({ blink: false }));

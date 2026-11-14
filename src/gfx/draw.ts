@@ -686,7 +686,9 @@ export function drawPortrait(target: HTMLCanvasElement, ch: CharacterDef, pose: 
   if (!done) {
     done = canvas(target.width, target.height).c;
     paintPortrait(done, ch, pose, f, boxPose, wear, layer);
-    if (portraitCache.size >= 48) portraitCache.delete(portraitCache.keys().next().value!);
+    // (room for every face the in-game badge makes — its glances stop at set heights — so it's
+    // never redrawn mid-level once seen: ~96 small canvases)
+    if (portraitCache.size >= 96) portraitCache.delete(portraitCache.keys().next().value!);
     portraitCache.set(key, done);
   }
   const ctx = target.getContext('2d')!;
