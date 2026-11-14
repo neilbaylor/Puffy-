@@ -29,6 +29,9 @@ import { mixTint, themeClock, themeMix } from '../world/theme';
 const INTERP_TICKS = 3;
 /** The hearts pictures' resolution (they're small, and the camera zooms in). */
 const HEART_RES = 3;
+/** The off-screen pointer's picture: its box round the badge's centre (world units), and resolution. */
+const ARROW_BOX = { x: 15, y: 15, w: 43, h: 30 };
+const ARROW_RES = 3;
 
 type PrizeView = {
   img: Phaser.GameObjects.Image;
@@ -230,6 +233,15 @@ export class BattleScene extends Phaser.Scene {
    * the others jittered.) When it's further off than that, it just jumps.
    */
   private otherClock: { tick: number; at: number } | null = null;
+  /**
+   * On a really bad network (snapshots often coming 80+ ms late) the others are drawn a little further
+   * behind (up to 3 ticks more), so they don't keep freezing while the next snapshot's still on its
+   * way; back to normal, slowly, once it calms down. On a normal network it stays at 0.
+   */
+  private extraDelay = 0;
+  /** How late recent snapshots came (ticks, against the earliest arrivals lately: `lateBase`, ms). */
+  private lateness: number[] = [];
+  private lateBase: number | null = null;
   private me: BPlayer | null = null;
   private pending: [number, number][] = [];
   private seq = 0;
@@ -279,6 +291,9 @@ export class BattleScene extends Phaser.Scene {
     this.makePrizeTextures();
     this.snaps = [];
     this.otherClock = null;
+    this.extraDelay = 0;
+    this.lateness = [];
+    this.lateBase = null;
     this.me = null;
     this.pending = [];
     this.seq = 0;
@@ -532,14 +547,8 @@ export class BattleScene extends Phaser.Scene {
 
   /** The off-screen pointer for another player: a badge in their colour with a point, and their name. */
   private makeArrow(name: string, col: string) {
-    const c = Phaser.Display.Color.HexStringToColor(col).color;
-    const g = this.add.graphics();
     // (drawn pointing right; the whole pointer turns to face them)
-    // a white edge round a dark outline round their colour, so it stands out on any background
-    g.fillStyle(0xffffff, 1).fillCircle(0, 0, 14).fillTriangle(9, -12.5, 9, 12.5, 26.5, 0);
-    g.fillStyle(0x3a2418, 1).fillCircle(0, 0, 12).fillTriangle(8.5, -10, 8.5, 10, 23, 0);
-    g.fillStyle(c, 1).fillCircle(0, 0, 9.5).fillTriangle(7.5, -7.5, 7.5, 7.5, 19, 0);
-    g.fillStyle(0xffffff, 0.55).fillCircle(-3, -3.5, 3.2);
+    const g = this.add.image(0, 0, this.arrowTex(col)).setOrigin(ARROW_BOX.x / ARROW_BOX.w, ARROW_BOX.y / ARROW_BOX.h).setScale(1 / ARROW_RES);
     const label = this.add
       .text(0, 0, name, { fontFamily: 'Nunito, sans-serif', fontSize: '15px', fontStyle: '900', color: col, stroke: '#ffffff', strokeThickness: 5 })
       .setOrigin(0.5, 0.5)
@@ -575,7 +584,7 @@ export class BattleScene extends Phaser.Scene {
       const x = Phaser.Math.Clamp(tx, wv.x + mx, wv.right - mx);
       const y = Phaser.Math.Clamp(ty, wv.y + 64 * px, wv.bottom - 70 * px);
       const ang = Math.atan2(ty - y, tx - x);
-      const [g, label] = v.arrow.list as [Phaser.GameObjects.Graphics, Phaser.GameObjects.Text];
+      const [g, label] = v.arrow.list as [Phaser.GameObjects.Image, Phaser.GameObjects.Text];
       g.setRotation(ang);
       // the name sits on the inside, away from the point
       label.setText(this.names.get(id) ?? '');
@@ -707,6 +716,7 @@ export class BattleScene extends Phaser.Scene {
       for (const s of fresh) {
         this.playEvents(s.events);
         this.snaps.push(s);
+        this.noteLateness(s);
       }
       if (this.snaps.length > 40) this.snaps.splice(0, this.snaps.length - 40);
       if (!this.spectate) {
@@ -842,6 +852,20 @@ export class BattleScene extends Phaser.Scene {
     this.me = me;
   }
 
+  /** A snapshot came in: how late was it (see extraDelay)? */
+  private noteLateness(s: Snapshot) {
+    // (when it would have come if every one came as early as the earliest lately; that line creeps
+    // up slowly, so the two clocks drifting apart doesn't count as lateness)
+    const ideal = s.at - s.tick * DT * 1000;
+    this.lateBase = this.lateBase === null ? ideal : Math.min(this.lateBase + 0.02, ideal);
+    this.lateness.push((ideal - this.lateBase) / (DT * 1000));
+    if (this.lateness.length > 60) this.lateness.shift();
+    // (the worst but a few of the last 2 seconds' worth, past what the usual 3 ticks already cover)
+    const sorted = [...this.lateness].sort((a, b) => a - b);
+    const want = Phaser.Math.Clamp(sorted[Math.floor(sorted.length * 0.95)] - 2.5, 0, 3);
+    this.extraDelay += (want - this.extraDelay) * (want > this.extraDelay ? 0.3 : 0.02);
+  }
+
   /** Where everyone else is right now: a smooth blend between two snapshots, a moment ago. */
   private othersAt(): {
     players: Map<string, SnapPlayer>;
@@ -856,7 +880,7 @@ export class BattleScene extends Phaser.Scene {
     if (!n) return null;
     const last = this.snaps[n - 1];
     const now = performance.now();
-    const want = last.tick + ((now - last.at) / 1000) * (1 / DT) - INTERP_TICKS;
+    const want = last.tick + ((now - last.at) / 1000) * (1 / DT) - INTERP_TICKS - this.extraDelay;
     const oc = this.otherClock;
     let clock = want;
     if (oc && Math.abs(want - oc.tick) <= INTERP_TICKS) {
@@ -1393,6 +1417,45 @@ export class BattleScene extends Phaser.Scene {
         v.shadow.destroy();
         this.hazardViews.delete(id);
       }
+  }
+
+  /**
+   * The off-screen pointer's badge in a player's colour, as a picture (made once per colour, at
+   * ARROW_RES): drawn as shapes, each one showing was cut into triangles all over again every frame.
+   */
+  private arrowTex(col: string) {
+    const key = `barrow-${col}`;
+    if (this.textures.exists(key)) return key;
+    const B = ARROW_BOX;
+    const cv = document.createElement('canvas');
+    cv.width = B.w * ARROW_RES;
+    cv.height = B.h * ARROW_RES;
+    const ctx = cv.getContext('2d')!;
+    ctx.scale(ARROW_RES, ARROW_RES);
+    ctx.translate(B.x, B.y);
+    const shape = (fill: string, r: number, tri: [number, number, number] | null) => {
+      ctx.fillStyle = fill;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fill();
+      if (!tri) return;
+      const [x0, h, x1] = tri;
+      ctx.beginPath();
+      ctx.moveTo(x0, -h);
+      ctx.lineTo(x0, h);
+      ctx.lineTo(x1, 0);
+      ctx.closePath();
+      ctx.fill();
+    };
+    // (the same shapes as always: a white edge round a dark outline round their colour, so it stands
+    // out on any background, and a little shine)
+    shape('#ffffff', 14, [9, 12.5, 26.5]);
+    shape('#3a2418', 12, [8.5, 10, 23]);
+    shape(col, 9.5, [7.5, 7.5, 19]);
+    ctx.translate(-3, -3.5);
+    shape('rgba(255,255,255,0.55)', 3.2, null);
+    addCanvas(this, key, cv);
+    return key;
   }
 
   /** The picture of a hero's hearts with `hp` of them full (made once per count, at HEART_RES). */
