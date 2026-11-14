@@ -8,6 +8,10 @@ import type { GameScene } from '../../scenes/GameScene';
 import type { Player } from '../Player';
 import { Weapon, type WeaponKind } from './Weapons';
 import { TILE } from '../../config';
+import { hexCss, roundRectPath, smallTex } from '../../gfx/smallTex';
+
+/** The pips pictures' resolution. */
+const PIP_RES = 3;
 
 export type DeathKind = 'stomp' | 'blast' | 'fall';
 
@@ -429,7 +433,7 @@ export class Giant extends Enemy {
   private chaseT = 0;
   private givenUp = false;
   private home = 0;
-  private pips: Phaser.GameObjects.Graphics;
+  private pips: Phaser.GameObjects.Image;
   private readonly maxHp = 5;
 
   constructor(gs: GameScene, x: number, y: number, texture = 'giant') {
@@ -439,7 +443,7 @@ export class Giant extends Enemy {
     this.stompable = false;
     this.bouncyTop = true;
     this.setDepth(DEPTH.enemies + 1);
-    this.pips = gs.add.graphics().setDepth(DEPTH.text);
+    this.pips = gs.add.image(0, 0, this.pipsTex()).setOrigin(0, 0).setScale(1 / PIP_RES).setDepth(DEPTH.text);
   }
 
   wake() {
@@ -629,16 +633,24 @@ export class Giant extends Enemy {
     return f === 'w0' || f === 'w1' ? `${f}c` : null;
   }
 
-  private drawPips() {
-    const g = this.pips;
-    g.clear();
+  /** His health pips: a picture for each count (rebuilding them as shapes every frame was a steady cost). */
+  private pipsTex() {
+    const hp = Math.max(0, Math.min(this.maxHp, this.hp));
     const w = 12;
-    const x0 = this.x - (this.maxHp * w) / 2;
-    const y = this.body.top - 16;
-    for (let i = 0; i < this.maxHp; i++) {
-      g.fillStyle(0x2a1e2e, 1).fillRoundedRect(x0 + i * w, y, w - 3, 7, 2);
-      g.fillStyle(i < this.hp ? 0xff4d6d : 0x6b5a70, 1).fillRoundedRect(x0 + i * w + 1, y + 1, w - 5, 5, 1.5);
-    }
+    return smallTex(this.gs, `pips${this.maxHp}_${hp}`, this.maxHp * w, 7, PIP_RES, (ctx) => {
+      for (let i = 0; i < this.maxHp; i++) {
+        ctx.fillStyle = hexCss(0x2a1e2e);
+        roundRectPath(ctx, i * w, 0, w - 3, 7, 2);
+        ctx.fill();
+        ctx.fillStyle = hexCss(i < hp ? 0xff4d6d : 0x6b5a70);
+        roundRectPath(ctx, i * w + 1, 1, w - 5, 5, 1.5);
+        ctx.fill();
+      }
+    });
+  }
+
+  private drawPips() {
+    this.pips.setTexture(this.pipsTex()).setPosition(this.x - (this.maxHp * 12) / 2, this.body.top - 16);
   }
 
   damage(n: number, how: DeathKind, by: Player | null) {

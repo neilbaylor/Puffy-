@@ -35,6 +35,11 @@ import { Fx } from '../world/Fx';
 import { stingerCover } from '../ui/stinger';
 import { mixTint, themeClock, themeMix, themesFor } from '../world/theme';
 import { LevelView } from '../world/LevelView';
+import { roundRectPath, smallTex } from '../gfx/smallTex';
+
+/** A puddle bubble's picture: radius (world px) and resolution. */
+const BUB_R = 6;
+const BUB_RES = 4;
 
 export interface GameData {
   session: Session;
@@ -188,7 +193,7 @@ export class GameScene extends Phaser.Scene {
   private drops: { img: Phaser.GameObjects.Image; vy: number; grow: number }[] = [];
   private dripT = 0;
   /** Puddles of poo (quicksand): their extent, surface, and the picture. */
-  private puddles: { x0: number; x1: number; y: number; g: Phaser.GameObjects.Graphics; t: number }[] = [];
+  private puddles: { x0: number; x1: number; y: number; g: Phaser.GameObjects.Graphics; t: number; bubbles?: Phaser.GameObjects.Image[]; streaks?: Phaser.GameObjects.Image[] }[] = [];
   /** Boulder chases: where they start and end, how fast; and the rock while it's rolling. */
   private chases: { x0: number; x1: number; speed: number; started: boolean }[] = [];
   private rock: null | {
@@ -1509,7 +1514,12 @@ export class GameScene extends Phaser.Scene {
       pd.t += dt;
       const g = pd.g;
       g.clear();
-      if (pd.x1 < left || pd.x0 > right) continue;
+      if (pd.x1 < left || pd.x0 > right) {
+        for (const im of pd.bubbles ?? []) im.setVisible(false);
+        for (const im of pd.streaks ?? []) im.setVisible(false);
+        continue;
+      }
+      this.puddleBits(pd);
       const y = pd.y;
       // the body of the puddle, all the way down (whatever sinks in it, disappears)
       const pts: Phaser.Types.Math.Vector2Like[] = [];
@@ -1549,28 +1559,52 @@ export class GameScene extends Phaser.Scene {
         }
         g.strokePath();
       }
-      // glossy streaks just under the surface, drifting
-      for (let i = 0; i < Math.max(1, Math.round(w / 90)); i++) {
+      // glossy streaks just under the surface, drifting (pictures: shapes were cut into triangles every frame)
+      pd.streaks!.forEach((im, i) => {
         const lx = pd.x0 + (((i * 0.43 + pd.t * 0.03) % 1) * (w - 30)) + 6;
-        g.fillStyle(0xffffff, 0.16).fillRoundedRect(lx, y + 6 + (i % 2) * 3, 18 + (i % 3) * 6, 2.5, 1.2);
-      }
+        im.setPosition(lx, y + 6 + (i % 2) * 3).setDisplaySize(18 + (i % 3) * 6, 2.5).setVisible(true);
+      });
       g.lineStyle(2, 0x3a2418, 1).strokePoints(pts);
       g.lineStyle(1.5, hexOf(POO.light), 0.9);
       g.beginPath();
       pts.forEach((q, i) => (i ? g.lineTo(q.x, q.y + 3) : g.moveTo(q.x, q.y + 3)));
       g.strokePath();
       // bubbles swelling and popping on the surface
-      for (let i = 0; i < 4; i++) {
+      pd.bubbles!.forEach((im, i) => {
         const ph = (pd.t * 0.6 + i * 0.27) % 1;
         const bx = pd.x0 + ((i * 0.31 + Math.floor(pd.t * 0.6 + i * 0.27) * 0.53) % 1) * (pd.x1 - pd.x0);
         const br = 1.5 + ph * 4;
-        g.fillStyle(hexOf(POO.light), 0.9 * (1 - ph * ph)).fillCircle(bx, y + 2 - br * 0.4, br);
-        g.lineStyle(1, 0x3a2418, 0.7 * (1 - ph * ph)).strokeCircle(bx, y + 2 - br * 0.4, br);
-      }
+        im.setPosition(bx, y + 2 - br * 0.4).setScale(br / BUB_R / BUB_RES).setAlpha(1 - ph * ph).setVisible(true);
+      });
       // a ring rippling round anyone wading in it
       for (const p of this.players)
         if (p.goo > 0) g.lineStyle(1.5, hexOf(POO.light), 0.7).strokeEllipse(p.x, y + 2, 26 + Math.sin(pd.t * 6) * 4, 5);
     }
+  }
+
+  /** A puddle's bubbles and gloss streaks as pictures (made the first time it's on screen). */
+  private puddleBits(pd: { x0: number; x1: number; g: Phaser.GameObjects.Graphics; bubbles?: Phaser.GameObjects.Image[]; streaks?: Phaser.GameObjects.Image[] }) {
+    if (pd.bubbles) return;
+    const bub = smallTex(this, 'pd-bubble', BUB_R * 2 + 2, BUB_R * 2 + 2, BUB_RES, (ctx) => {
+      ctx.beginPath();
+      ctx.arc(BUB_R + 1, BUB_R + 1, BUB_R, 0, Math.PI * 2);
+      ctx.fillStyle = POO.light;
+      ctx.globalAlpha = 0.9;
+      ctx.fill();
+      ctx.globalAlpha = 0.7;
+      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = '#3a2418';
+      ctx.stroke();
+    });
+    const streak = smallTex(this, 'pd-streak', 30, 2.5, 4, (ctx) => {
+      ctx.fillStyle = 'rgba(255,255,255,0.16)';
+      roundRectPath(ctx, 0, 0, 30, 2.5, 1.2);
+      ctx.fill();
+    });
+    const d = pd.g.depth;
+    pd.bubbles = [0, 1, 2, 3].map(() => this.add.image(0, 0, bub).setDepth(d + 0.001).setVisible(false));
+    const n = Math.max(1, Math.round((pd.x1 - pd.x0 + 4) / 90));
+    pd.streaks = Array.from({ length: n }, () => this.add.image(0, 0, streak).setOrigin(0, 0).setDepth(d + 0.001).setVisible(false));
   }
 
   /** Now and then a drop of poo swells at an edge, stretches, falls and splats. */

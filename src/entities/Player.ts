@@ -7,6 +7,7 @@ import { wardrobe } from '../core/wardrobe';
 import { FaceClock } from '../gfx/face';
 import { emptyInput, type InputSource, type InputState } from '../input/types';
 import type { Fx } from '../world/Fx';
+import { hexCss, roundRectPath, smallTex } from '../gfx/smallTex';
 
 /** What a hero needs from the scene it's in (a level, or Queen Plop's ring). */
 export interface PlayerHost extends Phaser.Scene {
@@ -24,6 +25,8 @@ const INVULN = 1.8;
 const RESPAWN_INVULN = 1.5;
 /** After running the meter dry you have to let it refill this much before running again. */
 const EXHAUSTED_UNTIL = 0.3;
+/** The stamina meter pictures' resolution. */
+const METER_RES = 4;
 const RECOIL_TIME = 0.16;
 /** How fast you sink in a puddle of poo (px/s, for a hero of the usual height). */
 const GOO_SINK = 22;
@@ -65,7 +68,7 @@ export class Player {
   readonly hitbox: Phaser.Physics.Arcade.Image;
   readonly body: Phaser.Physics.Arcade.Body;
   readonly view: Phaser.GameObjects.Sprite;
-  private meter: Phaser.GameObjects.Graphics;
+  private meter: StaminaMeter;
 
   state: PlayerState = 'alive';
   facing: 1 | -1 = 1;
@@ -150,7 +153,7 @@ export class Player {
 
     this.key = `char-${char.id}`;
     this.view = scene.add.sprite(x, y, `char-${char.id}`, 'idle0').setOrigin(0.5, 1).setScale(this.S).setDepth(DEPTH.players);
-    this.meter = scene.add.graphics().setDepth(DEPTH.text);
+    this.meter = new StaminaMeter(scene);
   }
 
   get x() {
@@ -558,46 +561,18 @@ export class Player {
     this.drawMeter();
   }
 
-  /** Small stamina ring over the hero's head, only while it isn't full. */
   /** Stamina gauge floating over the hero's head: a little glossy pill with a lightning bolt. */
   private meterAlpha = 0;
   private drawMeter() {
-    const g = this.meter;
-    g.clear();
     const show = this.state === 'alive' && this.stamina < 0.999;
     this.meterAlpha += ((show ? 1 : 0) - this.meterAlpha) * 0.18;
-    if (this.meterAlpha < 0.02) return;
-    g.setAlpha(this.meterAlpha);
-    const w = 30;
-    const h = 7;
-    const x0 = Math.round(this.view.x - w / 2 + 4);
-    const y = Math.round(this.body.top - 30);
+    if (this.meterAlpha < 0.02) {
+      this.meter.hide();
+      return;
+    }
     const flash = Math.floor(this.scene.time.now / 120) % 2;
     const col = this.exhausted ? (flash ? 0xff5a4f : 0xffa89c) : this.stamina < 0.35 ? 0xffb627 : this.running ? 0x7cf0ff : 0x6fe07a;
-    // case
-    g.fillStyle(0x1b1424, 0.8).fillRoundedRect(x0 - 2, y - 2, w + 4, h + 4, (h + 4) / 2);
-    g.fillStyle(0xffffff, 0.16).fillRoundedRect(x0, y, w, h, h / 2);
-    // fill + gloss
-    const fw = Math.max(h, w * this.stamina);
-    g.fillStyle(col, 1).fillRoundedRect(x0, y, fw, h, h / 2);
-    g.fillStyle(0xffffff, 0.4).fillRoundedRect(x0 + 2, y + 1, Math.max(2, fw - 4), 2, 1);
-    // when worn out: a tick showing how full it must get before you can run again
-    if (this.exhausted) g.fillStyle(0xffffff, 0.85).fillRect(x0 + w * EXHAUSTED_UNTIL - 0.5, y - 1, 1.5, h + 2);
-    // lightning bolt badge on the left
-    const bx = x0 - 7;
-    const by = y + h / 2;
-    g.fillStyle(0x1b1424, 0.8).fillCircle(bx, by, 6);
-    g.fillStyle(this.exhausted ? 0xff8a7a : 0xffd23f, 1).fillPoints(
-      [
-        { x: bx + 1.2, y: by - 4.2 },
-        { x: bx - 2.6, y: by + 0.6 },
-        { x: bx - 0.2, y: by + 0.6 },
-        { x: bx - 1.2, y: by + 4.2 },
-        { x: bx + 2.6, y: by - 0.8 },
-        { x: bx + 0.2, y: by - 0.8 },
-      ],
-      true,
-    );
+    this.meter.show(Math.round(this.view.x - 15 + 4), Math.round(this.body.top - 30), this.stamina, col, this.exhausted, this.meterAlpha);
   }
 
   /** Start the munch animation (nuggie pickup). */
@@ -654,7 +629,7 @@ export class Player {
     this.body.enable = false;
     sfx.die();
     this.view.setFrame('hurt').setAlpha(1);
-    this.meter.clear();
+    this.meter.hide();
     if (fell) {
       this.view.setVisible(false);
     } else {
@@ -706,4 +681,89 @@ export class Player {
 
 function approach(v: number, target: number, step: number) {
   return v < target ? Math.min(v + step, target) : Math.max(v - step, target);
+}
+
+/**
+ * The stamina gauge as pictures (it was shapes rebuilt every frame while it showed): the case and the
+ * bolt badge as they are, the fill and its gloss as three-slice strips that stretch to any length
+ * (rounded ends kept) and take the fill's colour as a tint.
+ */
+class StaminaMeter {
+  private box: Phaser.GameObjects.Container;
+  private fill: Phaser.GameObjects.NineSlice;
+  private gloss: Phaser.GameObjects.NineSlice;
+  private tick: Phaser.GameObjects.Image;
+  private badge: Phaser.GameObjects.Image;
+  constructor(scene: Phaser.Scene) {
+    const R = METER_RES;
+    const W = 30;
+    const H = 7;
+    const kase = smallTex(scene, 'm-case', W + 4, H + 4, R, (ctx) => {
+      ctx.fillStyle = hexCss(0x1b1424, 0.8);
+      roundRectPath(ctx, 0, 0, W + 4, H + 4, (H + 4) / 2);
+      ctx.fill();
+      ctx.fillStyle = hexCss(0xffffff, 0.16);
+      roundRectPath(ctx, 2, 2, W, H, H / 2);
+      ctx.fill();
+    });
+    const pill = smallTex(scene, 'm-pill', 16, H, R, (ctx) => {
+      ctx.fillStyle = '#ffffff';
+      roundRectPath(ctx, 0, 0, 16, H, H / 2);
+      ctx.fill();
+    });
+    const shine = smallTex(scene, 'm-shine', 8, 2, R, (ctx) => {
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      roundRectPath(ctx, 0, 0, 8, 2, 1);
+      ctx.fill();
+    });
+    const px = smallTex(scene, 'm-px', 2, 2, 1, (ctx) => {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, 2, 2);
+    });
+    const bolt = (key: string, col: number) =>
+      smallTex(scene, key, 12, 12, R, (ctx) => {
+        const bx = 6;
+        const by = 6;
+        ctx.fillStyle = hexCss(0x1b1424, 0.8);
+        ctx.beginPath();
+        ctx.arc(bx, by, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = hexCss(col);
+        ctx.beginPath();
+        const pts = [[1.2, -4.2], [-2.6, 0.6], [-0.2, 0.6], [-1.2, 4.2], [2.6, -0.8], [0.2, -0.8]];
+        pts.forEach(([x, y], i) => (i ? ctx.lineTo(bx + x, by + y) : ctx.moveTo(bx + x, by + y)));
+        ctx.closePath();
+        ctx.fill();
+      });
+    bolt('m-bolt', 0xffd23f);
+    bolt('m-bolt-x', 0xff8a7a);
+    const s = 1 / R;
+    // (laid out from the fill's top-left corner, as the shapes were)
+    const caseImg = scene.add.image(-2, -2, kase).setOrigin(0, 0).setScale(s);
+    this.fill = scene.add.nineslice(0, 0, pill, undefined, 16 * R, H * R, (H / 2) * R, (H / 2) * R, 0, 0).setOrigin(0, 0).setScale(s);
+    this.gloss = scene.add.nineslice(2, 1, shine, undefined, 8 * R, 2 * R, 1 * R, 1 * R, 0, 0).setOrigin(0, 0).setScale(s);
+    this.tick = scene.add.image(W * EXHAUSTED_UNTIL - 0.5, -1, px).setOrigin(0, 0).setDisplaySize(1.5, H + 2).setAlpha(0.85);
+    this.badge = scene.add.image(-7, H / 2, 'm-bolt').setScale(s);
+    this.box = scene.add.container(0, 0, [caseImg, this.fill, this.gloss, this.tick, this.badge]).setDepth(DEPTH.text).setVisible(false);
+  }
+
+  show(x: number, y: number, stamina: number, col: number, exhausted: boolean, alpha: number) {
+    const R = METER_RES;
+    const W = 30;
+    const H = 7;
+    const fw = Math.max(H, W * stamina);
+    this.fill.setSize(fw * R, H * R).setTint(col);
+    this.gloss.setSize(Math.max(2, fw - 4) * R, 2 * R);
+    this.tick.setVisible(exhausted);
+    this.badge.setTexture(exhausted ? 'm-bolt-x' : 'm-bolt');
+    this.box.setPosition(x, y).setAlpha(alpha).setVisible(true);
+  }
+
+  hide() {
+    this.box.setVisible(false);
+  }
+
+  destroy() {
+    this.box.destroy();
+  }
 }

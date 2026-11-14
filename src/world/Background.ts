@@ -35,7 +35,11 @@ interface Cloud {
 /** A cloud's picture: this box (in cloud units, × its size) and resolution; how often it's redrawn (s). */
 const CB = { x0: -92, y0: -62, w: 184, h: 80 };
 const CLOUD_RES = LIGHT ? 1 : 1.25;
-const CLOUD_EVERY = 0.45;
+// (every 1.5 s, was 0.45 s: each new picture is drawn and sent to the graphics chip, ~20 a second
+// across the sky before; and they change shape that much slower, so each step is as small as ever)
+const CLOUD_EVERY = 1.5;
+/** How fast the clouds change shape (1 = as they first did). */
+const MORPH_RATE = 0.45 / CLOUD_EVERY;
 /** A cloud's outline is worked out at this many angles round it (the sines and cosines once, here). */
 const SIL_N = 60;
 const SIL = new Float32Array(SIL_N * 2);
@@ -220,7 +224,7 @@ export class Background {
 
   /** The puffs of a cloud right now: each one slowly swells, shrinks and wanders, so the cloud keeps changing shape. */
   private lumpsNow(c: Cloud) {
-    const t = this.t;
+    const t = this.t * MORPH_RATE;
     return c.lumps.map((l) => [l.x + Math.sin(t * l.w * 0.7 + l.ph) * 9, l.y + Math.cos(t * l.w + l.ph) * 4, l.r * (1 + 0.3 * Math.sin(t * l.w + l.ph * 1.7))] as const);
   }
 
