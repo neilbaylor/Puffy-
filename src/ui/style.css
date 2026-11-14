@@ -2616,7 +2616,7 @@ kbd {
   z-index: 1;
 }
 /* (top right of the square) */
-.bl-slots { --lasttop: clamp(16px, 4.4vh, 30px); --lastfont: clamp(13px, 3.4vh, 22px); }
+.bl-slots { --lasttop: clamp(11px, 3.2vh, 24px); --lastfont: clamp(13px, 3.4vh, 22px); }
 .bl-last.won { background: var(--gold); }
 /* the room code window */
 .bc-panel .btn:disabled { filter: grayscale(1); opacity: 0.55; cursor: default; transform: none; }
