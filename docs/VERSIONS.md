@@ -294,3 +294,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.289: Perf pass: less graphics/canvas memory, faster start on slow connections, smaller main script.
 - v0.290: Perf round 2: bosses' arenas freed after you move on; basketball net makes no garbage.
 - v0.291: Perf round 4: start screen ready ~0.46 s sooner.
+- v0.292: Smoothness: no cloud-redraw hitch every 1.5 s; boulder rock drawn up front.
