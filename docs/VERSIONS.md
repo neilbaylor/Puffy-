@@ -300,3 +300,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.295: King Bob fishing: auto cast, 6 bites in a row (all 6 = catch, 5 = 50%, 4 = 20%, else no fish).
 - v0.296: Battle smoothness: server ticks on time; the others' clock never steps back.
 - v0.297: Fishing BITE!: taps on the ring or just off the edge count.
+- v0.298: Battle: no freezing on really bad networks; off-screen pointer cheaper to draw.
