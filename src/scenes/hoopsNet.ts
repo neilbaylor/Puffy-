@@ -104,14 +104,18 @@ export class NetSim {
         p.y += (p.hy - p.y) * 0.035;
         p.z += (p.hz - p.z) * 0.035;
       }
+      // (plain loops and square roots here: this runs thousands of times a frame, and Math.hypot and
+      // unpacking each link made garbage every time — a stutter's worth of clean-up every few frames)
       for (let it = 0; it < 5; it++) {
-        for (const [a, b, rest] of this.links) {
-          const p = this.pts[a];
-          const q = this.pts[b];
+        for (let li = 0; li < this.links.length; li++) {
+          const link = this.links[li];
+          const rest = link[2];
+          const p = this.pts[link[0]];
+          const q = this.pts[link[1]];
           const dx = q.x - p.x;
           const dy = q.y - p.y;
           const dz = q.z - p.z;
-          const d = Math.hypot(dx, dy, dz) || 1e-6;
+          const d = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1e-6;
           // cords pull tight but barely push back when squashed
           const diff = d > rest ? (d - rest) / d : ((d - rest) / d) * 0.15;
           const wp = p.pin ? 0 : q.pin ? 1 : 0.5;
@@ -130,7 +134,7 @@ export class NetSim {
             const dx = p.x - ball.x;
             const dy = p.y - ball.y;
             const dz = p.z;
-            const d = Math.hypot(dx, dy, dz);
+            const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
             if (d < rr && d > 1e-4) {
               const k = rr / d;
               p.x = ball.x + dx * k;
@@ -149,21 +153,29 @@ export class NetSim {
     const sy = (p: NetPoint) => oy + p.y + p.z * (this.ry / this.R);
     back.clear();
     front.clear();
-    const fronts: [NetPoint, NetPoint, number, number][] = [];
     const shade = (c: number, k: number) => (Math.round(((c >> 16) & 255) * k) << 16) | (Math.round(((c >> 8) & 255) * k) << 8) | Math.round((c & 255) * k);
-    for (const [a, b, i] of this.drawLinks) {
-      const p = this.pts[a];
-      const q = this.pts[b];
-      const col = this.colors[Math.floor(i / 2) % this.colors.length];
-      if (p.z + q.z < 0) {
-        back.lineStyle(1.1, shade(col, 0.62), 0.7);
-        back.lineBetween(sx(p), sy(p), sx(q), sy(q));
-      } else fronts.push([p, q, (p.hy + q.hy) / 2, col]);
+    // (three passes over the strands, in the same order: the back ones, then the front ones' shadows,
+    // then the front ones — no lists made for them every frame)
+    const L = this.drawLinks;
+    for (let n = 0; n < L.length; n++) {
+      const p = this.pts[L[n][0]];
+      const q = this.pts[L[n][1]];
+      if (p.z + q.z >= 0) continue;
+      back.lineStyle(1.1, shade(this.colors[Math.floor(L[n][2] / 2) % this.colors.length], 0.62), 0.7);
+      back.lineBetween(sx(p), sy(p), sx(q), sy(q));
     }
     front.lineStyle(2.4, 0x3e3850, 0.4);
-    for (const [p, q] of fronts) front.lineBetween(sx(p) + 0.5, sy(p) + 0.6, sx(q) + 0.5, sy(q) + 0.6);
-    for (const [p, q, d, col] of fronts) {
-      front.lineStyle(1.5, shade(col, 1 - (d / 50) * 0.14), 1);
+    for (let n = 0; n < L.length; n++) {
+      const p = this.pts[L[n][0]];
+      const q = this.pts[L[n][1]];
+      if (p.z + q.z >= 0) front.lineBetween(sx(p) + 0.5, sy(p) + 0.6, sx(q) + 0.5, sy(q) + 0.6);
+    }
+    for (let n = 0; n < L.length; n++) {
+      const p = this.pts[L[n][0]];
+      const q = this.pts[L[n][1]];
+      if (p.z + q.z < 0) continue;
+      const d = (p.hy + q.hy) / 2;
+      front.lineStyle(1.5, shade(this.colors[Math.floor(L[n][2] / 2) % this.colors.length], 1 - (d / 50) * 0.14), 1);
       front.lineBetween(sx(p), sy(p), sx(q), sy(q));
     }
     for (const i of this.tails) {
