@@ -366,6 +366,7 @@ export class UI {
     game.events.on('warm-cards', () => this.warmCards(false));
     game.events.on('game-start', (s: GameScene, info: { fresh: boolean; atStart: boolean; level: string; world: string }) => {
       this.gameScene = s;
+      this.warmHud();
       this.bossIntro = false;
       this.setScreen(null);
       // a new run starts the song from the top; restarts after a faint keep it going
@@ -1459,7 +1460,7 @@ export class UI {
   private showHud() {
     this.hud.hidden = false;
     this.hud.classList.remove('bare');
-    const hero = characterById(this.session.players[0]?.characterId ?? 'puffy');
+    const { hero, wear } = this.hudLook();
     const cv = this.hud.querySelector('canvas')!;
     // the hero's own standing animation (the same two frames as in the game, at the
     // same pace), plus the odd blink or glance
@@ -1468,10 +1469,6 @@ export class UI {
     const session = this.session;
     let pose: 'idle0' | 'idle1' = 'idle0';
     let face: Face | undefined;
-    // (the HUD's little portrait: the sunglasses if they're on, and under the sea the dive gear — no
-    // party hat or skateboard up there)
-    const glasses = wardrobe.wearKey.split(',').filter((w) => w === 'frogskins');
-    const wear = (swimLevel((this.gameScene as { levelId?: number } | null)?.levelId) ? [...glasses, 'scuba'] : glasses).join(',');
     const draw = () => drawPortrait(cv, hero, pose, face, 'idle0', wear);
     draw();
     const alive = () => !this.hud.hidden && this.session === session;
@@ -1484,6 +1481,28 @@ export class UI {
     this.touch.setFire(true);
     if (usingTouch()) this.touch.show();
     else this.touch.hide();
+  }
+
+  /** The HUD portrait's hero, in what it shows them wearing. */
+  private hudLook() {
+    const hero = characterById(this.session.players[0]?.characterId ?? 'puffy');
+    // (the sunglasses if they're on, and under the sea the dive gear — no party hat or skateboard up there)
+    const glasses = wardrobe.wearKey.split(',').filter((w) => w === 'frogskins');
+    const wear = (swimLevel((this.gameScene as { levelId?: number } | null)?.levelId) ? [...glasses, 'scuba'] : glasses).join(',');
+    return { hero, wear };
+  }
+
+  /**
+   * The HUD portrait's two standing frames drawn ahead, while the level is being set up (they're
+   * kept: see drawPortrait), so the HUD coming in at "GO!" doesn't stutter drawing them.
+   */
+  private warmHud() {
+    const { hero, wear } = this.hudLook();
+    const cv = this.hud.querySelector('canvas')!;
+    const scratch = document.createElement('canvas');
+    scratch.width = cv.width;
+    scratch.height = cv.height;
+    for (const pose of ['idle0', 'idle1'] as const) drawPortrait(scratch, hero, pose, undefined, 'idle0', wear);
   }
 
   private renderHud(s: HudState) {
