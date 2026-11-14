@@ -301,3 +301,5 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.296: Battle smoothness: server ticks on time; the others' clock never steps back.
 - v0.297: Fishing BITE!: taps on the ring or just off the edge count.
 - v0.298: Battle: no freezing on really bad networks; off-screen pointer cheaper to draw.
+- v0.299: Fishing: Fat Fish really big, BITE! stays up after a missed tap, catches tossed back.
+- v0.300: Battle: no stutter the first time someone blinks.
