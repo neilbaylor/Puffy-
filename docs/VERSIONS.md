@@ -305,3 +305,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.300: Battle: no stutter the first time someone blinks.
 - v0.301: Battle: your hero's bigger corrections slide into place instead of jumping.
 - v0.302: No stutter at GO!; unused code and styles removed.
+- v0.303: Battle: ball-and-chain cheaper when off screen.
