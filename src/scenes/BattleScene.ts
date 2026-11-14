@@ -1377,11 +1377,14 @@ export class BattleScene extends Phaser.Scene {
         const by = cy + Math.sin(ang) * R * 0.8;
         v.chain.clear();
         v.chain.lineStyle(2.4, 0x3a2418, 1);
-        // the chain runs from the hand to the ball
-        for (let i = 1; i <= 6; i++) {
-          const t = i / 7;
-          v.chain.strokeCircle(handX + (bx - handX) * t, handY + (by - handY) * t, 1.6);
-        }
+        // the chain runs from the hand to the ball (its links only while it's anywhere near the view:
+        // a shape is drawn every frame wherever it is, and its little rings cost the most off screen)
+        const wv = this.cameras.main.worldView;
+        if (bx > wv.x - 400 && bx < wv.right + 400 && by > wv.y - 400 && by < wv.bottom + 400)
+          for (let i = 1; i <= 6; i++) {
+            const t = i / 7;
+            v.chain.strokeCircle(handX + (bx - handX) * t, handY + (by - handY) * t, 1.6);
+          }
         v.ball.setPosition(bx, by).setFrame(Math.floor(this.time.now / 160) % 2 ? 'open' : 'shut').setFlipX(bx > x);
       }
     }
