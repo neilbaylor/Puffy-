@@ -237,7 +237,6 @@ export const sfx = {
     tone({ type: 'sine', from: 4186, dur: 0.35, vol: 0.03, delay: 0.08 });
   },
   powerup: () => [523, 659, 784, 1047].forEach((f, i) => tone({ type: 'square', from: f, dur: 0.09, vol: 0.07, delay: i * 0.07 })),
-  enemyShot: () => tone({ type: 'sawtooth', from: 300, to: 120, dur: 0.15, vol: 0.08 }),
   checkpoint: () => [659, 784, 988].forEach((f, i) => tone({ type: 'triangle', from: f, dur: 0.14, vol: 0.18, delay: i * 0.09 })),
   goal: () =>
     [523, 659, 784, 1047, 784, 1047].forEach((f, i) =>

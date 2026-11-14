@@ -1,7 +1,7 @@
 import type { Ctx } from './draw';
 import { STYLES, ellipsePts, roundRectPts, type Fill, type Pt } from './handdrawn';
 
-/** Hockey on the frozen pond: sticks, pucks, nets and rink lines (polished hand-drawn). */
+/** Hockey on the frozen pond: sticks, pucks and nets (polished hand-drawn). */
 const st = () => STYLES.polished;
 
 /**
@@ -96,27 +96,3 @@ export function drawHockeyNet(ctx: Ctx, x: number, ground: number, w: number, h:
   S.shape(ctx, roundRectPts(x - pw / 2, ground - h - pw / 2, w + pw, pw, 1.2), red, 922, { lw: 0.7 });
 }
 
-/** Painted rink lines on the ice: a red centre line, two blue lines and a centre circle. w wide. */
-export function drawRinkLines(ctx: Ctx, w: number, y: number) {
-  const pts = (x: number): Pt[] => [
-    [x - 1.6, y],
-    [x + 1.6, y],
-    [x + 1.6, y + 5],
-    [x - 1.6, y + 5],
-  ];
-  const fillPts = (p: Pt[], c: string) => {
-    ctx.fillStyle = c;
-    ctx.beginPath();
-    p.forEach(([px, py], i) => (i ? ctx.lineTo(px, py) : ctx.moveTo(px, py)));
-    ctx.closePath();
-    ctx.fill();
-  };
-  fillPts(pts(w / 2), 'rgba(232,70,63,0.8)');
-  fillPts(pts(w * 0.3), 'rgba(47,111,214,0.8)');
-  fillPts(pts(w * 0.7), 'rgba(47,111,214,0.8)');
-  ctx.strokeStyle = 'rgba(47,111,214,0.6)';
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.ellipse(w / 2, y + 2.5, 22, 2.6, 0, 0, Math.PI * 2);
-  ctx.stroke();
-}

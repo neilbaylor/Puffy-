@@ -73,13 +73,6 @@ export type Pose = 'idle0' | 'idle1' | `walk${0 | 1 | 2 | 3 | 4 | 5 | 6 | 7}` | 
 export const WALK_FRAMES = 8;
 export const POSES: Pose[] = ['idle0', 'idle1', 'walk0', 'walk1', 'walk2', 'walk3', 'walk4', 'walk5', 'walk6', 'walk7', 'jump', 'fall', 'hurt', 'shoot', 'eat0', 'eat1'];
 /**
- * Swimming (the underwater level, in the dive gear): the hero leans forward into the water, legs
- * flutter-kicking, bobbing a little, bubbles rising from the regulator. In the dive gear it's what
- * the walk frames draw (no extra frames in any sheet); swim0–3 name the frames on their own.
- */
-export const SWIM_POSES: Pose[] = ['swim0', 'swim1', 'swim2', 'swim3'];
-
-/**
  * One smooth walk cycle from a single phase (frame f of WALK_FRAMES): the legs
  * swing opposite each other, the leg swinging forward lifts mid-stride, the
  * body dips as each foot lands and rises as the legs pass, and `swing` (−1…1)

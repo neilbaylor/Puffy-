@@ -428,16 +428,3 @@ const sticker: Style = {
 
 export const STYLES: Record<StyleId, Style> = { storybook, polished, watercolor, sticker };
 
-/** Paper grain for the storybook / watercolor looks. */
-export function paperTexture(ctx: Ctx, w: number, h: number, seed = 5) {
-  const r = rng(seed);
-  for (let i = 0; i < (w * h) / 90; i++) {
-    ctx.fillStyle = r() > 0.5 ? '#00000009' : '#ffffff22';
-    ctx.fillRect(r() * w, r() * h, 1 + r() * 2, 1 + r() * 2);
-  }
-  const g = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.3, w / 2, h / 2, Math.max(w, h) * 0.75);
-  g.addColorStop(0, '#00000000');
-  g.addColorStop(1, '#3b2a1018');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, w, h);
-}

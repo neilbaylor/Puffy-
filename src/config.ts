@@ -10,8 +10,6 @@ export const MIN_VIEW_W = 680;
 export const GRAVITY = 1600;
 export const MAX_FALL_SPEED = 900;
 
-export const MAX_PLAYERS = 3;
-
 /** Render ordering. */
 export const DEPTH = {
   sky: -100,

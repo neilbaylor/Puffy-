@@ -4,13 +4,13 @@ import { CHARACTERS } from '../data/characters';
 import { TILE_COUNT } from '../level/tiles';
 import { BIGPUFF_FRAMES, BIGPUFF_H, BIGPUFF_W, GIANT_FRAMES, GIANT_H, GIANT_W, PUFFBALL_H, PUFFBALL_W, drawBigPuff, drawGiant, drawPuffball } from './baddies';
 import { drawMuzzleFlash, drawRocket } from './bazooka';
-import { drawSoccerBall, drawSoccerGoal } from './soccer';
+import { drawSoccerBall } from './soccer';
 import { GOAT_FRAMES, GOAT_H, GOAT_W, drawGoat, drawSpit } from './goat';
 import { BLASTER, SAW, W_RES, drawBlaster, drawBullet, drawChainsaw, drawFlailBall } from './weapons';
 import { drawParachute } from './parachute';
 import { drawHeroChuteLayer, drawPlopCanopy, type ChuteState } from './skydive';
 import { JETFLAME_H, JETFLAME_W, KING_H, KING_W, SMOKE_R, drawJetFlame, drawJetSmoke, drawPlopKing, type KingFrame } from './plopking';
-import { drawHockeyNet, drawPuck, drawRinkLines, drawStick } from './hockey';
+import { drawHockeyNet, drawPuck, drawStick } from './hockey';
 import { MOUNTAIN_LOOKS, drawMountainFar, drawMountainMid, drawMountainNear } from './mountain';
 import './plopLooks'; // (registers Plop Invasion's palettes)
 import { POOWAVE_H, POOWAVE_W, drawPooOnGoat, drawPooPile, drawPooWave, drawStink, drawVolleyNetSide, drawVolleyball } from './plopworld';
@@ -438,7 +438,6 @@ function itemParts(scene: Phaser.Scene, pal: WorldPalette): (() => void)[] {
     addCanvas(scene, 'aura', hires(48, 48, ART_RES, (ctx) => drawAura(ctx, 24, 25, 10.5)));
     addCanvas(scene, 'soccerball', hires(28, 28, ART_RES, (ctx) => drawSoccerBall(ctx, 14, 14, 11)));
     addCanvas(scene, 'soccerball-big', hires(44, 44, ART_RES, (ctx) => drawSoccerBall(ctx, 22, 22, 17)));
-    addCanvas(scene, 'soccergoal', hires(76, 56, PROP_RES, (ctx) => drawSoccerGoal(ctx, 4, 54, 58, 38)));
     // giant's ground shockwave: a curling crest of dust (faces right)
     addCanvas(
       scene,
@@ -470,7 +469,6 @@ function itemParts(scene: Phaser.Scene, pal: WorldPalette): (() => void)[] {
     addCanvas(scene, 'hstick', hires(40, 40, ART_RES, (ctx) => drawStick(ctx)));
     addCanvas(scene, 'puck', hires(18, 14, ART_RES, (ctx) => drawPuck(ctx, 9, 8, PUCK_R_ART)));
     addCanvas(scene, 'hockeynet', hires(64, 44, PROP_RES, (ctx) => drawHockeyNet(ctx, 4, 40, 44, 30)));
-    addCanvas(scene, 'rinklines', hires(400, 7, 2, (ctx) => drawRinkLines(ctx, 400, 1)));
     addCanvas(scene, 'nuggie', hires(40, 34, ART_RES, (ctx) => drawNuggie(ctx, 20, 17, 11)));
     addCanvas(scene, 'rootbeer', hires(30, 40, ART_RES, (ctx) => drawRootBeer(ctx, 15, 38, 34)));
     addCanvas(scene, 'rocket', hires(30, 16, ART_RES, (ctx) => drawRocket(ctx, st, 15, 8)));
