@@ -109,8 +109,10 @@ export const MAX_TEX = 4096;
 export function frameGrid(n: number, fw: number, fh: number, gap = 4) {
   const px = fw + gap;
   const py = fh + gap;
-  const cols = Math.max(1, Math.min(n, Math.floor(MAX_TEX / px)));
-  const rows = Math.ceil(n / cols);
+  // (rows as few as fit, then the frames shared out evenly between them: 14 frames are two rows
+  // of 7, not 12 and 2 — the empty end of a half-full last row was memory for nothing)
+  const rows = Math.ceil(n / Math.max(1, Math.min(n, Math.floor(MAX_TEX / px))));
+  const cols = Math.ceil(n / rows);
   return { w: cols * px, h: rows === 1 ? fh : rows * py, x: (i: number) => (i % cols) * px, y: (i: number) => Math.floor(i / cols) * py };
 }
 
