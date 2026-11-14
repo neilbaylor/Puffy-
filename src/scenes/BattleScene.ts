@@ -223,6 +223,13 @@ export class BattleScene extends Phaser.Scene {
   /** Am I holding a chair (FIRE swings it: the button says so)? */
   private holdingChair = false;
   private snaps: Snapshot[] = [];
+  /**
+   * The others' clock (in ticks, INTERP_TICKS behind the server): it runs with real time and eases
+   * toward what the newest snapshot says, never backwards. (Set from each snapshot as it came in,
+   * it jumped back and forth with every one that came a little early or late on a phone network:
+   * the others jittered.) When it's further off than that, it just jumps.
+   */
+  private otherClock: { tick: number; at: number } | null = null;
   private me: BPlayer | null = null;
   private pending: [number, number][] = [];
   private seq = 0;
@@ -271,6 +278,7 @@ export class BattleScene extends Phaser.Scene {
     this.prizeViews.clear();
     this.makePrizeTextures();
     this.snaps = [];
+    this.otherClock = null;
     this.me = null;
     this.pending = [];
     this.seq = 0;
@@ -847,8 +855,17 @@ export class BattleScene extends Phaser.Scene {
     const n = this.snaps.length;
     if (!n) return null;
     const last = this.snaps[n - 1];
-    const nowTick = last.tick + ((performance.now() - last.at) / 1000) * (1 / DT);
-    const rt = Math.min(last.tick, nowTick - INTERP_TICKS);
+    const now = performance.now();
+    const want = last.tick + ((now - last.at) / 1000) * (1 / DT) - INTERP_TICKS;
+    const oc = this.otherClock;
+    let clock = want;
+    if (oc && Math.abs(want - oc.tick) <= INTERP_TICKS) {
+      const sec = (now - oc.at) / 1000;
+      clock = oc.tick + sec / DT;
+      clock = Math.max(oc.tick, clock + (want - clock) * (1 - Math.exp(-sec * 6)));
+    }
+    this.otherClock = { tick: clock, at: now };
+    const rt = Math.min(last.tick, clock);
     let a = this.snaps[0];
     let b = last;
     for (let i = n - 1; i > 0; i--)

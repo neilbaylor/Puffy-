@@ -11,7 +11,7 @@ import type { Server } from 'node:http';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { CHARACTERS } from '../src/data/characters';
 import { buildArena } from '../src/shared/battle/arena';
-import { BattleSim, BTN, DT, TICK_HZ } from '../src/shared/battle/sim';
+import { BattleSim, BTN, DT } from '../src/shared/battle/sim';
 import { compactQueue } from './inputQueue';
 import { MAX_BATTLERS, START_NOW_SECS, WEAPON_CODE, packPlayer, type ClientMsg, type Phase, type RoomPlayer, type RoomState, type ServerMsg, type SnapChair, type SnapEnemy, type SnapHazard, type SnapPrize } from '../src/shared/battle/protocol';
 
@@ -478,15 +478,16 @@ export function attachBattle(server: Server) {
     });
     ws.on('error', () => {});
   });
-  // a steady 30 ticks a second (catching up if the timer runs late)
-  let last = performance.now();
-  let acc = 0;
-  setInterval(() => {
+  // a steady 30 ticks a second (catching up if the timer runs late): each tick has its due time and
+  // the timer is set for the next one. (A timer every half tick, counting up, put a tick a whole half
+  // tick late about twice a second: Node's timers run in whole milliseconds, 16 not 16.7.)
+  let due = performance.now() + DT * 1000;
+  const loop = () => {
     const now = performance.now();
-    acc += Math.min(0.25, (now - last) / 1000);
-    last = now;
-    while (acc >= DT) {
-      acc -= DT;
+    // (after a long stall, e.g. the machine was busy: at most a quarter second's worth caught up, as before)
+    if (now - due > 250) due = now - 250;
+    while (now >= due) {
+      due += DT * 1000;
       for (const [code, r] of rooms) {
         // (one room going wrong mustn't stop every battle on the server: log it, and end that
         // battle — its players go back to their lobby — instead of the whole server falling over)
@@ -509,6 +510,8 @@ export function attachBattle(server: Server) {
       else if (!r.emptySince) r.emptySince = t;
       else if (t - r.emptySince > 60000) rooms.delete(code);
     }
-  }, 1000 / TICK_HZ / 2);
+    setTimeout(loop, Math.max(0, due - performance.now()));
+  };
+  setTimeout(loop, DT * 1000);
   console.log('Battle server ready at /battle');
 }
