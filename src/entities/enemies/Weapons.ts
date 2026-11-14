@@ -227,7 +227,11 @@ export class Weapon {
       const g = this.chain!;
       g.clear();
       const len = Math.hypot(bx - hand.x, by - hand.y);
-      const n = Math.max(4, Math.round(len / 7));
+      // (the links only while it's anywhere near the screen: a shape is drawn every frame wherever
+      // it is, and off screen its little round links were the dearest thing in the frame)
+      const v = this.gs.cameras.main.worldView;
+      const seen = bx > v.x - 400 && bx < v.right + 400 && by > v.y - 400 && by < v.bottom + 400;
+      const n = seen ? Math.max(4, Math.round(len / 7)) : 0;
       for (let i = 1; i < n; i++) {
         const u = i / n;
         const cx = hand.x + (bx - hand.x) * u;
