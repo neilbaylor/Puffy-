@@ -1601,7 +1601,7 @@ html.rotating body {
 .boss-panel { align-items: center; text-align: center; min-width: min(100%, 380px); }
 .boss-panel h2 { margin: 0; }
 .boss-list { display: grid; gap: 16px; width: 100%; margin: 8px 0 12px; }
-.boss-btn { display: grid; gap: 2px; justify-items: center; }
+.boss-btn { display: grid; gap: 2px; justify-items: center; background: var(--gold-btn); }
 .boss-btn small { font: 800 12px/1.2 var(--body); letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.75; }
 @media (max-height: 500px) {
   /* (phones: two by two, slimmer, so all four and Back fit without scrolling) */
