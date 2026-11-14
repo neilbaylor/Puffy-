@@ -298,3 +298,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.293: HUD hero's face reused instead of redrawn every few seconds.
 - v0.294: Battle results: Leave ignores taps for the first 1.5 s.
 - v0.295: King Bob fishing: auto cast, 6 bites in a row (all 6 = catch, 5 = 50%, 4 = 20%, else no fish).
+- v0.296: Battle smoothness: server ticks on time; the others' clock never steps back.
