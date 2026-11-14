@@ -3403,3 +3403,7 @@ html.light .start .logo span { transform: rotate(-2deg); }
   .fsh-meter { bottom: calc(48px + var(--safe-b)) !important; }
   .fsh-catch { bottom: calc(56px + var(--safe-b)); zoom: 1.2; }
 }
+
+/* battle results: Leave isn't live for a moment (mashed shoot taps), fading in when it is */
+.br-foot .btn { transition: opacity 0.35s; }
+.br-foot .btn.br-wait { opacity: 0.25; pointer-events: none; }

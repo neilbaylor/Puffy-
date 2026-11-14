@@ -17,6 +17,9 @@ import { freeBossArtExcept, gameArtJobs } from '../gfx/textures';
 import { loadArt } from './artLoader';
 import { BattleNet, battleUrl, type NetStatus } from '../net/battleNet';
 import type { BattleHud } from '../scenes/BattleScene';
+
+/** The results card's Leave button ignores taps this long after it shows (mashed shoot taps). */
+const RESULTS_GUARD_MS = 1500;
 import { MAX_BATTLERS, START_NOW_SECS, SLOT_COLORS, SLOT_NAMES, type RoomState } from '../shared/battle/protocol';
 
 export interface BattleHost {
@@ -790,7 +793,14 @@ export class BattleUI {
     </div>`);
     el.querySelectorAll<HTMLCanvasElement>('.br-winner').forEach((cv, i) => slotPortrait(cv, top[i].hero, top[i].slot, 'idle0', null, top[i].wear ?? ''));
     el.querySelectorAll<HTMLCanvasElement>('.br-face').forEach((cv, i) => slotPortrait(cv, ranked[i].hero, ranked[i].slot, 'idle0', null, ranked[i].wear ?? ''));
-    el.querySelector('[data-act=leave]')!.addEventListener('click', () => this.leave());
+    // (Leave can't be hit for a moment: everyone's still hammering shoot as the battle ends, and a
+    // stray tap used to throw you out of the room — it fades in once it's live)
+    const leave = el.querySelector<HTMLButtonElement>('[data-act=leave]')!;
+    leave.classList.add('br-wait');
+    setTimeout(() => leave.classList.remove('br-wait'), RESULTS_GUARD_MS);
+    leave.addEventListener('click', () => {
+      if (!leave.classList.contains('br-wait')) this.leave();
+    });
     this.host.setScreen(el);
     if (iWon) sfx.cheer();
   }
