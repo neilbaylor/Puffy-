@@ -286,3 +286,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.281: Battle lobby: KO badge in its own band, clear of the hero.
 - v0.282: Fishing: you have to hit the BITE! button itself.
 - v0.283: Battle lobby: KO badge top right again; bigger heroes.
+- v0.284: Levels: lighter drawing (clouds re-made less often; pips, stamina meter, puddle bits as pictures).
