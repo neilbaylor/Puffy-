@@ -281,3 +281,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.276: Fishing opening: a beat after the purple sweep before the host speaks.
 - v0.277: Part 5 (The Rise of King Bob) for everyone; King Bob Fishing no longer a test; 'Stone'.
 - v0.278: Shop: root beer float pill instead of white.
+- v0.279: Battle: double jump on laggy phones, instant shots, safe respawns, bigger KO badge, lighter drawing.
