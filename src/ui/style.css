@@ -2603,7 +2603,7 @@ kbd {
 .bl-slot { position: relative; }
 .bl-last {
   position: absolute;
-  top: clamp(10px, 2.6vh, 20px);
+  top: clamp(16px, 4.4vh, 30px);
   right: clamp(8px, 1.4vw, 16px);
   padding: 3px 10px 4px;
   border-radius: 999px;
