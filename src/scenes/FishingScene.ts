@@ -84,6 +84,8 @@ const KING_CATCH = 0.46;
 const HERO_K = 2.38;
 /** How long the BITE button can be hit for (ms). */
 const BITE_MS = 620;
+/** A key pressed sooner than this after BITE! shows wasn't a reaction (mashing): a miss. */
+const BITE_REACT_MS = 120;
 /** The rods: length (world px), and how far the handle reaches behind the hands. */
 const ROD_LEN = 178;
 const ROD_BUTT = 34;
@@ -159,6 +161,12 @@ export class FishingScene extends Phaser.Scene {
   private tapped = false;
   private prevKey = true;
   private biteHit = false;
+  /** A tap off the BITE! button (or a mashed key) while it's up: that bite's lost. */
+  private biteMiss = false;
+  /** When the BITE! button came up (scene clock). */
+  private biteAt = 0;
+  /** The last bite was lost to a tap off the button (not to being too slow). */
+  private biteOff = false;
   private score = { hero: [] as boolean[], king: [] as boolean[] };
   /** where the camera looks (world) and how close in (1 = the whole boat and a stretch of sea) */
   private cam = { x: 640, y: 420, zoom: 1 };
@@ -253,6 +261,7 @@ export class FishingScene extends Phaser.Scene {
     this.tapped = false;
     this.prevKey = true;
     this.biteHit = false;
+    this.biteMiss = false;
     this.score = { hero: [], king: [] };
     this.cam = { x: 640, y: 420, zoom: 1 };
     this.camK = 3;
@@ -580,11 +589,17 @@ export class FishingScene extends Phaser.Scene {
   }
 
   private tapPressed() {
+    const pressed = this.tapped || this.keyPressed();
+    this.tapped = false;
+    return pressed;
+  }
+
+  /** A key (or a gamepad button) just went down. */
+  private keyPressed() {
     let key = isKeyDown('Space') || isKeyDown('Enter') || isKeyDown('KeyF') || isKeyDown('KeyJ') || isKeyDown('ArrowUp') || isKeyDown('KeyW');
     for (const g of gamepadSources) if (g.connected()) key ||= g.poll().jump || g.poll().fire;
-    const pressed = this.tapped || (key && !this.prevKey);
+    const pressed = key && !this.prevKey;
     this.prevKey = key;
-    this.tapped = false;
     return pressed;
   }
 
@@ -850,9 +865,17 @@ export class FishingScene extends Phaser.Scene {
       }
       m.el.querySelector<HTMLElement>('.hm-mark')!.style.left = `${m.pos * 100}%`;
     }
-    // BITE! can be hit with a key too
+    // BITE! is hit by tapping IT (its own listener) — a tap anywhere else while it's up is a miss
+    // (it used to count as a hit: tapping anywhere caught fish). A key or gamepad button hits it
+    // too, but not one pressed quicker than anyone could react (mashing): that's a miss as well.
     const bite = this.dom.querySelector<HTMLElement>('.fsh-bite')!;
-    if (!bite.hidden && this.tapPressed()) this.biteHit = true;
+    if (!bite.hidden && !this.biteHit && !this.biteMiss) {
+      const tapOff = this.tapped;
+      this.tapped = false;
+      const key = this.keyPressed();
+      if (tapOff || (key && this.clock - this.biteAt < BITE_REACT_MS)) this.biteMiss = true;
+      else if (key) this.biteHit = true;
+    }
   }
 
   private drawGulls(t: number, s: number) {
@@ -1299,12 +1322,16 @@ export class FishingScene extends Phaser.Scene {
     void b.offsetWidth;
     b.classList.add('go');
     this.biteHit = false;
+    this.biteMiss = false;
+    this.biteAt = this.clock;
     this.tapped = false;
     this.prevKey = true;
     const end = this.clock + BITE_MS;
-    while (this.clock < end && !this.biteHit) await this.wait(16);
-    const hit = this.biteHit;
+    while (this.clock < end && !this.biteHit && !this.biteMiss) await this.wait(16);
+    const hit = this.biteHit && !this.biteMiss;
+    this.biteOff = this.biteMiss;
     this.biteHit = false;
+    this.biteMiss = false;
     if (hit) {
       b.classList.add('hit');
       await this.wait(160);
@@ -1572,10 +1599,10 @@ export class FishingScene extends Phaser.Scene {
         });
         this.bubbles(L.x, WATER + 50, 6);
       } else {
-        // too slow: it takes the bait and goes
+        // too slow (or a tap off the button): it takes the bait and goes
         L.dip = 0;
         r.bend = 0;
-        this.callout('TOO SLOW!', 'bad small', 700);
+        this.callout(this.biteOff ? 'MISSED!' : 'TOO SLOW!', 'bad small', 700);
         this.tweens.add({
           targets: fish,
           x: fish.x + (fromLeft ? -360 : 360),

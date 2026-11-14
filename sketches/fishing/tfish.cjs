@@ -1,10 +1,11 @@
 // King Bob's fishing contest, played by a bot: stops the cast meter in the green, hits BITE! when it shows.
 // Screenshots each stage once (meter, cast in the air, bite button, fish on, the leap, the catch card, King Bob's turn, the end).
-// Args: <tag> <odds (chance a hit bite is a catch; default the game's)> <width> <height>
+// Args: <tag> <odds (chance a hit bite is a catch; default the game's)> <width> <height> [off: tap off the BITE! button instead of on it]
 const { chromium } = require('playwright');
 const TAG = process.argv[2] || 'a';
 const ODDS = process.argv[3] ? Number(process.argv[3]) : null;
 const W = Number(process.argv[4] || 844), H = Number(process.argv[5] || 390);
+const OFF = process.argv[6] === 'off';
 (async () => {
   const br = await chromium.launch({ args: ['--use-gl=swiftshader'] });
   const ctx = await br.newContext({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
@@ -51,7 +52,7 @@ const W = Number(process.argv[4] || 844), H = Number(process.argv[5] || 390);
     if (s.callout.startsWith('ROUND 1')) await shot('round');
     if (s.meter) { await shot(s.phase === 'aim' ? 'meter2' : 'meter'); if (s.inZone) { await p.mouse.click(W * 0.3, H * 0.5); await p.waitForTimeout(150); } continue; }
     if (s.hero === 'fly') await shot('cast');
-    if (s.bite) { await shot('bite'); await p.locator('.fsh-bite').click({ force: true, timeout: 500 }).catch(() => {}); continue; }
+    if (s.bite) { await shot('bite'); if (OFF) await p.mouse.click(W * 0.06, H * 0.92); else await p.locator('.fsh-bite').click({ force: true, timeout: 500 }).catch(() => {}); continue; }
     if (s.hero === 'hooked') await shot('fishon');
     if (s.card) await shot('catch');
     if (s.king === 'fly') await shot('kingcast');
