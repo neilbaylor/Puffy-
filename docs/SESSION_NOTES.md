@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.294)
+## Where things stand (v0.295)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -31,6 +31,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   Home screen (yellow).
 - Start screen: drone fly-over behind, logo hop, hero cards (pick = hop / backflip), Play, Part picker once a
   level is beaten, mute (top-left), full screen + **Battle** buttons (top-right, same height, side by side).
+- v0.295: KING BOB FISHING REDESIGN (user). No meters: your cast is automatic, HERO_CAST 0.7 every time (heroCast(HERO_CAST)). Then BITES = 6 BITE! buttons in a row (random 1100–1800 ms gaps, fish nibbles ×2 then biteButton(); hit → 'GOT IT! n of 6', miss → 'MISSED!'/'TOO SLOW!'; fish backs off 50 px between). Odds by hits: 6 = sure catch, 5 = 50%, 4 = 20%, ≤3 = no fish ('IT GOT AWAY!' for 4–5, 'GONE!' otherwise; window.__fishOdds still forces). Removed: lockMeter/hideMeters/.fsh-meter, usingTouch/tapPressed, CATCH. Ticker pro tip now 'HOOK ALL 6 BITES AND THE FISH IS YOURS'. King Bob's turn unchanged (KING_CATCH 0.46). Tests: tfish.cjs six (perfect bot: GOT IT 1–6 every round, won 5–3), tfish.cjs off6 '' 844 390 off (0 of 6 → GONE! → NO FISH); twin2.cjs waits for lures.hero.mode 'fly'.
 - v0.84: a loading screen with a progress bar; behind it everything the start screen needs is prepared, so it's
   smooth from the first moment (on a 4× slowed CPU the first hero tap went from 3.7 s to under 0.6 s).
   Since v0.86 it draws only the starting level's looks: one level at a time keeps its looks and scenery
