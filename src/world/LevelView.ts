@@ -503,7 +503,7 @@ export class LevelView {
           // (under the sea: a wooden pier, its posts down to the sea bed)
           let down = TILE * 2;
           while (y * TILE + down < this.heightPx && !this.isSolidAt(x * TILE + w - 8, y * TILE + down)) down += 8;
-          if (!this.scene.textures.exists(key)) addCanvas(this.scene, key, hires(w, down + 14, PROP_RES, (ctx) => drawPier(ctx, w, down + 8)));
+          if (!this.scene.textures.exists(key)) addCanvas(this.scene, key, hires(w, down + 14, PROP_RES, (ctx) => drawPier(ctx, w, down + 8)), undefined, { release: true });
           this.scene.add
             .image(x * TILE, y * TILE - 6, key)
             .setOrigin(0, 0)
@@ -512,7 +512,7 @@ export class LevelView {
           continue;
         }
         if (!this.scene.textures.exists(key))
-          addCanvas(this.scene, key, hires(w + 24, 34, PROP_RES, (ctx) => drawCloudPlatform(ctx, 12, 8, w, DEFAULT_PALETTE, x * 7 + y)));
+          addCanvas(this.scene, key, hires(w + 24, 34, PROP_RES, (ctx) => drawCloudPlatform(ctx, 12, 8, w, DEFAULT_PALETTE, x * 7 + y)), undefined, { release: true });
         this.scene.add
           .image(x * TILE - 12, y * TILE - 8, key)
           .setOrigin(0, 0)
@@ -576,6 +576,8 @@ export class LevelView {
           this.waving.push({ img, pre: 'k', speed: 0.42 + (i % 3) * 0.06, ph: i * 0.37 });
           return;
         }
+        // (like the cloud platforms and piers: only ever shown as a picture, so its canvas lets its
+        // pixels go once they're on the graphics chip)
         if (!this.scene.textures.exists(key))
           addCanvas(
             this.scene,
@@ -583,6 +585,8 @@ export class LevelView {
             hires(96, h + 50, PROP_RES, (ctx) =>
               s.opts?.pine ? drawPine(ctx, 48, h + 46, h, this.paletteAt(s.x * TILE), '#ffffff', 100 + i * 13) : drawPuffTree(ctx, 48, h + 46, h, this.paletteAt(s.x * TILE), 100 + i * 13),
             ),
+            undefined,
+            { release: true },
           );
         const img = this.scene.add
           .image(s.x * TILE + TILE / 2, (s.y + 1) * TILE + 4, key)
