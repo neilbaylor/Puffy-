@@ -293,3 +293,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.288: Battle lobby: KO badge a touch smaller on phones.
 - v0.289: Perf pass: less graphics/canvas memory, faster start on slow connections, smaller main script.
 - v0.290: Perf round 2: bosses' arenas freed after you move on; basketball net makes no garbage.
+- v0.291: Perf round 4: start screen ready ~0.46 s sooner.
