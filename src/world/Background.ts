@@ -307,7 +307,10 @@ export class Background {
           this.paintCloud(c, hi);
           // (light mode: still shapes — a new one a few times a second is a steady trickle of
           // pictures to make and send to the graphics chip)
-          c.next = this.stillClouds || LIGHT ? Infinity : this.t + CLOUD_EVERY;
+          // (the next one on its own beat, not 1.5 s from now: they all get their first picture in
+          // the same frame, and counting from then kept them all redrawing in the same frame, every
+          // 1.5 s — a hitch each time)
+          c.next = this.stillClouds || LIGHT ? Infinity : c.next + CLOUD_EVERY * Math.max(1, Math.ceil((this.t - c.next) / CLOUD_EVERY));
         }
         let y = c.y + Math.sin(this.t * 0.35 + c.bob) * 5;
         if (this.vertical) {
