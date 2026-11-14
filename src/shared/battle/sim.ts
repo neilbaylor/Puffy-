@@ -21,6 +21,8 @@ export const WIN_KOS = 5;
 export const RESPAWN_SECS = 2.4;
 /** A respawn spot is safe with no bad guy (their shots, falling rocks) nearer than this (px; ~12 tiles). */
 const SAFE_SPAWN = 380;
+/** How fast two bad guys standing in each other are eased apart (px/s). */
+const APART_SPEED = 90;
 
 const GRAVITY = 1600;
 const MAX_FALL = 900;
@@ -1320,7 +1322,44 @@ export class BattleSim {
         }
       }
     }
+    this.keepApart();
     this.enemies = this.enemies.filter((e) => e.hp > 0);
+  }
+
+  /**
+   * Bad guys don't stand in each other: two chasing the same hero used to slide into the very same
+   * spot and go about as one lump (looking stuck together). Ones on about the same level that
+   * overlap get eased apart, a bit each tick (not into walls), so they come along side by side.
+   */
+  private keepApart() {
+    const es = this.enemies;
+    for (let i = 0; i < es.length; i++) {
+      const a = es[i];
+      if (a.chute || a.hp <= 0) continue;
+      for (let j = i + 1; j < es.length; j++) {
+        const b = es[j];
+        if (b.chute || b.hp <= 0) continue;
+        const [aw, ah] = ENEMY_BOX[a.kind];
+        const [bw, bh] = ENEMY_BOX[b.kind];
+        // (only when they're on about the same level: one hopping over another is fine)
+        if (Math.abs(a.y - b.y) > Math.min(ah, bh) * 0.6) continue;
+        const want = (aw + bw) / 2 * 0.8;
+        let dx = b.x - a.x;
+        if (Math.abs(dx) >= want) continue;
+        if (dx === 0) dx = a.id < b.id ? 1 : -1;
+        const push = Math.min((want - Math.abs(dx)) / 2, APART_SPEED * DT) * Math.sign(dx);
+        this.nudge(a, -push);
+        this.nudge(b, push);
+      }
+    }
+  }
+
+  /** Move a bad guy sideways by dx, unless that's into a wall (or off the arena). */
+  private nudge(e: BEnemy, dx: number) {
+    const [w, h] = ENEMY_BOX[e.kind];
+    const nx = Math.max(w / 2 + 2, Math.min(this.map.widthPx - w / 2 - 2, e.x + dx));
+    const edge = nx + Math.sign(dx) * (w / 2);
+    if (!this.map.solidAt(edge, e.y - 4) && !this.map.solidAt(edge, e.y - h + 4)) e.x = nx;
   }
 
   // ── rocks from the sky ──
