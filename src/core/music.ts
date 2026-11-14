@@ -80,9 +80,12 @@ function decode(t: Track): Promise<AudioBuffer | null> {
   return p;
 }
 
-// the start screen's song and Part 1's are needed first: fetch them right away
-fetchBytes('menu');
-fetchBytes('levelClear');
+// the start screen's song and Part 1's are needed first: fetch them right away, one after the other
+// (the start screen's, which the loading screen waits for, gets the connection to itself first)
+void fetchBytes('menu')
+  .catch(() => null)
+  .then(() => fetchBytes('levelClear'))
+  .catch(() => null);
 
 interface Playing {
   t: Track;
