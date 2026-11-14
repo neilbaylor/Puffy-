@@ -3279,6 +3279,19 @@ html.light .start .logo span { transform: rotate(-2deg); }
   100% { transform: scale(0.8); opacity: 0; }
 }
 @keyframes fb-ring { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 100; } }
+/* a tap that missed BITE!: a little ring where it landed, gone in a moment (the button stays up) */
+.fsh-miss {
+  position: fixed;
+  width: 34px;
+  height: 34px;
+  margin: -17px 0 0 -17px;
+  border-radius: 50%;
+  border: 3px solid #ffffffd0;
+  box-shadow: 0 0 0 2px #0b214055;
+  pointer-events: none;
+  animation: fsh-miss 0.4s ease-out forwards;
+}
+@keyframes fsh-miss { from { transform: scale(0.4); opacity: 1; } to { transform: scale(1.3); opacity: 0; } }
 /* the opening: the host on an old telly (sepia, scanlines, a rolling bar, rounded dark corners, a flicker),
    a 70s title strap and closed captions typed along the bottom */
 .tv-old {

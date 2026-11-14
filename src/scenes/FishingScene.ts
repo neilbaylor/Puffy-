@@ -108,14 +108,23 @@ const CATCHES: {
   { kind: 'zippy', name: 'Zippy', lb: [0.6, 1.9], odds: 30, k: 1.7 },
   { kind: 'stone', name: 'Stone', lb: [2.2, 4.6], odds: 19, k: 0.95 },
   { kind: 'slinger', name: 'Slinger', lb: [3.1, 6.4], odds: 16, k: 0.9 },
-  { kind: 'fat', name: 'Fat Fish', lb: [9, 16], odds: 6, k: 0.6, rare: true },
+  // (the big one: a good deal longer than the hero is tall)
+  { kind: 'fat', name: 'Fat Fish', lb: [24, 41], odds: 6, k: 1.3, rare: true },
   { kind: 'kai', name: 'Kai Fish', lb: [1.4, 3.2], odds: 18, k: 1.25, rare: true },
 ];
-const pickCatch = () => {
+type Catch = (typeof CATCHES)[number];
+const pickCatch = (): Catch => {
+  // (tests can pick: window.__fishKind)
+  const forced = CATCHES.find((c) => c.kind === (window as unknown as { __fishKind?: string }).__fishKind);
+  if (forced) return forced;
   let r = Math.random() * CATCHES.reduce((a, c) => a + c.odds, 0);
   for (const c of CATCHES) if ((r -= c.odds) < 0) return c;
   return CATCHES[0];
 };
+/** A catch's pictures' resolution: the big ones drawn finer, so they're not blurry up close. */
+const fishRes = (c: Catch) => Math.min(2.2, Math.max(1.6, c.k * 1.6));
+/** A catch's size as shown (world px). */
+const fishDims = (c: Catch) => ({ w: FISH_SIZE[c.kind].w * c.k, h: FISH_SIZE[c.kind].h * c.k });
 
 type Who = 'hero' | 'king';
 interface Lure {
@@ -160,14 +169,13 @@ export class FishingScene extends Phaser.Scene {
   private clock = 0;
   private waits: { at: number; res: () => void }[] = [];
   private dom!: HTMLElement;
-  private tapped = false;
   private prevKey = true;
   private biteHit = false;
-  /** A tap off the BITE! button (or a mashed key) while it's up: that bite's lost. */
+  /** A key mashed the moment BITE! came up: that bite's lost. (A tap off the button isn't: it stays up.) */
   private biteMiss = false;
   /** When the BITE! button came up (scene clock). */
   private biteAt = 0;
-  /** The last bite was lost to a tap off the button (not to being too slow). */
+  /** There was a tap off the BITE! button (or a mashed key) during this bite: MISSED!, not TOO SLOW!. */
   private biteOff = false;
   private score = { hero: [] as boolean[], king: [] as boolean[] };
   /** where the camera looks (world) and how close in (1 = the whole boat and a stretch of sea) */
@@ -260,10 +268,11 @@ export class FishingScene extends Phaser.Scene {
         this.biteHit = true;
         return;
       }
+      // (a miss doesn't end it: the button stays up for another go, if you're quick enough)
+      const t = e.target as Element | null;
+      if (!t?.closest?.('.hud, .screen')) this.missMark(e.clientX, e.clientY);
+      return;
     }
-    const t = e.target as Element | null;
-    if (t?.closest?.('.hud, .screen')) return;
-    this.tapped = true;
   };
 
   constructor() {
@@ -274,7 +283,6 @@ export class FishingScene extends Phaser.Scene {
     this.fd = data;
     this.clock = 0;
     this.waits = [];
-    this.tapped = false;
     this.prevKey = true;
     this.biteHit = false;
     this.biteMiss = false;
@@ -332,7 +340,6 @@ export class FishingScene extends Phaser.Scene {
     add('fl-dock', DOCK.w, DOCK.h, 1.5, (ctx) => drawDock(ctx));
     for (const f of HOST_FRAMES) add(`fl-host-${f}`, HOST.w, HOST.h, 2, (ctx) => drawHost(ctx, f));
     add('fl-cooler', COOLER.w, COOLER.h, 2, (ctx) => drawCooler(ctx, false));
-    add('fl-cooler-open', COOLER.w, COOLER.h, 2, (ctx) => drawCooler(ctx, true));
     add('fl-bowl-back', BOWL.w, BOWL.h, 2, (ctx) => drawBowlBack(ctx));
     add('fl-bowl-front', BOWL.w, BOWL.h, 2, (ctx) => drawBowlFront(ctx));
     add('fl-bobber', BOBBER.w, BOBBER.h, 3, (ctx) => drawBobber(ctx));
@@ -353,7 +360,7 @@ export class FishingScene extends Phaser.Scene {
       ctx.fillRect(0, 0, 2, 2);
     });
     makeFishFrames(this, 'fl-kingbob', 'kingbob', ['sw0', 'sw1', 'sw2', 'sw3', 'sw4', 'sw5', 'bl1', 'bl4'], 2);
-    for (const c of CATCHES) makeFishFrames(this, `fl-fish-${c.kind}`, c.kind, ['sw0', 'sw2', 'sw4'], 1.6);
+    for (const c of CATCHES) makeFishFrames(this, `fl-fish-${c.kind}`, c.kind, ['sw0', 'sw2', 'sw4'], fishRes(c));
   }
 
   create() {
@@ -864,10 +871,8 @@ export class FishingScene extends Phaser.Scene {
     // too, but not one pressed quicker than anyone could react (mashing): that's a miss as well.
     const bite = this.dom.querySelector<HTMLElement>('.fsh-bite')!;
     if (!bite.hidden && !this.biteHit && !this.biteMiss) {
-      const tapOff = this.tapped;
-      this.tapped = false;
       const key = this.keyPressed();
-      if (tapOff || (key && this.clock - this.biteAt < BITE_REACT_MS)) this.biteMiss = true;
+      if (key && this.clock - this.biteAt < BITE_REACT_MS) this.biteMiss = true;
       else if (key) this.biteHit = true;
     }
   }
@@ -1256,6 +1261,18 @@ export class FishingScene extends Phaser.Scene {
     return this.score[who].filter(Boolean).length;
   }
 
+  /** A tap that missed BITE!: a little ring where it landed (the button stays up for another go). */
+  private missMark(x: number, y: number) {
+    this.biteOff = true;
+    const m = document.createElement('i');
+    m.className = 'fsh-miss';
+    m.style.left = `${x}px`;
+    m.style.top = `${y}px`;
+    this.dom.appendChild(m);
+    m.addEventListener('animationend', () => m.remove());
+    setTimeout(() => m.remove(), 600);
+  }
+
   /** The BITE! button: up somewhere over the water, fading fast. Resolves true if it was hit in time. */
   private async biteButton(): Promise<boolean> {
     const b = this.dom.querySelector<HTMLElement>('.fsh-bite')!;
@@ -1275,12 +1292,12 @@ export class FishingScene extends Phaser.Scene {
     this.biteHit = false;
     this.biteMiss = false;
     this.biteAt = this.clock;
-    this.tapped = false;
+    this.biteOff = false;
     this.prevKey = true;
     const end = this.clock + BITE_MS;
     while (this.clock < end && !this.biteHit && !this.biteMiss) await this.wait(16);
     const hit = this.biteHit && !this.biteMiss;
-    this.biteOff = this.biteMiss;
+    this.biteOff ||= this.biteMiss;
     this.biteHit = false;
     this.biteMiss = false;
     if (hit) {
@@ -1473,13 +1490,17 @@ export class FishingScene extends Phaser.Scene {
         await this.wait(16);
       }
     };
-    // the fish: its shadow comes over to the hook, and stays about it, biting
+    // the fish: its shadow comes over to the hook, and stays about it, biting (as big as the fish it is:
+    // a huge one means the Fat Fish's about)
+    const c = pickCatch();
+    const shK = Phaser.Math.Clamp((fishDims(c).w * 0.85) / 96, 0.7, 2.6);
+    const deep = (shK - 1) * 14;
     const fish = this.add
-      .image(L.x + (Math.random() < 0.5 ? -1 : 1) * 320, WATER + 130 + Math.random() * 60, 'fl-shadow')
+      .image(L.x + (Math.random() < 0.5 ? -1 : 1) * 320, WATER + 130 + Math.random() * 60 + deep, 'fl-shadow')
       .setDepth(5.5)
       .setAlpha(0);
     const fromLeft = fish.x < L.x;
-    fish.setFlipX(!fromLeft).setScale(0.7 + Math.random() * 0.4);
+    fish.setFlipX(!fromLeft).setScale(shK * (0.92 + Math.random() * 0.16));
     this.tweens.add({ targets: fish, alpha: 0.85, duration: 300 });
     let hits = 0;
     for (let i = 0; i < BITES; i++) {
@@ -1494,8 +1515,8 @@ export class FishingScene extends Phaser.Scene {
         this.shotLine('hero');
         this.heroPose = Math.floor(this.clock / 140) % 2 ? 'r1' : 'r0';
         const u = Phaser.Math.Easing.Sine.InOut(Math.min(1, (this.clock - tA) / approach));
-        fish.x = sx + (L.x + (fromLeft ? -34 : 34) - sx) * u;
-        fish.y = sy + (WATER + 52 - sy) * u + Math.sin(this.clock / 180) * 3;
+        fish.x = sx + (L.x + (fromLeft ? -34 : 34) * shK - sx) * u;
+        fish.y = sy + (WATER + 52 + deep - sy) * u + Math.sin(this.clock / 180) * 3;
         await this.wait(16);
       }
       // nibble, nibble… BITE
@@ -1541,7 +1562,7 @@ export class FishingScene extends Phaser.Scene {
       r.bend = 0.6;
       sfx.whoosh();
       await this.wait(140);
-      await this.heroCatch(fish);
+      await this.heroCatch(fish, c);
       return true;
     }
     // it gets away
@@ -1668,17 +1689,20 @@ export class FishingScene extends Phaser.Scene {
   /**
    * Fish on! It fights (the rod bends right over, the line goes tight, it thrashes about), leaps clean
    * out of the water halfway in, and comes up over the side on the line — held up in the light, its
-   * name and weight — then into the cooler.
+   * name and weight — then tossed back in the sea.
    */
-  private async heroCatch(shadow: Phaser.GameObjects.Image) {
+  private async heroCatch(shadow: Phaser.GameObjects.Image, c: Catch) {
     const L = this.lures.hero;
     const r = this.rod.hero;
-    const c = pickCatch();
+    const dims = fishDims(c);
+    // (a big fish swims deeper, so it's all under the water; and the camera stands back to fit it in)
+    const dd = Math.max(0, dims.h / 2 - 40);
+    const fitZ = Math.min(1, 165 / Math.max(dims.w, dims.h * 1.2));
     const lb = Math.round((c.lb[0] + Math.random() * (c.lb[1] - c.lb[0])) * 10) / 10;
     const { w } = FISH_SIZE[c.kind];
     const fish = this.add
       .sprite(shadow.x, shadow.y, `fl-fish-${c.kind}`, 'sw0')
-      .setScale(c.k / 1.6)
+      .setScale(c.k / fishRes(c))
       .setDepth(5.55);
     shadow.destroy();
     L.mode = 'hooked';
@@ -1727,7 +1751,7 @@ export class FishingScene extends Phaser.Scene {
         L.dip = 14 + Math.sin(this.clock / 80) * 6;
         // the fish follows the hook a little behind it, darting, deeper or shallower
         const tx = L.x + (run ? 30 : -10) + Math.sin(this.clock / 90) * 14;
-        const ty = WATER + 55 + Math.sin(this.clock / 230) * 18;
+        const ty = WATER + 55 + dd + Math.sin(this.clock / 230) * 18;
         fp.vx += ((tx - fp.x) * 30 - fp.vx * 6) * 0.016;
         fp.vy += ((ty - fp.y) * 30 - fp.vy * 6) * 0.016;
         fp.x += fp.vx * 0.016;
@@ -1737,7 +1761,7 @@ export class FishingScene extends Phaser.Scene {
         fish.setFrame(['sw0', 'sw2', 'sw4'][Math.floor(this.clock / (run ? 45 : 70)) % 3]);
         if (Math.random() < 0.25) this.bubbles(fish.x, fish.y, 1);
         // (near the surface it throws up a wake)
-        if (fp.y < WATER + 50 && Math.random() < 0.25) this.ripple(fp.x, WATER, 0.5);
+        if (fp.y - dd < WATER + 50 && Math.random() < 0.25) this.ripple(fp.x, WATER, 0.5 * Math.max(1, dims.w / 140));
         this.cam = this.frameOut(bx(BOAT.hero) - 160, L.x, 0.66, 1.12, WATER - 70);
         await this.wait(16);
       }
@@ -1767,7 +1791,7 @@ export class FishingScene extends Phaser.Scene {
     const hangLen = 30;
     this.swing = { x: m0.x, y: m0.y, px: m0.x + 9, py: m0.y + 16, len: Math.hypot(m0.x - r.tip.x, m0.y - r.tip.y), target: hangLen, t: this.clock };
     this.camK = 3.2;
-    this.cam = { x: this.hero.x + 70, y: this.hero.y - 150, zoom: 1.6 };
+    this.cam = { x: this.hero.x + 70, y: this.hero.y - 150, zoom: 1.6 * fitZ };
     const tLift = this.clock;
     while (this.clock - tLift < 900) {
       this.swingStep(fish, w * c.k);
@@ -1780,7 +1804,8 @@ export class FishingScene extends Phaser.Scene {
     r.reelRate = 0;
     // the show: held up on the line in a burst of light
     this.heroPose = 'j0';
-    this.arm = -0.85;
+    // (a big one held further out, over the side, so it's not on top of the hero)
+    this.arm = -0.85 + Math.max(0, dims.w / 120 - 1) * 0.15;
     const burst = this.add.image(fish.x, fish.y, 'fl-burst').setDepth(8.2).setBlendMode(Phaser.BlendModes.ADD).setScale(0.2).setAlpha(0.9);
     this.tweens.add({
       targets: burst,
@@ -1819,8 +1844,8 @@ export class FishingScene extends Phaser.Scene {
       burst.setPosition(fish.x, fish.y);
       this.cam = {
         x: (this.hero.x + fish.x) / 2 + 20,
-        y: fish.y + 40,
-        zoom: 1.6,
+        y: fish.y + 40 * fitZ,
+        zoom: 1.6 * fitZ,
       };
       if (Math.random() < 0.08) this.sparkle(fish.x, fish.y, 2);
       // (a drip now and then)
@@ -1848,46 +1873,187 @@ export class FishingScene extends Phaser.Scene {
       duration: 300,
       onComplete: () => burst.destroy(),
     });
-    // off the hook and into the cooler
-    this.dangle.hero = null;
-    this.swing = null;
-    this.cooler.setTexture('fl-cooler-open');
-    const cool = this.onBoat(BOAT.cooler, BOAT.feet - 30);
-    const f0 = { x: fish.x, y: fish.y };
-    const s0 = fish.scale;
-    const arc2 = { t: 0 };
-    sfx.whoosh();
-    await this.tw({
-      targets: arc2,
-      t: 1,
-      duration: 520,
-      ease: 'Sine.easeIn',
-      onUpdate: () => {
-        fish.setPosition(f0.x + (cool.x - f0.x) * arc2.t, f0.y + (cool.y - f0.y) * arc2.t - Math.sin(arc2.t * Math.PI) * 90);
-        fish.setRotation(-Math.PI / 2 + arc2.t * Math.PI * 1.5).setScale(s0 * (1 - arc2.t * 0.55));
-      },
-    });
-    fish.destroy();
-    this.splash(cool.x, cool.y + 10, 8, 0.5);
-    sfx.thud();
-    this.time.delayedCall(260, () => this.cooler.setTexture('fl-cooler'));
-    this.tweens.add({
-      targets: this.cooler,
-      scaleY: this.cooler.scaleY * 0.9,
-      yoyo: true,
-      duration: 90,
-    });
+    // off the hook and back in the sea it goes
+    await this.tossBack(fish, c);
     card.hidden = true;
     this.dangle.hero = null;
     r.taut = false;
     r.bend = 0;
     this.heroPose = null;
     this.arm = -0.85;
-    await this.wait(300);
+    await this.wait(120);
     this.hangLure('hero');
     this.camK = 2.2;
     this.shotBoat(1);
     await this.wait(500);
+  }
+
+  /**
+   * Back it goes: the hero swings the rod up and back, then flicks it forward; the fish comes off the
+   * hook and sails out over the side, turning over in the air (a little one spins, the Fat Fish
+   * flops), lands with a splash as big as it is, and swims off — with a happy leap on its way.
+   * Everything scales with the fish: how far and high it goes, how fast it turns, the splash.
+   */
+  private async tossBack(fish: Phaser.GameObjects.Sprite, c: Catch) {
+    const r = this.rod.hero;
+    const dims = fishDims(c);
+    // (how hefty it is: 1 = a Stone; the Fat Fish about 2.3, a Zippy under 0.8)
+    const m = Phaser.Math.Clamp(dims.w / 120, 0.6, 2.6);
+    const dd = Math.max(0, dims.h / 2 - 40);
+    const fitZ = Math.min(1, 165 / Math.max(dims.w, dims.h * 1.2));
+    const heroX = this.hero.x;
+    this.camK = 2.6;
+    // ── 1. the swing back: the rod up and back over the shoulder, the fish swinging along under it ──
+    this.heroPose = null;
+    this.tweens.killTweensOf(this);
+    this.tweens.killTweensOf(r);
+    this.tweens.add({ targets: this, heroLean: -0.1, duration: 440, ease: 'Sine.easeInOut' });
+    this.tweens.add({ targets: this, arm: -2.05, duration: 440, ease: 'Sine.easeInOut' });
+    this.tweens.add({ targets: r, bend: Math.min(0.75, 0.3 + 0.15 * m), duration: 440, ease: 'Sine.easeOut' });
+    let t0 = this.clock;
+    while (this.clock - t0 < 500) {
+      this.swingStep(fish, dims.w);
+      this.cam = { x: (heroX + fish.x) / 2 + 30, y: Math.min(fish.y, this.hero.y - 120) + 20, zoom: 1.35 * fitZ };
+      await this.wait(16);
+    }
+    // ── 2. the flick: the rod whips forward and the fish comes off the hook at the top ──
+    sfx.whoosh();
+    this.tipTrail = [];
+    this.tweens.add({ targets: this, heroLean: 0.1, duration: 260, ease: 'Cubic.easeIn' });
+    const whip = this.tweens.add({ targets: this, arm: -0.35, duration: 260, ease: 'Cubic.easeIn' });
+    r.bend = -0.45;
+    while (this.arm < -1.05 && !whip.isFinished()) {
+      this.swingStep(fish, dims.w);
+      this.tipTrail.push({ x: r.tip.x, y: r.tip.y, t: this.clock });
+      await this.wait(8);
+    }
+    const mouth = this.dangle.hero ?? r.tip;
+    this.swing = null;
+    this.dangle.hero = null;
+    this.sparkle(mouth.x, mouth.y, 5);
+    sfx.pop();
+    // (the rod springs back and the hero settles, as after a cast)
+    whip.once('complete', () => {
+      r.bend = 0.35;
+      this.tweens.add({ targets: r, bend: 0, duration: 900, ease: 'Elastic.easeOut' });
+      this.tweens.add({ targets: this, heroLean: 0, duration: 600, ease: 'Sine.easeOut' });
+      this.tweens.add({ targets: this, arm: -0.85, duration: 600, ease: 'Sine.easeInOut' });
+    });
+    // ── 3. through the air: out over the side, turning over; a big one goes less far and turns slower ──
+    const p = { x: fish.x, y: fish.y, vx: 640 / Math.pow(m, 0.35), vy: -560 / Math.pow(m, 0.3) };
+    const spin = 7 / m;
+    let rot = fish.rotation;
+    let tS = this.clock;
+    this.camK = 4.5;
+    const G = 1250;
+    while (!(p.y >= WATER + 6 && p.vy > 0)) {
+      // (on the scene clock in 60 Hz steps, like the swing: the same flight whatever the frame rate)
+      const steps = Phaser.Math.Clamp(Math.round((this.clock - tS) / 16.7), 0, 8);
+      tS += steps * 16.7;
+      for (let i = 0; i < steps; i++) {
+        p.vy += G / 60;
+        p.x += p.vx / 60;
+        p.y += p.vy / 60;
+        rot += spin / 60;
+      }
+      fish.setPosition(p.x, p.y).setRotation(rot);
+      fish.setFrame(['sw0', 'sw2', 'sw4'][Math.floor(this.clock / (40 + 25 * m)) % 3]);
+      if (Math.random() < 0.15) {
+        const d = this.add.image(p.x, p.y, 'fl-drop').setScale(0.4).setDepth(8.5);
+        this.tweens.add({ targets: d, y: d.y + 90, alpha: 0, duration: 450, ease: 'Quad.easeIn', onComplete: () => d.destroy() });
+      }
+      // (the camera goes with it, the boat still in shot behind)
+      this.cam = { x: (heroX + 2 * p.x) / 3, y: Math.min(WATER - 70, p.y + 30), zoom: Math.max(0.72, 1.15 * fitZ + 0.1) };
+      await this.wait(16);
+    }
+    // ── 4. splash! (as big as the fish) ──
+    sfx.splash();
+    this.splash(p.x, WATER, Math.round(9 + 8 * m), 0.65 + 0.35 * m);
+    if (m > 1.6) {
+      // (the Fat Fish: a belly flop you can feel)
+      sfx.thud();
+      this.cameras.main.shake(260, 0.005);
+      this.time.delayedCall(160, () => this.ripple(p.x, WATER, 1.6 * m));
+    }
+    fish.setDepth(5.55);
+    // under it goes, turning to swim away from the boat
+    const under = { x: p.x, y: p.y, r: rot };
+    const rTo = Math.round(rot / (Math.PI * 2)) * Math.PI * 2;
+    await this.tw({
+      targets: under,
+      x: p.x + 90 / Math.sqrt(m),
+      y: WATER + 60 + dd,
+      r: rTo,
+      duration: 480,
+      ease: 'Quad.easeOut',
+      onUpdate: () => {
+        fish.setPosition(under.x, under.y).setRotation(under.r).setAlpha(Math.max(0.85, fish.alpha - 0.01));
+        fish.setFrame(['sw0', 'sw2', 'sw4'][Math.floor(this.clock / 90) % 3]);
+      },
+    });
+    this.camK = 3;
+    fish.setFlipX(false).setRotation(0);
+    this.bubbles(fish.x, fish.y, Math.round(4 + 2 * m));
+    // ── 5. off it swims, faster and faster — then a happy leap, and away ──
+    const sp = 300 / Math.pow(m, 0.3);
+    const swimZ = Math.max(0.72, 1.2 * fitZ + 0.1);
+    let x = fish.x;
+    t0 = this.clock;
+    let last = this.clock;
+    while (this.clock - t0 < 420) {
+      const dt = (this.clock - last) / 1000;
+      last = this.clock;
+      x += sp * dt * (0.5 + (this.clock - t0) / 840);
+      fish.setPosition(x, WATER + 60 + dd + Math.sin(this.clock / 120) * 4).setRotation(Math.sin(this.clock / 70) * 0.12);
+      fish.setFrame(['sw0', 'sw2', 'sw4'][Math.floor(this.clock / 55) % 3]);
+      if (Math.random() < 0.2) this.bubbles(fish.x - dims.w * 0.4, fish.y, 1);
+      this.cam = { x: x - 140, y: WATER - 60, zoom: swimZ };
+      await this.wait(16);
+    }
+    // the leap: up out of the water and over, nose first (a little one higher, the Fat Fish a heave)
+    const lx0 = fish.x;
+    const ly0 = fish.y;
+    const up = 40 + 60 / m + dd;
+    const along = 170 / Math.sqrt(m);
+    sfx.splash();
+    this.splash(lx0 + along * 0.15, WATER, Math.round(5 + 3 * m), 0.5 + 0.25 * m);
+    fish.setDepth(8);
+    this.heroPose = 'j0';
+    this.tweens.add({ targets: this, heroHop: 16, duration: 200, ease: 'Quad.easeOut', yoyo: true, repeat: 1, repeatDelay: 60 });
+    const lp = { t: 0 };
+    await this.tw({
+      targets: lp,
+      t: 1,
+      duration: 560 + 120 * m,
+      ease: 'Linear',
+      onUpdate: () => {
+        const t = lp.t;
+        fish.setPosition(lx0 + along * t, ly0 - Math.sin(t * Math.PI) * (up + (ly0 - WATER)));
+        fish.setRotation(-(0.9 - t * 1.8) * 0.75);
+        fish.setFrame(['sw0', 'sw2', 'sw4'][Math.floor(t * 10) % 3]);
+        if (t > 0.45 && t < 0.5 && Math.random() < 0.5) this.sparkle(fish.x, fish.y - dims.h * 0.3, 2);
+        this.cam = { x: fish.x - 140, y: Math.min(WATER - 60, fish.y + 50), zoom: swimZ };
+      },
+    });
+    sfx.splash();
+    this.splash(fish.x, WATER, Math.round(6 + 4 * m), 0.5 + 0.3 * m);
+    fish.setDepth(5.55).setRotation(0);
+    this.heroPose = null;
+    // (and away, fading into the deep)
+    t0 = this.clock;
+    last = this.clock;
+    x = fish.x;
+    while (this.clock - t0 < 520) {
+      const dt = (this.clock - last) / 1000;
+      last = this.clock;
+      const u = (this.clock - t0) / 520;
+      x += sp * 1.4 * dt;
+      fish.setPosition(x, WATER + 60 + dd + u * 50).setAlpha(0.85 * (1 - u));
+      this.cam = { x: x - 160, y: WATER - 60, zoom: swimZ };
+      fish.setFrame(['sw0', 'sw2', 'sw4'][Math.floor(this.clock / 50) % 3]);
+      await this.wait(16);
+    }
+    fish.destroy();
   }
 
   /**
@@ -2042,7 +2208,7 @@ export class FishingScene extends Phaser.Scene {
         L.mode = 'hooked';
         fish = this.add
           .sprite(L.x, WATER + 60, `fl-fish-${c.kind}`, 'sw0')
-          .setScale((c.k / 1.6) * 0.7)
+          .setScale((c.k / fishRes(c)) * 0.7)
           .setDepth(5.55);
       }
       if (fish) {
