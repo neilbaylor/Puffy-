@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.282)
+## Where things stand (v0.283)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -192,6 +192,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Level 4 (Plop Invasion · Part 2) planning: mostly climbing up (~60%), 2 parachute drops (~25 s each, Plops parachuting at different speeds: slow big patched dome / middling / fast streamer; shoot them: POP), a baseball game in the middle, boss later. Concept art in src/gfx/skydive.ts (drawCanopy, drawHeroChute(ch, pose, 'pack'|'burst'|'opening'|'open'|'steer'|'land', lean), drawPlopChute(kind, 'slow'|'mid'|'fast'|'popped')), sheets in sketches/level4/ (sheet.ts renders them via esbuild + ../l4art/shot.cjs). Engine work needed: vertical terrain chunking (4096 px), climbing camera, vertical background, parachute player state, vertical fly-over.
 - v0.267: host captions 35 ms/char, lines 3400/2050/1850/2250 ms, lead-in 1250+500 (the user found 26 ms rushed, 38 slow). kingFlip lands with splash(34, 560) + spray burst + foam ring, then sfx.laugh + 'HA HA HA!' bubble.
 - v0.266: Fishing opening: DOCK_X -2700 (WORLD_L -3000); host → boat is a 4.4 s tweened swoop (arc up, zoom out 40% mid-way; Skip speeds it ×6), then King Bob 'You'll NEVER beat me at fishing!' + kingFlip() (out of the bowl in a roll and back, splash). Test: sketches/fishing/tflip.cjs.
+- v0.283: User liked the KO badge top right (not the centred band): .bl-last right clamp(8px,1.4vw,16px), top --lasttop clamp(16px,4.4vh,30px), no band. Lobby heroes bigger: --cw clamp(64px,16.5vh,118px) (tablet clamp(92px,22.5vh,188px)).
 - v0.282: Fishing BITE!: the window pointerdown listener's `tapped` used to count as a hit anywhere on screen (update() used tapPressed()). Now: button's own pointerdown = hit; any other tap while it's up = biteMiss (callout 'MISSED!' via biteOff); keys/gamepad (keyPressed()) hit unless within BITE_REACT_MS 120 of biteAt (mashing → miss). tfish.cjs 6th arg 'off' taps off the button.
 - v0.281: Lobby .bl-last centred at the top of the square (left 50%, --lasttop clamp(12px,3.4vh,24px), --lastfont clamp(13px,3.4vh,22px)); .bl-slots:has(.bl-last) .bl-slot gets padding-top for a band, so the badge never covers the hero (it did on phones) and squares stay equal.
 - v0.280: Battle sim keepApart() after stepEnemies: non-chute bad guys on about the same level (|dy| < 0.6·min h) closer than 0.8·(wa+wb)/2 are eased apart (APART_SPEED 90 px/s, nudge() never into walls). User: enemies (two Plops) stuck on each other — there was no enemy–enemy spacing at all. Test sketches/battle-tests/bapart.ts.
