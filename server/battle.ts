@@ -11,7 +11,8 @@ import type { Server } from 'node:http';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { CHARACTERS } from '../src/data/characters';
 import { buildArena } from '../src/shared/battle/arena';
-import { BattleSim, DT, TICK_HZ } from '../src/shared/battle/sim';
+import { BattleSim, BTN, DT, TICK_HZ } from '../src/shared/battle/sim';
+import { compactQueue } from './inputQueue';
 import { MAX_BATTLERS, START_NOW_SECS, WEAPON_CODE, packPlayer, type ClientMsg, type Phase, type RoomPlayer, type RoomState, type ServerMsg, type SnapChair, type SnapEnemy, type SnapHazard, type SnapPrize } from '../src/shared/battle/protocol';
 
 /** (BATTLE_COUNTDOWN lengthens it, for taking screenshots) */
@@ -350,7 +351,8 @@ class Room {
         const inputs = new Map<string, number>();
         for (const c of this.clients.values()) {
           if (!c.playing) continue;
-          if (c.queue.length > MAX_QUEUE) c.queue.splice(0, c.queue.length - 2);
+          // (catching up after a hiccup: drop the repeats, keep every press)
+          if (c.queue.length > MAX_QUEUE) compactQueue(c.queue, c.lastBtn, 2, MAX_QUEUE, MAX_QUEUE * 2, BTN.jump);
           const next = c.queue.shift();
           if (next) {
             c.lastSeq = next[0];
