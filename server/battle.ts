@@ -483,6 +483,14 @@ export function attachBattle(server: Server) {
   // tick late about twice a second: Node's timers run in whole milliseconds, 16 not 16.7.)
   let due = performance.now() + DT * 1000;
   const loop = () => {
+    // (the next tick is always set, even if something here throws: a dead loop would stop every battle)
+    try {
+      step();
+    } finally {
+      setTimeout(loop, Math.max(0, due - performance.now()));
+    }
+  };
+  const step = () => {
     const now = performance.now();
     // (after a long stall, e.g. the machine was busy: at most a quarter second's worth caught up, as before)
     if (now - due > 250) due = now - 250;
@@ -510,7 +518,6 @@ export function attachBattle(server: Server) {
       else if (!r.emptySince) r.emptySince = t;
       else if (t - r.emptySince > 60000) rooms.delete(code);
     }
-    setTimeout(loop, Math.max(0, due - performance.now()));
   };
   setTimeout(loop, DT * 1000);
   console.log('Battle server ready at /battle');
