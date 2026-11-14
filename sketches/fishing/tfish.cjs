@@ -1,5 +1,5 @@
-// King Bob's fishing contest, played by a bot: stops the cast meter in the green, hits BITE! when it shows.
-// Screenshots each stage once (meter, cast in the air, bite button, fish on, the leap, the catch card, King Bob's turn, the end).
+// King Bob's fishing contest, played by a bot: hits BITE! when it shows (the cast is automatic).
+// Screenshots each stage once (cast in the air, bite button, fish on, the leap, the catch card, King Bob's turn, the end).
 // Args: <tag> <odds (chance a hit bite is a catch; default the game's)> <width> <height> [off: tap off the BITE! button instead of on it]
 const { chromium } = require('playwright');
 const TAG = process.argv[2] || 'a';
@@ -34,9 +34,7 @@ const OFF = process.argv[6] === 'off';
       const f = window.__fishing;
       if (!f || !f.scene.isActive() || document.querySelector('.screen .results')) return { done: true };
       const d = f.dom;
-      const m = f.meter;
       return {
-        meter: !!m, phase: m ? m.el.dataset.m : '', inZone: m ? m.pos > m.zone[0] + 0.01 && m.pos < m.zone[1] - 0.01 : false,
         bite: !d.querySelector('.fsh-bite').hidden,
         hero: f.lures.hero.mode, king: f.lures.king.mode, lx: Math.round(f.lures.hero.x - f.hero.x), kx: Math.round(f.lures.king.x - f.hero.x),
         card: d.querySelector('.fsh-catch').classList.contains('show'),
@@ -50,7 +48,6 @@ const OFF = process.argv[6] === 'off';
     prevH = s.hero; prevK = s.king;
     if (s.callout && s.callout !== last) { last = s.callout; console.log('  callout:', s.callout, JSON.stringify(s.score)); await p.waitForTimeout(700); await shot('co' + String(++nco).padStart(2, '0')); }
     if (s.callout.startsWith('ROUND 1')) await shot('round');
-    if (s.meter) { await shot(s.phase === 'aim' ? 'meter2' : 'meter'); if (s.inZone) { await p.mouse.click(W * 0.3, H * 0.5); await p.waitForTimeout(150); } continue; }
     if (s.hero === 'fly') await shot('cast');
     if (s.bite) { await shot('bite'); if (OFF) await p.mouse.click(W * 0.06, H * 0.92); else await p.locator('.fsh-bite').click({ force: true, timeout: 500 }).catch(() => {}); continue; }
     if (s.hero === 'hooked') await shot('fishon');

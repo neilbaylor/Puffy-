@@ -38,7 +38,6 @@ import { FISH_SIZE, drawFish, type FishKind } from '../gfx/fish';
 import { stingerReveal, stingerTitle } from '../ui/stinger';
 import { gamepadSources } from '../input/gamepad';
 import { isKeyDown } from '../input/keyboard';
-import { usingTouch } from '../input/touch';
 import type { GameData, GameOverState, ResultState } from './GameScene';
 import { loseLife } from '../core/lives';
 import { SimpleConfetti } from '../world/SimpleConfetti';
@@ -76,8 +75,9 @@ const DOCK_X = -2700;
 const DOCK_TOP = WATER - 58;
 const HOST_X = DOCK_X + 470;
 const ROUNDS = 6;
-/** The share of bites you tap in time that end up a fish on the line. */
-const CATCH = 0.26;
+/** Your turn: the bites in a row (hit them all and the fish is yours), and the cast's power (always the same). */
+const BITES = 6;
+const HERO_CAST = 0.7;
 /** King Bob lands about this share of his casts. */
 const KING_CATCH = 0.46;
 /** A hero's size here: world px per art unit. */
@@ -147,10 +147,10 @@ interface Rod {
 
 /**
  * King Bob's fishing contest: the World 3 boss. Out on his boat, the REEL ROYAL, you take turns:
- * six rounds, then sudden death. Your turn: a cast (the basketball power meter — the better the cast,
- * the more bites, 3 to 6), the lure flying out over the sea on its line, then reeling in. Every so
- * often something bites: a round BITE! button pops up and fades fast — hit it in time and you strike;
- * one strike in about six hooks a fish, and then it's a fight, a leap, and up it comes over the boat.
+ * six rounds, then sudden death. Your turn: the cast is automatic (the same long one every time), the
+ * lure flying out over the sea on its line, then reeling in while a fish comes to the hook and bites
+ * six times: each time a round BITE! button pops up and fades fast. Hit all six and it's yours; five,
+ * a 50% chance; four, 20%; fewer and it gets away. Hooked, it's a fight, a leap, and up it comes.
  * King Bob's turn is quicker (about five seconds): he casts, reels like mad, and lands about half.
  */
 export class FishingScene extends Phaser.Scene {
@@ -513,7 +513,7 @@ export class FishingScene extends Phaser.Scene {
     this.placeBoat();
     for (const who of ['hero', 'king'] as const) this.hangLure(who);
 
-    // ── the HUD: the scoreboard, the cast meter, the BITE button, the call-outs ──
+    // ── the HUD: the scoreboard, the BITE button, the call-outs ──
     this.dom = document.createElement('div');
     this.dom.className = 'hoops fishing';
     this.dom.innerHTML = `
@@ -530,11 +530,6 @@ export class FishingScene extends Phaser.Scene {
         <div class="tvo-cc"></div>
       </div>
       <div class="tv-ticker" hidden><b>REEL ROYAL TV</b><div class="tv-crawl"><span></span></div></div>
-      <div class="hoops-meters fsh-meter" hidden>
-        <div class="hm" data-m="power"><b>Power</b><div class="hm-bar"><i class="hm-zone"></i><i class="hm-mark"></i></div></div>
-        <div class="hm" data-m="aim"><b>Aim</b><div class="hm-bar"><i class="hm-zone"></i><i class="hm-mark"></i></div></div>
-        <p class="hm-hint">${usingTouch() ? 'Tap' : 'Press Space or click'} to stop the marker in the green!</p>
-      </div>
       <button class="fsh-bite" hidden aria-label="Bite: strike now"><svg class="fb-ring" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="45" pathLength="100"></circle></svg><b>BITE!</b></button>
       <div class="fsh-callout"></div>
       <div class="fsh-catch" hidden><em></em><div class="lt"><small></small><b></b><span></span></div></div>
@@ -588,11 +583,7 @@ export class FishingScene extends Phaser.Scene {
     return this.wait(ms + 10);
   }
 
-  private tapPressed() {
-    const pressed = this.tapped || this.keyPressed();
-    this.tapped = false;
-    return pressed;
-  }
+
 
   /** A key (or a gamepad button) just went down. */
   private keyPressed() {
@@ -851,19 +842,6 @@ export class FishingScene extends Phaser.Scene {
       const canSkip = this.clock > 1800;
       this.dom.querySelector<HTMLElement>('.hoops-skip')!.hidden = !canSkip || this.skipping;
       if (canSkip && !this.skipping && (isKeyDown('Enter') || isKeyDown('Escape'))) this.skipping = true;
-    }
-    // the meter's marker
-    if (this.meter) {
-      const m = this.meter;
-      m.pos += m.dir * m.speed * s;
-      if (m.pos > 1) {
-        m.pos = 2 - m.pos;
-        m.dir = -1;
-      } else if (m.pos < 0) {
-        m.pos = -m.pos;
-        m.dir = 1;
-      }
-      m.el.querySelector<HTMLElement>('.hm-mark')!.style.left = `${m.pos * 100}%`;
     }
     // BITE! is hit by tapping IT (its own listener) — a tap anywhere else while it's up is a miss
     // (it used to count as a hit: tapping anywhere caught fish). A key or gamepad button hits it
@@ -1224,7 +1202,7 @@ export class FishingScene extends Phaser.Scene {
       'WIND NE 6 KNOTS',
       'SEAS 1–2 FT',
       'KING BOB: 312 CONTESTS, 312 WINS',
-      'PRO TIP: STOP THE MARKER IN THE GREEN FOR MORE BITES',
+      'PRO TIP: HOOK ALL 6 BITES AND THE FISH IS YOURS',
       'THE BITES DON’T WAIT — STRIKE FAST!',
     ];
     span.textContent = items.join('   ◆   ') + '   ◆   ';
@@ -1260,49 +1238,6 @@ export class FishingScene extends Phaser.Scene {
   }
   private total(who: Who) {
     return this.score[who].filter(Boolean).length;
-  }
-
-  private meter: null | {
-    pos: number;
-    dir: number;
-    speed: number;
-    zone: [number, number];
-    el: HTMLElement;
-  } = null;
-  /** The cast meter: the marker runs back and forth; stop it in the green. Gives where it stopped and how far off the green. */
-  private async lockMeter(phase: 'power' | 'aim', speed: number, zoneW: number) {
-    const box = this.dom.querySelector<HTMLElement>('.fsh-meter')!;
-    box.hidden = false;
-    const el = box.querySelector<HTMLElement>(`[data-m=${phase}]`)!;
-    el.classList.add('active');
-    el.classList.remove('locked');
-    const c = 0.25 + Math.random() * 0.6;
-    const zone: [number, number] = [c - zoneW / 2, c + zoneW / 2];
-    const z = el.querySelector<HTMLElement>('.hm-zone')!;
-    z.style.left = `${zone[0] * 100}%`;
-    z.style.width = `${zoneW * 100}%`;
-    this.meter = { pos: Math.random() * 0.15, dir: 1, speed, zone, el };
-    await this.wait(250);
-    this.tapped = false;
-    for (;;) {
-      await this.wait(16);
-      if (this.tapPressed()) break;
-    }
-    const m = this.meter!;
-    this.meter = null;
-    el.classList.remove('active');
-    el.classList.add('locked');
-    sfx.select();
-    const off = m.pos < zone[0] ? zone[0] - m.pos : m.pos > zone[1] ? m.pos - zone[1] : 0;
-    // (how far off and which way: − short of the green, + past it)
-    return { pos: m.pos, off, side: m.pos < zone[0] ? -1 : m.pos > zone[1] ? 1 : 0 };
-  }
-  /** Both meters done: put them away. */
-  private hideMeters() {
-    this.time.delayedCall(450, () => {
-      this.dom.querySelector<HTMLElement>('.fsh-meter')!.hidden = true;
-      this.dom.querySelectorAll('.fsh-meter .hm').forEach((e) => e.classList.remove('locked', 'active'));
-    });
   }
 
   /** The BITE! button: up somewhere over the water, fading fast. Resolves true if it was hit in time. */
@@ -1483,7 +1418,7 @@ export class FishingScene extends Phaser.Scene {
 
   // ── your turn ──
 
-  private async heroTurn(round: number): Promise<boolean> {
+  private async heroTurn(_round: number): Promise<boolean> {
     const L = this.lures.hero;
     this.shotBoat(1.12);
     this.cam.x = bx(BOAT.hero) + 140;
@@ -1492,31 +1427,18 @@ export class FishingScene extends Phaser.Scene {
     this.arm = -0.85;
     this.hangLure('hero');
     await this.callout('YOUR CAST', 'you', 900);
-    // the meters, as at basketball: power (how far it goes), then aim; a little quicker and a little
-    // narrower as the contest goes on. The nearer both are to the green, the more bites (3 to 6).
-    const n = Math.min(round, ROUNDS) - 1;
-    const speed = 1.05 + n * 0.08;
-    const zw = Math.max(0.1, 0.17 - n * 0.012);
-    const p = await this.lockMeter('power', speed, zw);
-    const aim = await this.lockMeter('aim', speed * 1.1, zw);
-    this.hideMeters();
-    const miss = p.off + aim.off;
-    const bites = miss === 0 ? 6 : miss <= 0.06 ? 5 : miss <= 0.16 ? 4 : 3;
-    const power = 0.25 + p.pos * 0.75;
-    await this.heroCast(power, aim.side * Math.min(1, aim.off * 5));
-    this.callout(
-      bites === 6 ? 'PERFECT CAST!<small>6 bites</small>' : bites === 5 ? 'GREAT CAST!<small>5 bites</small>' : bites === 4 ? 'GOOD CAST<small>4 bites</small>' : 'WEAK CAST<small>3 bites</small>',
-      bites >= 5 ? 'good' : bites === 3 ? 'bad' : '',
-      1300,
-    );
-    // ── reeling in: the bites come, one after another, as the bobber comes back in ──
+    // the cast is automatic, the same good long one every time; it's all in the bites
+    await this.heroCast(HERO_CAST);
+    this.callout(`HOOK IT!<small>${BITES} bites — get them all</small>`, 'good', 1300);
+    // ── reeling in: one fish comes to the hook and bites, again and again, as the bobber comes in ──
     const r = this.rod.hero;
     r.reelRate = 0.9;
     this.heroPose = null;
     this.arm = -0.5;
     const startX = L.x;
     const endX = bx(BOAT.motor) + 80;
-    const gaps = Array.from({ length: bites }, () => 1100 + Math.random() * 700);
+    // (a random wait before each bite)
+    const gaps = Array.from({ length: BITES }, () => 1100 + Math.random() * 700);
     const total = gaps.reduce((a, b) => a + b, 0) + 900;
     const t0 = this.clock;
     // (the bites come while the bobber's still well out: it's wound only about halfway in through them,
@@ -1535,15 +1457,18 @@ export class FishingScene extends Phaser.Scene {
         await this.wait(16);
       }
     };
-    for (let i = 0; i < bites; i++) {
-      // a fish's shadow comes over to the hook while you reel
-      const fish = this.add
-        .image(L.x + (Math.random() < 0.5 ? -1 : 1) * 320, WATER + 130 + Math.random() * 60, 'fl-shadow')
-        .setDepth(5.5)
-        .setAlpha(0);
-      const fromLeft = fish.x < L.x;
-      fish.setFlipX(!fromLeft).setScale(0.7 + Math.random() * 0.4);
-      this.tweens.add({ targets: fish, alpha: 0.85, duration: 300 });
+    // the fish: its shadow comes over to the hook, and stays about it, biting
+    const fish = this.add
+      .image(L.x + (Math.random() < 0.5 ? -1 : 1) * 320, WATER + 130 + Math.random() * 60, 'fl-shadow')
+      .setDepth(5.5)
+      .setAlpha(0);
+    const fromLeft = fish.x < L.x;
+    fish.setFlipX(!fromLeft).setScale(0.7 + Math.random() * 0.4);
+    this.tweens.add({ targets: fish, alpha: 0.85, duration: 300 });
+    let hits = 0;
+    for (let i = 0; i < BITES; i++) {
+      // (the first time it swims in from off to the side; after that it hangs about the hook, backing
+      // off a little and nosing in again)
       const approach = gaps[i] - 300;
       const tA = this.clock;
       const sx = fish.x;
@@ -1573,47 +1498,48 @@ export class FishingScene extends Phaser.Scene {
       sfx.bloop();
       const hit = await this.biteButton();
       if (hit) {
-        // strike! the rod snaps up
+        // a strike: the rod snaps up
+        hits++;
         this.heroPose = null;
-        this.arm = -1.55;
-        r.bend = 0.6;
+        this.arm = -1.3;
+        r.bend = 0.55;
         sfx.whoosh();
-        await this.wait(140);
-        if (Math.random() < ((window as unknown as { __fishOdds?: number }).__fishOdds ?? CATCH)) {
-          await this.heroCatch(fish);
-          return true;
-        }
-        // …it's off: the fish bolts
-        L.dip = 0;
-        r.bend = 0;
+        this.callout(`GOT IT!<small>${hits} of ${BITES}</small>`, 'good small', 650);
+        await this.wait(160);
         this.arm = -0.5;
-        this.callout('MISSED!', 'bad small', 700);
-        this.tweens.add({
-          targets: fish,
-          x: fish.x + (fromLeft ? -420 : 420),
-          y: fish.y + 80,
-          alpha: 0,
-          duration: 450,
-          ease: 'Quad.easeIn',
-          onComplete: () => fish.destroy(),
-        });
-        this.bubbles(L.x, WATER + 50, 6);
       } else {
-        // too slow (or a tap off the button): it takes the bait and goes
-        L.dip = 0;
-        r.bend = 0;
-        this.callout(this.biteOff ? 'MISSED!' : 'TOO SLOW!', 'bad small', 700);
-        this.tweens.add({
-          targets: fish,
-          x: fish.x + (fromLeft ? -360 : 360),
-          alpha: 0,
-          duration: 900,
-          ease: 'Sine.easeIn',
-          onComplete: () => fish.destroy(),
-        });
+        this.callout(`${this.biteOff ? 'MISSED!' : 'TOO SLOW!'}<small>${hits} of ${BITES}</small>`, 'bad small', 650);
       }
+      L.dip = 0;
+      r.bend = 0;
+      // (it backs off a little before it comes in again)
+      if (i < BITES - 1) this.tweens.add({ targets: fish, x: fish.x + (fromLeft ? -50 : 50), y: fish.y + 22, duration: 300, ease: 'Sine.easeOut' });
       await reelFor(260);
     }
+    // all six: it's yours; five: a coin toss; four: a long shot; fewer, it gets away
+    const forced = (window as unknown as { __fishOdds?: number }).__fishOdds;
+    const chance = forced ?? (hits >= BITES ? 1 : hits === BITES - 1 ? 0.5 : hits === BITES - 2 ? 0.2 : 0);
+    if (Math.random() < chance) {
+      this.heroPose = null;
+      this.arm = -1.55;
+      r.bend = 0.6;
+      sfx.whoosh();
+      await this.wait(140);
+      await this.heroCatch(fish);
+      return true;
+    }
+    // it gets away
+    this.callout(hits >= BITES - 2 ? 'IT GOT AWAY!' : 'GONE!', 'bad small', 800);
+    this.tweens.add({
+      targets: fish,
+      x: fish.x + (fromLeft ? -420 : 420),
+      y: fish.y + 80,
+      alpha: 0,
+      duration: 600,
+      ease: 'Quad.easeIn',
+      onComplete: () => fish.destroy(),
+    });
+    this.bubbles(L.x, WATER + 50, 6);
     // the last of it in, no fish: wound in briskly
     await reelFor(Math.max(0, total - (this.clock - t0)));
     {
@@ -2170,7 +2096,6 @@ export class FishingScene extends Phaser.Scene {
     const ch = characterById(this.fd.charId);
     const score = `${this.total('hero')} – ${this.total('king')}`;
     this.noClear = true;
-    this.dom.querySelector<HTMLElement>('.fsh-meter')!.hidden = true;
     // ── 1. in close on the hero: hopping for joy, the confetti going off ──
     this.tweens.killTweensOf(this);
     this.heroLean = 0;
