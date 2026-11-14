@@ -777,6 +777,58 @@ export function dropBaddiesExcept(scene: Phaser.Scene, level: number | 'battle')
   if (!want.includes('chutes')) for (const c of CHARACTERS) if (scene.textures.exists(`chute-${c.id}`)) scene.textures.remove(`chute-${c.id}`);
 }
 
+/**
+ * Each boss's own pictures (the arena, the crowd, the boss…: whatever was made while it was up), by
+ * boss (scene and level: Hoops has two arenas). Kept while you're there, back on the start screen and
+ * through the level it ends (a rematch is instant), freed once you start anything else: memory
+ * doesn't keep growing with every boss you visit.
+ */
+const bossArt = new Map<string, Set<string>>();
+const BOSS_SCENES = ['Hoops', 'Wrestle', 'Fishing'];
+
+/** Note what each boss scene makes (call once the game's scenes exist). */
+export function trackBossArt(game: Phaser.Game) {
+  for (const key of BOSS_SCENES) {
+    const sc = game.scene.getScene(key);
+    let before: Set<string> | null = null;
+    sc.events.on(Phaser.Scenes.Events.START, () => (before = new Set(game.textures.getTextureKeys())));
+    sc.events.on(Phaser.Scenes.Events.SHUTDOWN, () => {
+      // (only after a real start: stopping a scene that isn't running says shutdown too)
+      if (!before) return;
+      const id = `${key}:${(sc.sys.settings.data as { level?: number } | undefined)?.level}`;
+      const own = bossArt.get(id) ?? new Set<string>();
+      for (const k of game.textures.getTextureKeys()) if (!before.has(k)) own.add(k);
+      bossArt.set(id, own);
+      before = null;
+    });
+  }
+}
+
+/**
+ * Free the bosses' own pictures (all but `keep`'s, e.g. 'Hoops:1'), before a game's art is drawn. Never
+ * a boss that's still up (its results card), anything a running scene is showing, the looks or the
+ * heroes' own sheets (those are looked after elsewhere).
+ */
+export function freeBossArtExcept(game: Phaser.Game, keep?: string) {
+  const S = Phaser.Scenes;
+  const up = (sc: Phaser.Scene) => sc.sys.settings.status >= S.START && sc.sys.settings.status <= S.SLEEPING;
+  const inUse = new Set<string>();
+  const walk = (list: Phaser.GameObjects.GameObject[]) => {
+    for (const o of list) {
+      const t = (o as { texture?: Phaser.Textures.Texture }).texture;
+      if (t) inUse.add(t.key);
+      const kids = (o as { list?: Phaser.GameObjects.GameObject[] }).list;
+      if (kids) walk(kids);
+    }
+  };
+  for (const sc of game.scene.getScenes(false)) if (up(sc)) walk(sc.children.list);
+  for (const [id, keys] of bossArt) {
+    if (id === keep || up(game.scene.getScene(id.split(':')[0]))) continue;
+    for (const k of keys) if (!inUse.has(k) && !/^bg-|^char-[a-z]+(-face|-sea|-sea-face)?$/.test(k) && game.textures.exists(k)) game.textures.remove(k);
+    bossArt.delete(id);
+  }
+}
+
 /** Only one set of a hero's pictures at a time: the dive-gear ones under the sea, the usual ones elsewhere (memory). */
 export function dropOtherHeroSheets(scene: Phaser.Scene, level: number) {
   const sea = swimLevel(level);

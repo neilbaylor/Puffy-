@@ -13,7 +13,7 @@ import { drawHeroCard, drawPortrait } from '../gfx/draw';
 import { FaceClock, faceFromKey } from '../gfx/face';
 import { recolorForSlot } from '../gfx/recolor';
 import { gearOf } from '../core/wardrobe';
-import { gameArtJobs } from '../gfx/textures';
+import { freeBossArtExcept, gameArtJobs } from '../gfx/textures';
 import { loadArt } from './artLoader';
 import { BattleNet, battleUrl, type NetStatus } from '../net/battleNet';
 import type { BattleHud } from '../scenes/BattleScene';
@@ -128,6 +128,8 @@ export class BattleUI {
       return;
     }
     // the battle's art (every hero — anyone can pick any — and the bad guys), drawn first if it isn't yet
+    // (the last boss's arena let go first)
+    freeBossArtExcept(this.host.game);
     const jobs = gameArtJobs(this.host.game.scene.getScene('Menu'), { heroes: CHARACTERS.map((c) => c.id), level: 'battle' });
     if (jobs.length) {
       void loadArt(jobs).then(() => this.open(code));

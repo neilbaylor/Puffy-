@@ -9,7 +9,7 @@ import { BattleUI } from './battleUi';
 import { loadArt } from './artLoader';
 import { LIGHT } from '../core/light';
 import { savedResCap } from '../core/res';
-import { dropHeroSheets, gameArtJobs, seaWear, swimLevel } from '../gfx/textures';
+import { dropHeroSheets, freeBossArtExcept, gameArtJobs, seaWear, swimLevel } from '../gfx/textures';
 import { SHOP, wardrobe } from '../core/wardrobe';
 import { groundPaintJobs } from '../world/LevelView';
 import { gamepadSources } from '../input/gamepad';
@@ -1322,7 +1322,7 @@ export class UI {
     const hero = CHARACTERS[this.selected];
     if (this.starting) return;
     this.starting = true;
-    void this.gameArt([hero.id], null).then(() => {
+    void this.gameArt([hero.id], null, `${boss.scene}:${level}`).then(() => {
       this.starting = false;
       this.launchBoss(boss, hero, level);
     });
@@ -1397,7 +1397,10 @@ export class UI {
   }
 
   /** The game's own art for these heroes (and a level's bad guys), drawn first behind a little loading card if it isn't yet. */
-  private gameArt(heroes: string[], level: number | null) {
+  private gameArt(heroes: string[], level: number | null, boss?: string) {
+    // (the bosses' arenas let go first: all but this one's in a rematch, or the one at the end of this level)
+    const next = level !== null ? BOSSES.find((b) => b.level === level) : undefined;
+    freeBossArtExcept(this.game, boss ?? (next && `${next.scene}:${level}`));
     const scene = this.game.scene.getScene('Menu') as unknown as Phaser.Scene & { groundJobs?: (id: number) => { name: string; run: () => void }[] };
     // (and the level's ground, for its opening fly-over, if the start screen hasn't drawn it yet)
     let ground: { name: string; run: () => void }[] = [];

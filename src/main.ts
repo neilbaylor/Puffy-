@@ -11,6 +11,7 @@ import { FishingScene } from './scenes/FishingScene';
 import { UI } from './ui/ui';
 import { LIGHT, LIGHT_KEY } from './core/light';
 import { savedResCap, saveResCap } from './core/res';
+import { trackBossArt } from './gfx/textures';
 
 installInput();
 
@@ -128,6 +129,7 @@ function start(refreshMs: number) {
     resize();
   };
   game.events.once(Phaser.Core.Events.READY, () => {
+    trackBossArt(game);
     const ev = game.scene.getScene('Menu').events;
     ev.on(Phaser.Scenes.Events.START, () => setHome(true));
     ev.on(Phaser.Scenes.Events.SHUTDOWN, () => setHome(false));
