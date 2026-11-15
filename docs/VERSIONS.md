@@ -307,3 +307,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.302: No stutter at GO!; unused code and styles removed.
 - v0.303: Battle: ball-and-chain cheaper when off screen.
 - v0.304: Fishing: King Bob catches more, BITE! a touch shorter, bigger bite count.
+- v0.305: Light mode: much less memory and faster boss starts on older devices.
