@@ -514,6 +514,7 @@ export class WrestleScene extends Phaser.Scene {
   private ribbonTex!: Phaser.Textures.CanvasTexture;
   private jumbo: JumboContent = { kind: 'title' };
   private jumboUntil = 0;
+  private screensNext = 0;
   private ribbonMsg: { text: string; color: string; bg: string; t0: number } | null = null;
   private ropesBack!: Phaser.GameObjects.Graphics;
   private ropesFront!: Phaser.GameObjects.Graphics;
@@ -615,6 +616,7 @@ export class WrestleScene extends Phaser.Scene {
     this.skipping = false;
     this.lastHud = '';
     this.clock = 0;
+    this.screensNext = 0;
   }
 
   create() {
@@ -1395,7 +1397,12 @@ export class WrestleScene extends Phaser.Scene {
       // (before the fight, back to her title: the hits to go only go up once it's on)
       this.jumbo = this.fighting || this.ended ? this.countJumbo() : { kind: 'title' };
     }
-    this.drawScreens();
+    // (light mode: the screens are redrawn every 70 ms, like the basketball ones, not every frame:
+    // redrawing and re-uploading both was a third of a slow phone's frame)
+    if (!LIGHT || this.clock >= this.screensNext) {
+      this.screensNext = this.clock + 70;
+      this.drawScreens();
+    }
   }
 
   /** The hero against her: land on her (from the top rope: two hits), or she gets you. */
