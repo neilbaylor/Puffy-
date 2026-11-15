@@ -79,11 +79,11 @@ const ROUNDS = 6;
 const BITES = 6;
 const HERO_CAST = 0.7;
 /** King Bob lands about this share of his casts. */
-const KING_CATCH = 0.46;
+const KING_CATCH = 0.51;
 /** A hero's size here: world px per art unit. */
 const HERO_K = 2.38;
 /** How long the BITE button can be hit for (ms). */
-const BITE_MS = 620;
+const BITE_MS = 589;
 /** A key pressed sooner than this after BITE! shows wasn't a reaction (mashing): a miss. */
 const BITE_REACT_MS = 120;
 /** How far past the BITE! button's edge a tap still hits it (px): its cyan ring (~17) and a fingertip of slop. */
@@ -1541,11 +1541,11 @@ export class FishingScene extends Phaser.Scene {
         this.arm = -1.3;
         r.bend = 0.55;
         sfx.whoosh();
-        this.callout(`GOT IT!<small>${hits} of ${BITES}</small>`, 'good small', 650);
+        this.callout(`GOT IT!<small class="cnt">${hits} of ${BITES}</small>`, 'good small', 650);
         await this.wait(160);
         this.arm = -0.5;
       } else {
-        this.callout(`${this.biteOff ? 'MISSED!' : 'TOO SLOW!'}<small>${hits} of ${BITES}</small>`, 'bad small', 650);
+        this.callout(`${this.biteOff ? 'MISSED!' : 'TOO SLOW!'}<small class="cnt">${hits} of ${BITES}</small>`, 'bad small', 650);
       }
       L.dip = 0;
       r.bend = 0;

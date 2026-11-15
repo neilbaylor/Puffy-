@@ -2967,6 +2967,8 @@ html.light .start .logo span { transform: rotate(-2deg); }
 .fsh-callout.king small { color: #fff; }
 .fsh-callout.you { color: #fff; }
 .fsh-callout.small { font-size: clamp(26px, 6.4vmin, 46px); top: 46%; }
+/* the bite count under GOT IT! / MISSED! ("3 of 6"): big enough to read at a glance */
+.fsh-callout small.cnt { font-size: 0.8em; margin-top: 4px; letter-spacing: 0.03em; -webkit-text-stroke: 0.16em #0b2140; }
 .fsh-callout.big { font-size: clamp(44px, 12vmin, 92px); }
 /* a new round: the TV wipe, a band sweeping across behind the words */
 .fsh-callout.turn { top: 46%; padding: 0.18em 0.9em 0.22em; }
