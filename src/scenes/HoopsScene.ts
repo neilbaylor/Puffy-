@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { LIGHT } from '../core/light';
 import { characterById } from '../data/characters';
 import type { Session } from '../core/session';
 import { fadeOutMusic, playHoops, setMusicRate } from '../core/music';
@@ -96,8 +97,14 @@ const KING_SPOTS = [
 /** Perspective: how big someone standing at stage height y looks, relative to `baseY`. */
 const depthK = (y: number, baseY: number) => (y - 120) / (baseY - 120);
 
-const ARENA_RES = 1.25;
-const KING_RES = 2.5;
+/** The arena's big pictures per stage unit: lower in light mode (drawn at 1x on an older device). */
+const ARENA_RES = LIGHT ? 1 : 1.25;
+/**
+ * The King's pictures' resolution, and the Plops' in the parade at the end (light mode, drawn at 1x
+ * on an older device: half the resolution, a quarter of the memory).
+ */
+const KING_RES = LIGHT ? 1.25 : 2.5;
+const PARADE_RES = LIGHT ? 1.25 : 2.5;
 /** Stage (1280 × 720) → arena texture coordinates. */
 /** The screen's safe-area insets (notch, rounded corners) in CSS px (re-read on resize). */
 const readSafe = () => {
@@ -256,7 +263,7 @@ export class HoopsScene extends Phaser.Scene {
     for (const kind of PLOP_KINDS) {
       const key = `plop-${kind}`;
       if (!this.textures.exists(key)) {
-        const R = 2.5;
+        const R = PARADE_RES;
         const fw = Math.round(PLOP_W * R);
         const fh = Math.round(PLOP_H * R);
         const g = frameGrid(PLOP_FRAMES.length, fw, fh);
@@ -655,7 +662,8 @@ export class HoopsScene extends Phaser.Scene {
     }
     // the hop lifts the picture, not the King's real position (walks and tweens own that)
     const hopPx = this.kingHop.h;
-    k.setOrigin(0.5, 1 + hopPx / (KING_H * KING_RES));
+    // (the hop is in the full-size picture's pixels, so it's the same height in light mode)
+    k.setOrigin(0.5, 1 + hopPx / (KING_H * 2.5));
     // the crown
     const c = this.crown;
     const cs = this.crownState;
@@ -1722,10 +1730,10 @@ export class HoopsScene extends Phaser.Scene {
     // the whole family: small, medium and large Plops, and their King in the middle
     const line: PlopKind[] = ['small', 'medium', 'king', 'large', 'small', 'medium'];
     const plops = line.map((kind, i) => {
-      const p = this.add.sprite(ARENA_W + 120 + i * 110, floorY - (i % 2) * 26, `plop-${kind}`, 'run0').setOrigin(0.5, 1).setScale((PLOP_SCALE[kind] * 1.15) / 2.5).setDepth(8.5 - (i % 2) * 0.2);
+      const p = this.add.sprite(ARENA_W + 120 + i * 110, floorY - (i % 2) * 26, `plop-${kind}`, 'run0').setOrigin(0.5, 1).setScale((PLOP_SCALE[kind] * 1.15) / PARADE_RES).setDepth(8.5 - (i % 2) * 0.2);
       return p;
     });
-    const shadows = plops.map((p) => this.add.image(p.x, p.y, 'softshadow').setDisplaySize(110 * p.scaleX * 2.5, 22).setDepth(6));
+    const shadows = plops.map((p) => this.add.image(p.x, p.y, 'softshadow').setDisplaySize(110 * p.scaleX * PARADE_RES, 22).setDepth(6));
     this.cameras.main.shake(300, 0.004);
     sfx.drum();
     let t0 = this.clock;

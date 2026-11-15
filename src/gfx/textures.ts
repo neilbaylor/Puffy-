@@ -356,8 +356,11 @@ function baddiePieces(scene: Phaser.Scene): { name: string; run: () => void }[] 
   ];
 }
 
-/** Plops in the game: drawn this many times their art size (shown smaller), with room either side for the arms. */
-export const PLOP_RES = 2.5;
+/**
+ * Plops in the game: drawn this many times their art size (shown smaller), with room either side for
+ * the arms. (Light mode, drawn at 1x on an older device: 1.5, about a third of the memory.)
+ */
+export const PLOP_RES = LIGHT ? 1.5 : 2.5;
 export const PLOP_PAD = 16;
 /** Headroom over the art (the big Plops' swirl tip pokes up past the art's own frame). */
 export const PLOP_TOP = 22;

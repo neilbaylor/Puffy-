@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { DEPTH, GRAVITY, MAX_FALL_SPEED, MIN_VIEW_W, TILE, VIEW_H } from '../config';
-import { PROP_RES, addCanvas, dropBaddiesExcept, dropOtherHeroSheets, ensureLook, freeLooksExcept, gameArtJobs, hires, lookJobs } from '../gfx/textures';
+import { PROP_RES, addCanvas, dropBaddiesExcept, dropOtherHeroSheets, dropTextures, ensureLook, freeLooksExcept, gameArtJobs, hires, lookJobs } from '../gfx/textures';
 import { PALETTES } from '../gfx/world';
 import { drawRock } from '../gfx/hazards';
 import { POO, POO_DARK } from '../gfx/plopworld';
@@ -327,6 +327,10 @@ export class GameScene extends Phaser.Scene {
     if (!this.scene.isActive('Battle')) {
       dropBaddiesExcept(this, this.levelId);
       dropOtherHeroSheets(this, this.levelId);
+      // (and another level's soccer pitches and ice rink: they stayed in memory for good)
+      const has = (type: string) => data.spawns.some((s) => s.type === type);
+      if (!has('soccer')) for (const p of ['pitch-front-', 'pitch-back-']) dropTextures(this, p);
+      if (!has('hockey')) for (const p of ['rink-back-', 'rink-ice-']) dropTextures(this, p);
     }
     this.lookNext = 0;
     if (!this.scene.isActive('Menu') && !this.scene.isActive('Battle')) freeLooksExcept(this, themesFor(this.levelId));
