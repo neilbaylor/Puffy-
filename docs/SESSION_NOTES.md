@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.303)
+## Where things stand (v0.304)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -31,6 +31,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   Home screen (yellow).
 - Start screen: drone fly-over behind, logo hop, hero cards (pick = hop / backflip), Play, Part picker once a
   level is beaten, mute (top-left), full screen + **Battle** buttons (top-right, same height, side by side).
+- v0.304: Fishing harder (user: too easy): KING_CATCH 0.46 → 0.51 (+5 points), BITE_MS 620 → 589 (−5%). The bite count under GOT IT!/MISSED! is <small class="cnt"> at 0.8em (was 0.4em; user: too small).
 - v0.303: SMOOTHNESS B4 (merged claude/perf-b4; second series G3+B4 done). BattleScene flail: chain links only drawn while the ball is within 400 px of the camera view (0.30 → 0.12 ms/frame when off screen; same as the levels' fix). Found, not changed: nothing leaks across battles (4 in a row: textures 92.7 MB flat, heap 11.6–12.6 MB, DOM 145, listeners 40); no dead battle code left (all 7 client→server and 5 server→client messages, all 22 event kinds used); 'setViewport of undefined' not reproducible without the agent's instrumentation.
 - v0.302: SMOOTHNESS G3 (merged claude/perf-g3). ui.ts warmHud() on 'game-start': both HUD portrait standing frames drawn (into portraitCache) during level setup — fly-over end frame 21–23 → 13–15 ms (HUD part 12–15 → 4–5 ms). Dead code removed (each grepped across src/server/sketches/index.html incl. string keys): CSS .hoops-score/.hs-*, .fsh-meter, .keys-hint, .unlock-note, .results-lives, .bl-dice/.bl-pen/.bl-name/.bl-room, .bc-help, .acct-note, .acct-stats + 5 keyframes; textures soccergoal, rinklines (+ drawSoccerGoal, drawRinkLines), battle 'prize-chute'; src/world/Confetti.ts; sfx.enemyShot, paperTexture, SWIM_POSES, MAX_PLAYERS. CSS 82.99 → 77.46 kB. Measured clean: fly-overs 3–6 ms, Fishing incl. tossBack max 4.8 ms; goal→boss 243–1003 ms behind the stinger (by design).
 - v0.301: Battle own-hero corrections (user picked 'slide the big ones' over a slower blend for all): BattleScene FIX_JUMP 160 (was 90: further off → jump), FIX_GLIDE 1000 px/s cap on the fix's fade (k = min(1 − e^(−14·dt), FIX_GLIDE·dt/|fix|)) so big ones slide instead of lurch; small ones unchanged. reconcile: no fix when the old me was respawning (a respawn always jumps). Tests: tbattle2 no errors; tshotlag 150 ms → shots drawn 2–15 ms.

@@ -306,3 +306,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.301: Battle: your hero's bigger corrections slide into place instead of jumping.
 - v0.302: No stutter at GO!; unused code and styles removed.
 - v0.303: Battle: ball-and-chain cheaper when off screen.
+- v0.304: Fishing: King Bob catches more, BITE! a touch shorter, bigger bite count.
