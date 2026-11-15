@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { LIGHT } from '../core/light';
 import { DEPTH, VIEW_H } from '../config';
 import { sfx } from '../core/sfx';
 import { characterById } from '../data/characters';
@@ -141,7 +142,8 @@ const PLOP_ART: Record<EnemyKind, { kind: PlopKind; scale: number }> = {
   medium: { kind: 'medium', scale: 0.72 },
   big: { kind: 'large', scale: 1.6 },
 };
-const PLOP_RES = 2;
+/** The battle Plops' pictures' resolution (light mode, drawn at 1x on an older device: a little under half the memory). */
+const PLOP_RES = LIGHT ? 1.25 : 2;
 
 /** How each kind of bad guy is drawn: texture, scale, feet origin, gun size. */
 const ENEMY_ART: Record<EnemyKind, { tex: string; scale: number; ox: number; oy: number; gun: number }> = {

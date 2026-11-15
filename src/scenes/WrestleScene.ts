@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { LIGHT } from '../core/light';
 import { DEPTH, GRAVITY, MIN_VIEW_W, VIEW_H } from '../config';
 import { characterById } from '../data/characters';
 import type { Session } from '../core/session';
@@ -51,7 +52,8 @@ const WX = (sx: number) => (sx + STAGE_OX) * K;
 const WY = (sy: number) => (sy + STAGE_OY) * K;
 const WORLD_W = ARENA_W * K;
 const WORLD_H = ARENA_H * K;
-const ARENA_RES = 1.25;
+/** The arena's big pictures (and the ring's, RES) per stage unit: lower in light mode (drawn at 1x on an older device). */
+const ARENA_RES = LIGHT ? 1 : 1.25;
 
 const MAT_Y = WY(RING.floorY);
 const GROUND_Y = WY(RING.groundY);
@@ -67,9 +69,12 @@ const POST_R = WX(RING.x1);
 /** The top of the front corner posts (you can stand on them). */
 const POST_TOP = WY(RING.frontY - RING.post);
 
-/** Queen Plop: art units → world, and her texture's resolution. */
+/**
+ * Queen Plop: art units → world, and her texture's resolution (light mode, drawn at 1x on an older
+ * device: half the resolution, a quarter of the memory — each of her sheets and the King's was 15.5 MB).
+ */
 const QS = 1.3;
-const Q_RES = 4;
+const Q_RES = LIGHT ? 2 : 4;
 const Q_PAD = 18;
 const Q_TOP = 24;
 const HITS = 12;
@@ -87,7 +92,7 @@ const CHAIR_AT_HP = [-1, 8, 4];
 const PUD_X0 = WX(PUDDLE.x - PUDDLE.w * 0.78);
 const PUD_X1 = WX(PUDDLE.x + PUDDLE.w * 0.78);
 
-const RES = 2;
+const RES = LIGHT ? 1.25 : 2;
 type Side = -1 | 1;
 
 const DEPTH_W = {
