@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { DEPTH } from '../config';
+import { LIGHT } from '../core/light';
 import { SURFACE_LINE } from '../gfx/sea';
 
 interface View {
@@ -70,13 +71,14 @@ export class SeaLife {
     // the sky over the water (a row of the same picture across the level), a plain colour above it
     for (let x = -512; x < widthPx + 1024; x += 1024) this.sky.push(scene.add.image(x, surfaceY + 6, 'sea-sky').setOrigin(0, 1).setDisplaySize(1024, 160).setDepth(DEPTH.near + 4));
     this.skyTop = scene.add.rectangle(-600, surfaceY - 160 * 1 + 8, widthPx + 1800, 2000, 0x5fc0f6).setOrigin(0, 1).setDepth(DEPTH.near + 4);
-    // light beams
-    for (let i = 0; i < 5; i++) {
+    // light beams (light mode: three, not five; each is a tall see-through picture over the whole view)
+    const rays = LIGHT ? 3 : 5;
+    for (let i = 0; i < rays; i++) {
       const img = scene.add.image(0, surfaceY, 'sea-ray').setOrigin(0.5, 0).setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.near + 3);
-      this.rays.push({ img, x: i / 5 + Math.random() * 0.1, ph: Math.random() * 6, a: 0.16 + Math.random() * 0.12 });
+      this.rays.push({ img, x: i / rays + Math.random() * 0.1, ph: Math.random() * 6, a: 0.16 + Math.random() * 0.12 });
     }
-    // a few jellyfish far off
-    for (let i = 0; i < 3; i++) this.addJelly(Math.random(), 0.2 + Math.random() * 0.6);
+    // a few jellyfish far off (light mode: two)
+    for (let i = 0; i < (LIGHT ? 2 : 3); i++) this.addJelly(Math.random(), 0.2 + Math.random() * 0.6);
     this.bubbleE = scene.add
       .particles(0, 0, 'sea-bubble', {
         emitting: false,
@@ -190,7 +192,7 @@ export class SeaLife {
       const y = 0.25 + Math.random() * 0.4;
       const tint = [0xffd27a, 0xbfe8ff, 0xffb0c8, 0xd8ffd0][Math.floor(Math.random() * 4)];
       const k = 0.15 + Math.random() * 0.2;
-      const count = 5 + Math.floor(Math.random() * 5);
+      const count = Math.ceil((5 + Math.floor(Math.random() * 5)) / (LIGHT ? 2 : 1));
       for (let i = 0; i < count; i++) {
         const img = this.scene.add.image(0, 0, 'sea-school', 's0').setDepth(DEPTH.far + 2).setTint(tint).setAlpha(0.55).setScale(0.45 + k).setFlipX(dir < 0);
         const fx = dir > 0 ? -0.1 - (i % 4) * 0.025 : 1.1 + (i % 4) * 0.025;
@@ -245,7 +247,7 @@ export class SeaLife {
       return !gone;
     });
     // ── crabs on the sand near you ──
-    if (this.crabs.length < 2 && Math.random() < dt * 0.4) {
+    if (this.crabs.length < (LIGHT ? 1 : 2) && Math.random() < dt * 0.4) {
       const x = view.left + view.width * (Math.random() < 0.5 ? 0.05 : 0.95);
       const gy = this.groundBelow(x, view.top + 20, view.height + 200);
       if (gy !== null) {

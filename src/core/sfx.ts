@@ -3,6 +3,8 @@
  * Browsers only allow audio after a user gesture, so `unlockAudio()` is called
  * from the first tap/click/key.
  */
+import { LIGHT } from './light';
+
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 /** Sound on/off, remembered between visits. */
@@ -22,6 +24,9 @@ export function unlockAudio() {
     master = ctx.createGain();
     master.gain.value = muted ? 0 : 0.5;
     master.connect(ctx.destination);
+    // (light mode: the noise is made now, on the tap, not mid-game on the first shot: a second of
+    // random samples was most of the first rocket's stall on a slow phone)
+    if (LIGHT) noiseBuffer(ctx);
   }
   if (ctx.state === 'suspended') void ctx.resume();
 }
@@ -65,16 +70,19 @@ function tone({ type = 'square', from, to = from, dur, vol = 0.2, delay = 0 }: T
 }
 
 let noiseBuf: AudioBuffer | null = null;
-function noise(dur: number, vol: number, filterFrom: number, filterTo: number, delay = 0) {
-  if (!ctx || !master || muted) return;
+function noiseBuffer(ac: AudioContext) {
   if (!noiseBuf) {
-    noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+    noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
     const d = noiseBuf.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
   }
+  return noiseBuf;
+}
+function noise(dur: number, vol: number, filterFrom: number, filterTo: number, delay = 0) {
+  if (!ctx || !master || muted) return;
   const t0 = ctx.currentTime + delay;
   const src = ctx.createBufferSource();
-  src.buffer = noiseBuf;
+  src.buffer = noiseBuffer(ctx);
   const f = ctx.createBiquadFilter();
   f.type = 'lowpass';
   f.frequency.setValueAtTime(filterFrom, t0);

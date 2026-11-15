@@ -1,7 +1,15 @@
 import Phaser from 'phaser';
 import { DEPTH } from '../config';
+import { LIGHT } from '../core/light';
 
 type Emitter = Phaser.GameObjects.Particles.ParticleEmitter;
+
+/**
+ * Light mode: the pop-up words' font measurements, by size. Phaser measures a fixed test string
+ * for every new Text, so it's the same answer each time for the same font and size (and the
+ * measuring was most of what a new word cost).
+ */
+const fontMetrics = new Map<number, Phaser.Types.GameObjects.Text.TextMetrics>();
 
 /** Particle + juice effects. One emitter per effect type, fired with explode(). */
 export class Fx {
@@ -21,7 +29,17 @@ export class Fx {
   private pooE: Emitter;
   private crumbE: Emitter;
 
-  constructor(private scene: Phaser.Scene) {
+  /** Light mode: finished pop-up words kept to show again (a new one is a canvas, a font measure and a texture each time). */
+  private spareText = new Map<string, Phaser.GameObjects.Text[]>();
+
+  /**
+   * `thin` (the levels and battles in light mode): bursts of bits have about half as many in them.
+   * The flash, the ring and the timing stay the same.
+   */
+  constructor(
+    private scene: Phaser.Scene,
+    private thin = false,
+  ) {
     const mk = (tex: string, cfg: Phaser.Types.GameObjects.Particles.ParticleEmitterConfig, depth: number = DEPTH.fx) =>
       scene.add.particles(0, 0, tex, { emitting: false, ...cfg }).setDepth(depth);
 
@@ -153,6 +171,11 @@ export class Fx {
     }, DEPTH.projectiles - 1);
   }
 
+  /** How many bits a burst has (about half when thin). */
+  private n(n: number) {
+    return this.thin && n > 1 ? Math.ceil(n / 2) : n;
+  }
+
   dust(x: number, y: number, n = 6) {
     this.dustE.explode(n, x, y);
   }
@@ -164,12 +187,12 @@ export class Fx {
 
   /** A glob of goat spit going splat. */
   splat(x: number, y: number, n = 9) {
-    this.goopE.explode(n, x, y);
+    this.goopE.explode(this.n(n), x, y);
   }
 
   /** Poo going splat (and drips off a flying lump of it). */
   pooSplat(x: number, y: number, n = 10) {
-    this.pooE.explode(n, x, y);
+    this.pooE.explode(this.n(n), x, y);
   }
 
   /** A drip or two flying off a spit glob in flight. */
@@ -182,24 +205,24 @@ export class Fx {
   }
 
   sparkle(x: number, y: number, n = 8) {
-    this.sparkE.explode(n, x, y);
+    this.sparkE.explode(this.n(n), x, y);
   }
 
   stars(x: number, y: number, n = 6) {
-    this.starE.explode(n, x, y);
+    this.starE.explode(this.n(n), x, y);
   }
 
   debris(x: number, y: number) {
-    this.debrisE.explode(5, x, y);
+    this.debrisE.explode(this.n(5), x, y);
   }
 
   /** Bits of fluff when a bad guy pops. */
   fluffBurst(x: number, y: number, k = 1) {
-    this.fluffE.explode(Math.round(10 * k + 4), x, y);
+    this.fluffE.explode(this.n(Math.round(10 * k + 4)), x, y);
   }
 
   auraSparkle(x: number, y: number, n = 8) {
-    this.auraE.explode(n, x, y);
+    this.auraE.explode(this.n(n), x, y);
   }
 
   /** Bazooka muzzle flash + smoke out of the back of the tube. */
@@ -278,12 +301,25 @@ export class Fx {
     const ring = s.add.image(x, y, 'ring').setDepth(DEPTH.fx + 1).setTint(0xffffff).setAlpha(0.9);
     ring.setScale(0.1);
     s.tweens.add({ targets: ring, scale: (radius * 2.2) / 128, alpha: 0, duration: 320, ease: 'Quad.easeOut', onComplete: () => ring.destroy() });
-    this.fireE.explode(Math.round(18 * k), x, y);
-    this.smokeE.explode(Math.round(10 * k), x, y);
-    this.sparkE.explode(Math.round(12 * k), x, y);
+    this.fireE.explode(this.n(Math.round(18 * k)), x, y);
+    this.smokeE.explode(this.n(Math.round(10 * k)), x, y);
+    this.sparkE.explode(this.n(Math.round(12 * k)), x, y);
   }
 
-  popText(x: number, y: number, text: string, color = '#ffffff', size = 18) {
+  /**
+   * Light mode: make pop-up words ahead (while the level is loading), so the first of each in play
+   * is one already made. [text, colour, size] as for popText.
+   */
+  warmText(words: [string, string, number][]) {
+    if (!LIGHT) return;
+    for (const [text, color, size] of words) {
+      const key = `${text}|${color}|${size}`;
+      if (this.spareText.get(key)?.length) continue;
+      this.spareText.set(key, [this.makeText(0, 0, text, color, size).setVisible(false)]);
+    }
+  }
+
+  private makeText(x: number, y: number, text: string, color: string, size: number) {
     const t = this.scene.add
       .text(x, y, text, {
         fontFamily: '"Lilita One", "Arial Black", sans-serif',
@@ -291,16 +327,33 @@ export class Fx {
         color,
         stroke: '#2a1e2e',
         strokeThickness: 5,
+        metrics: LIGHT ? fontMetrics.get(size) : undefined,
       })
       .setOrigin(0.5)
       .setDepth(DEPTH.text);
+    if (LIGHT && !fontMetrics.has(size)) fontMetrics.set(size, t.style.getTextMetrics());
+    return t;
+  }
+
+  popText(x: number, y: number, text: string, color = '#ffffff', size = 18) {
+    const key = `${text}|${color}|${size}`;
+    const spare = LIGHT ? this.spareText.get(key)?.pop() : undefined;
+    const t = spare?.setPosition(x, y).setAlpha(1).setVisible(true) ?? this.makeText(x, y, text, color, size);
     this.scene.tweens.add({
       targets: t,
       y: y - 36,
       alpha: { from: 1, to: 0 },
       duration: 800,
       ease: 'Cubic.easeOut',
-      onComplete: () => t.destroy(),
+      onComplete: () => {
+        if (!LIGHT) return t.destroy();
+        // (light mode: put by to show again, a few of each at most)
+        t.setVisible(false);
+        const list = this.spareText.get(key) ?? [];
+        if (list.length >= 3) return t.destroy();
+        list.push(t);
+        this.spareText.set(key, list);
+      },
     });
   }
 }

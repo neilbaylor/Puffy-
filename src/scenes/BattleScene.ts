@@ -293,7 +293,7 @@ export class BattleScene extends Phaser.Scene {
     // (still clouds: they drift and bob but keep their shape — no new cloud pictures to send to the
     // graphics chip ~20 times a second, which a battle's phones can do without)
     this.bg = new Background(this, this.level.heightPx - VIEW_H, true);
-    this.fx = new Fx(this);
+    this.fx = new Fx(this, LIGHT);
     this.views.clear();
     this.rocketViews.clear();
     this.prizeViews.clear();

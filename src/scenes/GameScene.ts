@@ -8,6 +8,7 @@ import { characterById } from '../data/characters';
 import type { Session } from '../core/session';
 import { lives, loseLife, resetLives } from '../core/lives';
 import { sfx } from '../core/sfx';
+import { LIGHT } from '../core/light';
 import type { Enemy } from '../entities/enemies/Enemy';
 import { bank } from '../core/bank';
 import { createBadGuy } from '../entities/enemies/Plops';
@@ -340,7 +341,13 @@ export class GameScene extends Phaser.Scene {
       return null;
     }, data.water !== undefined ? { surface: data.water, width: widthPx, dark: data.dark } : undefined);
     this.applyTheme();
-    this.fx = new Fx(this);
+    this.fx = new Fx(this, LIGHT);
+    // (light mode: the words that pop up most, made now rather than on the first bad guy)
+    this.fx.warmText([
+      [this.levelId === 3 || this.levelId === 4 ? 'SPLAT!' : 'POP!', '#ffffff', 15],
+      ['+1 AURA', '#6ff0d8', 17],
+      ['NOM!', '#ffd27a', 13],
+    ]);
 
     this.gPlayers = this.add.group();
     this.gEnemies = this.add.group();

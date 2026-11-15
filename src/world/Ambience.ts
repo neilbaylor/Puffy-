@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { DEPTH } from '../config';
+import { LIGHT } from '../core/light';
 import { SeaLife } from './Sea';
 
 /**
@@ -318,8 +319,9 @@ export class Ambience {
 
     // ── birds: a little flock now and then, far off in the sky ──
     this.nextFlock -= dt;
-    if (this.nextFlock <= 0 && this.birds.length < 12) {
-      this.nextFlock = 7 + Math.random() * 9;
+    // (light mode: a flock half as often, and half as many butterflies or flies about)
+    if (this.nextFlock <= 0 && this.birds.length < (LIGHT ? 6 : 12)) {
+      this.nextFlock = (7 + Math.random() * 9) * (LIGHT ? 2 : 1);
       const dir = Math.random() < 0.6 ? 1 : -1;
       const n = 2 + Math.floor(Math.random() * 4);
       const y0 = view.top + view.height * (0.1 + Math.random() * 0.25);
@@ -357,7 +359,7 @@ export class Ambience {
     });
 
     // ── butterflies flitting over the ground near you ──
-    if (this.flies.length < (this.stinky ? 7 : 4) && Math.random() < dt * (this.stinky ? 1.5 : 0.5)) {
+    if (this.flies.length < (this.stinky ? 7 : 4) / (LIGHT ? 2 : 1) && Math.random() < dt * (this.stinky ? 1.5 : 0.5)) {
       const x = view.left + view.width * (0.1 + Math.random() * 0.8);
       const gy = this.groundBelow(x, view.top + 10, view.height);
       if (gy !== null && gy < view.top + view.height - 20) {
