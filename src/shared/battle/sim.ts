@@ -537,7 +537,7 @@ export function heroShot(p: BPlayer, fire: 1 | 2, map?: ArenaMap): Omit<BRocket,
       }
   const big = p.power === POWER.grow;
   // a lobbed bomb: bounces about, then a big blast
-  if (fire === 2) return { owner: p.id, kind: 'bomb', x, y, vx: p.facing * 300 + p.vx * 0.35, vy: -430, dir: p.facing, age: 0, speed: 0, radius: 118 * (big ? 1.25 : 1), damage: 2 };
+  if (fire === 2) return { owner: p.id, kind: 'bomb', x, y, vx: p.facing * 300 + p.vx * 0.35, vy: -430, dir: p.facing, age: 0, speed: 0, radius: 136 * (big ? 1.25 : 1), damage: 2 };
   // a fireball: lobbed forward, it arcs down and bursts into flames
   if (p.power === POWER.fire) return { owner: p.id, kind: 'fire', x, y, vx: p.facing * 430 + p.vx * 0.3, vy: -300, dir: p.facing, age: 0, speed: 0, radius: 58, damage: 1 };
   return { owner: p.id, kind: 'rocket', x, y, vx: p.facing * c.rocketSpeed * 0.45, vy: 0, dir: p.facing, age: 0, speed: c.rocketSpeed, radius: c.blastRadius * (big ? 1.4 : 1), damage: big ? 2 : 1 };
