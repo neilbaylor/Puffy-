@@ -309,3 +309,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.304: Fishing: King Bob catches more, BITE! a touch shorter, bigger bite count.
 - v0.305: Light mode: much less memory and faster boss starts on older devices.
 - v0.306: Light mode: thinner effects and background life, no stall on the first pop or shot.
+- v0.307: Battle: no shooting through walls, bigger live window when watching; full mode gets the first-pop/first-shot smoothing.
