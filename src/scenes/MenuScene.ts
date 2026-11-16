@@ -237,7 +237,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private startX(id: number) {
-    return id === 2 ? 86 * 32 : id === 5 ? 14 * 32 : 0;
+    return id === 2 ? 86 * 32 : id === 5 ? 14 * 32 : id === 6 ? 34 * 32 : 0;
   }
   private top: number | null = null;
   /** The ground height the camera last followed (kept over a long gap). */

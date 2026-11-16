@@ -124,6 +124,8 @@ export class Player {
   key: string;
   /** Under the sea: the water's surface (world y), or null on dry levels. */
   water: number | null = null;
+  /** Held still for a moment (a little scene's playing: the look back at the chasing gang). */
+  held = false;
   /** In the water now (swimming, not walking). */
   swimming = false;
   /** Diving in off the pier: no control until you're in the water. */
@@ -183,7 +185,7 @@ export class Player {
       input = emptyInput();
       input.jump = this.onGround && Math.random() < 0.03; // happy hops at the goal
     }
-    if (this.diving) input = emptyInput();
+    if (this.diving || this.held) input = emptyInput();
 
     const c = this.char;
     const b = this.body;

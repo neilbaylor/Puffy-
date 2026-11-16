@@ -4,6 +4,7 @@ import { buildLevel2 } from './level2';
 import { buildLevel3 } from './level3';
 import { buildLevel4 } from './level4';
 import { buildLevel5 } from './level5';
+import { buildLevel6 } from './level6';
 
 export interface LevelInfo {
   /** 1-based level number. */
@@ -20,6 +21,8 @@ export interface LevelInfo {
   wrestle?: boolean;
   /** Ends in King Bob's fishing contest (the FishingScene). */
   fishing?: boolean;
+  /** Part 6: King Bob's gang chases you the whole way (see FishChase). */
+  chase?: boolean;
   /** What the hero says when the level starts (after the fly-over). */
   speech?: string;
   /** The label on its Part button on the start screen (default: `part`). */
@@ -91,7 +94,20 @@ export const DEV = (() => {
 /** Accounts that get the work-in-progress levels (names, any case), and every boss in the Bosses menu. */
 const TESTERS = ['neil', 'founder'];
 /** Levels still being made: only testers see them. */
-const WIP: LevelInfo[] = [];
+const WIP: LevelInfo[] = [
+  {
+    id: 6,
+    world: 'World 3',
+    title: 'The Rise of King Bob',
+    part: 'Part 2',
+    button: 'Part 6',
+    build: buildLevel6,
+    speech: 'Now for a nice relaxing swim',
+    chase: true,
+    wip: true,
+    testers: ['neil', 'founder'],
+  },
+];
 let tester = false;
 /** A tester's signed in (or this is a dev device). */
 export const isTester = () => tester;

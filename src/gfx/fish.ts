@@ -32,7 +32,13 @@ export const FIRE_FRAMES: FireFrame[] = ['fire0', 'fire1', 'fire2'];
 /** A blink: swim frames sw1 and sw4 with the eyes shut (shown for a moment in place of the nearest swim frame). */
 export type BlinkFrame = 'bl1' | 'bl4';
 export const BLINK_FRAMES: BlinkFrame[] = ['bl1', 'bl4'];
-export type FishFrame = SwimFrame | FireFrame | BlinkFrame;
+/**
+ * Part 6's chase: the pack's swim cycle with their game faces on — the same swim, a cross brow on the
+ * ones who don't already have one (Zippy, Kai). an0–an5.
+ */
+export type ChaseFrame = 'an0' | 'an1' | 'an2' | 'an3' | 'an4' | 'an5';
+export const CHASE_FRAMES: ChaseFrame[] = ['an0', 'an1', 'an2', 'an3', 'an4', 'an5'];
+export type FishFrame = SwimFrame | FireFrame | BlinkFrame | ChaseFrame;
 /** The blink frame to show in place of swim frame `i` (0–5). */
 export const blinkFor = (i: number): BlinkFrame => (i % 6 < 3 ? 'bl1' : 'bl4');
 /** Every fish's frames: the swim cycle (and for the bad guy fish, firing). */
@@ -97,10 +103,12 @@ const rot = (pts: Pt[], px: number, py: number, a: number): Pt[] => {
 };
 
 /** Where in the swim cycle a frame is (0…2π; the fire frames hold still at the start). */
-const phaseOf = (f: FishFrame) => (f.startsWith('sw') || f.startsWith('bl') ? (+f.slice(2) / SWIM_FRAMES.length) * Math.PI * 2 : 0);
+const phaseOf = (f: FishFrame) => (f.startsWith('sw') || f.startsWith('bl') || f.startsWith('an') ? (+f.slice(2) / SWIM_FRAMES.length) * Math.PI * 2 : 0);
 
 /** Drawing a blink frame: every eye drawn shut, its lid in the body's colour (`lidFill`, the last body drawn). */
 let shut = false;
+/** Drawing a chase frame (an0–an5): game faces on. */
+let angry = false;
 let lidFill: Fill = F('#ff9a3c', '#e2661a', '#ffc98c');
 
 /** A forked tail, pinned at (px, py) on the body, `len` long, the two lobes `spread` apart, swung by `a`. */
@@ -226,6 +234,7 @@ function patches(ctx: Ctx, body: Pt[], draw: () => void) {
 export function drawFish(ctx: Ctx, ox: number, oy: number, kind: FishKind, f: FishFrame, st: Style = STYLES.polished) {
   if (f.startsWith('fire') && kind !== 'badguy' && kind !== 'badguybig' && kind !== 'kai') f = 'sw0';
   shut = f.startsWith('bl');
+  angry = f.startsWith('an');
   const p = phaseOf(f);
   const fire = f.startsWith('fire') ? +f.slice(4) : -1;
   const sw = Math.sin(p); // the tail's sweep
@@ -267,6 +276,7 @@ export function drawFish(ctx: Ctx, ox: number, oy: number, kind: FishKind, f: Fi
       break;
   }
   shut = false;
+  angry = false;
   ctx.restore();
 }
 
@@ -330,6 +340,7 @@ function drawKai(ctx: Ctx, st: Style, sw: number, flap: number, fire = -1) {
     ctx.fill();
   });
   eye(st, ctx, cx - 2, cy - 1, 9, 9.5, 9205);
+  if (angry) brow(st, ctx, cx - 1, cy - 12.5, 17, 9209);
   mouth(st, ctx, cx + 19, cy + 9, 5.6, 9206);
   // whiskers at the mouth
   st.line(ctx, [[cx + 18, cy + 12], [cx + 27, cy + 10]], 9207, 0.7);
@@ -384,6 +395,7 @@ function drawZippy(ctx: Ctx, st: Style, sw: number, flap: number) {
   st.shape(ctx, body, BODY, 9402, { lw: 1, light: [cx - 4, cy - 6] });
   lidFill = BODY;
   eye(st, ctx, cx + 2, cy - 3, 3.6, 4, 9404);
+  if (angry) brow(st, ctx, cx + 2.5, cy - 8.2, 8.5, 9406);
   // a big grin
   st.line(ctx, [[cx + 3, cy + 4], [cx + 6.5, cy + 6.5], [cx + 10, cy + 3.5]], 9405, 0.9);
   // whiskers sweeping back as it zips along

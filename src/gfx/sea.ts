@@ -70,6 +70,25 @@ PALETTES['w-dusk'] = look('w-dusk', 'Twilight reef', 'Purple evening water, glow
   hill2: { base: '#9a8ee0', shade: '#7266c0', light: '#cdc6f6' },
   near: { base: '#e6c8a8', shade: '#b89a86', light: '#fbe6d2' },
 });
+/** Part 6's looks (the chase): a kelp forest, green-gold, and the sunset sea; then the deep blue. */
+PALETTES['w-kelp'] = look('w-kelp', 'Kelp forest', 'Green-gold water, sunbeams through tall kelp.', {
+  sky: ['#9fe8b8', '#4cb49a', '#1f6f6a'],
+  far: { base: '#5fb49a', shade: '#4a9a84', light: '#93d8bc' },
+  farInk: '#357c6c',
+  cloud: { base: '#d2f6cf', shade: '#246a62', light: '#ffffff' },
+  hill: { base: '#f2b45c', shade: '#c88a3a', light: '#ffdca0' },
+  hill2: { base: '#6fbf7a', shade: '#4a9a5a', light: '#b0e6b4' },
+  near: { base: '#e6d396', shade: '#bca66a', light: '#fbefc4' },
+});
+PALETTES['w-sunset'] = look('w-sunset', 'Sunset sea', 'Warm pink-gold water as the sun goes down.', {
+  sky: ['#ffc6a8', '#e88aa0', '#7c4e9a'],
+  far: { base: '#d888a8', shade: '#b86e92', light: '#f4b6cc' },
+  farInk: '#8c5482',
+  cloud: { base: '#ffe6dc', shade: '#6e3f86', light: '#ffffff' },
+  hill: { base: '#ffb070', shade: '#e0844a', light: '#ffd8b4' },
+  hill2: { base: '#c89ae0', shade: '#a072c0', light: '#e6cdf4' },
+  near: { base: '#f2cfa0', shade: '#c9a074', light: '#fff0d6' },
+});
 
 
 // ───────────────────────────── backgrounds (tileable, width W) ──

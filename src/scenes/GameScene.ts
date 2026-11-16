@@ -36,6 +36,7 @@ import { Fx } from '../world/Fx';
 import { stingerCover } from '../ui/stinger';
 import { mixTint, themeClock, themeMix, themesFor } from '../world/theme';
 import { LevelView } from '../world/LevelView';
+import { FishChase } from '../world/FishChase';
 import { roundRectPath, smallTex } from '../gfx/smallTex';
 
 /** A puddle bubble's picture: radius (world px) and resolution. */
@@ -174,6 +175,25 @@ export class GameScene extends Phaser.Scene {
   get liveRockets() {
     return this.rockets;
   }
+  /** The bad guys (Part 6's falling Fat Fish squashes them). */
+  get badGuys() {
+    return this.enemies;
+  }
+  /** What the camera shows (world px, a little oversize). */
+  get viewRect() {
+    return this.view;
+  }
+  /** Under the sea: the sea life (splashes, bubbles). */
+  get sea() {
+    return this.amb?.sea;
+  }
+  isSolidAt(x: number, y: number) {
+    return this.level.isSolidAt(x, y);
+  }
+  /** Part 6: King Bob's gang chasing you, and the Fat Fish falling. */
+  private fishChase: FishChase | null = null;
+  /** Where the camera looks instead of the hero for a moment (Part 6's look back at the gang), or null. */
+  camLook: { x: number; y: number } | null = null;
   /** A little scene's playing (the world's paused). */
   get cutsceneOn() {
     return this.cutscene || !!this.intro;
@@ -283,6 +303,8 @@ export class GameScene extends Phaser.Scene {
     this.dripFrom = [];
     this.drops = [];
     this.chases = [];
+    this.fishChase = null;
+    this.camLook = null;
     this.rock = null;
     // every level (and every restart at a checkpoint) starts you with one nuggie
     this.aura = 1;
@@ -358,6 +380,9 @@ export class GameScene extends Phaser.Scene {
     // ── Spawns ──
     const surface = (row: number) => (row + 1) * TILE; // ground top under something standing in `row`
     let start = { x: 0, y: 0 };
+    // (Part 6: where King Bob's gang waits, and where the Fat Fish falls)
+    let packAt: { x: number; y: number } | null = null;
+    const fatDrops: number[] = [];
     const cps = data.spawns.filter((s) => s.type === 'checkpoint').sort((a, b) => a.x - b.x);
     for (const s of data.spawns) {
       const cx = s.x * TILE + TILE / 2;
@@ -379,6 +404,14 @@ export class GameScene extends Phaser.Scene {
         case 'checkpoint': {
           const idx = cps.indexOf(s);
           const cp = new Checkpoint(this, cx, surface(s.y), idx);
+          // (Part 6, under the sea: swim past it at any height and it counts — the chase doesn't wait for
+          // you to go down and touch it)
+          if (data.water !== undefined && data.spawns.some((q) => q.type === 'pack')) {
+            const gy = surface(s.y);
+            const water = data.water;
+            cp.zone.setSize(64, gy - water).setPosition(cx, (gy + water) / 2);
+            (cp.zone.body as Phaser.Physics.Arcade.StaticBody).setSize(64, gy - water).updateFromGameObject();
+          }
           if (idx <= this.startCheckpoint) {
             cp.activate(true);
             if (idx === this.startCheckpoint) start = { x: cx + 24, y: surface(s.y) - 24 };
@@ -433,6 +466,12 @@ export class GameScene extends Phaser.Scene {
           break;
         case 'baseball':
           this.ballgames.push(new BaseballGame(this, s.x * TILE, surface(s.y), Number(s.opts?.w ?? 36)));
+          break;
+        case 'pack':
+          packAt = { x: s.x * TILE, y: s.y * TILE };
+          break;
+        case 'fatdrop':
+          fatDrops.push(s.x);
           break;
         case 'chase':
           this.chases.push({ x0: s.x * TILE, x1: Number(s.opts?.to ?? s.x + 40) * TILE, speed: Number(s.opts?.speed ?? 1.1), started: false });
@@ -505,6 +544,8 @@ export class GameScene extends Phaser.Scene {
       this.players.push(p);
       this.gPlayers.add(p.hitbox);
     });
+    // (Part 6: the gang, waiting behind the start; they come after you once you're in the water)
+    if (packAt) this.fishChase = new FishChase(this, packAt, fatDrops, { retry: this.retry, startX: start.x });
 
     // ── Under the sea: a splash as you dive in, bubbles on every stroke ──
     this.events.off('hero-splash');
@@ -513,6 +554,7 @@ export class GameScene extends Phaser.Scene {
       this.amb.sea?.splash(p.x);
       sfx.splash();
       this.cameras.main.shake(140, 0.003);
+      this.fishChase?.heroSplashed();
     });
     this.events.on('hero-stroke', (p: Player) => this.amb.sea?.bubbles(p.x + p.facing * 10, p.body.top + 8, 2));
 
@@ -749,6 +791,7 @@ export class GameScene extends Phaser.Scene {
     this.swanSlowMo(dt);
     // (the rock moves on the same clock as the heroes' physics, even on a slow device)
     this.updateChase(Math.min(deltaMs / 1000, 0.1));
+    this.fishChase?.update(Math.min(deltaMs / 1000, 0.1));
 
     this.updateCamera(dt);
     if (this.players.length > 1)
@@ -1127,7 +1170,8 @@ export class GameScene extends Phaser.Scene {
     // (and over the tricky jumping sections, so you can see where you'll land)
     const hx = this.players[0]?.x ?? 0;
     const wide = this.wideZones.find((w) => hx > w.x0 && hx < w.x1);
-    const chaseTarget = this.rock ? 0.78 : wide ? wide.zoom : 1;
+    // (Part 6's chase: pulled back a little, so you see the gang behind you and what's coming)
+    const chaseTarget = this.rock ? 0.78 : this.fishChase?.phase === 'chase' ? 0.86 : wide ? wide.zoom : 1;
     this.chaseZoom = snap ? chaseTarget : this.chaseZoom + (chaseTarget - this.chaseZoom) * (1 - Math.exp(-dt * 1.6));
     const zoom = Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W) * this.cineZoom * this.chaseZoom;
     cam.setZoom(zoom);
@@ -1179,8 +1223,14 @@ export class GameScene extends Phaser.Scene {
       // (the run goes downhill: the jump at the bottom is ahead and below you, so you stay
       // well up the screen; the rock's top is shown if there's room)
       if (R) tTop = Math.max(Math.min(feet - vh * 0.55, R.y - R.r - 30), feet - vh * 0.66);
-      this.camX += (tx - this.camX) * (snap ? 1 : 1 - Math.exp(-dt * 7));
-      this.camTop += (tTop - this.camTop) * (snap ? 1 : 1 - Math.exp(-dt * 4));
+      // (a look somewhere else for a moment: Part 6's look back at the gang — a gentler swing)
+      const look = this.camLook;
+      const lx = look ? look.x : tx;
+      if (look) tTop = look.y - vh * 0.5;
+      const k = look || this.lookingBack > 0 ? 2.2 : 7;
+      this.lookingBack = look ? 1.2 : Math.max(0, this.lookingBack - dt);
+      this.camX += (lx - this.camX) * (snap ? 1 : 1 - Math.exp(-dt * k));
+      this.camTop += (tTop - this.camTop) * (snap ? 1 : 1 - Math.exp(-dt * (look || this.lookingBack > 0 ? 2.2 : 4)));
     }
     this.camX = Phaser.Math.Clamp(this.camX, vw / 2, Math.max(vw / 2, widthPx - vw / 2));
     // (under the sea, once you're in: no higher than a sliver of sky over the surface)
@@ -1657,7 +1707,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** The first solid ground at or below (x, fromY), or null (a pit). */
-  private groundUnder(x: number, fromY: number) {
+  groundUnder(x: number, fromY: number) {
     for (let y = Math.max(0, fromY); y < this.level.heightPx + 16; y += 6) if (this.level.isSolidAt(x, y)) return Math.floor(y / TILE) * TILE;
     return null;
   }
@@ -1829,7 +1879,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** A speech bubble over someone (where: their middle x and the top of their head, each frame). */
-  private sayAt(where: () => [number, number], text: string, ms = 3900) {
+  sayAt(where: () => [number, number], text: string, ms = 3900) {
     const t = this.add
       .text(0, 0, text, { fontFamily: 'Nunito, sans-serif', fontSize: '12px', fontStyle: '900', color: '#3a2418', align: 'center', wordWrap: { width: 168 } })
       .setOrigin(0.5)
@@ -2109,6 +2159,7 @@ export class GameScene extends Phaser.Scene {
   private reachGoal(p: Player) {
     if (this.ended || !p.alive || !this.goal) return;
     this.ended = true;
+    this.fishChase?.giveUp();
     this.goal.celebrate();
     sfx.goal();
     this.fx.auraSparkle(this.goal.swirl.x, this.goal.swirl.y, 30);
@@ -2167,6 +2218,8 @@ export class GameScene extends Phaser.Scene {
 
   /** Extra camera zoom for cinematic moments. */
   cineZoom = 1;
+  /** Swinging back from a look somewhere else (s left: the camera eases gently, see updateCamera). */
+  private lookingBack = 0;
   /** Eased out during a boulder run (see updateCamera). */
   private chaseZoom = 1;
   /** Where the camera pulls back (from the level). */

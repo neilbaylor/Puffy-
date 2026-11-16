@@ -12,7 +12,7 @@ export type Cell = 'ground' | 'rock' | 'boulder' | 'bramble' | 'cloud' | null;
 export type EnemyKind = 'puffball' | 'bigpuff' | 'giant' | 'goat' | 'plop' | 'bigplop' | 'giantplop' | 'poogoat' | 'fish' | 'bigfish' | 'kai' | 'crab';
 
 export interface Spawn {
-  type: EnemyKind | 'aura' | 'rootbeer' | 'checkpoint' | 'goal' | 'player' | 'tree' | 'soccer' | 'hockey' | 'para' | 'puddle' | 'chase' | 'volley' | 'drop' | 'king' | 'baseball' | 'tennis';
+  type: EnemyKind | 'aura' | 'rootbeer' | 'checkpoint' | 'goal' | 'player' | 'tree' | 'soccer' | 'hockey' | 'para' | 'puddle' | 'chase' | 'volley' | 'drop' | 'king' | 'baseball' | 'tennis' | 'pack' | 'fatdrop';
   x: number; // tile column (may be fractional for aura / trees)
   y: number; // tile row the thing occupies
   opts?: Record<string, number | string | boolean>;
@@ -180,6 +180,21 @@ export class LevelBuilder {
    */
   chase(x0: number, x1: number, speed = 1.3) {
     this.spawns.push({ type: 'chase', x: x0, y: 0, opts: { to: x1, speed } });
+    return this;
+  }
+
+  /**
+   * Part 6: King Bob's gang (Stone, Slinger, Kai, Zippy) waiting in the water behind the start,
+   * around column x at height h; after the opening they chase you the whole level.
+   */
+  pack(x: number, h: number) {
+    this.spawns.push({ type: 'pack', x, y: this.top(h) });
+    return this;
+  }
+
+  /** Part 6: when you swim past column x, the Fat Fish comes falling out of the sky just ahead of you (with a warning). */
+  fatDrop(x: number) {
+    this.spawns.push({ type: 'fatdrop', x, y: 0 });
     return this;
   }
 

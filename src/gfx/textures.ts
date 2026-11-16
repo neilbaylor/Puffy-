@@ -15,7 +15,8 @@ import { MOUNTAIN_LOOKS, drawMountainFar, drawMountainMid, drawMountainNear } fr
 import './plopLooks'; // (registers Plop Invasion's palettes)
 import { POOWAVE_H, POOWAVE_W, drawPooOnGoat, drawPooPile, drawPooWave, drawStink, drawVolleyNetSide, drawVolleyball } from './plopworld';
 import { PLOP_DRESS, PLOP_FRAMES, PLOP_H, PLOP_W, drawPlop, type PlopKind } from './plops';
-import { BUBBLE_FRAMES, BUBBLE_SIZE, FISH_FRAMES, FISH_SIZE, drawBubbleShot, drawFish, type FishKind } from './fish';
+import { BUBBLE_FRAMES, BUBBLE_SIZE, CHASE_FRAMES, FISH_FRAMES, FISH_SIZE, SWIM_FRAMES, drawBubbleShot, drawFish, type FishKind } from './fish';
+import { COLUMN, SIGN, STREAKS, TARGET, WAKE, drawDangerColumn, drawFallSign, drawFallStreaks, drawPackWake, drawSurfaceTarget } from './chase';
 import { drawPoo } from './hazards';
 import { CLAM_FRAMES, CLAM_H, CLAM_W, NET_CELL_H, NET_W, TCRAB_FRAMES, TCRAB_H, TCRAB_W, drawClam, drawTennisCrab, drawTennisNet } from './tennis';
 import { CRAB_FRAMES, CRAB_H, CRAB_W, JELLY_FRAMES, JELLY_H, JELLY_W, SCHOOL_FRAMES, SEA_PROPS, SEA_PROP_H, SEA_PROP_W, SURFACE_H, TURTLE_FRAMES, TURTLE_H, TURTLE_W, drawCrab, drawJelly, drawLightRay, drawSchoolFish, drawSeaBubble, drawSeaFar, drawSeaMid, drawSeaNear, drawSeaProp, drawSeaSky, drawSurface, drawTurtle, GRASS_FRAMES, GRASS_H, GRASS_W, KELP_FRAMES, KELP_H, KELP_W, OCTO_FRAMES, OCTO_H, OCTO_W, drawGrassFrame, drawKelpFrame, drawOctopus } from './sea';
@@ -123,7 +124,7 @@ const keepPixels = (key: string) => /^char-[a-z]+(-face|-carry)?$/.test(key);
 /** What a hero wears under the sea: their own things, the dive gear on (no skateboard in the water). */
 export const seaWear = () => [...wardrobe.wearKey.split(',').filter((w) => w && w !== 'board'), 'scuba'].sort().join(',');
 /** A level where you swim (World 3): its hero sheets are the dive-gear ones (`char-<id>-sea`). */
-export const swimLevel = (level: number | 'battle' | null | undefined) => level === 5;
+export const swimLevel = (level: number | 'battle' | null | undefined) => level === 5 || level === 6;
 
 /** A frame sheet: each frame is drawn in world units w × h at `res`. */
 function sheet<F extends string>(
@@ -378,6 +379,26 @@ export function makeFish(scene: Phaser.Scene, kind: FishKind) {
   const st = STYLES[ART_STYLE];
   sheet(scene, key, w, h, FISH_FRAMES[kind], (ctx, f) => drawFish(ctx, 0, 0, kind, f, st));
   return key;
+}
+
+/** Part 6's chasing gang, with their game faces on (an0–an5), as `fish6-<kind>`. */
+export const PACK_KINDS = ['stone', 'slinger', 'kai', 'zippy'] as const;
+/**
+ * Part 6, the chase: the gang's sheets (game faces), the Fat Fish that falls from the sky (its swim
+ * frames, a little lower resolution: it's big), the warning sign, the danger column, the target on the
+ * surface, the streaks behind it as it drops, and the wake behind the gang.
+ */
+export function makeChaseArt(scene: Phaser.Scene) {
+  const T = scene.textures;
+  const st = STYLES[ART_STYLE];
+  const res = LIGHT ? 1.5 : 2.5;
+  for (const k of PACK_KINDS) if (!T.exists(`fish6-${k}`)) sheet(scene, `fish6-${k}`, FISH_SIZE[k].w, FISH_SIZE[k].h, CHASE_FRAMES, (ctx, f) => drawFish(ctx, 0, 0, k, f, st), res);
+  if (!T.exists('fish6-fat')) sheet(scene, 'fish6-fat', FISH_SIZE.fat.w, FISH_SIZE.fat.h, SWIM_FRAMES.filter((_, i) => i % 2 === 0), (ctx, f) => drawFish(ctx, 0, 0, 'fat', f, st), LIGHT ? 1.2 : 1.8);
+  if (!T.exists('chase-sign')) addCanvas(scene, 'chase-sign', hires(SIGN.w, SIGN.h, 3, (ctx) => drawFallSign(ctx)));
+  if (!T.exists('chase-col')) addCanvas(scene, 'chase-col', hires(COLUMN.w, COLUMN.h, 1, (ctx) => drawDangerColumn(ctx)));
+  if (!T.exists('chase-target')) addCanvas(scene, 'chase-target', hires(TARGET.w, TARGET.h, 2, (ctx) => drawSurfaceTarget(ctx)));
+  if (!T.exists('chase-streaks')) addCanvas(scene, 'chase-streaks', hires(STREAKS.w, STREAKS.h, 1.5, (ctx) => drawFallStreaks(ctx)));
+  if (!T.exists('chase-wake')) addCanvas(scene, 'chase-wake', hires(WAKE.w, WAKE.h, 1.5, (ctx) => drawPackWake(ctx)));
 }
 
 /** The orange fish's bubble shot (b0, b1), as `fish-bubble`. */
@@ -697,6 +718,7 @@ const BADDIE_KEYS: Record<string, string[]> = {
   king: ['pking-jet', 'jetflame', 'jetsmoke'],
   baseball: BB_KEYS,
   fish: ['fish-badguy', 'fish-badguybig', 'fish-kai', 'fish-bubble'],
+  chase: ['fish6-stone', 'fish6-slinger', 'fish6-kai', 'fish6-zippy', 'fish6-fat', 'chase-sign', 'chase-col', 'chase-target', 'chase-streaks', 'chase-wake'],
   tennis: ['tcrab-red', 'tcrab-orange', 'clam', 'tennisnet'],
 };
 
@@ -707,6 +729,7 @@ const BADDIES_FOR: Record<string, string[]> = {
   3: ['goat', 'weapons', 'plops'],
   4: ['goat', 'weapons', 'plops', 'chutes', 'king', 'baseball'],
   5: ['fish', 'tennis'],
+  6: ['fish', 'chase'],
   battle: ['puffball', 'bigpuff', 'giant', 'weapons'],
 };
 
@@ -742,6 +765,7 @@ export function gameArtJobs(scene: Phaser.Scene, opts: { heroes: readonly string
         if (!T.exists('tennisnet')) addCanvas(scene, 'tennisnet', hires(NET_W, NET_CELL_H, 3, (ctx) => drawTennisNet(ctx)));
       },
     });
+  if (want.includes('chase') && !BADDIE_KEYS.chase.every((k) => T.exists(k))) out.push({ name: 'the chase', run: () => makeChaseArt(scene) });
   if (want.includes('fish'))
     for (const k of ['badguy', 'badguybig', 'kai'] as const) if (!T.exists(`fish-${k}`)) out.push({ name: `fish ${k}`, run: () => { makeFish(scene, k); makeFishBubble(scene); } });
   for (const b of baddiePieces(scene)) if (want.includes(b.name) && !BADDIE_KEYS[b.name].every((k) => T.exists(k))) out.push(b);
