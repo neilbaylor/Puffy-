@@ -315,3 +315,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.310: Battle: ping readout bottom left, level with the scores.
 - v0.311: Part 6 (testers): the underwater chase — King Bob's gang after you, the Fat Fish falling from the sky.
 - v0.312: Part 6: "Now for a nice relaxing dive".
+- v0.313: Part 6 round 2: harder chase (on your tail, lunges), Fat Fish you can see coming, pier coil, smoother fly-over, warning/marker looks.
