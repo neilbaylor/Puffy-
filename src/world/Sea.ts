@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { DEPTH } from '../config';
 import { LIGHT } from '../core/light';
 import { SURFACE_LINE } from '../gfx/sea';
+import { drawOnlyWhenBusy } from './Fx';
 
 interface View {
   left: number;
@@ -114,6 +115,7 @@ export class SeaLife {
         gravityY: 1100,
       })
       .setDepth(DEPTH.players + 2);
+    drawOnlyWhenBusy(scene, [this.bubbleE, this.splashE, this.columnE]);
   }
 
   private addJelly(x: number, y: number) {
