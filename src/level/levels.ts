@@ -102,7 +102,7 @@ const WIP: LevelInfo[] = [
     part: 'Part 2',
     button: 'Part 6',
     build: buildLevel6,
-    speech: 'Now for a nice relaxing swim',
+    speech: 'Now for a nice relaxing dive',
     chase: true,
     wip: true,
     testers: ['neil', 'founder'],

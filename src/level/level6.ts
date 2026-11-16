@@ -3,7 +3,7 @@ import { LevelBuilder, type LevelData } from './builder';
 /**
  * World 3 · "The Rise of King Bob" Part 2: THE CHASE (testers only for now).
  *
- * You start on a pier over the water: "Now for a nice relaxing swim" — a swan dive in. Then a
+ * You start on a pier over the water: "Now for a nice relaxing dive" — a swan dive in. Then a
  * rumble from behind… the camera swings back to King Bob's gang (Stone, Slinger, Kai and Zippy):
  * "Let's get him!" — and back to you, just ahead. From there it's a chase the whole way: they follow
  * your trail through the water, taking turns in the lead; if the lead fish gets you, you lose your
