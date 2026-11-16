@@ -166,3 +166,44 @@ export function drawPackWake(ctx: Ctx) {
     ctx.stroke();
   }
 }
+
+/** The left edge of the screen glowing red while they're close behind (a strip, stretched to the screen's height). */
+export const EDGE = { w: 48, h: 64 };
+export function drawEdgeGlow(ctx: Ctx) {
+  const { w, h } = EDGE;
+  const g = ctx.createLinearGradient(0, 0, w, 0);
+  g.addColorStop(0, 'rgba(232,50,40,0.85)');
+  g.addColorStop(0.35, 'rgba(240,80,60,0.38)');
+  g.addColorStop(1, 'rgba(255,120,90,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+}
+
+/** The Fat Fish's shadow on the sea bed, growing as it comes (a soft dark oval). */
+export const SHADOW = { w: 128, h: 28 };
+export function drawBedShadow(ctx: Ctx) {
+  const { w, h } = SHADOW;
+  ctx.save();
+  ctx.translate(w / 2, h / 2);
+  ctx.scale(1, h / w);
+  const g = ctx.createRadialGradient(0, 0, 0, 0, 0, w / 2);
+  g.addColorStop(0, 'rgba(10,30,50,0.75)');
+  g.addColorStop(0.6, 'rgba(10,30,50,0.45)');
+  g.addColorStop(1, 'rgba(10,30,50,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(0, 0, w / 2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+/** The "they're behind you" badge: a white disc in a red rim, a red arrow pointing back (the fish goes in it). */
+export const BADGE = { w: 76, h: 56 };
+export function drawBehindBadge(ctx: Ctx) {
+  const cx = 46;
+  const cy = BADGE.h / 2;
+  // the arrow, pointing left (back, where they're coming from)
+  ST.shape(ctx, [[3, cy], [20, cy - 13], [20, cy + 13]], F('#e8463f', '#b82d28', '#ff8a7a'), 8301, { lw: 1.4 });
+  ST.shape(ctx, ellipsePts(cx, cy, 25, 25, 0, 36), F('#e8463f', '#b82d28', '#ff8a7a'), 8302, { lw: 1.6, light: [cx - 8, cy - 12] });
+  ST.shape(ctx, ellipsePts(cx, cy, 19.5, 19.5, 0, 32), F('#fff8ec', '#e9dcc4', '#ffffff'), 8303, { lw: 1 });
+}

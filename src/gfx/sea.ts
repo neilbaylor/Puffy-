@@ -753,8 +753,12 @@ export function drawSurface(ctx: Ctx, W: number) {
   }
 }
 
-/** The wooden pier you dive off: `w` wide; its deck's top at y = 6, posts reaching down `h`. */
+/** Room over the pier's deck in its picture (for the rope coil sat on it). */
+export const PIER_HEAD = 12;
+
+/** The wooden pier you dive off: `w` wide; its deck's top at y = 6 + PIER_HEAD, posts reaching down `h`. */
 export function drawPier(ctx: Ctx, w: number, h: number) {
+  ctx.translate(0, PIER_HEAD);
   const wood: Fill = { base: '#c0905a', shade: '#8a5e34', light: '#e6bf8a' };
   const post: Fill = { base: '#9a6c40', shade: '#6a4422', light: '#c8966a' };
   // posts (going down into the water), with cross braces
@@ -784,7 +788,18 @@ export function drawPier(ctx: Ctx, w: number, h: number) {
   }
   // a rope coil and a life ring on the end post
   const ex = posts[posts.length - 1];
-  ST.shape(ctx, ellipsePts(ex - 26, 2, 8, 4, 0, 24), { base: '#e8d6a8', shade: '#bca878', light: '#fff4d8' }, 1240, { lw: 0.7 });
+  // (the coil: three turns of rope stacked on the deck, seen from the side, the loose end trailing off it)
+  const ROPE: Fill = { base: '#e8d6a8', shade: '#bca878', light: '#fff4d8' };
+  const cx = ex - 26;
+  for (const [i, [dy, rx]] of ([[3.2, 9], [0.4, 8], [-2.4, 6.6]] as const).entries()) {
+    ST.shape(ctx, ellipsePts(cx, dy, rx, 3.1, 0, 24), ROPE, 1240 + i, { lw: 0.7 });
+    ctx.strokeStyle = ROPE.shade;
+    ctx.lineWidth = 0.6;
+    ctx.beginPath();
+    ctx.ellipse(cx, dy - 0.3, rx * 0.55, 1.2, 0, Math.PI * 0.1, Math.PI * 0.9);
+    ctx.stroke();
+  }
+  ST.line(ctx, [[cx + 8, 4.5], [cx + 13, 5.5], [cx + 17, 5]], 1245, 1.6, ROPE.shade);
   ctx.save();
   ctx.lineWidth = 5;
   ctx.strokeStyle = INK;

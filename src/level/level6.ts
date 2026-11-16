@@ -29,12 +29,18 @@ export function buildLevel6(): LevelData {
   const L = new LevelBuilder('The Rise of King Bob · Part 2', 'World 3', W, H);
   L.pal = 'sea';
   L.water(SURF);
-  // the fly-over: from the gate, back along the level just under the surface, to the pier
+  // the fly-over: from the gate, back along the level under the surface (down past the reef, up
+  // over the slabs), coming in on the pier from out over the meadow — a bit slower than Part 5's,
+  // there's more to see. (Its last point well clear of the pier: right beside the hero, the
+  // flight's curve swung on past him and back.)
   L.flyPath = [
     [244, 11],
-    [130, 11],
-    [30, 12],
+    [190, 10],
+    [130, 9.5],
+    [85, 11],
+    [52, 13],
   ];
+  L.flyMs = 8200;
   /** A shelf of reef hanging from the surface over x0..x1, its ragged underside at about height h. */
   const shelf = (x0: number, x1: number, h: number) => {
     const under = [0, -1, 0, 1, 0, -1, -1, 0, 1, 0];

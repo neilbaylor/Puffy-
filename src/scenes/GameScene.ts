@@ -194,6 +194,8 @@ export class GameScene extends Phaser.Scene {
   private fishChase: FishChase | null = null;
   /** Where the camera looks instead of the hero for a moment (Part 6's look back at the gang), or null. */
   camLook: { x: number; y: number } | null = null;
+  /** Under the sea: this much more sky shown over the surface for a moment (Part 6: the Fat Fish coming), px. */
+  camSky = 0;
   /** A little scene's playing (the world's paused). */
   get cutsceneOn() {
     return this.cutscene || !!this.intro;
@@ -305,6 +307,7 @@ export class GameScene extends Phaser.Scene {
     this.chases = [];
     this.fishChase = null;
     this.camLook = null;
+    this.camSky = 0;
     this.rock = null;
     // every level (and every restart at a checkpoint) starts you with one nuggie
     this.aura = 1;
@@ -888,7 +891,7 @@ export class GameScene extends Phaser.Scene {
     this.introU = 0;
     const info = levelInfo(this.levelId);
     this.game.events.emit('level-intro', { world: info.world, title: info.title, part: info.part });
-    const tw = this.tweens.add({ targets: this.intro, u: 1, duration: this.level.data.flyPath ? (this.level.data.water !== undefined ? 6200 : 9000) : 6400, ease: 'Linear', onComplete: () => this.endIntro() });
+    const tw = this.tweens.add({ targets: this.intro, u: 1, duration: this.level.data.flyMs ?? (this.level.data.flyPath ? (this.level.data.water !== undefined ? 6200 : 9000) : 6400), ease: 'Linear', onComplete: () => this.endIntro() });
     // skipping just fast-forwards the same flight (still lands smoothly)
     this.introSkip = () => tw.setTimeScale(5);
     this.game.events.once('skip-intro', this.introSkip);
@@ -1223,6 +1226,7 @@ export class GameScene extends Phaser.Scene {
       // (the run goes downhill: the jump at the bottom is ahead and below you, so you stay
       // well up the screen; the rock's top is shown if there's room)
       if (R) tTop = Math.max(Math.min(feet - vh * 0.55, R.y - R.r - 30), feet - vh * 0.66);
+      tTop -= this.camSky;
       // (a look somewhere else for a moment: Part 6's look back at the gang — a gentler swing)
       const look = this.camLook;
       const lx = look ? look.x : tx;
@@ -1236,7 +1240,7 @@ export class GameScene extends Phaser.Scene {
     // (under the sea, once you're in: no higher than a sliver of sky over the surface)
     const water = this.level.data.water;
     // (and before: up on the pier, more of the sky over you)
-    const camMin = water === undefined ? Math.min(0, heightPx - vh) : tracked.length && tracked.every((p) => p.swimming) ? Math.min(water - 52, heightPx - vh) : Math.min(water - 230, heightPx - vh);
+    const camMin = water === undefined ? Math.min(0, heightPx - vh) : tracked.length && tracked.every((p) => p.swimming) ? Math.min(water - 52 - this.camSky, heightPx - vh) : Math.min(water - 230, heightPx - vh);
     this.camMin = snap ? camMin : this.camMin + (camMin - this.camMin) * (1 - Math.exp(-dt * 1.5));
     this.camTop = Phaser.Math.Clamp(this.camTop, this.camMin, heightPx - vh);
 
@@ -1283,6 +1287,8 @@ export class GameScene extends Phaser.Scene {
       for (let i = 0; i < n; i++) this.addAura(new Aura(this, p.x, p.y - 10, true, float, p.swimming));
       this.aura = 0;
       p.knockBack(fromX);
+      // (Part 6's chase: knocked back only a little — not straight into the gang's mouths)
+      if (this.fishChase?.phase === 'chase' && p.body.velocity.x < 0) p.body.velocity.x *= 0.3;
       this.fx.auraSparkle(p.x, p.y, 14);
     } else {
       p.faint(false);

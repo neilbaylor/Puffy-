@@ -48,8 +48,8 @@ export const WATER_G = 420;
 const SINK_MAX = 115;
 const STROKE = 195;
 const STROKE_EVERY = 0.14;
-const SWIM_WALK = 0.95;
-const SWIM_RUN = 0.62;
+export const SWIM_WALK = 0.95;
+export const SWIM_RUN = 0.62;
 /** How far under the surface your middle is held (you can't swim up out of the water). */
 const SURFACE_HOLD = 8;
 

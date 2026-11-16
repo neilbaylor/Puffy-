@@ -3,7 +3,7 @@ import { DEPTH, TILE } from '../config';
 import { rng } from '../gfx/draw';
 import type { Pt } from '../gfx/handdrawn';
 import { PROP_RES, TERRAIN_RES, addCanvas, ensureSeaArt, hires, kelpBends } from '../gfx/textures';
-import { GRASS_FILLS, KELP_H, SEA_PROPS, SWAY_N, drawPier } from '../gfx/sea';
+import { GRASS_FILLS, KELP_H, PIER_HEAD, SEA_PROPS, SWAY_N, drawPier } from '../gfx/sea';
 import { DEFAULT_PALETTE, PALETTES, drawCloudPlatform, drawPuffTree, drawTerrainPiece, roundPoly, traceCells, type TerrainKind, type WorldPalette } from '../gfx/world';
 import { drawPine } from '../gfx/mountain';
 import type { Cell, LevelData } from '../level/builder';
@@ -503,9 +503,10 @@ export class LevelView {
           // (under the sea: a wooden pier, its posts down to the sea bed)
           let down = TILE * 2;
           while (y * TILE + down < this.heightPx && !this.isSolidAt(x * TILE + w - 8, y * TILE + down)) down += 8;
-          if (!this.scene.textures.exists(key)) addCanvas(this.scene, key, hires(w, down + 14, PROP_RES, (ctx) => drawPier(ctx, w, down + 8)), undefined, { release: true });
+          // (PIER_HEAD of room over the deck: the rope coil sits up on it)
+          if (!this.scene.textures.exists(key)) addCanvas(this.scene, key, hires(w, down + 14 + PIER_HEAD, PROP_RES, (ctx) => drawPier(ctx, w, down + 8)), undefined, { release: true });
           this.scene.add
-            .image(x * TILE, y * TILE - 6, key)
+            .image(x * TILE, y * TILE - 6 - PIER_HEAD, key)
             .setOrigin(0, 0)
             .setScale(1 / PROP_RES)
             .setDepth(DEPTH.tiles + 1);

@@ -16,7 +16,7 @@ import './plopLooks'; // (registers Plop Invasion's palettes)
 import { POOWAVE_H, POOWAVE_W, drawPooOnGoat, drawPooPile, drawPooWave, drawStink, drawVolleyNetSide, drawVolleyball } from './plopworld';
 import { PLOP_DRESS, PLOP_FRAMES, PLOP_H, PLOP_W, drawPlop, type PlopKind } from './plops';
 import { BUBBLE_FRAMES, BUBBLE_SIZE, CHASE_FRAMES, FISH_FRAMES, FISH_SIZE, SWIM_FRAMES, drawBubbleShot, drawFish, type FishKind } from './fish';
-import { COLUMN, SIGN, STREAKS, TARGET, WAKE, drawDangerColumn, drawFallSign, drawFallStreaks, drawPackWake, drawSurfaceTarget } from './chase';
+import { BADGE, COLUMN, EDGE, SHADOW, SIGN, STREAKS, TARGET, WAKE, drawBedShadow, drawBehindBadge, drawDangerColumn, drawEdgeGlow, drawFallSign, drawFallStreaks, drawPackWake, drawSurfaceTarget } from './chase';
 import { drawPoo } from './hazards';
 import { CLAM_FRAMES, CLAM_H, CLAM_W, NET_CELL_H, NET_W, TCRAB_FRAMES, TCRAB_H, TCRAB_W, drawClam, drawTennisCrab, drawTennisNet } from './tennis';
 import { CRAB_FRAMES, CRAB_H, CRAB_W, JELLY_FRAMES, JELLY_H, JELLY_W, SCHOOL_FRAMES, SEA_PROPS, SEA_PROP_H, SEA_PROP_W, SURFACE_H, TURTLE_FRAMES, TURTLE_H, TURTLE_W, drawCrab, drawJelly, drawLightRay, drawSchoolFish, drawSeaBubble, drawSeaFar, drawSeaMid, drawSeaNear, drawSeaProp, drawSeaSky, drawSurface, drawTurtle, GRASS_FRAMES, GRASS_H, GRASS_W, KELP_FRAMES, KELP_H, KELP_W, OCTO_FRAMES, OCTO_H, OCTO_W, drawGrassFrame, drawKelpFrame, drawOctopus } from './sea';
@@ -399,6 +399,9 @@ export function makeChaseArt(scene: Phaser.Scene) {
   if (!T.exists('chase-target')) addCanvas(scene, 'chase-target', hires(TARGET.w, TARGET.h, 2, (ctx) => drawSurfaceTarget(ctx)));
   if (!T.exists('chase-streaks')) addCanvas(scene, 'chase-streaks', hires(STREAKS.w, STREAKS.h, 1.5, (ctx) => drawFallStreaks(ctx)));
   if (!T.exists('chase-wake')) addCanvas(scene, 'chase-wake', hires(WAKE.w, WAKE.h, 1.5, (ctx) => drawPackWake(ctx)));
+  if (!T.exists('chase-edge')) addCanvas(scene, 'chase-edge', hires(EDGE.w, EDGE.h, 1, (ctx) => drawEdgeGlow(ctx)));
+  if (!T.exists('chase-shadow')) addCanvas(scene, 'chase-shadow', hires(SHADOW.w, SHADOW.h, 1, (ctx) => drawBedShadow(ctx)));
+  if (!T.exists('chase-badge')) addCanvas(scene, 'chase-badge', hires(BADGE.w, BADGE.h, 2, (ctx) => drawBehindBadge(ctx)));
 }
 
 /** The orange fish's bubble shot (b0, b1), as `fish-bubble`. */
@@ -718,7 +721,7 @@ const BADDIE_KEYS: Record<string, string[]> = {
   king: ['pking-jet', 'jetflame', 'jetsmoke'],
   baseball: BB_KEYS,
   fish: ['fish-badguy', 'fish-badguybig', 'fish-kai', 'fish-bubble'],
-  chase: ['fish6-stone', 'fish6-slinger', 'fish6-kai', 'fish6-zippy', 'fish6-fat', 'chase-sign', 'chase-col', 'chase-target', 'chase-streaks', 'chase-wake'],
+  chase: ['fish6-stone', 'fish6-slinger', 'fish6-kai', 'fish6-zippy', 'fish6-fat', 'chase-sign', 'chase-col', 'chase-target', 'chase-streaks', 'chase-wake', 'chase-edge', 'chase-shadow', 'chase-badge'],
   tennis: ['tcrab-red', 'tcrab-orange', 'clam', 'tennisnet'],
 };
 

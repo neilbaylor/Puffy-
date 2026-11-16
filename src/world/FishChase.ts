@@ -2,9 +2,9 @@ import Phaser from 'phaser';
 import { DEPTH, TILE } from '../config';
 import { sfx } from '../core/sfx';
 import { FISH_SCALE, FISH_SIZE, type FishKind } from '../gfx/fish';
-import { COLUMN, STREAKS, TARGET } from '../gfx/chase';
+import { BADGE, COLUMN, EDGE, SHADOW, STREAKS, TARGET } from '../gfx/chase';
 import { PACK_KINDS } from '../gfx/textures';
-import type { Player } from '../entities/Player';
+import { SWIM_RUN, SWIM_WALK, type Player } from '../entities/Player';
 import type { Enemy } from '../entities/enemies/Enemy';
 import type { Rocket } from '../entities/Rocket';
 import type { Fx } from './Fx';
@@ -25,14 +25,28 @@ export interface ChaseHost extends Phaser.Scene {
   isSolidAt(x: number, y: number): boolean;
   /** Where the camera should look instead of the hero (the opening's look back at the gang), or null. */
   camLook: { x: number; y: number } | null;
+  /** Extra sky shown over the surface (for the Fat Fish coming down), px. */
+  camSky: number;
 }
 
 /** How far behind each other the gang swim, along your trail (px). */
 const GAP = 74;
-/** Never further behind you than this along your trail (they catch up, just off the edge of the screen). */
-const MAX_LEAD = 600;
-/** Close enough for the lead fish to lunge. */
-const LUNGE_AT = 170;
+/** Never further behind you than this along your trail (on the screen, or only just off it). */
+const MAX_LEAD = 560;
+/** Where they like to be along your trail behind you (px): right on your tail. The further ahead you get, the harder they swim. */
+const TAIL = 230;
+/** How much harder they swim for each px you're ahead of TAIL (px/s per px). */
+const PULL = 1.1;
+/** Close enough for the lead fish to lunge (a wind-up, then a dash). */
+const LUNGE_AT = 270;
+/** The lunge: the wind-up (it draws back, a "!"), then the dash at this × their pace. */
+const WINDUP = 0.42;
+const DASH_SECS = 0.55;
+const DASH_K = 2.45;
+/** Time between lunges (s). */
+const LUNGE_EVERY: [number, number] = [3.2, 5.2];
+/** While the Fat Fish is coming down they hang back this much further (they're scared of him too). */
+const WARY = 130;
 /** How long each fish leads before the next one takes over (s). */
 const LEAD_SECS: [number, number] = [6.5, 9];
 /** How big the gang are here (a bit under their size in the drawings' scale: they're four, and the screen's small). */
@@ -43,6 +57,38 @@ const FAT_K = 0.8;
 const SIGN_SCALE = 1.5 / 3;
 /** The warning before the Fat Fish comes down (s). */
 const WARN_SECS = 3.2;
+/** The camera tips up to show this much sky over the spot as it comes (px), from this long before it appears (s). */
+const SKY = 180;
+const SKY_LEAD = 1.3;
+/** It hangs at the top of the screen this long before it drops (s). */
+const HANG_SECS = 0.5;
+/** Its fall: gravity and top speed (px/s², px/s) — slow enough to watch it come. */
+const DROP_G = 700;
+const DROP_MAX = 640;
+/** Down through the water, at about this speed (px/s). */
+const SINK_V = 270;
+
+/**
+ * Which look the Fat Fish warning and the "they're behind you" marker have, while we try a few (a dev
+ * device can pick another: localStorage puffy.chase6 = "<warning><marker>", each a, b or c — e.g. "cb").
+ *   warning  a: the sign under the surface, the danger column, the target ring
+ *            b: + a countdown ring round the sign (3, 2, 1), kept on the screen
+ *            c: the sign up at the top of the screen with a bouncing arrow, the Fat Fish's shadow
+ *               growing on the sea bed under the spot, a softer column
+ *   marker   a: a red ball with an arrow and a "!"
+ *            b: a badge with the lead fish's own face in it (whoever's leading), pulsing faster the closer they are
+ *            c: the left edge of the screen glowing red, the lead fish peeking in at it
+ */
+const STYLE = (() => {
+  let v = 'bb';
+  try {
+    const q = localStorage.getItem('puffy.chase6');
+    if (q && /^[abc][abc]$/.test(q)) v = q;
+  } catch {
+    // (no storage: the default)
+  }
+  return { warn: v[0], mark: v[1] };
+})();
 
 const NAMES: Record<string, string> = { stone: 'Stone', slinger: 'Slinger', kai: 'Kai', zippy: 'Zippy' };
 
@@ -66,11 +112,18 @@ interface PackFish {
 
 interface Fall {
   x: number;
-  /** 'warn' (the sign's up), 'drop' (falling), 'sink' (down through the water), 'daze' (on the sea bed), 'off' (swimming away). */
-  phase: 'warn' | 'drop' | 'sink' | 'daze' | 'off';
+  /** 'warn' (the sign's up), 'hang' (it appears at the top of the screen, a moment in the air), 'drop' (falling), 'sink' (down through the water), 'daze' (on the sea bed), 'off' (swimming away). */
+  phase: 'warn' | 'hang' | 'drop' | 'sink' | 'daze' | 'off';
   t: number;
   sign: Phaser.GameObjects.Image;
   target: Phaser.GameObjects.Image;
+  /** (warning b) the countdown ring round the sign. */
+  ring?: Phaser.GameObjects.Graphics;
+  /** (warning c) the arrow under the sign, and the shadow growing on the sea bed. */
+  down?: Phaser.GameObjects.Text;
+  shadow?: Phaser.GameObjects.Image;
+  /** The countdown so far (3, 2, 1). */
+  count: number;
   col: Phaser.GameObjects.TileSprite;
   fish?: Phaser.GameObjects.Sprite;
   streaks?: Phaser.GameObjects.Image;
@@ -95,13 +148,23 @@ export class FishChase {
   /** The leader's place along your trail. */
   private sPack = 0;
   private v = 0;
+  /** The lunge: >0 while dashing (s left). */
   private lunge = 0;
+  /** >0 while winding up for one (s left). */
+  private windup = 0;
   private lungeCool = 0;
+  /** After you've been hit (and are flashing), and a moment more: they hold back. */
+  private calm = 0;
   private swapIn = 8;
   private drops: { x: number; done: boolean }[];
   private fall: Fall | null = null;
   private warned = false;
   private arrow: Phaser.GameObjects.Container;
+  /** (marker b) the lead fish's face in the badge; (marker c) the edge glow and the fish peeking in. */
+  private face: Phaser.GameObjects.Sprite | null = null;
+  private edge: Phaser.GameObjects.Image | null = null;
+  /** How close behind they are, for the marker (0 far … 1 right there), eased. */
+  private near = 0;
   private rumbleT = 0;
 
   constructor(
@@ -121,12 +184,22 @@ export class FishChase {
       const wake = gs.add.image(0, 0, 'chase-wake').setOrigin(1, 0.5).setDepth(DEPTH.enemies + 0.9).setAlpha(0).setScale((w * k * 0.9) / 180);
       this.fish.push({ kind, img, wake, back: i * GAP, lane: [0, -26, 22, -10][i], ph: i * 1.7, stun: 0, x: img.x, y: img.y, rx: w * k * 0.36, ry: h * k * 0.32 });
     });
-    // the "they're right behind you" arrow, at the left edge of the screen when the leader's off it
-    const g = gs.add.graphics();
-    g.fillStyle(0x3a2418, 1).fillCircle(0, 0, 15).fillTriangle(-24, 0, -10, -11, -10, 11);
-    g.fillStyle(0xe8463f, 1).fillCircle(0, 0, 12.5).fillTriangle(-20, 0, -9, -8.5, -9, 8.5);
-    const ex = gs.add.text(0, 0, '!', { fontFamily: '"Lilita One", "Arial Black", sans-serif', fontSize: '20px', color: '#ffffff' }).setOrigin(0.5, 0.52);
-    this.arrow = gs.add.container(0, 0, [g, ex]).setDepth(DEPTH.text + 1).setVisible(false);
+    // the "they're right behind you" marker, at the left edge of the screen when the leader's off it
+    if (STYLE.mark === 'b') {
+      const badge = gs.add.image(0, 0, 'chase-badge').setOrigin(46 / BADGE.w, 0.5).setScale(0.5);
+      this.face = gs.add.sprite(0, 0, 'fish6-stone', 'an0');
+      this.arrow = gs.add.container(0, 0, [badge, this.face]).setDepth(DEPTH.text + 1).setVisible(false);
+    } else if (STYLE.mark === 'c') {
+      this.edge = gs.add.image(0, 0, 'chase-edge').setOrigin(0, 0).setDepth(DEPTH.text).setAlpha(0).setVisible(false);
+      this.face = gs.add.sprite(0, 0, 'fish6-stone', 'an0');
+      this.arrow = gs.add.container(0, 0, [this.face]).setDepth(DEPTH.text + 1).setVisible(false);
+    } else {
+      const g = gs.add.graphics();
+      g.fillStyle(0x3a2418, 1).fillCircle(0, 0, 15).fillTriangle(-24, 0, -10, -11, -10, 11);
+      g.fillStyle(0xe8463f, 1).fillCircle(0, 0, 12.5).fillTriangle(-20, 0, -9, -8.5, -9, 8.5);
+      const ex = gs.add.text(0, 0, '!', { fontFamily: '"Lilita One", "Arial Black", sans-serif', fontSize: '20px', color: '#ffffff' }).setOrigin(0.5, 0.52);
+      this.arrow = gs.add.container(0, 0, [g, ex]).setDepth(DEPTH.text + 1).setVisible(false);
+    }
     // (coming back to a checkpoint: no opening; they turn up behind you after a moment)
     if (opts.retry) gs.time.delayedCall(900, () => this.heroSplashed());
   }
@@ -223,9 +296,13 @@ export class FishChase {
     this.phase = 'chase';
   }
 
-  /** The gang's own pace: a little under yours at an easy swim. */
+  /** The gang's own pace: just under yours at an easy swim. */
   private baseSpeed(p: Player) {
-    return p.char.walkSpeed * 0.95 * 0.9;
+    return p.char.walkSpeed * SWIM_WALK * 0.96;
+  }
+  /** Your pace swimming flat out. */
+  private runSpeed(p: Player) {
+    return p.char.runSpeed * SWIM_RUN;
   }
 
   /** Where along your trail distance s is (before its start: on back the way the trail began). */
@@ -262,6 +339,7 @@ export class FishChase {
     if (this.phase === 'done') return;
     this.phase = 'done';
     this.arrow.setVisible(false);
+    this.edge?.setVisible(false);
     const lead = this.fish[0];
     if (lead.img.visible) this.gs.sayAt(() => [lead.x, lead.y - lead.ry * 1.6], 'Grr… next time!', 1800);
     for (const f of this.fish) {
@@ -295,24 +373,39 @@ export class FishChase {
     if (d > 6) this.trail.push({ x: p.x, y: p.y, s: last.s + d });
     if (this.trail.length > 4000) this.trail.splice(0, 1000);
     const sHero = this.trail[this.trail.length - 1].s;
-    // their pace: their own, a surge if you've got well ahead, a lunge when the leader's close
+    // their pace: they keep right on your tail — the further ahead you get, the harder they swim
+    // (so running only buys you a little room) — and every few seconds the leader winds up and lunges
     const base = this.baseSpeed(p);
     const lead = sHero - this.sPack;
     this.lungeCool = Math.max(0, this.lungeCool - dt);
     const leader = this.fish[0];
-    if (this.lunge > 0) this.lunge -= dt;
-    else if (lead < LUNGE_AT && this.lungeCool <= 0 && leader.stun <= 0 && p.alive && !p.invulnerable) {
-      this.lunge = 0.55;
-      this.lungeCool = 1.6;
-      sfx.chomp();
+    if (this.windup > 0) {
+      this.windup -= dt;
+      if (this.windup <= 0) {
+        this.lunge = DASH_SECS;
+        sfx.chomp();
+      }
+    } else if (this.lunge > 0) this.lunge -= dt;
+    // (the Fat Fish coming: they hang back, no lunging — and just after you've been hit by anything,
+    // a moment to get going again)
+    if (p.invulnerable) this.calm = 0.9;
+    else this.calm = Math.max(0, this.calm - dt);
+    const wary = (!!this.fall && this.fall.phase !== 'daze' && this.fall.phase !== 'off') || this.calm > 0;
+    if (this.windup > 0 || this.lunge > 0) {
+      // (mid-lunge: carry on)
+    } else if (!wary && lead < LUNGE_AT && this.lungeCool <= 0 && leader.stun <= 0 && p.alive && !p.invulnerable) {
+      this.windup = WINDUP;
+      this.lungeCool = LUNGE_EVERY[0] + Math.random() * (LUNGE_EVERY[1] - LUNGE_EVERY[0]);
+      if (leader.img.visible && this.onScreen(leader.x, leader.y)) this.gs.fx.popText(leader.x, leader.y - leader.ry * 1.7, '!', '#ff5a4a', 24);
     }
-    const want = this.lunge > 0 ? base * 2.6 : lead > 380 ? base * 1.45 : base;
-    this.v += (want - this.v) * (1 - Math.exp(-dt * (this.lunge > 0 ? 9 : 2.5)));
+    const chase = Phaser.Math.Clamp(base + (lead - TAIL - (wary ? WARY : 0)) * PULL, base * 0.7, this.runSpeed(p) * 1.15);
+    const want = this.lunge > 0 ? Math.max(chase, base) * DASH_K : this.windup > 0 ? base * 0.45 : chase;
+    this.v += (want - this.v) * (1 - Math.exp(-dt * (this.lunge > 0 || this.windup > 0 ? 10 : 3)));
     this.sPack = Math.min(sHero - 4, this.sPack + this.v * dt);
     if (lead > MAX_LEAD) this.sPack = sHero - MAX_LEAD;
     // taking turns: the leader drops to the back, the others move up
     this.swapIn -= dt;
-    if (this.swapIn <= 0 && this.lunge <= 0) {
+    if (this.swapIn <= 0 && this.lunge <= 0 && this.windup <= 0) {
       this.swapIn = LEAD_SECS[0] + Math.random() * (LEAD_SECS[1] - LEAD_SECS[0]);
       const old = this.fish.shift()!;
       this.fish.push(old);
@@ -334,7 +427,8 @@ export class FishChase {
         this.gs.fx.popText(f.x + f.rx, f.y - f.ry, 'CHOMP!', '#ffffff', 16);
         this.sPack -= 240;
         this.lunge = 0;
-        this.lungeCool = 1.8;
+        this.windup = 0;
+        this.lungeCool = 2.4;
       }
       break;
     }
@@ -348,18 +442,74 @@ export class FishChase {
         f.stun = 1.1;
         this.gs.fx.popText(f.x, f.y - f.ry * 1.4, 'BONK!', '#ffffff', 15);
         this.gs.fx.stars(f.x, f.y - f.ry, 6);
-        if (f === this.fish[0]) this.lunge = 0;
+        if (f === this.fish[0]) this.lunge = this.windup = 0;
         break;
       }
     }
-    // the arrow: the leader's off the left of the screen
+    this.marker(dt, leader);
+  }
+
+  /** The "they're behind you" marker: at the left edge of the screen while the leader's off it (see STYLE). */
+  private marker(dt: number, leader: PackFish) {
     const v = this.gs.viewRect;
-    const off = leader.x < v.left + 60 && leader.img.visible;
-    this.arrow.setVisible(off);
-    if (off) {
-      this.arrow.setPosition(v.left + 86, Phaser.Math.Clamp(leader.y, v.top + 90, v.top + v.height - 140));
-      this.arrow.setScale(1 + Math.sin(this.gs.time.now / 120) * 0.08);
+    // (shown once it's mostly off the screen, not over the fish itself)
+    const off = leader.x + leader.rx * 0.3 < v.left && leader.img.visible;
+    // (how close: right at the edge 1, well back 0)
+    const want = off ? Phaser.Math.Clamp(1 - (v.left - leader.x) / 320, 0.15, 1) : 0;
+    this.near += (want - this.near) * Math.min(1, dt * 6);
+    const t = this.gs.time.now / 1000;
+    const y = Phaser.Math.Clamp(leader.y, v.top + 90, v.top + v.height - 140);
+    if (STYLE.mark === 'c' && this.edge && this.face) {
+      // the edge glows (stronger, faster the closer they are); the leader's nose peeks in
+      const glow = this.near > 0.02;
+      this.edge.setVisible(glow);
+      if (glow) {
+        const pulse = 0.7 + 0.3 * Math.sin(t * (5 + this.near * 9));
+        this.edge.setPosition(v.left, v.top).setDisplaySize(EDGE.w * (1.4 + this.near * 0.8), v.height).setAlpha(Math.min(1, 0.35 + this.near) * pulse);
+      }
+      this.arrow.setVisible(off);
+      if (off) {
+        this.syncFace(leader, 0.7);
+        // (its nose in at the edge: further in the closer it is)
+        const fw = this.face.displayWidth;
+        this.arrow.setPosition(v.left - fw * (0.32 - 0.22 * this.near), y + Math.sin(t * 3) * 5);
+      }
+      return;
     }
+    this.arrow.setVisible(off);
+    if (!off) return;
+    if (STYLE.mark === 'b' && this.face) {
+      this.syncFace(leader, 0, true);
+      this.arrow.setPosition(v.left + 74, y);
+      this.arrow.setScale(1 + Math.max(0, Math.sin(t * (4 + this.near * 10))) * (0.06 + this.near * 0.1));
+      return;
+    }
+    this.arrow.setPosition(v.left + 86, y);
+    this.arrow.setScale(1 + Math.sin(t * 8.3) * 0.08);
+  }
+
+  /**
+   * The marker's fish: whoever's leading, as they are right now, `k` × their size — or (`portrait`)
+   * just its face, cropped and sized to fill the badge.
+   */
+  private syncFace(leader: PackFish, k: number, portrait = false) {
+    const f = this.face!;
+    const key = `fish6-${leader.kind}`;
+    if (f.texture.key !== key || f.frame.name !== leader.img.frame.name) f.setTexture(key, leader.img.frame.name);
+    f.setFlipX(false);
+    if (!portrait) {
+      f.setScale(leader.img.scaleX * k);
+      return;
+    }
+    // (the front of the fish, facing right: its eye and mouth; the badge's disc is 19.5 across at half size)
+    const fw = f.frame.width;
+    const fh = f.frame.height;
+    const cw = Math.min(fw * 0.5, fh * 1.05);
+    f.setCrop(fw - cw, 0, cw, fh);
+    const sc = 17.5 / Math.max(cw, fh) * 2;
+    f.setScale(sc);
+    // (centred on the disc: the crop's middle, not the frame's)
+    f.setPosition(-(fw / 2 - cw / 2) * sc, 0);
   }
 
   private onScreen(x: number, y: number) {
@@ -416,21 +566,35 @@ export class FishChase {
     }
     F.t += dt;
     const water = this.gs.sea ? this.waterY() : 0;
+    // (the view tips up to the sky over the spot just before it comes, and back down once it's in the water)
+    this.gs.camSky = (F.phase === 'warn' && F.t > WARN_SECS - SKY_LEAD) || F.phase === 'hang' || F.phase === 'drop' ? SKY : 0;
     switch (F.phase) {
       case 'warn': {
         // the sign bobs over the spot; the column and the target pulse
         const k = F.t / WARN_SECS;
-        F.sign.setPosition(F.x, water + 52 + Math.sin(F.t * 7) * 4).setScale(SIGN_SCALE * (1 + Math.sin(F.t * 9) * 0.05));
         F.col.setAlpha(0.5 + 0.35 * Math.abs(Math.sin(F.t * (5 + k * 6))));
+        this.warnLook(F, water, k);
         F.col.tilePositionY -= dt * 60;
         F.target.setAlpha(0.7 + 0.3 * Math.sin(F.t * 8)).setScale(this.targetScale() * (1 + Math.sin(F.t * 8) * 0.05));
         if (Math.floor((F.t - dt) * 2.5) !== Math.floor(F.t * 2.5)) sfx.tick();
-        if (F.t >= WARN_SECS) this.drop(F, water);
+        if (F.t >= WARN_SECS) this.appear(F, water);
         break;
       }
+      case 'hang':
+        // (a cartoon moment up there: it's spotted the drop, wiggles — and down it comes)
+        if (F.fish) F.fish.setRotation(Math.PI / 2 - 0.12 + Math.sin(F.t * 30) * 0.1);
+        if (F.t >= HANG_SECS) {
+          F.phase = 'drop';
+          F.t = 0;
+          F.vy = 90;
+          sfx.whoosh();
+          this.gs.tweens.add({ targets: F.streaks, alpha: 1, duration: 200 });
+        }
+        break;
       case 'drop': {
-        F.vy = Math.min(1500, F.vy + 1800 * dt);
+        F.vy = Math.min(DROP_MAX, F.vy + DROP_G * dt);
         F.y += F.vy * dt;
+        if (F.fish) F.fish.setRotation(Math.PI / 2 - 0.12 + Math.sin(F.t * 14) * 0.05);
         if (F.y + this.fatHalfH() * 0.5 >= water) {
           // SPLASH
           F.phase = 'sink';
@@ -440,13 +604,15 @@ export class FishChase {
           sfx.splash();
           sfx.thud();
           this.gs.tweens.add({ targets: [F.sign, F.target], alpha: 0, scale: 0.2, duration: 220, onComplete: () => { F.sign.destroy(); F.target.destroy(); } });
+          F.ring?.destroy();
+          F.down?.destroy();
           this.gs.tweens.add({ targets: F.streaks, alpha: 0, duration: 200 });
         }
         break;
       }
       case 'sink': {
         // through the water, slowing: down to the sea bed
-        F.vy += (430 - F.vy) * Math.min(1, dt * 3);
+        F.vy += (SINK_V - F.vy) * Math.min(1, dt * 3);
         F.y += F.vy * dt;
         if (Math.random() < 0.5) this.gs.sea?.bubbles(F.x + (Math.random() - 0.5) * 60, F.y - this.fatHalfH(), 1);
         if (F.y + this.fatHalfH() >= F.bed) {
@@ -458,7 +624,7 @@ export class FishChase {
           this.gs.fx.dust(F.x - 40, F.bed, 8);
           this.gs.fx.dust(F.x + 40, F.bed, 8);
           this.gs.fx.stars(F.x, F.y - this.fatHalfH() * 0.6, 8);
-          this.gs.tweens.add({ targets: F.col, alpha: 0, duration: 400 });
+          this.gs.tweens.add({ targets: [F.col, F.shadow].filter(Boolean), alpha: 0, duration: 400 });
         }
         break;
       }
@@ -480,6 +646,7 @@ export class FishChase {
           F.fish?.destroy();
           F.streaks?.destroy();
           F.col.destroy();
+          F.shadow?.destroy();
           this.fall = null;
           return;
         }
@@ -542,7 +709,45 @@ export class FishChase {
       this.warned = true;
       gs.fx.popText(Math.min(x, p.x + 260), water + 40, 'LOOK OUT ABOVE!', '#ffd23f', 22);
     } else gs.fx.popText(Math.min(x, p.x + 260), water + 40, 'FAT FISH!', '#ffd23f', 20);
-    this.fall = { x, phase: 'warn', t: 0, sign, target, col, y: 0, vy: 0, bed, hitDone: false };
+    this.fall = { x, phase: 'warn', t: 0, sign, target, col, y: 0, vy: 0, bed, hitDone: false, count: 0 };
+    if (STYLE.warn === 'b') this.fall.ring = gs.add.graphics().setDepth(DEPTH.text - 0.1);
+    if (STYLE.warn === 'c') {
+      this.fall.down = gs.add.text(x, 0, '▼', { fontFamily: '"Lilita One", "Arial Black", sans-serif', fontSize: '26px', color: '#ff5a4a', stroke: '#3a2418', strokeThickness: 5 }).setOrigin(0.5).setDepth(DEPTH.text);
+      this.fall.shadow = gs.add.image(x, bed - 2, 'chase-shadow').setDepth(DEPTH.enemies - 0.4).setAlpha(0).setScale(0.3);
+    }
+  }
+
+  /** The warning while it's up (see STYLE): `k` how far through it (0…1). */
+  private warnLook(F: Fall, water: number, k: number) {
+    const v = this.gs.viewRect;
+    const bob = Math.sin(F.t * 7) * 4;
+    const scale = SIGN_SCALE * (1 + Math.sin(F.t * 9) * 0.05);
+    if (STYLE.warn === 'b' && F.ring) {
+      // kept on the screen; a ring round it running down, and 3, 2, 1
+      const sy = Math.max(water + 52, v.top + 58) + bob;
+      F.sign.setPosition(F.x, sy).setScale(scale);
+      const r = SIGN_SCALE * 3 * 34;
+      F.ring.clear();
+      F.ring.lineStyle(6, 0x3a2418, 0.55).strokeCircle(F.x, sy + 2, r);
+      F.ring.lineStyle(4, 0xffd23f, 1).beginPath().arc(F.x, sy + 2, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - k), false).strokePath();
+      const n = 3 - Math.floor(F.t / (WARN_SECS / 3));
+      if (n !== F.count && n >= 1) {
+        F.count = n;
+        this.gs.fx.popText(F.x + r + 18, sy - 10, String(n), '#ffd23f', 32);
+      }
+      return;
+    }
+    if (STYLE.warn === 'c' && F.down && F.shadow) {
+      // up at the top of the screen, an arrow bouncing under it; its shadow on the sea bed grows
+      const sy = v.top + 46 + bob;
+      F.sign.setPosition(F.x, sy).setScale(scale);
+      F.down.setPosition(F.x, sy + 44 + Math.abs(Math.sin(F.t * 6)) * 10);
+      const w = this.fatHalfW() * 2.4;
+      F.shadow.setScale((w / SHADOW.w) * (0.35 + 0.65 * k), (w / SHADOW.w) * (0.35 + 0.65 * k)).setAlpha(0.25 + 0.65 * k);
+      F.col.setAlpha(0.25 + 0.2 * Math.abs(Math.sin(F.t * (5 + k * 6))));
+      return;
+    }
+    F.sign.setPosition(F.x, water + 52 + bob).setScale(scale);
   }
 
   /** The target on the surface: a bit wider than the falling fish (its picture's drawn at 2×). */
@@ -550,19 +755,23 @@ export class FishChase {
     return (this.fatHalfW() * 2.3) / (TARGET.w * 2);
   }
 
-  private drop(F: Fall, water: number) {
+  /** The warning's up: the Fat Fish turns up at the top of the screen over the spot, hangs there a moment… */
+  private appear(F: Fall, water: number) {
     const gs = this.gs;
-    F.phase = 'drop';
+    F.phase = 'hang';
     F.t = 0;
     const v = gs.viewRect;
-    F.y = Math.min(v.top, water - 200) - this.fatHalfH();
-    F.vy = 700;
+    // (up in the sky over the spot, in view: the camera's tipped up to show it)
+    F.y = Math.min(v.top + this.fatHalfH() + 14, water - this.fatHalfH() * 0.9);
+    F.vy = 0;
     const fw = FISH_SIZE.fat.w * FISH_SCALE.fat * FAT_K;
     const fish = gs.add.sprite(F.x, F.y, 'fish6-fat', 'sw0').setDepth(DEPTH.enemies + 2).setRotation(Math.PI / 2 - 0.12);
     fish.setScale(fw / fish.frame.width);
     F.fish = fish;
-    F.streaks = gs.add.image(F.x, F.y, 'chase-streaks').setOrigin(0.5, 1).setDepth(DEPTH.enemies + 1.9).setScale((this.fatHalfW() * 2) / (STREAKS.w * 1.5));
-    sfx.whoosh();
+    F.streaks = gs.add.image(F.x, F.y, 'chase-streaks').setOrigin(0.5, 1).setDepth(DEPTH.enemies + 1.9).setScale((this.fatHalfW() * 2) / (STREAKS.w * 1.5)).setAlpha(0);
+    gs.fx.popText(F.x + this.fatHalfW() + 10, F.y, 'uh oh', '#ffffff', 14);
+    // (the sign up top would sit on it: it's done its job)
+    if (STYLE.warn === 'c') gs.tweens.add({ targets: [F.sign, F.down].filter(Boolean), alpha: 0, duration: 200 });
   }
 
   destroy() {
@@ -571,5 +780,6 @@ export class FishChase {
       f.wake.destroy();
     }
     this.arrow.destroy();
+    this.edge?.destroy();
   }
 }

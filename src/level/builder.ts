@@ -31,6 +31,8 @@ export interface LevelData {
   vertical?: boolean;
   /** A climb's fly-over: the points it flies through (tile x, height in tiles), from the start of the flight; it ends on the hero. */
   flyPath?: [number, number][];
+  /** How long the fly-over takes (ms; default by kind of level). */
+  flyMs?: number;
   /** Under the sea (World 3): the water's surface (world px from the top). Below it you swim. */
   water?: number;
   /** Under the sea: going down a trench it gets dark — from this world y (none) to this one (as dark as it gets). */
@@ -56,6 +58,7 @@ export class LevelBuilder {
   /** Mostly climbing up (see LevelData.vertical). */
   vertical = false;
   flyPath: [number, number][] | undefined;
+  flyMs: number | undefined;
   /** Under the sea: the surface's world y (see LevelData.water). */
   waterY: number | undefined;
   darkY: [number, number] | undefined;
@@ -241,6 +244,7 @@ export class LevelBuilder {
       pal: this.pal,
       vertical: this.vertical || undefined,
       flyPath: this.flyPath,
+      flyMs: this.flyMs,
       water: this.waterY,
       dark: this.darkY,
       bgBottom: this.bgBottomY,
