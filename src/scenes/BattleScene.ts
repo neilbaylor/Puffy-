@@ -272,7 +272,7 @@ export class BattleScene extends Phaser.Scene {
    * down slowly. (A rare later one: the others carry on by the rules for a moment — EXTRAP_TICKS.)
    */
   private interp = 3;
-  /** How late recent snapshots came (ticks, against the earliest arrivals lately: `lateBase`, ms). */
+  /** When recent snapshots came, less their tick's time (ms; the earliest of them: `lateBase`). */
   private lateness: number[] = [];
   private lateBase: number | null = null;
   /** The others carried on past the newest snapshot (by the rules, with their last buttons): a few ticks of it, worked out once per snapshot. */
@@ -286,8 +286,6 @@ export class BattleScene extends Phaser.Scene {
   /** Each other player's clock of buttons against the server's ticks (ack − tick, eased); and when it was last eased. */
   private ackOff = new Map<string, number>();
   private ackAt = 0;
-  /** The prizes as last drawn (what you touch, on your screen). */
-  private lastPrizes: [number, PrizeKind, number, number, number][] | null = null;
   private me: BPlayer | null = null;
   /**
    * Your hero one tick on from `me` (the same rules, the buttons held right now): drawn part way
@@ -357,7 +355,6 @@ export class BattleScene extends Phaser.Scene {
     this.otherFix.clear();
     this.carriedFrom.clear();
     this.ackOff.clear();
-    this.lastPrizes = null;
     this.me = null;
     this.meNext = null;
     this.pending = [];
@@ -1002,12 +999,23 @@ export class BattleScene extends Phaser.Scene {
    * got there first — it's put back, or goes to them.
    */
   private grabPrizes(me: BPlayer) {
-    const prizes = this.lastPrizes;
-    if (!prizes || me.respawn > 0) return;
+    const n = this.snaps.length;
+    if (!n || me.respawn > 0) return;
+    // (where they are by your clock: the newest snapshot's, and one still floating down that much
+    // further down — you're ahead of the server by the ticks it hasn't had from you yet)
+    const last = this.snaps[n - 1];
+    const prev = n > 1 ? this.snaps[n - 2] : null;
+    const lead = Math.max(0, this.seq - (last.players.find((p) => p.id === me.id)?.ack ?? this.seq));
     const c = characterById(me.hero);
     const k = sizeOf(me);
-    for (const [pid, kind, x, y] of prizes) {
+    for (const [pid, kind, x, y0, age] of last.prizes) {
       if (this.grabbed.has(pid)) continue;
+      let y = y0;
+      if (age < 0) {
+        const py = prev?.prizes.find((z) => z[0] === pid)?.[3];
+        const vy = py !== undefined && last.tick > prev!.tick ? (y0 - py) / (last.tick - prev!.tick) : 3;
+        y = Math.min(landingY(this.map, x), y0 + Math.max(0, vy) * lead);
+      }
       // (the sim's test)
       if (Math.abs(me.x - x) < boxW(c, k) / 2 + 22 && y > me.y - boxH(c, k) - 10 && y - 44 < me.y) {
         this.myGrabs.set(pid, { at: performance.now(), kind, x, y });
@@ -1053,14 +1061,16 @@ export class BattleScene extends Phaser.Scene {
 
   /** A snapshot came in: how late was it (see interp)? */
   private noteLateness(s: Snapshot) {
-    // (when it would have come if every one came as early as the earliest lately; that line creeps
-    // up slowly, so the two clocks drifting apart doesn't count as lateness)
+    // (when it would have come if every one came as early as the earliest in the last 3 seconds: so a
+    // lasting change — the server stalled and skipped ticks, the clocks drifting apart, a new route —
+    // is forgotten within 3 seconds rather than counted as lateness for good)
     const ideal = s.at - s.tick * TICK_MS;
-    this.lateBase = this.lateBase === null ? ideal : Math.min(this.lateBase + 0.02, ideal);
-    this.lateness.push((ideal - this.lateBase) / TICK_MS);
+    this.lateness.push(ideal);
     if (this.lateness.length > 90) this.lateness.shift();
-    // (all but the latest few in 3 seconds: a rare later one is covered by carrying on for a moment)
-    const sorted = [...this.lateness].sort((a, b) => a - b);
+    this.lateBase = Math.min(...this.lateness);
+    // (all but the latest few: a rare later one is covered by carrying on for a moment)
+    const base = this.lateBase;
+    const sorted = this.lateness.map((v) => (v - base) / TICK_MS).sort((a, b) => a - b);
     const want = Phaser.Math.Clamp(0.8 + sorted[Math.floor(sorted.length * 0.9)], INTERP_MIN, INTERP_MAX);
     this.interp += (want - this.interp) * (want > this.interp ? 0.3 : 0.02);
   }
@@ -1259,7 +1269,6 @@ export class BattleScene extends Phaser.Scene {
     const cur = this.othersAt();
     if (!cur) return;
     this.lastSeen = { players: cur.players, enemies: cur.enemies };
-    this.lastPrizes = cur.prizes;
     // your own shots: drawn where they are on your phone, instead of the server's copies (behind)
     // (and not once they've blown up here)
     if (this.shots.length) {
