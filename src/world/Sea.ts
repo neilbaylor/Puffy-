@@ -185,7 +185,10 @@ export class SeaLife {
     this.skyTop.setVisible(showTop);
     // ── light beams from the surface, slowly breathing ──
     for (const r of this.rays) {
-      const x = view.left + ((r.x * view.width * 1.4 - view.left * 0.15 + t * 3) % (view.width * 1.4)) - view.width * 0.2;
+      // (wrapped round within 1.4 view widths — a true wrap: JS's % of a negative number stays negative,
+      // and further into a level this went negative, so the beams all slid off the left of the screen)
+      const span = view.width * 1.4;
+      const x = view.left + ((((r.x * span - view.left * 0.15 + t * 3) % span) + span) % span) - view.width * 0.2;
       const len = view.top + view.height - this.surfaceY;
       r.img
         .setPosition(x, this.surfaceY)
