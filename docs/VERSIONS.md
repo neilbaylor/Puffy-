@@ -329,3 +329,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.324: Part 6 fly-over shorter (11.5 → 7.5 s).
 - v0.325: Part 6 fly-over 6.5 s.
 - v0.326: Part 6: shallow water twice (a reef roof over the football field, a sandbar).
+- v0.327: Perf: Part 6 draws about half as much per frame (and less memory); savings across the app.
