@@ -692,7 +692,11 @@ export class GameScene extends Phaser.Scene {
       cull(b);
       cull(b.glint);
     }
-    for (const e of this.enemies) if (e.active) cull(e);
+    for (const e of this.enemies)
+      if (e.active) {
+        cull(e);
+        e.cullParts(cull);
+      }
     // (the checkpoint flowers, the gate, Part 6's football players: all a long way off, mostly)
     for (const cp of this.checkpoints) cull(cp);
     if (this.goal) {

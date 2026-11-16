@@ -285,8 +285,16 @@ export class Weapon {
   }
 
   /** The owner is gone: the weapon clatters to the ground and fades. */
+  /** Skipped by the camera while it's off it, with its bad guy (see GameScene.cullOffCamera). */
+  cullWith(cull: (o: Phaser.GameObjects.Image) => void) {
+    cull(this.img);
+    if (this.ball) cull(this.ball);
+  }
+
   drop() {
     const parts = [this.img, this.ball].filter((p): p is Phaser.GameObjects.Image => !!p && p.visible);
+    // (no longer checked against the camera as it falls: drawn wherever it is, as before)
+    for (const p of parts) p.cameraFilter = 0;
     this.chain?.destroy();
     for (const p of parts)
       this.gs.tweens.add({
