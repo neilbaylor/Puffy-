@@ -23,6 +23,7 @@ import { HockeyMatch } from '../entities/Hockey';
 import { VolleyMatch } from '../entities/Volley';
 import { BaseballGame } from '../entities/Baseball';
 import { TennisMatch } from '../entities/Tennis';
+import { FootballGame } from '../entities/Football';
 import { soloSource, sourceById } from '../input/devices';
 import type { EnemyKind } from '../level/builder';
 import { levelInfo } from '../level/levels';
@@ -155,6 +156,8 @@ export class GameScene extends Phaser.Scene {
   private ballgames: BaseballGame[] = [];
   /** Crab tennis under the sea (each court a match). */
   private tennis: TennisMatch[] = [];
+  /** Part 6's underwater football. */
+  private football: FootballGame[] = [];
   /** Bad guys waiting to drop in by parachute (they fall when you get near), and the ones in the air. */
   private paraWaiting: { kind: EnemyKind; x: number; y: number }[] = [];
   private paras: { e: Enemy; chute: Phaser.GameObjects.Image; t: number }[] = [];
@@ -191,10 +194,16 @@ export class GameScene extends Phaser.Scene {
   isSolidAt(x: number, y: number) {
     return this.level.isSolidAt(x, y);
   }
+  /** Part 6: the Fat Fish is on its way down (the football players hold their throws). */
+  get fatFishFalling() {
+    return this.fishChase?.falling ?? false;
+  }
   /** Part 6: King Bob's gang chasing you, and the Fat Fish falling. */
   private fishChase: FishChase | null = null;
   /** Where the camera looks instead of the hero for a moment (Part 6's look back at the gang), or null. */
   camLook: { x: number; y: number } | null = null;
+  /** Something on the sea bed worth seeing under you (Part 6's football field): the camera keeps this world y in view when it can, px. */
+  camFloor: number | null = null;
   /** Part 6's pier: the Ferris wheel. */
   private ferris: FerrisWheel | null = null;
   /** Under the sea: this much more sky shown over the surface for a moment (Part 6: the Fat Fish coming), px. */
@@ -297,6 +306,7 @@ export class GameScene extends Phaser.Scene {
     this.volleys = [];
     this.ballgames = [];
     this.tennis = [];
+    this.football = [];
     this.paraWaiting = [];
     this.paras = [];
     this.kingAt = null;
@@ -319,6 +329,7 @@ export class GameScene extends Phaser.Scene {
     this.fishChase = null;
     this.ferris = null;
     this.camLook = null;
+    this.camFloor = null;
     this.camSky = 0;
     this.rock = null;
     // every level (and every restart at a checkpoint) starts you with one nuggie
@@ -488,6 +499,9 @@ export class GameScene extends Phaser.Scene {
           break;
         case 'tennis':
           this.tennis.push(new TennisMatch(this, cx, surface(s.y), Number(s.opts?.w ?? 18)));
+          break;
+        case 'football':
+          this.football.push(new FootballGame(this, s.x * TILE, surface(s.y)));
           break;
         case 'baseball':
           this.ballgames.push(new BaseballGame(this, s.x * TILE, surface(s.y), Number(s.opts?.w ?? 36)));
@@ -901,6 +915,7 @@ export class GameScene extends Phaser.Scene {
     for (const v of this.volleys) v.update(dt);
     for (const g of this.ballgames) g.update(dt);
     for (const m of this.tennis) m.update(dt);
+    for (const f of this.football) f.update(dt);
     this.updateParachutes(dt);
     this.updateDrops(dt);
 
@@ -1305,6 +1320,9 @@ export class GameScene extends Phaser.Scene {
       // well up the screen; the rock's top is shown if there's room)
       if (R) tTop = Math.max(Math.min(feet - vh * 0.55, R.y - R.r - 30), feet - vh * 0.66);
       tTop -= this.camSky;
+      // (Part 6's football: the field on the sea bed kept in view under you — unless that'd put you
+      // up near the top of the screen, or the Fat Fish is coming and the sky's what matters)
+      if (this.camFloor !== null && !this.camSky && !this.camLook) tTop = Math.max(tTop, Math.min(this.camFloor - vh, feet - vh * 0.3));
       // (a look somewhere else for a moment: Part 6's look back at the gang — a gentler swing)
       const look = this.camLook;
       const lx = look ? look.x : tx;

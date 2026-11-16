@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { DEPTH, TILE } from '../config';
 import { rng } from '../gfx/draw';
+import { FB_FIELD_TILES } from '../gfx/football';
 import type { Pt } from '../gfx/handdrawn';
 import { PROP_RES, TERRAIN_RES, addCanvas, ensureSeaArt, hires, kelpBends } from '../gfx/textures';
 import { GRASS_FILLS, KELP_H, PIER_HEAD, PIER_HEAD_MODERN, SEA_PROPS, SWAY_N, drawModernPier, drawPier } from '../gfx/sea';
@@ -654,6 +655,8 @@ export class LevelView {
     const r = rng(1234);
     // (no plants on a court: the crabs' tennis courts keep their ground clear)
     const courts = d.spawns.filter((sp) => sp.type === 'tennis').map((sp) => [sp.x - Number(sp.opts?.w ?? 18) / 2 - 3, sp.x + Number(sp.opts?.w ?? 18) / 2 + 3]);
+    // (nor on the football field)
+    for (const sp of d.spawns) if (sp.type === 'football') courts.push([sp.x - 3, sp.x + FB_FIELD_TILES + 3]);
     for (let x = 1; x < d.width - 1; x++) {
       let y = -1;
       for (let yy = 1; yy < d.height; yy++)

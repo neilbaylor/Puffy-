@@ -227,6 +227,12 @@ export class FishChase {
     return this.gs.players.find((p) => p.alive) ?? null;
   }
 
+  /** The Fat Fish is up there over you or on its way down. */
+  get falling() {
+    const ph = this.fall?.phase;
+    return ph === 'hang' || ph === 'drop' || ph === 'sink';
+  }
+
   /** The hero's in the water (the dive's splash, or back at a checkpoint): the gang turns up. */
   heroSplashed() {
     if (this.phase !== 'wait') return;

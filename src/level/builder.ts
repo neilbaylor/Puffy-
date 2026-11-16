@@ -12,7 +12,7 @@ export type Cell = 'ground' | 'rock' | 'boulder' | 'bramble' | 'cloud' | null;
 export type EnemyKind = 'puffball' | 'bigpuff' | 'giant' | 'goat' | 'plop' | 'bigplop' | 'giantplop' | 'poogoat' | 'fish' | 'bigfish' | 'kai' | 'crab';
 
 export interface Spawn {
-  type: EnemyKind | 'aura' | 'rootbeer' | 'checkpoint' | 'goal' | 'player' | 'tree' | 'soccer' | 'hockey' | 'para' | 'puddle' | 'chase' | 'volley' | 'drop' | 'king' | 'baseball' | 'tennis' | 'pack' | 'fatdrop' | 'ferris';
+  type: EnemyKind | 'aura' | 'rootbeer' | 'checkpoint' | 'goal' | 'player' | 'tree' | 'soccer' | 'hockey' | 'para' | 'puddle' | 'chase' | 'volley' | 'drop' | 'king' | 'baseball' | 'tennis' | 'pack' | 'fatdrop' | 'ferris' | 'football';
   x: number; // tile column (may be fractional for aura / trees)
   y: number; // tile row the thing occupies
   opts?: Record<string, number | string | boolean>;
@@ -187,6 +187,14 @@ export class LevelBuilder {
   chase(x0: number, x1: number, speed = 1.3) {
     this.spawns.push({ type: 'chase', x: x0, y: 0, opts: { to: x1, speed } });
     return this;
+  }
+
+  /**
+   * Part 6: underwater football on the sea bed (ground of height h), the field's left end line at
+   * column x0; it's FB_FIELD_TILES (36) long, its stands and posts a little past both ends.
+   */
+  football(x0: number, h: number) {
+    return this.spawn('football', x0, h);
   }
 
   /**

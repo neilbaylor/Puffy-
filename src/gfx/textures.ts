@@ -23,6 +23,7 @@ import { CLAM_FRAMES, CLAM_H, CLAM_W, NET_CELL_H, NET_W, TCRAB_FRAMES, TCRAB_H, 
 import { CRAB_FRAMES, CRAB_H, CRAB_W, JELLY_FRAMES, JELLY_H, JELLY_W, SCHOOL_FRAMES, SEA_PROPS, SEA_PROP_H, SEA_PROP_W, SURFACE_H, TURTLE_FRAMES, TURTLE_H, TURTLE_W, drawCrab, drawJelly, drawLightRay, drawSchoolFish, drawSeaBubble, drawSeaFar, drawSeaMid, drawSeaNear, drawSeaProp, drawSeaSky, drawSurface, drawTurtle, GRASS_FRAMES, GRASS_H, GRASS_W, KELP_FRAMES, KELP_H, KELP_W, OCTO_FRAMES, OCTO_H, OCTO_W, drawGrassFrame, drawKelpFrame, drawOctopus } from './sea';
 import { BB_ALIAS, BB_FIELD_TILES, BB_KEYS, BB_PLAIN, BB_ROSTER, BB_SIZE, PARK, drawBallparkBack, drawBallparkFront, drawBaseball, drawBaseballPlop, drawCappedPlop, drawLineDrive, type BBPlayer, type BaseballRole } from './baseball';
 import { PLOP_COLOURS } from './plops';
+import { BOARD, FB_FIELD_TILES, FB_FRAMES, FB_H, FB_SHADOW, FB_W, FBALL_FRAMES, FBALL_H, FBALL_W, FIELD, NUM_FRAMES, NUM_H, NUM_W, POST, drawBallShadow, drawFieldFront, drawFieldStands, drawFootball, drawFootballer, drawGoalpost, drawJerseyNumber, drawScoreboard } from './football';
 import { gearOf, wardrobe } from '../core/wardrobe';
 import { FLAME_FRAMES, FLAME_H, FLAME_W, drawDyingFlame, drawFlame, drawScorch } from './flame';
 import { ART_RES, ART_STYLE, CARRY_SWING, CHAR_H, CHAR_W, POSES, gearUp, canvas, carry, drawCharacter, ellipse, type CarryFrame, type Ctx, type Layer, type Pose } from './draw';
@@ -716,6 +717,9 @@ export function textureSteps(scene: Phaser.Scene, level = 1, pal: WorldPalette =
   };
 }
 
+/** Part 6's underwater football: every picture it uses. */
+const FB_KEYS = ['fb-front', 'fb-stands', 'fb-post-snappers', 'fb-post-stallions', 'fb-board', 'fb-snappers', 'fb-stallions', 'fb-ball', 'fb-num', 'fb-shadow'];
+
 /** The pictures each bad-guy piece makes (to skip the ones already drawn, and free the ones a level doesn't use). */
 const BADDIE_KEYS: Record<string, string[]> = {
   puffball: ['puffball'],
@@ -730,6 +734,7 @@ const BADDIE_KEYS: Record<string, string[]> = {
   fish: ['fish-badguy', 'fish-badguybig', 'fish-kai', 'fish-bubble'],
   chase: ['fish6-stone', 'fish6-slinger', 'fish6-kai', 'fish6-zippy', 'fish6-fat', 'chase-sign', 'chase-col', 'chase-target', 'chase-streaks', 'chase-wake', 'chase-edge', 'chase-shadow', 'chase-badge', 'ferris-wheel', 'ferris-stand', 'ferris-car'],
   tennis: ['tcrab-red', 'tcrab-orange', 'clam', 'tennisnet'],
+  football: FB_KEYS,
 };
 
 /** The bad guys each level has (and a battle): only those are drawn, the others freed. */
@@ -739,7 +744,7 @@ const BADDIES_FOR: Record<string, string[]> = {
   3: ['goat', 'weapons', 'plops'],
   4: ['goat', 'weapons', 'plops', 'chutes', 'king', 'baseball'],
   5: ['fish', 'tennis'],
-  6: ['fish', 'chase'],
+  6: ['fish', 'chase', 'football'],
   battle: ['puffball', 'bigpuff', 'giant', 'weapons'],
 };
 
@@ -776,6 +781,8 @@ export function gameArtJobs(scene: Phaser.Scene, opts: { heroes: readonly string
       },
     });
   if (want.includes('chase') && !BADDIE_KEYS.chase.every((k) => T.exists(k))) out.push({ name: 'the chase', run: () => makeChaseArt(scene) });
+  // (Part 6's underwater football: the field, the stands, the posts and the board, then each team's sheet)
+  if (want.includes('football')) for (const [name, run] of footballJobs(scene)) out.push({ name, run });
   if (want.includes('fish'))
     for (const k of ['badguy', 'badguybig', 'kai'] as const) if (!T.exists(`fish-${k}`)) out.push({ name: `fish ${k}`, run: () => { makeFish(scene, k); makeFishBubble(scene); } });
   for (const b of baddiePieces(scene)) if (want.includes(b.name) && !BADDIE_KEYS[b.name].every((k) => T.exists(k))) out.push(b);
@@ -967,4 +974,36 @@ export function makeBallPlayer(scene: Phaser.Scene, r: BBPlayer) {
     },
     { release: true },
   );
+}
+
+/**
+ * The football's pictures still to draw, a job each (the field's the big one): still pictures for the
+ * field (released once uploaded: nothing reads them back), a sheet a team for the players (the
+ * numbers are decals on top), the ball's spin. Lower resolutions in light mode.
+ */
+function footballJobs(scene: Phaser.Scene): [string, () => void][] {
+  const T = scene.textures;
+  const w = FB_FIELD_TILES * TILE;
+  const W = w + FIELD.END * 2;
+  const rel = { release: true };
+  const jobs: [string, () => void][] = [];
+  const job = (key: string, name: string, run: () => void) => !T.exists(key) && jobs.push([name, run]);
+  job('fb-front', 'football field', () => addCanvas(scene, 'fb-front', hires(W, FIELD.UP + FIELD.DOWN, LIGHT ? 1.25 : 2, (ctx) => drawFieldFront(ctx, w)), undefined, rel));
+  job('fb-stands', 'football stands', () => addCanvas(scene, 'fb-stands', hires(W, FIELD.STANDS_UP, LIGHT ? 1 : 1.5, (ctx) => drawFieldStands(ctx, w)), undefined, rel));
+  for (const team of ['snappers', 'stallions'] as const) {
+    job(`fb-post-${team}`, `goalpost ${team}`, () => addCanvas(scene, `fb-post-${team}`, hires(POST.W, POST.H, LIGHT ? 1.25 : 2, (ctx) => drawGoalpost(ctx, team)), undefined, rel));
+    job(`fb-${team}`, `football ${team}`, () => sheet(scene, `fb-${team}`, FB_W, FB_H, FB_FRAMES, (ctx, f) => drawFootballer(ctx, team, f), LIGHT ? 1.3 : 2));
+  }
+  job('fb-board', 'scoreboard', () => addCanvas(scene, 'fb-board', hires(BOARD.W, BOARD.H, LIGHT ? 1.25 : 2, (ctx) => drawScoreboard(ctx)), undefined, rel));
+  job('fb-ball', 'football', () => {
+    sheet(scene, 'fb-ball', FBALL_W, FBALL_H, FBALL_FRAMES, (ctx, f) => drawFootball(ctx, f), LIGHT ? 2 : 3);
+    sheet(scene, 'fb-num', NUM_W, NUM_H, NUM_FRAMES, (ctx, f) => drawJerseyNumber(ctx, f), LIGHT ? 2 : 3);
+    addCanvas(scene, 'fb-shadow', hires(FB_SHADOW.W, FB_SHADOW.H, 1, (ctx) => drawBallShadow(ctx)), undefined, rel);
+  });
+  return jobs;
+}
+
+/** The football's pictures, drawn now (if the level's loading somehow didn't). */
+export function makeFootballArt(scene: Phaser.Scene) {
+  for (const [, run] of footballJobs(scene)) run();
 }
