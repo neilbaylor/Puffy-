@@ -26,8 +26,17 @@ import { LevelView } from '../world/LevelView';
 import { FaceClock } from '../gfx/face';
 import { mixTint, themeClock, themeMix } from '../world/theme';
 
-/** How far behind the newest snapshot the other players are shown (ticks): smooth, ~100 ms. */
-const INTERP_TICKS = 3;
+/**
+ * How far behind the server's clock the other players are shown (ticks): a tick (to have the next
+ * snapshot to blend towards) plus however late snapshots have been coming lately — about 45 ms on a
+ * steady connection, more on a bumpy one (it was always 100 ms or more). INTERP_MAX is the most.
+ */
+const INTERP_MIN = 1.3;
+const INTERP_MAX = 7;
+/** When the next snapshot's late, the others carry on (as they were going, by the rules) for up to this many ticks, then wait. */
+const EXTRAP_TICKS = 3;
+/** (ms per tick) */
+const TICK_MS = DT * 1000;
 /**
  * Your hero's corrections (the server saw it a little differently): further off than this and it just
  * jumps there (a respawn, a real teleport); up to this it glides there — small ones fade out in a few
@@ -221,7 +230,21 @@ export class BattleScene extends Phaser.Scene {
    * is tied to its server twin (`sid`) when that turns up, and goes when the twin does (the blast
    * comes with that). `hit`: when it stopped (a wall, someone) — it waits there for the server.
    */
-  private shots: { n: number; r: Omit<BRocket, 'id'>; sid: number | null; born: number; hit: number | null }[] = [];
+  private shots: {
+    n: number;
+    r: Omit<BRocket, 'id'>;
+    sid: number | null;
+    born: number;
+    hit: number | null;
+    /** (the tick it stopped on someone, here) */
+    hitSeq: number;
+    /** Blew up here (a wall, its fuse): its blast's been shown. */
+    boomed: boolean;
+    /** Stopped on someone here, waiting for the server to say. */
+    onHero: boolean;
+    /** It flew on past someone at the server: now it only stops for walls. */
+    passed: boolean;
+  }[] = [];
   private shotN = 0;
   /** My shots the server had in the last snapshot (a new one there is the twin of my oldest untied shot). */
   private mineSeen = new Set<number>();
@@ -236,25 +259,50 @@ export class BattleScene extends Phaser.Scene {
   private holdingChair = false;
   private snaps: Snapshot[] = [];
   /**
-   * The others' clock (in ticks, INTERP_TICKS behind the server): it runs with real time and eases
-   * toward what the newest snapshot says, never backwards. (Set from each snapshot as it came in,
-   * it jumped back and forth with every one that came a little early or late on a phone network:
-   * the others jittered.) When it's further off than that, it just jumps.
+   * The others' clock (in ticks, `interp` behind the server's): it runs with real time and eases
+   * toward where it should be, never backwards. (Set from each snapshot as it came in, it jumped
+   * back and forth with every one that came a little early or late on a phone network: the others
+   * jittered.) When it's further off than that, it just jumps.
    */
   private otherClock: { tick: number; at: number } | null = null;
   /**
-   * On a really bad network (snapshots often coming 80+ ms late) the others are drawn a little further
-   * behind (up to 3 ticks more), so they don't keep freezing while the next snapshot's still on its
-   * way; back to normal, slowly, once it calms down. On a normal network it stays at 0.
+   * How far behind the server the others are drawn (ticks, INTERP_MIN to INTERP_MAX): enough that the
+   * next snapshot is nearly always in by the time it's needed — a tick plus how late they've been
+   * coming (all but the latest few in the last 3 seconds). Up quickly on a bumpier connection, back
+   * down slowly. (A rare later one: the others carry on by the rules for a moment — EXTRAP_TICKS.)
    */
-  private extraDelay = 0;
-  /** How late recent snapshots came (ticks, against the earliest arrivals lately: `lateBase`, ms). */
+  private interp = 3;
+  /** When recent snapshots came, less their tick's time (ms; the earliest of them: `lateBase`). */
   private lateness: number[] = [];
   private lateBase: number | null = null;
+  /** The others carried on past the newest snapshot (by the rules, with their last buttons): a few ticks of it, worked out once per snapshot. */
+  private ahead: { tick: number; players: Map<string, BPlayer[]> } | null = null;
+  /** …and the last lot, so that coming back from carrying on (the snapshot's in) can be smoothed over. */
+  private aheadPrev: { tick: number; players: Map<string, BPlayer[]> } | null = null;
+  /** Each other player's drawing's leftover offset after carrying on guessed a little wrong (px; fades out). */
+  private otherFix = new Map<string, { x: number; y: number }>();
+  /** Each other player carried on last frame: from which snapshot (its tick). */
+  private carriedFrom = new Map<string, { tick: number }>();
+  /** Each other player's clock of buttons against the server's ticks (ack − tick, eased); and when it was last eased. */
+  private ackOff = new Map<string, number>();
+  private ackAt = 0;
   private me: BPlayer | null = null;
-  private pending: [number, number][] = [];
+  /**
+   * Your hero one tick on from `me` (the same rules, the buttons held right now): drawn part way
+   * there, as far as the time since the last tick — so it moves smoothly on any screen (not in 30
+   * steps a second), and what you press shows the very next frame.
+   */
+  private meNext: BPlayer | null = null;
+  /** Your buttons not yet sent, per tick: [seq, buttons, whether a shot was allowed (null: not asked)]. */
+  private pending: [number, number, boolean | null][] = [];
   private seq = 0;
   private acc = 0;
+  /** Jump, fire and bomb pressed since the last tick (a tap quicker than a tick still counts). */
+  private latched = 0;
+  /** Blasts of your own shots shown already, on your screen (the server's own for the same shot isn't shown twice). */
+  private myBooms: { x: number; y: number; at: number }[] = [];
+  /** Prizes you've just touched on your screen: picked up already (the server's word comes a moment later). */
+  private myGrabs = new Map<number, { at: number; kind: PrizeKind; x: number; y: number }>();
   /** Visual-only correction for your hero, faded out over a few frames. */
   private fix = { x: 0, y: 0 };
   private names = new Map<string, string>();
@@ -300,13 +348,27 @@ export class BattleScene extends Phaser.Scene {
     this.makePrizeTextures();
     this.snaps = [];
     this.otherClock = null;
-    this.extraDelay = 0;
+    this.interp = 3;
     this.lateness = [];
     this.lateBase = null;
+    this.ahead = this.aheadPrev = null;
+    this.otherFix.clear();
+    this.carriedFrom.clear();
+    this.ackOff.clear();
     this.me = null;
+    this.meNext = null;
     this.pending = [];
     this.seq = 0;
     this.acc = 0;
+    this.latched = 0;
+    this.myBooms = [];
+    this.myGrabs.clear();
+    // (the scene's used again for the next battle, where the prizes and shots are numbered from 1
+    // again: one grabbed last time mustn't stay hidden)
+    this.grabbed.clear();
+    this.shots = [];
+    this.mineSeen.clear();
+    this.lastSeen = null;
     this.net.inbox = [];
     const m = themeMix(themeClock.t);
     this.bg.setTheme(m);
@@ -497,16 +559,21 @@ export class BattleScene extends Phaser.Scene {
    * hero who grabbed it (following them), with a trail of sparkles and a ring
    * of its colour when it gets there.
    */
-  private collectPrize(x: number, y: number, kind: PrizeKind, v: HeroView | undefined) {
+  private collectPrize(x: number, y: number, kind: PrizeKind, v: HeroView | undefined, pid?: number) {
     let best = -1;
     let bd = 90;
-    for (const [pid, pv] of this.prizeViews) {
-      const d = Math.hypot(pv.img.x - x, pv.img.y - y);
-      if (d < bd) {
-        bd = d;
-        best = pid;
+    if (pid !== undefined) {
+      // (by number: this one's out of the picture now, drawn or not)
+      this.grabbed.add(pid);
+      if (this.prizeViews.has(pid)) best = pid;
+    } else
+      for (const [id, pv] of this.prizeViews) {
+        const d = Math.hypot(pv.img.x - x, pv.img.y - y);
+        if (d < bd) {
+          bd = d;
+          best = id;
+        }
       }
-    }
     if (best < 0) return;
     const pv = this.prizeViews.get(best)!;
     this.prizeViews.delete(best);
@@ -614,7 +681,7 @@ export class BattleScene extends Phaser.Scene {
   private followCamera(dt: number, players: Map<string, SnapPlayer>) {
     const watching = this.spectate || !!this.preview || !this.me;
     let p: { x: number; y: number; respawn: number; kos?: number } | null = null;
-    if (!watching) p = { x: this.me!.x + this.fix.x, y: this.me!.y + this.fix.y, respawn: this.me!.respawn };
+    if (!watching) p = { ...this.myDrawn(), respawn: this.me!.respawn };
     else for (const q of players.values()) if (q.respawn <= 0 && (!p || q.kos > (p.kos ?? 0))) p = q;
     if (!p) return;
     const cam = this.cameras.main;
@@ -735,17 +802,39 @@ export class BattleScene extends Phaser.Scene {
       if (!this.spectate) {
         this.reconcile(fresh[fresh.length - 1]);
         this.tieShots(fresh);
+        this.checkGrabs();
       }
     }
 
     // ── your hero: one step per tick with your buttons, sent to the server too ──
-    this.acc += dt;
+    // (the buttons are looked at every frame: a press between two ticks counts at the next one, and
+    // shows straight away in where your hero's drawn — see meNext)
+    const held = this.spectate ? 0 : this.buttons();
+    this.latched |= held & (BTN.jump | BTN.fire | BTN.bomb);
+    // (after a hiccup — the phone busy a moment — the ticks it missed are caught up, up to a quarter
+    // second: losing them put your hero behind the server's, and that came back as a yank)
+    this.acc += Math.min(deltaMs / 1000, 0.25);
     while (this.acc >= DT) {
       this.acc -= DT;
-      if (!this.spectate) this.localTick();
+      if (!this.spectate) this.localTick(held | this.latched);
+      this.latched = 0;
     }
+    const me = this.me;
+    if (me && me.respawn <= 0) {
+      const n = (this.meNext ??= { ...me });
+      Object.assign(n, me);
+      stepMove(n, held | this.latched, this.map, undefined, () => false);
+    } else this.meNext = null;
 
     this.render(dt);
+  }
+
+  /** Where your hero's drawn: part way to the next tick (as far as the time since this one), plus what's left of a correction. */
+  private myDrawn() {
+    const me = this.me!;
+    const n = this.meNext;
+    const k = n ? Phaser.Math.Clamp(this.acc / DT, 0, 1) : 0;
+    return { x: me.x + (n ? (n.x - me.x) * k : 0) + this.fix.x, y: me.y + (n ? (n.y - me.y) * k : 0) + this.fix.y };
   }
 
   private buttons() {
@@ -760,26 +849,35 @@ export class BattleScene extends Phaser.Scene {
     return last?.chairs.find((c) => c[3] === this.net.myId) ?? null;
   }
 
-  private myRockets() {
-    const last = this.snaps[this.snaps.length - 1];
-    return last ? last.rockets.filter((r) => r.owner === this.net.myId).length : 0;
+  /**
+   * My shots still out, as the server will count them when it gets to this tick's buttons: the ones
+   * still flying on my screen (my shots fly on the same ticks as my buttons, so they're where the
+   * server's will be then), and any that stopped on someone and the server hasn't blown up yet. (The
+   * last snapshot's count was a round trip old: firing fast, it let a shot go here that the server
+   * then said no to — a shot that vanished, and a recoil that got taken back.)
+   */
+  private myShotsOut() {
+    let n = 0;
+    for (const s of this.shots) if (!s.boomed && (s.hit === null || (s.sid !== null && this.mineSeen.has(s.sid)))) n++;
+    return n;
   }
 
-  private localTick() {
-    const b = this.buttons();
+  private localTick(b: number) {
     this.seq++;
     this.net.input(this.seq, b);
     const me = this.me;
     if (!me) return;
-    this.pending.push([this.seq, b]);
+    const entry: [number, number, boolean | null] = [this.seq, b, null];
+    this.pending.push(entry);
     if (this.pending.length > 90) this.pending.splice(0, this.pending.length - 90);
     if (me.respawn > 0) return;
     const ev: BEvent[] = [];
     const max = characterById(me.hero).maxRockets + (me.power === POWER.rapid ? 3 : 0);
-    const fired = stepMove(me, b, this.map, ev, () => !this.myChair() && this.myRockets() < max);
+    // (whether a shot was allowed is remembered, so going over these buttons again after a snapshot decides the same)
+    const fired = stepMove(me, b, this.map, ev, () => (entry[2] = !this.myChair() && this.myShotsOut() < max));
     for (const e of ev) if (e.k === 'jump') this.jumpFx(me.x, me.y, e.air, true);
     // (your shot leaves now, on your screen — the same shot the server makes, flying the same way)
-    if (fired) this.shots.push({ n: ++this.shotN, r: heroShot(me, fired, this.map), sid: null, born: performance.now(), hit: null });
+    if (fired) this.shots.push({ n: ++this.shotN, r: heroShot(me, fired, this.map), sid: null, born: performance.now(), hit: null, hitSeq: 0, boomed: false, onHero: false, passed: false });
     this.flyShots();
     if (fired) {
       const c = characterById(me.hero);
@@ -792,39 +890,81 @@ export class BattleScene extends Phaser.Scene {
         this.fx.muzzle(me.x + me.facing * 24 * c.scale * k, me.y - (c.muzzleY ?? 18) * k, me.facing, me.x - me.facing * 14 * c.scale * k);
       }
     }
+    this.grabPrizes(me);
   }
 
-  /** A tick of your own shots' flight; one that reaches a wall or someone stops there. */
+  /**
+   * A tick of your own shots' flight. One that reaches a wall (or its fuse runs out) blows up there and
+   * then, on your screen — that's certain: the server's twin flies the same way (its blast isn't shown
+   * again when it comes). One that reaches someone stops there and waits for the server to say.
+   */
   private flyShots() {
     const seen = this.lastSeen;
     const now = performance.now();
     for (const s of this.shots) {
       if (s.hit !== null) continue;
-      if (moveShot(s.r, this.map) || (seen && this.shotHits(s.r, seen))) s.hit = now;
+      if (moveShot(s.r, this.map)) {
+        s.hit = now;
+        s.boomed = true;
+        this.myBoom(s.r);
+      } else if (seen && !s.passed && this.shotHits(s.r, seen)) {
+        s.hit = now;
+        s.hitSeq = this.seq;
+        s.onHero = true;
+      }
     }
   }
 
-  /** Is one of your shots into a bad guy or another hero, as they're drawn on your screen? (the sim's test) */
+  /** One of your shots blowing up on your screen (the same blast the server will make there). */
+  private myBoom(r: Omit<BRocket, 'id'>) {
+    const x = r.x + (r.kind === 'rocket' ? r.dir * 6 : 0);
+    this.myBooms.push({ x, y: r.y, at: performance.now() });
+    this.boomFx(x, r.y, r.radius);
+  }
+
+  private boomFx(x: number, y: number, radius: number) {
+    this.fx.explosion(x, y, radius);
+    sfx.explode();
+    const me = this.me;
+    const near = me ? Math.hypot(me.x - x, me.y - y) : 999;
+    this.cameras.main.shake(140, 0.004 * Math.max(0.3, 1 - near / 500) * (radius / 56));
+  }
+
+  /**
+   * Is one of your shots into a bad guy or another hero (the sim's test)? The others are drawn a
+   * moment in the past, and your shot's ahead of the server, so a hero's taken where they'll be by
+   * then if they keep going — most of the way: people dodge.
+   */
   private shotHits(r: Omit<BRocket, 'id'>, seen: { players: Map<string, SnapPlayer>; enemies: SnapEnemy[] }) {
     for (const e of seen.enemies) {
       const [w, h] = ENEMY_BOX[e[1]];
       if (Math.abs(r.x - e[2]) < w / 2 + 6 && r.y > e[3] - h - 3 && r.y < e[3] + 3) return true;
     }
     if (r.kind !== 'rocket' && r.kind !== 'fire' && r.age <= 0.2) return false;
+    const lead = this.lead() * DT;
     for (const p of seen.players.values()) {
       if (p.id === r.owner || p.respawn > 0) continue;
       const c = characterById(p.hero);
       const k = sizeOf(p);
-      if (Math.abs(r.x - p.x) < boxW(c, k) / 2 + 6 && r.y > p.y - boxH(c, k) - 3 && r.y < p.y + 3) return true;
+      const px = p.x + Phaser.Math.Clamp(p.vx * lead * 0.7, -90, 90);
+      if (Math.abs(r.x - px) < boxW(c, k) / 2 + 6 && r.y > p.y - boxH(c, k) - 3 && r.y < p.y + 3) return true;
     }
     return false;
+  }
+
+  /** How far (ticks) your own timeline is ahead of the others' as drawn: the round trip, the server's wait for your buttons, and how far behind the others are drawn. */
+  private lead() {
+    const last = this.snaps[this.snaps.length - 1];
+    const mine = last?.players.find((p) => p.id === this.net.myId);
+    if (!last || !mine || !this.otherClock) return 0;
+    return Phaser.Math.Clamp(last.tick + (this.seq - mine.ack) - this.otherClock.tick, 0, 15);
   }
 
   /**
    * Tie your shots to the server's copies as they turn up (each new one of yours to your oldest
    * untied shot of its kind), and let them go when the server's are gone (blown up). One the server
-   * never made (it said no — too many in the air) goes after a while; one that stopped on your
-   * screen but flew on at the server's (a near miss) gives way to the server's.
+   * never made (it said no — too many in the air) goes after a while. One that stopped on someone on
+   * your screen but flew on at the server's (they'd moved) flies on again as soon as that's known.
    */
   private tieShots(fresh: Snapshot[]) {
     const myId = this.net.myId;
@@ -840,7 +980,61 @@ export class BattleScene extends Phaser.Scene {
       this.mineSeen = now;
     }
     const t = performance.now();
-    this.shots = this.shots.filter((s) => (s.sid !== null ? this.mineSeen.has(s.sid) : t - s.born < 1200) && (s.hit === null || t - s.hit < 600));
+    // (the server's twin still flying a couple of ticks past where this one stopped on someone here:
+    // it missed them there — so it flies on here too, only stopping for walls now)
+    const ack = fresh[fresh.length - 1].players.find((p) => p.id === myId)?.ack ?? 0;
+    for (const s of this.shots)
+      if (s.onHero && s.hit !== null && s.sid !== null && this.mineSeen.has(s.sid) && ack >= s.hitSeq + 2) {
+        s.hit = null;
+        s.onHero = false;
+        s.passed = true;
+      }
+    this.shots = this.shots.filter((s) => (s.sid !== null ? this.mineSeen.has(s.sid) : t - s.born < 1200) && (s.hit === null || t - s.hit < (s.boomed ? 1500 : 900)));
+    this.myBooms = this.myBooms.filter((b) => t - b.at < 1500);
+  }
+
+  /**
+   * Touching a prize on your screen: it's yours (the hop, the sparkles and the sound now; what it
+   * does comes with the server's word, a moment later). If the server doesn't agree — someone else
+   * got there first — it's put back, or goes to them.
+   */
+  private grabPrizes(me: BPlayer) {
+    const n = this.snaps.length;
+    if (!n || me.respawn > 0) return;
+    // (where they are by your clock: the newest snapshot's, and one still floating down that much
+    // further down — you're ahead of the server by the ticks it hasn't had from you yet)
+    const last = this.snaps[n - 1];
+    const prev = n > 1 ? this.snaps[n - 2] : null;
+    const lead = Math.max(0, this.seq - (last.players.find((p) => p.id === me.id)?.ack ?? this.seq));
+    const c = characterById(me.hero);
+    const k = sizeOf(me);
+    for (const [pid, kind, x, y0, age] of last.prizes) {
+      if (this.grabbed.has(pid)) continue;
+      let y = y0;
+      if (age < 0) {
+        const py = prev?.prizes.find((z) => z[0] === pid)?.[3];
+        const vy = py !== undefined && last.tick > prev!.tick ? (y0 - py) / (last.tick - prev!.tick) : 3;
+        y = Math.min(landingY(this.map, x), y0 + Math.max(0, vy) * lead);
+      }
+      // (the sim's test)
+      if (Math.abs(me.x - x) < boxW(c, k) / 2 + 22 && y > me.y - boxH(c, k) - 10 && y - 44 < me.y) {
+        this.myGrabs.set(pid, { at: performance.now(), kind, x, y });
+        this.prizeFx(x, y, kind, this.views.get(this.net.myId ?? ''), pid);
+        break;
+      }
+    }
+  }
+
+  /** Prizes I grabbed on my screen that the server hasn't said I got: back on show if it's still there, a while after it should have said. */
+  private checkGrabs() {
+    if (!this.myGrabs.size) return;
+    const last = this.snaps[this.snaps.length - 1];
+    const t = performance.now();
+    for (const [pid, g] of this.myGrabs) {
+      if (t - g.at < this.net.rtt + 400) continue;
+      this.myGrabs.delete(pid);
+      if (last.prizes.some((z) => z[0] === pid)) this.grabbed.delete(pid);
+    }
   }
 
   /** Take the server's word for your hero, then replay the buttons it hasn't seen yet. */
@@ -855,8 +1049,8 @@ export class BattleScene extends Phaser.Scene {
     this.pending = this.pending.filter(([q]) => q > mine.ack);
     const max = characterById(me.hero).maxRockets + (me.power === POWER.rapid ? 3 : 0);
     const mineInFlight = s.rockets.filter((r) => r.owner === me.id).length;
-    for (const [, b] of this.pending)
-      if (me.respawn <= 0 && stepMove(me, b, this.map, undefined, () => !this.myChair() && mineInFlight < max) === 2) me.bombs--;
+    for (const [, b, ok] of this.pending)
+      if (me.respawn <= 0 && stepMove(me, b, this.map, undefined, () => ok ?? (!this.myChair() && mineInFlight < max)) === 2) me.bombs--;
     if (before && me.respawn <= 0) {
       this.fix.x += before.x - me.x;
       this.fix.y += before.y - me.y;
@@ -865,18 +1059,135 @@ export class BattleScene extends Phaser.Scene {
     this.me = me;
   }
 
-  /** A snapshot came in: how late was it (see extraDelay)? */
+  /** A snapshot came in: how late was it (see interp)? */
   private noteLateness(s: Snapshot) {
-    // (when it would have come if every one came as early as the earliest lately; that line creeps
-    // up slowly, so the two clocks drifting apart doesn't count as lateness)
-    const ideal = s.at - s.tick * DT * 1000;
-    this.lateBase = this.lateBase === null ? ideal : Math.min(this.lateBase + 0.02, ideal);
-    this.lateness.push((ideal - this.lateBase) / (DT * 1000));
-    if (this.lateness.length > 60) this.lateness.shift();
-    // (the worst but a few of the last 2 seconds' worth, past what the usual 3 ticks already cover)
-    const sorted = [...this.lateness].sort((a, b) => a - b);
-    const want = Phaser.Math.Clamp(sorted[Math.floor(sorted.length * 0.95)] - 2.5, 0, 3);
-    this.extraDelay += (want - this.extraDelay) * (want > this.extraDelay ? 0.3 : 0.02);
+    // (when it would have come if every one came as early as the earliest in the last 3 seconds: so a
+    // lasting change — the server stalled and skipped ticks, the clocks drifting apart, a new route —
+    // is forgotten within 3 seconds rather than counted as lateness for good)
+    const ideal = s.at - s.tick * TICK_MS;
+    this.lateness.push(ideal);
+    if (this.lateness.length > 90) this.lateness.shift();
+    this.lateBase = Math.min(...this.lateness);
+    // (all but the latest few: a rare later one is covered by carrying on for a moment)
+    const base = this.lateBase;
+    const sorted = this.lateness.map((v) => (v - base) / TICK_MS).sort((a, b) => a - b);
+    const want = Phaser.Math.Clamp(0.8 + sorted[Math.floor(sorted.length * 0.9)], INTERP_MIN, INTERP_MAX);
+    this.interp += (want - this.interp) * (want > this.interp ? 0.3 : 0.02);
+  }
+
+  /** The others carried on from snapshot `s` by the rules with the buttons they last had (EXTRAP_TICKS ticks of it, worked out once). */
+  private aheadOf(s: Snapshot) {
+    if (this.ahead?.tick === s.tick) return this.ahead;
+    const players = new Map<string, BPlayer[]>();
+    for (const p of s.players) {
+      if (p.id === this.net.myId || p.respawn > 0) continue;
+      const q: BPlayer = { ...p, lastHitBy: null };
+      const steps: BPlayer[] = [];
+      for (let i = 0; i < EXTRAP_TICKS; i++) {
+        stepMove(q, p.prevBtn, this.map, undefined, () => false);
+        steps.push({ ...q });
+      }
+      players.set(p.id, steps);
+    }
+    this.aheadPrev = this.ahead;
+    this.ahead = { tick: s.tick, players };
+    return this.ahead;
+  }
+
+  /** Where a player's carried on to, `e` ticks past snapshot `p`'s (null if not worked out). */
+  private static carried(p: SnapPlayer, steps: BPlayer[] | undefined, e: number) {
+    if (!steps) return null;
+    const i = Math.min(Math.floor(e), steps.length);
+    const f = e - i;
+    const a = i === 0 ? p : steps[i - 1];
+    const b = steps[Math.min(i, steps.length - 1)];
+    return { a, b, f: i >= steps.length ? 0 : f };
+  }
+
+  /** A player blended between two snapshots (none across a respawn: they'd slide across the arena). */
+  private snapPlayerAt(id: string, a: Snapshot, b: Snapshot, k: number): SnapPlayer | null {
+    const pb = b.players.find((p) => p.id === id);
+    if (!pb) return null;
+    const pa = a.players.find((p) => p.id === id);
+    if (!pa || pa.respawn > 0 !== pb.respawn > 0 || Math.abs(pa.x - pb.x) > 120) return pb;
+    return { ...(k < 0.5 ? pa : pb), x: pa.x + (pb.x - pa.x) * k, y: pa.y + (pb.y - pa.y) * k, vx: pa.vx + (pb.vx - pa.vx) * k, vy: pa.vy + (pb.vy - pa.vy) * k };
+  }
+
+  /**
+   * Another player, drawn by their own buttons' clock rather than the server's ticks: each snapshot
+   * says which of their ticks of buttons they're at (`ack`), and they're blended between those. When
+   * their buttons come in late, the server has them wait a tick and then take two steps at once —
+   * by its ticks that's a stop and a lurch; by their own ticks it's just how they moved. (The offset
+   * between the two clocks: the most it's been lately, eased.) Past their newest, they carry on by
+   * the rules with the buttons they last had, for up to EXTRAP_TICKS, and anything that turns out a
+   * little wrong is faded out (otherFix).
+   */
+  private otherAt(id: string, clock: number, now: number): SnapPlayer | null {
+    const snaps = this.snaps;
+    const last = snaps[snaps.length - 1];
+    const newest = last.players.find((p) => p.id === id);
+    if (!newest) return null;
+    // (the offset, from the last second or so of snapshots)
+    let off = -Infinity;
+    for (let i = Math.max(0, snaps.length - 30); i < snaps.length; i++) {
+      const q = snaps[i].players.find((p) => p.id === id);
+      if (q) off = Math.max(off, q.ack - snaps[i].tick);
+    }
+    const o = this.ackOff.get(id);
+    const eased = o === undefined || Math.abs(off - o) > 6 ? off : o + (off - o) * Math.min(1, (off > o ? 0.2 : 0.05) * ((now - this.ackAt) / TICK_MS));
+    this.ackOff.set(id, eased);
+    const t = clock + eased;
+    // the snapshots either side of `t` by their ticks of buttons (the latest one for each)
+    let pa: SnapPlayer | null = null;
+    let pb: SnapPlayer | null = null;
+    for (let i = snaps.length - 1; i >= 0; i--) {
+      const q = snaps[i].players.find((p) => p.id === id);
+      if (!q) continue;
+      if (q.ack > t) {
+        if (!pb || q.ack < pb.ack) pb = q;
+      } else {
+        pa = q;
+        break;
+      }
+    }
+    let p: SnapPlayer;
+    let basis: { tick: number; e: number } | null = null;
+    if (!pa) p = pb ?? newest;
+    else if (!pb) {
+      // past their newest: carry on a little way
+      const e = Phaser.Math.Clamp(t - newest.ack, 0, EXTRAP_TICKS);
+      const run = newest.respawn > 0 ? null : BattleScene.carried(newest, this.aheadOf(last).players.get(id), e);
+      if (run) {
+        const { a: q0, b: q1, f } = run;
+        p = { ...newest, ...(f < 0.5 ? q0 : q1), ack: newest.ack, x: q0.x + (q1.x - q0.x) * f, y: q0.y + (q1.y - q0.y) * f };
+        basis = { tick: last.tick, e };
+      } else p = newest;
+    } else if (pa.respawn > 0 !== pb.respawn > 0 || Math.abs(pa.x - pb.x) > 120) p = pb;
+    else {
+      const k = (t - pa.ack) / (pb.ack - pa.ack);
+      p = { ...(k < 0.5 ? pa : pb), x: pa.x + (pb.x - pa.x) * k, y: pa.y + (pb.y - pa.y) * k, vx: pa.vx + (pb.vx - pa.vx) * k, vy: pa.vy + (pb.vy - pa.vy) * k };
+    }
+    // (carried on last frame from another snapshot (or not now): where that had them by now, against
+    // where they are, faded out rather than jumped)
+    const prev = this.carriedFrom.get(id);
+    if (prev && (!basis || basis.tick !== prev.tick) && p.respawn <= 0) {
+      const cache = [this.ahead, this.aheadPrev].find((c) => c?.tick === prev.tick);
+      const base = snaps.find((s) => s.tick === prev.tick)?.players.find((q) => q.id === id);
+      const was = cache && base && base.respawn <= 0 ? BattleScene.carried(base, cache.players.get(id), Phaser.Math.Clamp(t - base.ack, 0, EXTRAP_TICKS)) : null;
+      if (was) {
+        const wx = was.a.x + (was.b.x - was.a.x) * was.f;
+        const wy = was.a.y + (was.b.y - was.a.y) * was.f;
+        if (Math.hypot(wx - p.x, wy - p.y) < 80) {
+          const fo = this.otherFix.get(id) ?? { x: 0, y: 0 };
+          fo.x += wx - p.x;
+          fo.y += wy - p.y;
+          this.otherFix.set(id, fo);
+        }
+      }
+    }
+    if (basis) this.carriedFrom.set(id, { tick: basis.tick });
+    else this.carriedFrom.delete(id);
+    return p;
   }
 
   /** Where everyone else is right now: a smooth blend between two snapshots, a moment ago. */
@@ -893,15 +1204,18 @@ export class BattleScene extends Phaser.Scene {
     if (!n) return null;
     const last = this.snaps[n - 1];
     const now = performance.now();
-    const want = last.tick + ((now - last.at) / 1000) * (1 / DT) - INTERP_TICKS - this.extraDelay;
+    // (the server's clock as it would be showing here at the earliest, less `interp`)
+    const want = this.lateBase !== null ? (now - this.lateBase) / TICK_MS - this.interp : last.tick - this.interp;
     const oc = this.otherClock;
     let clock = want;
-    if (oc && Math.abs(want - oc.tick) <= INTERP_TICKS) {
+    if (oc && Math.abs(want - oc.tick) <= 4) {
       const sec = (now - oc.at) / 1000;
       clock = oc.tick + sec / DT;
       clock = Math.max(oc.tick, clock + (want - clock) * (1 - Math.exp(-sec * 6)));
     }
     this.otherClock = { tick: clock, at: now };
+    // past the newest snapshot (it's late): carry on a little way, then wait
+    const extra = Phaser.Math.Clamp(clock - last.tick, 0, EXTRAP_TICKS);
     const rt = Math.min(last.tick, clock);
     let a = this.snaps[0];
     let b = last;
@@ -911,34 +1225,42 @@ export class BattleScene extends Phaser.Scene {
         b = this.snaps[i];
         break;
       }
-    const k = b.tick === a.tick ? 1 : Phaser.Math.Clamp((rt - a.tick) / (b.tick - a.tick), 0, 1);
+    // (for things that just go on as they were: k past 1 carries them on in a straight line)
+    const span = b.tick - a.tick;
+    const k = span === 0 ? 1 : Phaser.Math.Clamp((rt - a.tick) / span, 0, 1) + (extra > 0 ? extra / span : 0);
+    const kp = Math.min(k, 1);
     const players = new Map<string, SnapPlayer>();
-    for (const pb of b.players) {
-      const pa = a.players.find((p) => p.id === pb.id);
-      // no blending across a respawn (they'd slide across the arena)
-      if (!pa || pa.respawn > 0 !== pb.respawn > 0 || Math.abs(pa.x - pb.x) > 120) players.set(pb.id, pb);
-      else players.set(pb.id, { ...(k < 0.5 ? pa : pb), x: pa.x + (pb.x - pa.x) * k, y: pa.y + (pb.y - pa.y) * k, vx: pa.vx + (pb.vx - pa.vx) * k, vy: pa.vy + (pb.vy - pa.vy) * k });
+    for (const pl of last.players) {
+      const p = pl.id === this.net.myId ? this.snapPlayerAt(pl.id, a, b, kp) : this.otherAt(pl.id, clock, now);
+      if (p) players.set(pl.id, p);
     }
+    this.ackAt = now;
+    // (gone at the server — blown up: not drawn any more, though the others' picture is a moment behind)
+    const live = new Set(last.rockets.map((r) => r.id));
     const rockets = new Map<number, { x: number; y: number; dir: 1 | -1; kind: RocketKind; owner: string }>();
     for (const rb of b.rockets) {
+      if (!live.has(rb.id)) continue;
       const ra = a.rockets.find((r) => r.id === rb.id);
       rockets.set(rb.id, ra ? { x: ra.x + (rb.x - ra.x) * k, y: ra.y + (rb.y - ra.y) * k, dir: rb.dir, kind: rb.kind, owner: rb.owner } : rb);
     }
     const prizes = b.prizes.map(([id, kind, x, y, age]) => {
       const pa = a.prizes.find((z) => z[0] === id);
-      return [id, kind, x, pa ? pa[3] + (y - pa[3]) * k : y, age] as [number, PrizeKind, number, number, number];
+      return [id, kind, x, pa ? pa[3] + (y - pa[3]) * kp : y, age] as [number, PrizeKind, number, number, number];
     });
-    const enemies = b.enemies.map((eb): SnapEnemy => {
+    const liveE = new Set(last.enemies.map((e) => e[0]));
+    const enemies: SnapEnemy[] = [];
+    for (const eb of b.enemies) {
+      if (!liveE.has(eb[0])) continue;
       const ea = a.enemies.find((e) => e[0] === eb[0]);
-      return ea ? [eb[0], eb[1], ea[2] + (eb[2] - ea[2]) * k, ea[3] + (eb[3] - ea[3]) * k, eb[4], eb[5], eb[6], eb[7], eb[8]] : eb;
-    });
+      enemies.push(ea ? [eb[0], eb[1], ea[2] + (eb[2] - ea[2]) * k, ea[3] + (eb[3] - ea[3]) * k, eb[4], eb[5], eb[6], eb[7], eb[8]] : eb);
+    }
     const hazards = b.hazards.map((hb): SnapHazard => {
       const ha = a.hazards.find((h) => h[0] === hb[0]);
-      return ha && hb[4] <= 0 ? [hb[0], hb[1], ha[2] + (hb[2] - ha[2]) * k, ha[3] + (hb[3] - ha[3]) * k, hb[4], hb[5]] : hb;
+      return ha && hb[4] <= 0 ? [hb[0], hb[1], ha[2] + (hb[2] - ha[2]) * kp, ha[3] + (hb[3] - ha[3]) * kp, hb[4], hb[5]] : hb;
     });
     const chairs = b.chairs.map((cb): SnapChair => {
       const ca = a.chairs.find((c) => c[0] === cb[0]);
-      return ca && !cb[3] && !ca[3] ? [cb[0], ca[1] + (cb[1] - ca[1]) * k, ca[2] + (cb[2] - ca[2]) * k, cb[3], cb[4], cb[5], cb[6]] : cb;
+      return ca && !cb[3] && !ca[3] ? [cb[0], ca[1] + (cb[1] - ca[1]) * kp, ca[2] + (cb[2] - ca[2]) * kp, cb[3], cb[4], cb[5], cb[6]] : cb;
     });
     return { players, rockets, prizes, enemies, hazards, chairs, timeLeft: last.timeLeft };
   }
@@ -948,9 +1270,17 @@ export class BattleScene extends Phaser.Scene {
     if (!cur) return;
     this.lastSeen = { players: cur.players, enemies: cur.enemies };
     // your own shots: drawn where they are on your phone, instead of the server's copies (behind)
+    // (and not once they've blown up here)
     if (this.shots.length) {
       for (const s of this.shots) if (s.sid !== null) cur.rockets.delete(s.sid);
-      for (const s of this.shots) cur.rockets.set(-s.n, { x: s.r.x, y: s.r.y, dir: s.r.dir, kind: s.r.kind, owner: s.r.owner });
+      for (const s of this.shots) if (!s.boomed) cur.rockets.set(-s.n, { x: s.r.x, y: s.r.y, dir: s.r.dir, kind: s.r.kind, owner: s.r.owner });
+    }
+    // (the others' leftover offsets from carrying on a little wrong, fading out)
+    const ofk = 1 - Math.exp(-dt * 10);
+    for (const [id, o] of this.otherFix) {
+      o.x -= o.x * ofk;
+      o.y -= o.y * ofk;
+      if (Math.abs(o.x) + Math.abs(o.y) < 0.05) this.otherFix.delete(id);
     }
     // (fading out — a big one no faster than FIX_GLIDE, so it slides rather than lurches)
     const fixLen = Math.hypot(this.fix.x, this.fix.y);
@@ -968,8 +1298,10 @@ export class BattleScene extends Phaser.Scene {
       const p: SnapPlayer | BPlayer = isMe ? this.me! : p0;
       const v = this.viewFor(p0);
       const down = p.respawn > 0;
-      const x = p.x + (isMe ? this.fix.x : 0);
-      const y = p.y + (isMe ? this.fix.y : 0);
+      const of = isMe ? null : this.otherFix.get(id);
+      const at = isMe ? this.myDrawn() : { x: p.x + (of?.x ?? 0), y: p.y + (of?.y ?? 0) };
+      const x = at.x;
+      const y = at.y;
       v.sprite.setVisible(!down);
       v.tag.setVisible(!down);
       v.hearts.setVisible(!down);
@@ -1515,6 +1847,22 @@ export class BattleScene extends Phaser.Scene {
     return key;
   }
 
+  /** A prize grabbed: it flies into the grabber, who hops; its name pops up. (pid: which one, if known) */
+  private prizeFx(x: number, y: number, kind: PrizeKind, v: HeroView | undefined, pid?: number) {
+    const [text, col] = PRIZE_TEXT[kind];
+    this.collectPrize(x, y, kind, v, pid);
+    if (v) {
+      v.cheer = 0;
+      // a little burst of stars round whoever grabbed it
+      this.fx.stars(v.sprite.x, v.sprite.y - 24 * v.size, 10);
+      this.fx.sparkle(v.sprite.x, v.sprite.y - 30 * v.size, 10);
+    }
+    this.fx.popText(x, y - 40, text, col, 18);
+    this.fx.sparkle(x, y - 14, 12);
+    if (v && kind === 'grow') this.cameras.main.shake(180, 0.006);
+    (kind === 'heart' ? sfx.rootbeer : sfx.aura)();
+  }
+
   private jumpFx(x: number, y: number, air: boolean, mine: boolean) {
     if (air) this.fx.airPuff(x, y);
     else this.fx.dust(x, y, 5);
@@ -1539,11 +1887,10 @@ export class BattleScene extends Phaser.Scene {
           }
           break;
         case 'boom': {
-          this.fx.explosion(e.x, e.y, e.r);
-          sfx.explode();
-          const me = this.me;
-          const near = me ? Math.hypot(me.x - e.x, me.y - e.y) : 999;
-          this.cameras.main.shake(140, 0.004 * Math.max(0.3, 1 - near / 500) * (e.r / 56));
+          // (one of my shots I've already seen blow up here: not twice)
+          const i = this.myBooms.findIndex((b) => Math.abs(b.x - e.x) < 48 && Math.abs(b.y - e.y) < 48);
+          if (i >= 0) this.myBooms.splice(i, 1);
+          else this.boomFx(e.x, e.y, e.r);
           break;
         }
         case 'hit': {
@@ -1613,19 +1960,15 @@ export class BattleScene extends Phaser.Scene {
           break;
         }
         case 'prize': {
-          const [text, col] = PRIZE_TEXT[e.kind];
-          const v = this.views.get(e.id);
-          this.collectPrize(e.x, e.y, e.kind, v);
-          if (v) {
-            v.cheer = 0;
-            // a little burst of stars round whoever grabbed it
-            this.fx.stars(v.sprite.x, v.sprite.y - 24 * v.size, 10);
-            this.fx.sparkle(v.sprite.x, v.sprite.y - 30 * v.size, 10);
+          // (one I grabbed on my screen already: it's all been shown)
+          if (e.id === myId) {
+            const mine = [...this.myGrabs].find(([, g]) => g.kind === e.kind && Math.abs(g.x - e.x) < 48);
+            if (mine) {
+              this.myGrabs.delete(mine[0]);
+              break;
+            }
           }
-          this.fx.popText(e.x, e.y - 40, text, col, 18);
-          this.fx.sparkle(e.x, e.y - 14, 12);
-          if (v && e.kind === 'grow') this.cameras.main.shake(180, 0.006);
-          (e.kind === 'heart' ? sfx.rootbeer : sfx.aura)();
+          this.prizeFx(e.x, e.y, e.kind, this.views.get(e.id));
           break;
         }
         case 'bounce':

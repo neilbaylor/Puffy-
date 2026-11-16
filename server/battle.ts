@@ -25,6 +25,18 @@ const REJOIN_SECS = 30;
 const LOBBY_REJOIN_SECS = 8;
 /** Don't let a player's queued inputs pile up (a laggy phone catching up). */
 const MAX_QUEUE = 6;
+/**
+ * A player's buttons for this tick haven't come yet (a bump in their connection): they wait — up to
+ * this many ticks in a row — rather than carry on with the last ones. Each button press then moves
+ * them exactly once, as it already did on their phone, so their phone has nothing to correct (going
+ * on with the last buttons and then playing the late ones too put them a step ahead: a little yank
+ * back on their screen, every bump). Longer than this, they go on with their last buttons, as before.
+ */
+const MAX_WAIT = 4;
+/** …and when the late buttons arrive, the ticks waited are made up two steps a tick, down to this many waiting (a cushion for the next bump). */
+const CUSHION = 1;
+/** (and no more than this many waited ticks are owed at once) */
+const MAX_OWED = 8;
 
 interface Client {
   id: string;
@@ -40,6 +52,9 @@ interface Client {
   queue: [number, number][];
   lastSeq: number;
   lastBtn: number;
+  /** Ticks this player waited for their buttons (made up when they come); and how many in a row just now. */
+  owed: number;
+  waited: number;
   kos: number;
   deaths: number;
   droppedAt: number;
@@ -165,6 +180,8 @@ class Room {
       queue: [],
       lastSeq: 0,
       lastBtn: 0,
+      owed: 0,
+      waited: 0,
       kos: 0,
       deaths: 0,
       droppedAt: 0,
@@ -204,6 +221,7 @@ class Room {
     c.droppedAt = Date.now();
     c.queue = [];
     c.lastBtn = 0;
+    c.owed = c.waited = 0;
     this.broadcastRoom();
   }
 
@@ -266,6 +284,7 @@ class Room {
       c.queue = [];
       c.lastSeq = 0;
       c.lastBtn = 0;
+      c.owed = c.waited = 0;
       c.kos = 0;
       c.deaths = 0;
       if (c.playing) this.sim.add(c.id, c.hero, c.slot);
@@ -348,17 +367,36 @@ class Room {
       }
       case 'battle': {
         const sim = this.sim!;
-        const inputs = new Map<string, number>();
+        const inputs = new Map<string, number[]>();
         for (const c of this.clients.values()) {
           if (!c.playing) continue;
+          if (!c.ws) {
+            inputs.set(c.id, [0]);
+            continue;
+          }
           // (catching up after a hiccup: drop the repeats, keep every press)
           if (c.queue.length > MAX_QUEUE) compactQueue(c.queue, c.lastBtn, 2, MAX_QUEUE, MAX_QUEUE * 2, BTN.jump);
-          const next = c.queue.shift();
-          if (next) {
-            c.lastSeq = next[0];
-            c.lastBtn = next[1];
-          }
-          inputs.set(c.id, c.ws ? c.lastBtn : 0);
+          const steps: number[] = [];
+          const take = () => {
+            const [seq, b] = c.queue.shift()!;
+            c.lastSeq = seq;
+            c.lastBtn = b;
+            steps.push(b);
+          };
+          if (c.queue.length) {
+            c.waited = 0;
+            take();
+            // (made up: the ticks they waited, one extra step a tick, keeping a little cushion)
+            if (c.owed > 0 && c.queue.length > CUSHION) {
+              take();
+              c.owed--;
+            }
+          } else if (c.waited < MAX_WAIT) {
+            // their buttons are late: wait for them
+            c.waited++;
+            c.owed = Math.min(MAX_OWED, c.owed + 1);
+          } else steps.push(c.lastBtn);
+          inputs.set(c.id, steps);
         }
         const events = sim.step(inputs);
         const players = [...sim.players.values()].map((p) => {

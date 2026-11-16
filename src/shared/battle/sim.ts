@@ -693,8 +693,12 @@ export class BattleSim {
     return charOf(p.hero).maxRockets + (p.power === POWER.rapid ? 3 : 0);
   }
 
-  /** One tick. `inputs` = buttons per player id. Returns what happened (for sounds and effects). */
-  step(inputs: Map<string, number>): BEvent[] {
+  /**
+   * One tick. `inputs` = buttons per player id: one tick's worth, or a list — each one a step of that
+   * hero's own movement, in order (none: they stand still this tick, waiting for their buttons; two:
+   * catching up). Returns what happened (for sounds and effects).
+   */
+  step(inputs: Map<string, number | readonly number[]>): BEvent[] {
     const ev: BEvent[] = [];
     this.tick++;
     this.timeLeft = Math.max(0, this.timeLeft - DT);
@@ -709,17 +713,19 @@ export class BattleSim {
         }
         continue;
       }
-      const btn = inputs.get(p.id) ?? 0;
-      // holding a chair: FIRE swings it (no rockets)
-      const chair = this.chairOf(p.id);
-      const swingPress = !!chair && (btn & BTN.fire) !== 0 && !(p.prevBtn & BTN.fire) && p.stun <= 0 && p.frozen <= 0;
-      const fire = stepMove(p, btn, this.map, ev, () => !chair && this.rocketsOf(p.id) < this.maxShots(p));
-      if (swingPress && chair && chair.swing <= 0) this.swingChair(p, chair, ev);
-      if (fire) {
-        if (fire === 2) p.bombs--;
-        const shot = heroShot(p, fire, this.map);
-        this.rockets.push({ id: this.nextRocket++, ...shot });
-        ev.push({ k: 'fire', id: p.id, x: shot.x, y: shot.y, dir: p.facing, ...(fire === 2 ? { bomb: true } : {}) });
+      const btns = inputs.get(p.id) ?? 0;
+      for (const btn of typeof btns === 'number' ? [btns] : btns) {
+        // holding a chair: FIRE swings it (no rockets)
+        const chair = this.chairOf(p.id);
+        const swingPress = !!chair && (btn & BTN.fire) !== 0 && !(p.prevBtn & BTN.fire) && p.stun <= 0 && p.frozen <= 0;
+        const fire = stepMove(p, btn, this.map, ev, () => !chair && this.rocketsOf(p.id) < this.maxShots(p));
+        if (swingPress && chair && chair.swing <= 0) this.swingChair(p, chair, ev);
+        if (fire) {
+          if (fire === 2) p.bombs--;
+          const shot = heroShot(p, fire, this.map);
+          this.rockets.push({ id: this.nextRocket++, ...shot });
+          ev.push({ k: 'fire', id: p.id, x: shot.x, y: shot.y, dir: p.facing, ...(fire === 2 ? { bomb: true } : {}) });
+        }
       }
     }
     this.stomps(ev);
