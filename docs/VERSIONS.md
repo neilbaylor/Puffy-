@@ -317,3 +317,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.312: Part 6: "Now for a nice relaxing dive".
 - v0.313: Part 6 round 2: harder chase (on your tail, lunges), Fat Fish you can see coming, pier coil, smoother fly-over, warning/marker looks.
 - v0.314: E1 efficiency round (physics without the body tree, off-camera scenery culling, boss canvases released, idle battle server sleeps).
+- v0.315: Part 6 round 3: gang heads straight for you, longer level (360), aiming Fat Fish with earlier warning, modern pier at the left edge, Ferris wheel.
