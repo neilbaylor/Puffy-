@@ -865,3 +865,111 @@ export function drawOctopus(ctx: Ctx, f: (typeof OCTO_FRAMES)[number]) {
     ctx.fill();
   }
 }
+
+/** Room over the modern pier's deck in its picture (its glass railing and lamp post stand on it). */
+export const PIER_HEAD_MODERN = 54;
+
+/**
+ * Part 6's pier: a modern one — a concrete deck on steel pilings, a glass railing along the back
+ * (open at the end, where you dive off), a lamp post, a bollard, a ladder down the end and a life
+ * ring. `w` wide; its deck's top at y = 6 + PIER_HEAD_MODERN, the pilings reaching down `h`.
+ */
+export function drawModernPier(ctx: Ctx, w: number, h: number) {
+  ctx.translate(0, PIER_HEAD_MODERN);
+  const concrete: Fill = { base: '#d9dee2', shade: '#aab3ba', light: '#f5f7f9' };
+  const steel: Fill = { base: '#8f9ca7', shade: '#62707c', light: '#d3dbe2' };
+  const dark: Fill = { base: '#55626e', shade: '#3c4650', light: '#7d8a96' };
+  // pilings (round steel, down into the water), a tie beam between them under the deck
+  const piles: number[] = [];
+  for (let x = 16; x < w - 20; x += 56) piles.push(x);
+  piles.push(w - 13);
+  ST.shape(ctx, roundRectPts(6, h * 0.34, w - 12, 5, 1.5), dark, 1300, { lw: 0.8 });
+  for (const [i, x] of piles.entries()) {
+    ST.shape(ctx, roundRectPts(x - 6, 16, 12, h - 16, 5), steel, 1310 + i, { lw: 0.9, light: [x - 4, 22] });
+    // (a light stripe down each, for the round, and a couple of bands)
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.fillRect(x - 3.5, 20, 2, h - 26);
+    ctx.fillStyle = 'rgba(40,50,60,0.35)';
+    ctx.fillRect(x - 6, 28, 12, 2);
+    ctx.fillRect(x - 6, h * 0.5, 12, 2);
+  }
+  // the deck: a concrete slab, a steel edge beam under it, a yellow line along its edge, joints
+  ST.shape(ctx, roundRectPts(0, 17, w, 6, 1.5), dark, 1330, { lw: 0.9 });
+  ST.shape(ctx, roundRectPts(0, 6, w, 12, 2), concrete, 1331, { lw: 1, light: [10, 6] });
+  ctx.fillStyle = '#f2c230';
+  ctx.fillRect(2, 7.2, w - 4, 1.6);
+  ctx.strokeStyle = concrete.shade;
+  ctx.lineWidth = 0.8;
+  for (let x = 48; x < w - 8; x += 48) {
+    ctx.beginPath();
+    ctx.moveTo(x, 9.5);
+    ctx.lineTo(x, 17);
+    ctx.stroke();
+  }
+  // the glass railing along the back, panels between slim posts (open over the last stretch)
+  const railEnd = w - 44;
+  const posts: number[] = [];
+  for (let x = 6; x <= railEnd; x += 34) posts.push(x);
+  for (let i = 0; i < posts.length - 1; i++) {
+    const x0 = posts[i] + 2;
+    const x1 = posts[i + 1] - 2;
+    ctx.fillStyle = 'rgba(190,232,248,0.42)';
+    ctx.fillRect(x0, -16, x1 - x0, 21);
+    ctx.strokeStyle = 'rgba(40,70,90,0.55)';
+    ctx.lineWidth = 0.7;
+    ctx.strokeRect(x0, -16, x1 - x0, 21);
+    // (a glint across each pane)
+    ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(x0 + 4, 2);
+    ctx.lineTo(x0 + 11, -13);
+    ctx.moveTo(x0 + 9, 2);
+    ctx.lineTo(x0 + 13, -6);
+    ctx.stroke();
+  }
+  for (const [i, x] of posts.entries()) ST.shape(ctx, roundRectPts(x - 1.6, -19, 3.2, 26, 1.2), steel, 1340 + i, { lw: 0.7 });
+  ST.shape(ctx, roundRectPts(posts[0] - 2, -21, posts[posts.length - 1] - posts[0] + 4, 3.4, 1.5), steel, 1360, { lw: 0.8, light: [posts[0], -21] });
+  // a lamp post near the land end: a slim pole, an arm, a light bar
+  const lx = 22;
+  ST.shape(ctx, roundRectPts(lx - 2, -46, 4, 52, 1.5), dark, 1370, { lw: 0.8 });
+  ST.shape(ctx, roundRectPts(lx - 2, -48, 22, 4, 1.5), dark, 1371, { lw: 0.8 });
+  ST.shape(ctx, roundRectPts(lx + 8, -45, 13, 3, 1.2), { base: '#fff6c8', shade: '#e8d890', light: '#ffffff' }, 1372, { lw: 0.6 });
+  // a bollard near the end (a short dark post with a cap)
+  const bx = w - 34;
+  ST.shape(ctx, roundRectPts(bx - 4, -1, 8, 8, 2), dark, 1380, { lw: 0.8 });
+  ST.shape(ctx, ellipsePts(bx, -1.5, 6, 2.2, 0, 16), dark, 1381, { lw: 0.8 });
+  // a ladder down the end, into the water
+  const ax = w - 26;
+  ctx.strokeStyle = steel.shade;
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(ax, 18);
+  ctx.lineTo(ax, h * 0.62);
+  ctx.moveTo(ax + 8, 18);
+  ctx.lineTo(ax + 8, h * 0.62);
+  ctx.stroke();
+  ctx.lineWidth = 1.1;
+  for (let y = 26; y < h * 0.6; y += 9) {
+    ctx.beginPath();
+    ctx.moveTo(ax, y);
+    ctx.lineTo(ax + 8, y);
+    ctx.stroke();
+  }
+  // a life ring on the end piling (orange and white)
+  const ex = piles[piles.length - 1];
+  ctx.save();
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = INK;
+  ctx.beginPath();
+  ctx.arc(ex, 34, 9, 0, Math.PI * 2);
+  ctx.stroke();
+  for (let i = 0; i < 4; i++) {
+    ctx.strokeStyle = i % 2 ? '#ffffff' : '#ff8a1e';
+    ctx.lineWidth = 3.4;
+    ctx.beginPath();
+    ctx.arc(ex, 34, 9, (i / 4) * Math.PI * 2, ((i + 1) / 4) * Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}

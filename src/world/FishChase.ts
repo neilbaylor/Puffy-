@@ -34,7 +34,7 @@ const GAP = 74;
 /** Never further behind you than this along your trail (on the screen, or only just off it). */
 const MAX_LEAD = 560;
 /** Where they like to be along your trail behind you (px): right on your tail. The further ahead you get, the harder they swim. */
-const TAIL = 230;
+const TAIL = 250;
 /** How much harder they swim for each px you're ahead of TAIL (px/s per px). */
 const PULL = 1.1;
 /** Close enough for the lead fish to lunge (a wind-up, then a dash). */
@@ -42,10 +42,10 @@ const LUNGE_AT = 270;
 /** The lunge: the wind-up (it draws back, a "!"), then the dash at this × their pace. */
 const WINDUP = 0.42;
 const DASH_SECS = 0.55;
-const DASH_K = 2.45;
+const DASH_K = 2.4;
 /** Time between lunges (s). */
-const LUNGE_EVERY: [number, number] = [3.2, 5.2];
-/** While the Fat Fish is coming down they hang back this much further (they're scared of him too). */
+const LUNGE_EVERY: [number, number] = [3.4, 5.4];
+/** Just after you've been hit they hang back this much further. */
 const WARY = 130;
 /** How long each fish leads before the next one takes over (s). */
 const LEAD_SECS: [number, number] = [6.5, 9];
@@ -56,7 +56,9 @@ const FAT_K = 0.8;
 /** The warning sign's size on screen (its picture's drawn at 3×: half its units' size again). */
 const SIGN_SCALE = 1.5 / 3;
 /** The warning before the Fat Fish comes down (s). */
-const WARN_SECS = 3.2;
+const WARN_SECS = 4.6;
+/** While the warning's up (and it hangs in the sky) the spot follows you — aiming where you're going — at up to this speed (px/s); it locks once it drops. */
+const AIM_V = 240;
 /** The camera tips up to show this much sky over the spot as it comes (px), from this long before it appears (s). */
 const SKY = 180;
 const SKY_LEAD = 1.3;
@@ -89,6 +91,8 @@ const STYLE = (() => {
   }
   return { warn: v[0], mark: v[1] };
 })();
+
+type TrailPt = { x: number; y: number; s: number };
 
 const NAMES: Record<string, string> = { stone: 'Stone', slinger: 'Slinger', kai: 'Kai', zippy: 'Zippy' };
 
@@ -143,10 +147,23 @@ interface Fall {
 export class FishChase {
   phase: 'wait' | 'intro' | 'chase' | 'done' = 'wait';
   private fish: PackFish[] = [];
-  /** Your trail through the water: points every few px, with the distance along it. */
-  private trail: { x: number; y: number; s: number }[] = [];
-  /** The leader's place along your trail. */
+  /** Your trail through the water: points every few px, with the distance along it (their way round rocks). */
+  private trail: TrailPt[] = [];
+  /**
+   * Where the chase is (the leader's nose): it heads straight for you whenever nothing's in the
+   * way — your ups and downs don't throw it off — and otherwise for the furthest point of your
+   * trail it can see, round the rocks the way you went. `ti`: how far along your trail it's got.
+   */
+  private head = { x: 0, y: 0, ti: 0 };
+  /** The head's own path: the gang follow it in a line, each a gap further back. */
+  private path: TrailPt[] = [];
+  /** The head's place along its path (the end of it). */
   private sPack = 0;
+  /** Which point of your trail the head is making for (worked out every other frame). */
+  private aim = 0;
+  private aimT = 0;
+  /** After a bite: the head holds still this long (you get away a little). */
+  private stall = 0;
   private v = 0;
   /** The lunge: >0 while dashing (s left). */
   private lunge = 0;
@@ -274,9 +291,11 @@ export class FishChase {
     sfx.roar();
     this.gs.cameras.main.shake(500, 0.004);
     this.gs.sayAt(() => [p.x, p.body.top], 'Here they come!', 1600);
-    const back = Math.min(p.x - 120, p.x - this.gs.viewRect.width * 0.6);
+    const back = Math.min(p.x - 120, p.x - this.gs.viewRect.width * 0.85);
     for (const f of this.fish) f.img.setVisible(true).setAlpha(1);
     this.begin(p, back, p.y);
+    // (a little longer to get going again before the first lunge)
+    this.lungeCool = 4;
   }
 
   /** The chase starts: your trail from where the leader is to you. */
@@ -290,7 +309,13 @@ export class FishChase {
       const last = this.trail[this.trail.length - 1];
       this.trail.push({ x, y, s: last ? last.s + Math.hypot(x - last.x, y - last.y) : 0 });
     }
-    this.sPack = 0;
+    this.head = { x: fromX, y: fromY, ti: 0 };
+    this.path = [{ x: fromX - 1, y: fromY, s: 0 }, { x: fromX, y: fromY, s: 1 }];
+    this.sPack = 1;
+    this.aim = this.trail.length - 1;
+    this.stall = 0;
+    // (a moment before the first lunge: you've only just got going)
+    this.lungeCool = 2.5;
     this.v = this.baseSpeed(p);
     this.swapIn = LEAD_SECS[0] + Math.random() * (LEAD_SECS[1] - LEAD_SECS[0]);
     this.phase = 'chase';
@@ -305,9 +330,50 @@ export class FishChase {
     return p.char.runSpeed * SWIM_RUN;
   }
 
-  /** Where along your trail distance s is (before its start: on back the way the trail began). */
-  private at(s: number): { x: number; y: number; dx: number; dy: number } {
+  /**
+   * The furthest point of your trail the head can see from where it is (you, mostly): a clear line
+   * through the water, wide enough for a fish.
+   */
+  private seeFurthest() {
     const tr = this.trail;
+    const H = this.head;
+    const last = tr.length - 1;
+    if (this.clear(H.x, H.y, tr[last].x, tr[last].y)) return last;
+    // (back along your trail a bit at a time, to where they've got to)
+    for (let i = last - 4; i > H.ti; i -= 4) if (this.clear(H.x, H.y, tr[i].x, tr[i].y)) return i;
+    return Math.min(last, H.ti + 1);
+  }
+
+  /** Nothing solid on the way from a to b, along the line and a little either side of it. */
+  private clear(ax: number, ay: number, bx: number, by: number) {
+    const d = Math.hypot(bx - ax, by - ay);
+    const n = Math.ceil(d / 14);
+    const nx = d ? -(by - ay) / d : 0;
+    const ny = d ? (bx - ax) / d : 1;
+    for (let i = 1; i < n; i++) {
+      const t = i / n;
+      const x = ax + (bx - ax) * t;
+      const y = ay + (by - ay) * t;
+      if (this.gs.isSolidAt(x, y) || this.gs.isSolidAt(x + nx * 14, y + ny * 14) || this.gs.isSolidAt(x - nx * 14, y - ny * 14)) return false;
+    }
+    return true;
+  }
+
+  /** The index of the point of your trail at distance s along it. */
+  private trailIndex(s: number) {
+    const tr = this.trail;
+    let lo = 0;
+    let hi = tr.length - 1;
+    while (hi - lo > 1) {
+      const m = (lo + hi) >> 1;
+      if (tr[m].s <= s) lo = m;
+      else hi = m;
+    }
+    return lo;
+  }
+
+  /** Where along your trail distance s is (before its start: on back the way the trail began). */
+  private at(s: number, tr: TrailPt[] = this.trail): { x: number; y: number; dx: number; dy: number } {
     if (s <= 0 || tr.length < 2) {
       const a = tr[0];
       const b = tr[Math.min(1, tr.length - 1)];
@@ -371,12 +437,25 @@ export class FishChase {
     const last = this.trail[this.trail.length - 1];
     const d = Math.hypot(p.x - last.x, p.y - last.y);
     if (d > 6) this.trail.push({ x: p.x, y: p.y, s: last.s + d });
-    if (this.trail.length > 4000) this.trail.splice(0, 1000);
+    if (this.trail.length > 4000) {
+      this.trail.splice(0, 1000);
+      this.head.ti = Math.max(0, this.head.ti - 1000);
+      this.aim = Math.max(0, this.aim - 1000);
+    }
     const sHero = this.trail[this.trail.length - 1].s;
+    // where they're making for: you, if nothing's in the way; else the furthest bit of your trail they can see
+    const H = this.head;
+    this.aimT -= dt;
+    if (this.aimT <= 0) {
+      this.aimT = 1 / 30;
+      this.aim = this.seeFurthest();
+    }
+    const tgt = this.trail[this.aim];
+    const toT = Math.hypot(tgt.x - H.x, tgt.y - H.y);
     // their pace: they keep right on your tail — the further ahead you get, the harder they swim
     // (so running only buys you a little room) — and every few seconds the leader winds up and lunges
     const base = this.baseSpeed(p);
-    const lead = sHero - this.sPack;
+    const lead = toT + (sHero - tgt.s);
     this.lungeCool = Math.max(0, this.lungeCool - dt);
     const leader = this.fish[0];
     if (this.windup > 0) {
@@ -386,11 +465,10 @@ export class FishChase {
         sfx.chomp();
       }
     } else if (this.lunge > 0) this.lunge -= dt;
-    // (the Fat Fish coming: they hang back, no lunging — and just after you've been hit by anything,
-    // a moment to get going again)
+    // (just after you've been hit by anything: they hang back a moment, no lunging, so you can get going again)
     if (p.invulnerable) this.calm = 0.9;
     else this.calm = Math.max(0, this.calm - dt);
-    const wary = (!!this.fall && this.fall.phase !== 'daze' && this.fall.phase !== 'off') || this.calm > 0;
+    const wary = this.calm > 0;
     if (this.windup > 0 || this.lunge > 0) {
       // (mid-lunge: carry on)
     } else if (!wary && lead < LUNGE_AT && this.lungeCool <= 0 && leader.stun <= 0 && p.alive && !p.invulnerable) {
@@ -401,8 +479,30 @@ export class FishChase {
     const chase = Phaser.Math.Clamp(base + (lead - TAIL - (wary ? WARY : 0)) * PULL, base * 0.7, this.runSpeed(p) * 1.15);
     const want = this.lunge > 0 ? Math.max(chase, base) * DASH_K : this.windup > 0 ? base * 0.45 : chase;
     this.v += (want - this.v) * (1 - Math.exp(-dt * (this.lunge > 0 || this.windup > 0 ? 10 : 3)));
-    this.sPack = Math.min(sHero - 4, this.sPack + this.v * dt);
-    if (lead > MAX_LEAD) this.sPack = sHero - MAX_LEAD;
+    // the head swims for it (holding still a moment after a bite)
+    this.stall = Math.max(0, this.stall - dt);
+    const step = this.stall > 0 ? 0 : this.v * dt;
+    if (toT > 4) {
+      const k = Math.min(1, step / toT);
+      H.x += (tgt.x - H.x) * k;
+      H.y += (tgt.y - H.y) * k;
+    }
+    if (toT - step < 14 && this.aim > H.ti) H.ti = this.aim;
+    // (never too far behind: caught up along your trail, just off the screen)
+    if (lead > MAX_LEAD) {
+      const q = this.at(sHero - MAX_LEAD);
+      H.x = q.x;
+      H.y = q.y;
+      H.ti = this.trailIndex(sHero - MAX_LEAD);
+    }
+    // (its path, for the line behind it)
+    const lp = this.path[this.path.length - 1];
+    const ld = Math.hypot(H.x - lp.x, H.y - lp.y);
+    if (ld > 5) {
+      this.path.push({ x: H.x, y: H.y, s: lp.s + ld });
+      if (this.path.length > 3000) this.path.splice(0, 1000);
+    }
+    this.sPack = lp.s + ld;
     // taking turns: the leader drops to the back, the others move up
     this.swapIn -= dt;
     if (this.swapIn <= 0 && this.lunge <= 0 && this.windup <= 0) {
@@ -425,7 +525,7 @@ export class FishChase {
         // shoved on ahead (and up a little), and they fall back a bit
         p.body.setVelocity(Math.max(p.body.velocity.x, 0) + 380, -140);
         this.gs.fx.popText(f.x + f.rx, f.y - f.ry, 'CHOMP!', '#ffffff', 16);
-        this.sPack -= 240;
+        this.stall = 0.8;
         this.lunge = 0;
         this.windup = 0;
         this.lungeCool = 2.4;
@@ -527,7 +627,7 @@ export class FishChase {
         // (eased to its slot: moving up when the leader drops to the back; a dazed one drops back too)
         const want = i * GAP + (f.stun > 0 ? 150 : 0);
         f.back += (want - f.back) * (1 - Math.exp(-dt * (f.back > want ? 1.6 : 1.1)));
-        const q = this.at(this.sPack - f.back);
+        const q = this.at(this.sPack - f.back, this.path);
         const bob = Math.sin(f.ph * 2.2) * 5;
         // (their own lane across the trail: never quite in a line)
         f.x = q.x - q.dy * f.lane * 0.5;
@@ -568,6 +668,8 @@ export class FishChase {
     const water = this.gs.sea ? this.waterY() : 0;
     // (the view tips up to the sky over the spot just before it comes, and back down once it's in the water)
     this.gs.camSky = (F.phase === 'warn' && F.t > WARN_SECS - SKY_LEAD) || F.phase === 'hang' || F.phase === 'drop' ? SKY : 0;
+    // (it's aiming for you: where you'll be when it gets down to you, if you keep going as you are)
+    if ((F.phase === 'warn' || F.phase === 'hang') && p) this.aimFall(F, p, dt, water);
     switch (F.phase) {
       case 'warn': {
         // the sign bobs over the spot; the column and the target pulse
@@ -587,6 +689,7 @@ export class FishChase {
           F.phase = 'drop';
           F.t = 0;
           F.vy = 90;
+          this.fitColumn(F, water);
           sfx.whoosh();
           this.gs.tweens.add({ targets: F.streaks, alpha: 1, duration: 200 });
         }
@@ -659,7 +762,7 @@ export class FishChase {
     }
     // in its way: you (lose your nuggies), and any bad guy fish (squashed)
     if (F.fish && (F.phase === 'drop' || F.phase === 'sink' || (F.phase === 'daze' && F.t < 0.25))) {
-      const hw = this.fatHalfW() * 0.8;
+      const hw = this.fatHalfW() * 0.95;
       const hh = this.fatHalfH() * 0.9;
       for (const q of this.gs.players)
         if (q.alive && !q.invulnerable && q.body.right > F.x - hw && q.body.left < F.x + hw && q.body.bottom > F.y - hh && q.body.top < F.y + hh) {
@@ -689,8 +792,8 @@ export class FishChase {
     const gs = this.gs;
     const water = this.waterY();
     // just ahead of you (where you'll be in a moment), over open water
-    const speed = Phaser.Math.Clamp(Math.abs(p.body.velocity.x), 110, 230);
-    let x = p.x + speed * WARN_SECS * 0.75 + 60;
+    // (to start with, a little way ahead of you: it follows you from there)
+    let x = p.x + 240;
     for (let i = 0; i < 20 && gs.isSolidAt(x, water + 12); i++) x += 40;
     const bed = gs.groundUnder(x, water + 8) ?? water + 14 * TILE;
     const colW = this.fatHalfW() * 2;
@@ -748,6 +851,35 @@ export class FishChase {
       return;
     }
     F.sign.setPosition(F.x, water + 52 + bob).setScale(scale);
+  }
+
+  /**
+   * The spot follows you while the warning's up: where you'll be when it gets down to you if you
+   * keep on as you are (so to dodge it, change your pace — speed up or hold back — at the right
+   * moment). Not over a rock.
+   */
+  private aimFall(F: Fall, p: Player, dt: number, water: number) {
+    const left = (F.phase === 'warn' ? WARN_SECS - F.t : 0) + (F.phase === 'hang' ? HANG_SECS - F.t : HANG_SECS);
+    // (time to it: what's left of the warning and the hang, the fall and the sink down to you)
+    const toYou = Math.min(1.8, left + 0.6 + Math.max(0, p.y - water) / SINK_V);
+    const want = p.x + p.body.velocity.x * toYou;
+    const dx = Phaser.Math.Clamp(want - F.x, -AIM_V * dt, AIM_V * dt);
+    const nx = F.x + dx;
+    if (this.gs.isSolidAt(nx, water + 12)) return;
+    F.x = nx;
+    F.col.x = nx;
+    F.target.x = nx;
+    F.fish?.setX(nx);
+    if (F.shadow) F.shadow.x = nx;
+    // (the column down to the sea bed under it, as the bed rises and falls)
+    if (Math.abs(dx) > 0.5) this.fitColumn(F, water);
+  }
+
+  /** The column down to the sea bed under the spot (and where it lands): as the spot moves, and once it drops and the spot is fixed. */
+  private fitColumn(F: Fall, water: number) {
+    F.bed = this.gs.groundUnder(F.x, water + 8) ?? water + 14 * TILE;
+    F.col.setDisplaySize(this.fatHalfW() * 2, F.bed - water);
+    if (F.shadow) F.shadow.setPosition(F.x, F.bed - 2);
   }
 
   /** The target on the surface: a bit wider than the falling fish (its picture's drawn at 2×). */

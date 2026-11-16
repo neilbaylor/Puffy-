@@ -8,7 +8,7 @@ const W = Number(process.argv[3] || 844), H = Number(process.argv[4] || 390);
 const SECS = Number(process.argv[5] || 120);
 // the bot: right all the way (waiting short of a Fat Fish's danger column till it's come down), strokes to stay about mid-water (and when it bumps into something), a
 // rocket now and then; runs `runK` of the time
-const bot = `(g, pl, runK) => { let st = 5, f = 0; const rnd = () => ((st = (st * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff); const water = g.level.data.water; let runT = 0; pl.input = { ...pl.input, id: 'bot', poll: () => { f++; const want = water + 32 * 6 + Math.sin(f / 90) * 70; const blocked = pl.body.blocked.right || pl.body.blocked.down; const c = g.fishChase; const F = c && c.fall; const ahead = !!F && pl.x < F.x + 90 && F.x - pl.x < 520; const rush = ahead && F.phase === 'warn' && (F.x + 90 - pl.x) / 200 < 3.2 - F.t - 0.25; const wait = ahead && !rush && (F.phase === 'warn' || F.phase === 'hang' || F.phase === 'drop' || F.phase === 'sink' || F.phase === 'daze') && F.x - pl.x < 230; const lunging = !!c && (c.windup > 0 || c.lunge > 0); if (f % 30 === 0) runT = rnd() < runK ? 30 : 0; return { left: false, right: !wait, run: runT > 0 || rush || lunging, fire: rnd() < 0.03, jump: (pl.y > want || blocked) && f % 6 < 2 }; } }; }`;
+const bot = `(g, pl, runK) => { let st = 5, f = 0; const rnd = () => ((st = (st * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff); const water = g.level.data.water; let runT = 0, detour = 0, goUp = false; pl.input = { ...pl.input, id: 'bot', poll: () => { f++; if (pl.body.blocked.right && !detour) { detour = 50; goUp = pl.y > water + 32 * 7; } if (detour) detour--; const want = detour ? (goUp ? water + 40 : water + 32 * 13) : water + 32 * 6 + Math.sin(f / 90) * 70; const blocked = pl.body.blocked.down; const c = g.fishChase; const F = c && c.fall; const near = !!F && ((F.phase === 'warn' && F.t > 3.6) || F.phase === 'hang' || F.phase === 'drop' || F.phase === 'sink') && Math.abs(F.x - pl.x) < 170; const rush = near && pl.x >= F.x - 10; const wait = near && !rush; const lunging = !!c && (c.windup > 0 || c.lunge > 0); if (f % 30 === 0) runT = rnd() < runK ? 30 : 0; return { left: false, right: !wait, run: runT > 0 || rush || lunging, fire: rnd() < 0.03, jump: (pl.y > want || blocked) && f % 6 < 2 }; } }; }`;
 (async () => {
   const br = await chromium.launch({ args: ['--use-gl=swiftshader'] });
   const ctx = await br.newContext({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
@@ -47,7 +47,7 @@ const bot = `(g, pl, runK) => { let st = 5, f = 0; const rnd = () => ((st = (st 
       const g = window.game.scene.getScene('Game');
       if (!g || !g.scene.isActive()) return { gone: true };
       const c = g.fishChase; const pl = g.players[0];
-      const tr = c?.trail; const lead = tr?.length ? Math.round(tr[tr.length - 1].s - c.sPack) : null;
+      const tr = c?.trail; const lead = c?.head && tr?.length ? Math.round(Math.hypot(tr[tr.length - 1].x - c.head.x, tr[tr.length - 1].y - c.head.y)) : null;
       // (the bot: re-attach after a restart)
       if (pl && pl.input.id !== 'bot') window.__mkBot(g, pl, window.__runK);
       // (each hit: what did it — the gang mid-lunge, the gang, the Fat Fish, or something else)

@@ -3,7 +3,7 @@ import { DEPTH, TILE } from '../config';
 import { rng } from '../gfx/draw';
 import type { Pt } from '../gfx/handdrawn';
 import { PROP_RES, TERRAIN_RES, addCanvas, ensureSeaArt, hires, kelpBends } from '../gfx/textures';
-import { GRASS_FILLS, KELP_H, PIER_HEAD, SEA_PROPS, SWAY_N, drawPier } from '../gfx/sea';
+import { GRASS_FILLS, KELP_H, PIER_HEAD, PIER_HEAD_MODERN, SEA_PROPS, SWAY_N, drawModernPier, drawPier } from '../gfx/sea';
 import { DEFAULT_PALETTE, PALETTES, drawCloudPlatform, drawPuffTree, drawTerrainPiece, roundPoly, traceCells, type TerrainKind, type WorldPalette } from '../gfx/world';
 import { drawPine } from '../gfx/mountain';
 import type { Cell, LevelData } from '../level/builder';
@@ -556,10 +556,12 @@ export class LevelView {
           // (under the sea: a wooden pier, its posts down to the sea bed)
           let down = TILE * 2;
           while (y * TILE + down < this.heightPx && !this.isSolidAt(x * TILE + w - 8, y * TILE + down)) down += 8;
-          // (PIER_HEAD of room over the deck: the rope coil sits up on it)
-          if (!this.scene.textures.exists(key)) addCanvas(this.scene, key, hires(w, down + 14 + PIER_HEAD, PROP_RES, (ctx) => drawPier(ctx, w, down + 8)), undefined, { release: true });
+          // (room over the deck for what stands on it: the old pier's rope coil, the modern one's railing and lamp)
+          const modern = this.data.pierStyle === 'modern';
+          const head = modern ? PIER_HEAD_MODERN : PIER_HEAD;
+          if (!this.scene.textures.exists(key)) addCanvas(this.scene, key, hires(w, down + 14 + head, PROP_RES, (ctx) => (modern ? drawModernPier : drawPier)(ctx, w, down + 8)), undefined, { release: true });
           this.scene.add
-            .image(x * TILE, y * TILE - 6 - PIER_HEAD, key)
+            .image(x * TILE, y * TILE - 6 - head, key)
             .setOrigin(0, 0)
             .setScale(1 / PROP_RES)
             .setDepth(DEPTH.tiles + 1);

@@ -14,16 +14,19 @@ import { LevelBuilder, type LevelData } from './builder';
  * the Fat Fish coming), and the way through flows — rocks to swim over and under, never a dead end.
  * Heights are tiles from the bottom: the sea bed around 3, the surface at 17.
  *
- *   0-25    Open water behind you (where the gang comes from)
- *   26-33   The pier you dive off
+ *   0-7     The (modern) pier you dive off, at the very start; the gang come in from off the left
+ *   8-33    Open water ahead
  *   34-74   The kelp meadow: a gentle start, low rocks, a floating slab (Fat Fish #1)
  *   75-116  The slabs: rock slabs floating in the water, over or under them; bad guy fish (checkpoint)
- *   117-162 The reef narrows: a shelf hangs under the surface, low rocks below (checkpoint, Fat Fish #2)
- *   163-208 The open blue: wide water, the last bad guys (checkpoint, Fat Fish #3)
- *   209-249 The sprint home: up the slope to the gate
+ *   117-162 The reef narrows: a shelf hangs under the surface, low rocks below (checkpoint)
+ *   163-208 The open blue: wide water, bad guys (checkpoint, Fat Fish #2)
+ *   209-262 The kelp weave: rock slabs high and low by turns — up, down, up (checkpoint)
+ *   263-290 The narrows: a tunnel under the reef, the gang squeezing in after you
+ *   291-320 The deep blue: out into open water again (checkpoint, Fat Fish #3)
+ *   321-359 The sprint home: up the slope to the gate
  */
 export function buildLevel6(): LevelData {
-  const W = 250;
+  const W = 360;
   const H = 22;
   const SURF = 17;
   const L = new LevelBuilder('The Rise of King Bob · Part 2', 'World 3', W, H);
@@ -34,13 +37,15 @@ export function buildLevel6(): LevelData {
   // there's more to see. (Its last point well clear of the pier: right beside the hero, the
   // flight's curve swung on past him and back.)
   L.flyPath = [
-    [244, 11],
-    [190, 10],
-    [130, 9.5],
-    [85, 11],
+    [354, 11],
+    [305, 10],
+    [276, 8.5],
+    [235, 9],
+    [170, 10],
+    [110, 9.5],
     [52, 13],
   ];
-  L.flyMs = 8200;
+  L.flyMs = 10000;
   /** A shelf of reef hanging from the surface over x0..x1, its ragged underside at about height h. */
   const shelf = (x0: number, x1: number, h: number) => {
     const under = [0, -1, 0, 1, 0, -1, -1, 0, 1, 0];
@@ -49,16 +54,20 @@ export function buildLevel6(): LevelData {
   /** A slab of rock floating in the water (swim over it or under it), x0..x1 at heights h0..h1. */
   const slab = (x0: number, x1: number, h0: number, h1: number) => L.rock(x0, x1, h0, h1);
 
-  // ── Open water behind; the pier ──────────────────────────────
-  L.ground(0, 25, 2);
-  L.spawn('tree', 6, 2, { h: 200 });
-  L.spawn('tree', 13, 2, { h: 160 });
-  L.spawn('tree', 20, 2, { h: 230 });
-  L.pack(17, 10);
-  L.ground(26, 33, 3);
-  L.pier(26, 32, SURF + 1);
-  L.spawn('player', 29, SURF + 1);
-  L.auraArc(34, 4, 12, 1.5, true);
+  // ── The pier (a modern one), at the very start like Part 5's: nothing behind it but the edge ──
+  // (the gang come in from off the left, under the pier, just behind you)
+  L.pierStyle = 'modern';
+  L.ground(0, 33, 3);
+  L.pier(0, 7, SURF + 1);
+  L.spawn('player', 4, SURF + 1);
+  // (a Ferris wheel on the pier behind you, seaside style)
+  L.spawn('ferris', 3.2, SURF + 1);
+  L.pack(5, 10);
+  L.spawn('tree', 14, 3, { h: 210 });
+  L.spawn('tree', 23, 3, { h: 170 });
+  L.auraArc(13, 4, 12, 1.5, true);
+  L.auraArc(26, 4, 9, 1.2, true);
+  L.spawn('tree', 31, 3, { h: 240 });
 
   // ── The kelp meadow: a gentle start, low rocks ───────────────
   L.ground(34, 74, 3);
@@ -108,7 +117,6 @@ export function buildLevel6(): LevelData {
   // out from under it: open water up to the light again
   L.spawn('checkpoint', 145, 3);
   L.auraArc(148, 4, 12, 1.5, true);
-  L.fatDrop(150);
   L.spawn('tree', 154, 3, { h: 240 });
   slab(157, 160, 8, 8);
   L.rootbeer(158.5, 11);
@@ -127,15 +135,54 @@ export function buildLevel6(): LevelData {
   slab(203, 206, 10, 10);
   L.aura(204.5, 7, true);
 
+  // ── The kelp weave: slabs high and low by turns ──────────────
+  L.ground(209, 262, 3);
+  L.spawn('checkpoint', 210, 3);
+  slab(214, 218, 10, 13);
+  L.auraArc(214.6, 4, 7, 0.5, true);
+  L.spawn('tree', 220, 3, { h: 230 });
+  slab(223, 227, 4, 7);
+  L.auraArc(223.6, 4, 11, 0.5, true);
+  slab(232, 236, 10, 13);
+  L.auraArc(232.6, 4, 7, 0.5);
+  L.spawn('fish', 238, 9);
+  slab(241, 245, 4, 7);
+  L.auraArc(241.6, 4, 11, 0.5, true);
+  L.rootbeer(243, 14);
+  slab(250, 254, 10, 13);
+  L.spawn('tree', 257, 3, { h: 200 });
+  L.aura(259, 9, true);
+
+  // ── The narrows: a tunnel under the reef ─────────────────────
+  L.ground(263, 290, 5);
+  shelf(264, 289, 12);
+  L.auraArc(266, 6, 8.5, 0.6, true);
+  L.rock(272, 273, 6, 6);
+  L.spawn('fish', 278, 9);
+  L.auraArc(280, 5, 8.5, 0.6, true);
+  L.rock(285, 286, 11, 11);
+  L.aura(288, 8, true);
+
+  // ── The deep blue: open water again ──────────────────────────
+  L.ground(291, 320, 2);
+  L.spawn('checkpoint', 294, 2);
+  L.auraArc(297, 4, 10, 1.4, true);
+  L.fatDrop(300);
+  L.spawn('bigfish', 306, 10);
+  L.spawn('tree', 309, 2, { h: 250 });
+  L.rock(312, 314, 3, 4);
+  L.auraArc(315, 3, 12, 1, true);
+  L.spawn('fish', 318, 7);
+
   // ── The sprint home: up the slope to the gate ────────────────
-  L.ground(209, 214, 4);
-  L.ground(215, 221, 6);
-  L.ground(222, 249, 8);
-  L.auraArc(211, 3, 9, 1, true);
-  L.rootbeer(218, 12);
-  L.spawn('tree', 225, 8, { h: 180 });
-  L.spawn('fish', 232, 13);
-  L.aura(236, 12, true);
-  L.spawn('goal', 244, 8);
+  L.ground(321, 326, 4);
+  L.ground(327, 333, 6);
+  L.ground(334, 359, 8);
+  L.auraArc(323, 3, 9, 1, true);
+  L.rootbeer(330, 12);
+  L.spawn('tree', 337, 8, { h: 180 });
+  L.spawn('fish', 344, 13);
+  L.aura(348, 12, true);
+  L.spawn('goal', 354, 8);
   return L.build();
 }

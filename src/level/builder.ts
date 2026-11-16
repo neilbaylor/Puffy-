@@ -12,7 +12,7 @@ export type Cell = 'ground' | 'rock' | 'boulder' | 'bramble' | 'cloud' | null;
 export type EnemyKind = 'puffball' | 'bigpuff' | 'giant' | 'goat' | 'plop' | 'bigplop' | 'giantplop' | 'poogoat' | 'fish' | 'bigfish' | 'kai' | 'crab';
 
 export interface Spawn {
-  type: EnemyKind | 'aura' | 'rootbeer' | 'checkpoint' | 'goal' | 'player' | 'tree' | 'soccer' | 'hockey' | 'para' | 'puddle' | 'chase' | 'volley' | 'drop' | 'king' | 'baseball' | 'tennis' | 'pack' | 'fatdrop';
+  type: EnemyKind | 'aura' | 'rootbeer' | 'checkpoint' | 'goal' | 'player' | 'tree' | 'soccer' | 'hockey' | 'para' | 'puddle' | 'chase' | 'volley' | 'drop' | 'king' | 'baseball' | 'tennis' | 'pack' | 'fatdrop' | 'ferris';
   x: number; // tile column (may be fractional for aura / trees)
   y: number; // tile row the thing occupies
   opts?: Record<string, number | string | boolean>;
@@ -33,6 +33,8 @@ export interface LevelData {
   flyPath?: [number, number][];
   /** How long the fly-over takes (ms; default by kind of level). */
   flyMs?: number;
+  /** Under the sea: the look of the pier you start on (default the old wooden one). */
+  pierStyle?: 'wood' | 'modern';
   /** Under the sea (World 3): the water's surface (world px from the top). Below it you swim. */
   water?: number;
   /** Under the sea: going down a trench it gets dark — from this world y (none) to this one (as dark as it gets). */
@@ -59,6 +61,7 @@ export class LevelBuilder {
   vertical = false;
   flyPath: [number, number][] | undefined;
   flyMs: number | undefined;
+  pierStyle: 'wood' | 'modern' | undefined;
   /** Under the sea: the surface's world y (see LevelData.water). */
   waterY: number | undefined;
   darkY: [number, number] | undefined;
@@ -245,6 +248,7 @@ export class LevelBuilder {
       vertical: this.vertical || undefined,
       flyPath: this.flyPath,
       flyMs: this.flyMs,
+      pierStyle: this.pierStyle,
       water: this.waterY,
       dark: this.darkY,
       bgBottom: this.bgBottomY,

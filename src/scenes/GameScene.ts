@@ -37,6 +37,7 @@ import { stingerCover } from '../ui/stinger';
 import { mixTint, themeClock, themeMix, themesFor } from '../world/theme';
 import { LevelView } from '../world/LevelView';
 import { FishChase } from '../world/FishChase';
+import { FerrisWheel } from '../world/FerrisWheel';
 import { roundRectPath, smallTex } from '../gfx/smallTex';
 
 /** A puddle bubble's picture: radius (world px) and resolution. */
@@ -194,6 +195,8 @@ export class GameScene extends Phaser.Scene {
   private fishChase: FishChase | null = null;
   /** Where the camera looks instead of the hero for a moment (Part 6's look back at the gang), or null. */
   camLook: { x: number; y: number } | null = null;
+  /** Part 6's pier: the Ferris wheel. */
+  private ferris: FerrisWheel | null = null;
   /** Under the sea: this much more sky shown over the surface for a moment (Part 6: the Fat Fish coming), px. */
   camSky = 0;
   /** A little scene's playing (the world's paused). */
@@ -306,6 +309,7 @@ export class GameScene extends Phaser.Scene {
     this.drops = [];
     this.chases = [];
     this.fishChase = null;
+    this.ferris = null;
     this.camLook = null;
     this.camSky = 0;
     this.rock = null;
@@ -472,6 +476,10 @@ export class GameScene extends Phaser.Scene {
           break;
         case 'pack':
           packAt = { x: s.x * TILE, y: s.y * TILE };
+          break;
+        case 'ferris':
+          // (standing on the pier's deck: the row under its spawn)
+          this.ferris = new FerrisWheel(this, s.x * TILE, (s.y + 1) * TILE);
           break;
         case 'fatdrop':
           fatDrops.push(s.x);
@@ -795,6 +803,7 @@ export class GameScene extends Phaser.Scene {
     // (the rock moves on the same clock as the heroes' physics, even on a slow device)
     this.updateChase(Math.min(deltaMs / 1000, 0.1));
     this.fishChase?.update(Math.min(deltaMs / 1000, 0.1));
+    this.ferris?.update(Math.min(deltaMs / 1000, 0.1), this.view);
 
     this.updateCamera(dt);
     if (this.players.length > 1)
@@ -942,7 +951,13 @@ export class GameScene extends Phaser.Scene {
 
   /** The swan dive's moment at the top: everything slows right down while the hero's stretched out flat, a glint, then on. */
   private swanSlowMo(dt: number) {
-    const p = this.players.find((q) => q.swan && !q.swimming);
+    let p = this.players.find((q) => q.swan && !q.swimming);
+    // (a dive that came down on something instead of the water: that's the end of it, back to normal)
+    if (p && p.body.blocked.down && p.body.velocity.y >= 0) {
+      p.swan = false;
+      p.diving = false;
+      p = undefined;
+    }
     const vy = p ? p.body.velocity.y : 999;
     const slow = !!p && vy > -210 && vy < 120;
     const target = slow ? 3.2 : 1;
@@ -1162,6 +1177,7 @@ export class GameScene extends Phaser.Scene {
     this.level.animate(this.time.now / 1000, this.view.left, this.view.left + this.view.width);
     this.bg.update(this.view, dt);
     this.updateAmbience(dt);
+    this.ferris?.update(dt, this.view);
   }
 
   private updateCamera(dt: number, snap = false) {

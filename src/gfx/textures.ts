@@ -16,6 +16,7 @@ import './plopLooks'; // (registers Plop Invasion's palettes)
 import { POOWAVE_H, POOWAVE_W, drawPooOnGoat, drawPooPile, drawPooWave, drawStink, drawVolleyNetSide, drawVolleyball } from './plopworld';
 import { PLOP_DRESS, PLOP_FRAMES, PLOP_H, PLOP_W, drawPlop, type PlopKind } from './plops';
 import { BUBBLE_FRAMES, BUBBLE_SIZE, CHASE_FRAMES, FISH_FRAMES, FISH_SIZE, SWIM_FRAMES, drawBubbleShot, drawFish, type FishKind } from './fish';
+import { FERRIS_SIZE, FERRIS_STAND, GONDOLA, GONDOLA_FRAMES, drawFerrisStand, drawFerrisWheel, drawGondola } from './ferris';
 import { BADGE, COLUMN, EDGE, SHADOW, SIGN, STREAKS, TARGET, WAKE, drawBedShadow, drawBehindBadge, drawDangerColumn, drawEdgeGlow, drawFallSign, drawFallStreaks, drawPackWake, drawSurfaceTarget } from './chase';
 import { drawPoo } from './hazards';
 import { CLAM_FRAMES, CLAM_H, CLAM_W, NET_CELL_H, NET_W, TCRAB_FRAMES, TCRAB_H, TCRAB_W, drawClam, drawTennisCrab, drawTennisNet } from './tennis';
@@ -402,6 +403,11 @@ export function makeChaseArt(scene: Phaser.Scene) {
   if (!T.exists('chase-edge')) addCanvas(scene, 'chase-edge', hires(EDGE.w, EDGE.h, 1, (ctx) => drawEdgeGlow(ctx)));
   if (!T.exists('chase-shadow')) addCanvas(scene, 'chase-shadow', hires(SHADOW.w, SHADOW.h, 1, (ctx) => drawBedShadow(ctx)));
   if (!T.exists('chase-badge')) addCanvas(scene, 'chase-badge', hires(BADGE.w, BADGE.h, 2, (ctx) => drawBehindBadge(ctx)));
+  // the pier's Ferris wheel: the wheel (it turns), its stand, the gondolas
+  const fr = LIGHT ? 1.25 : 2;
+  if (!T.exists('ferris-wheel')) addCanvas(scene, 'ferris-wheel', hires(FERRIS_SIZE, FERRIS_SIZE, fr, (ctx) => drawFerrisWheel(ctx)), undefined, { release: true });
+  if (!T.exists('ferris-stand')) addCanvas(scene, 'ferris-stand', hires(FERRIS_STAND.w, FERRIS_STAND.h, fr, (ctx) => drawFerrisStand(ctx)), undefined, { release: true });
+  if (!T.exists('ferris-car')) sheet(scene, 'ferris-car', GONDOLA.w, GONDOLA.h, GONDOLA_FRAMES, (ctx, f) => drawGondola(ctx, f), fr);
 }
 
 /** The orange fish's bubble shot (b0, b1), as `fish-bubble`. */
@@ -721,7 +727,7 @@ const BADDIE_KEYS: Record<string, string[]> = {
   king: ['pking-jet', 'jetflame', 'jetsmoke'],
   baseball: BB_KEYS,
   fish: ['fish-badguy', 'fish-badguybig', 'fish-kai', 'fish-bubble'],
-  chase: ['fish6-stone', 'fish6-slinger', 'fish6-kai', 'fish6-zippy', 'fish6-fat', 'chase-sign', 'chase-col', 'chase-target', 'chase-streaks', 'chase-wake', 'chase-edge', 'chase-shadow', 'chase-badge'],
+  chase: ['fish6-stone', 'fish6-slinger', 'fish6-kai', 'fish6-zippy', 'fish6-fat', 'chase-sign', 'chase-col', 'chase-target', 'chase-streaks', 'chase-wake', 'chase-edge', 'chase-shadow', 'chase-badge', 'ferris-wheel', 'ferris-stand', 'ferris-car'],
   tennis: ['tcrab-red', 'tcrab-orange', 'clam', 'tennisnet'],
 };
 
