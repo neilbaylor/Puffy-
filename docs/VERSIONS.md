@@ -325,3 +325,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.320: Part 6: the Reef Bowl — underwater football (turtles vs seahorses), a new section; level 430 tiles.
 - v0.321: Part 6: fewer nuggies (100 → 71); open water where the Fat Fish comes down (no landing on rocks above you).
 - v0.322: Battle: bigger bomb blast (radius 118 → 136).
+- v0.323: Battle feels less laggy (no more snap-backs, others drawn sooner and smoother, your blasts and pickups instant); Part 6 gang speed per hero.
