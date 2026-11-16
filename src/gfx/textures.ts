@@ -731,7 +731,9 @@ const BADDIE_KEYS: Record<string, string[]> = {
   chutes: ['pchute'],
   king: ['pking-jet', 'jetflame', 'jetsmoke'],
   baseball: BB_KEYS,
-  fish: ['fish-badguy', 'fish-badguybig', 'fish-kai', 'fish-bubble'],
+  fish: ['fish-badguy', 'fish-badguybig', 'fish-bubble'],
+  // (Kai the bad guy fish is only in Part 5: Part 6's gang has its own Kai, fish6-kai)
+  kai: ['fish-kai'],
   chase: ['fish6-stone', 'fish6-slinger', 'fish6-kai', 'fish6-zippy', 'fish6-fat', 'chase-sign', 'chase-col', 'chase-target', 'chase-streaks', 'chase-wake', 'chase-edge', 'chase-shadow', 'chase-badge', 'ferris-wheel', 'ferris-stand', 'ferris-car'],
   tennis: ['tcrab-red', 'tcrab-orange', 'clam', 'tennisnet'],
   football: FB_KEYS,
@@ -743,7 +745,7 @@ const BADDIES_FOR: Record<string, string[]> = {
   2: ['puffball', 'bigpuff', 'giant', 'goat', 'weapons'],
   3: ['goat', 'weapons', 'plops'],
   4: ['goat', 'weapons', 'plops', 'chutes', 'king', 'baseball'],
-  5: ['fish', 'tennis'],
+  5: ['fish', 'kai', 'tennis'],
   6: ['fish', 'chase', 'football'],
   battle: ['puffball', 'bigpuff', 'giant', 'weapons'],
 };
@@ -784,7 +786,7 @@ export function gameArtJobs(scene: Phaser.Scene, opts: { heroes: readonly string
   // (Part 6's underwater football: the field, the stands, the posts and the board, then each team's sheet)
   if (want.includes('football')) for (const [name, run] of footballJobs(scene)) out.push({ name, run });
   if (want.includes('fish'))
-    for (const k of ['badguy', 'badguybig', 'kai'] as const) if (!T.exists(`fish-${k}`)) out.push({ name: `fish ${k}`, run: () => { makeFish(scene, k); makeFishBubble(scene); } });
+    for (const k of want.includes('kai') ? (['badguy', 'badguybig', 'kai'] as const) : (['badguy', 'badguybig'] as const)) if (!T.exists(`fish-${k}`)) out.push({ name: `fish ${k}`, run: () => { makeFish(scene, k); makeFishBubble(scene); } });
   for (const b of baddiePieces(scene)) if (want.includes(b.name) && !BADDIE_KEYS[b.name].every((k) => T.exists(k))) out.push(b);
   if (want.includes('plops')) (['small', 'medium', 'large'] as const).forEach((k) => !T.exists(`gplop-${k}`) && out.push({ name: `plops ${k}`, run: () => makePlops(scene, k) }));
   // (level 4's opening: the Plop King with his jetpack)
