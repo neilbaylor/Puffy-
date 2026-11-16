@@ -389,11 +389,13 @@ export class BattleScene extends Phaser.Scene {
 
   private makePrizeTextures() {
     const R = ART_RES;
-    for (const k of PRIZE_KINDS) if (!this.textures.exists(`prize-${k}`)) addCanvas(this, `prize-${k}`, hires(30, 30, R, (ctx) => drawPrize(ctx, k)));
-    if (!this.textures.exists('bbomb')) addCanvas(this, 'bbomb', hires(24, 24, R, (ctx) => drawBombBall(ctx, 11, 13, 7)));
-    if (!this.textures.exists('brock')) addCanvas(this, 'brock', hires(42, 42, R, (ctx) => drawRock(ctx)));
-    if (!this.textures.exists('banvil')) addCanvas(this, 'banvil', hires(42, 40, R, (ctx) => drawAnvil(ctx)));
-    if (!this.textures.exists('wr-chair')) addCanvas(this, 'wr-chair', hires(CHAIR_W + 8, CHAIR_H + 4, R, (ctx) => (ctx.translate(4, 2), drawFoldingChair(ctx))));
+    // (still pictures: their canvas pixels go once they're on the graphics chip, nothing reads them back)
+    const REL = { release: true };
+    for (const k of PRIZE_KINDS) if (!this.textures.exists(`prize-${k}`)) addCanvas(this, `prize-${k}`, hires(30, 30, R, (ctx) => drawPrize(ctx, k)), undefined, REL);
+    if (!this.textures.exists('bbomb')) addCanvas(this, 'bbomb', hires(24, 24, R, (ctx) => drawBombBall(ctx, 11, 13, 7)), undefined, REL);
+    if (!this.textures.exists('brock')) addCanvas(this, 'brock', hires(42, 42, R, (ctx) => drawRock(ctx)), undefined, REL);
+    if (!this.textures.exists('banvil')) addCanvas(this, 'banvil', hires(42, 40, R, (ctx) => drawAnvil(ctx)), undefined, REL);
+    if (!this.textures.exists('wr-chair')) addCanvas(this, 'wr-chair', hires(CHAIR_W + 8, CHAIR_H + 4, R, (ctx) => (ctx.translate(4, 2), drawFoldingChair(ctx))), undefined, REL);
     if (!this.textures.exists('bhalo'))
       addCanvas(this, 'bhalo', hires(96, 96, R, (ctx) => {
         // a soft white-gold glow with a brighter ring at its edge
@@ -407,11 +409,11 @@ export class BattleScene extends Phaser.Scene {
         ctx.beginPath();
         ctx.arc(48, 48, 47, 0, Math.PI * 2);
         ctx.fill();
-      }));
-    for (const k of PRIZE_KINDS) if (!this.textures.exists(`prize-chute-${k}`)) addCanvas(this, `prize-chute-${k}`, hires(30, 22, R, (ctx) => drawChute(ctx, k)));
-    if (!this.textures.exists('bfire')) addCanvas(this, 'bfire', hires(40, 26, R, (ctx) => drawFireball(ctx, 26, 13, 9, 1)));
-    if (!this.textures.exists('bpoo')) addCanvas(this, 'bpoo', hires(26, 24, R, (ctx) => drawPoo(ctx, 13, 21, 1)));
-    if (!this.textures.exists('bice')) addCanvas(this, 'bice', hires(60, 70, R, (ctx) => drawIceBlock(ctx, 60, 70)));
+      }), undefined, REL);
+    for (const k of PRIZE_KINDS) if (!this.textures.exists(`prize-chute-${k}`)) addCanvas(this, `prize-chute-${k}`, hires(30, 22, R, (ctx) => drawChute(ctx, k)), undefined, REL);
+    if (!this.textures.exists('bfire')) addCanvas(this, 'bfire', hires(40, 26, R, (ctx) => drawFireball(ctx, 26, 13, 9, 1)), undefined, REL);
+    if (!this.textures.exists('bpoo')) addCanvas(this, 'bpoo', hires(26, 24, R, (ctx) => drawPoo(ctx, 13, 21, 1)), undefined, REL);
+    if (!this.textures.exists('bice')) addCanvas(this, 'bice', hires(60, 70, R, (ctx) => drawIceBlock(ctx, 60, 70)), undefined, REL);
     for (const kind of ['small', 'medium', 'large'] as PlopKind[]) {
       const key = `bplop-${kind}`;
       if (this.textures.exists(key)) continue;

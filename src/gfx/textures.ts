@@ -118,9 +118,10 @@ export function frameGrid(n: number, fw: number, fh: number, gap = 4) {
   return { w: cols * px, h: rows === 1 ? fh : rows * py, x: (i: number) => (i % cols) * px, y: (i: number) => Math.floor(i / cols) * py };
 }
 
-/** The heroes' own sheets are read back (recoloured for the other players in a battle); everything else lets its pixels go once uploaded. */
-// (the heroes' frames, faces and chair-carrying frames: Battle recolours them for each player)
-const keepPixels = (key: string) => /^char-[a-z]+(-face|-carry)?$/.test(key);
+/** The heroes' chair-carrying frames are read back (recoloured for the other players in a battle); everything else lets its pixels go once uploaded. */
+// (the heroes' frames and faces aren't read back: a battle draws each player's own, recoloured as
+// they're drawn — see BattleScene.textureFor)
+const keepPixels = (key: string) => /^char-[a-z]+-carry$/.test(key);
 
 /** What a hero wears under the sea: their own things, the dive gear on (no skateboard in the water). */
 export const seaWear = () => [...wardrobe.wearKey.split(',').filter((w) => w && w !== 'board'), 'scuba'].sort().join(',');
