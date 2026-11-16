@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.319)
+## Where things stand (v0.320)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -31,6 +31,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   Home screen (yellow).
 - Start screen: drone fly-over behind, logo hop, hero cards (pick = hop / backflip), Play, Part picker once a
   level is beaten, mute (top-left), full screen + **Battle** buttons (top-right, same height, side by side).
+- v0.320: THE REEF BOWL (merged claude/football): src/entities/Football.ts (FootballGame: two teams of 6 on lanes, no physics bodies; huddle/snap/routes/pass/tackle/touchdown; throwers QB + receiver when you're ahead, safety + linebacker when you're coming — wind-up '!' then a slowing spiral aimed ahead, ≥1.2 s between throws, none while FishChase.falling; rockets THWACK a ball / flatten a player 3 s; hit → gs.hitPlayer), art src/gfx/football.ts (field, stands, driftwood posts, REEF BOWL scoreboard, Snappers turtles red / Stallions seahorses blue-gold 16-frame sheets, number decals, ball), textures via BADDIES_FOR[6]/BADDIE_KEYS.football (released, sized from getFrame). Level 6 W 430: new section 209-278 (cp 215, field 220-256), everything after shifted +70 (cps 88/145/185/215/280/364, drops 58/190/370, goal 424), flyMs 11500. GameScene.camFloor keeps the field in view while over it (off during camSky / camLook). LevelView keeps plants off the field. Test: sketches/level6/tfootball.cjs. Bots: full 102 s 2 faints, light Muscles 95 s 1 faint. Textures +5.2 MB full / +2.2 MB light.
 - v0.319: Part 6 a touch harder (FishChase TAIL 240, LUNGE_EVERY 3.2-5.0, AIM_V 260); Fat Fish 'off' phase swims away (OFF_V 300, level, bubbles, 'hmph!') until off the view instead of fading. Longer level: the football agent (branch claude/football) adds a new 60-80 tile section for the field.
 - v0.318: LIGHT only: the HUD badge's FaceLife (calm) glances use LITE_LOOKS [-0.75, 0.4, 0.9] at lookY -0.4 (ui.ts) — 5 faces × 2 idle poses stay in drawPortrait's 96-entry cache, so no mid-play portrait redraws. Full mode unchanged (user OK'd this for lite).
 - v0.317: E3 efficiency round (merged claude/perf-e3): textures.ts keepPixels now only char-<id>-carry (the one sheet Battle reads back, carryTextureFor); hero frame/face sheets and Battle's still pictures (prizes, chutes, bomb, rock, anvil, chair, halo, fireball, poo, ice) addCanvas release:true. Canvas memory kept: 2-player battle 15.9→3.3 MB, Part 1 8.1→4.4, Plop King 12.5→8.7. Not done (measured): HUD portrait (no identical cheaper path), start-screen culling (needs a texture-warm step), load times (all real one-off work), FishChase ~0.6 ms of an 8.7 ms frame at 4×. Series E1–E3 complete. User decisions: NO pre-drawing hero/bad-guy sheets on the start screen; HUD portrait cache (bigger cache ~90 KB/face, or fewer poses) still open.
