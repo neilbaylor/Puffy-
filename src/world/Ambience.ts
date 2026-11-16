@@ -301,6 +301,12 @@ export class Ambience {
         }
         continue;
       }
+      // (off the view — the bad guys a long way off — it isn't drawn, nor its ground looked for)
+      const half = tg.w * 0.75;
+      if (tg.x + half < view.left || tg.x - half > view.left + view.width || tg.bottom - 40 > view.top + view.height || tg.bottom + 240 < view.top) {
+        sh.setVisible(false);
+        continue;
+      }
       const gy = this.groundBelow(tg.x, tg.bottom - 4, 220);
       if (gy === null) {
         sh.setVisible(false);

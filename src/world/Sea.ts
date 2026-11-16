@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { DEPTH } from '../config';
 import { LIGHT } from '../core/light';
 import { SURFACE_LINE } from '../gfx/sea';
+import { drawOnlyWhenBusy } from './Fx';
 
 interface View {
   left: number;
@@ -39,8 +40,13 @@ interface Crab {
  *  - crabs scuttling about on the sand near you,
  *  - splashes and bursts of bubbles for the game (a dive, a popped fish).
  */
+/** Room round a far-off critter's middle for its picture (the biggest, the turtle, is under 50 px across). */
+const CRITTER_R = 64;
+
 export class SeaLife {
   private t = 0;
+  /** (a light beam's bounds, worked out into this each frame) */
+  private box = new Phaser.Geom.Rectangle();
   private sky: Phaser.GameObjects.Image[] = [];
   private skyTop: Phaser.GameObjects.Rectangle;
   private surface: Phaser.GameObjects.Image[] = [];
@@ -114,6 +120,7 @@ export class SeaLife {
         gravityY: 1100,
       })
       .setDepth(DEPTH.players + 2);
+    drawOnlyWhenBusy(scene, [this.bubbleE, this.splashE, this.columnE]);
   }
 
   private addJelly(x: number, y: number) {
@@ -172,7 +179,9 @@ export class SeaLife {
     while (this.surface.length < n) this.surface.push(this.scene.add.image(0, 0, 'sea-surface').setOrigin(0, 0).setScale(1 / 2).setDepth(DEPTH.players + 1));
     const showTop = view.top < this.surfaceY + 30;
     this.surface.forEach((img, i) => img.setVisible(showTop && i < n).setPosition(x0 + i * sw - i * 0.3, this.surfaceY - SURFACE_LINE + Math.sin(t * 1.3) * 1.2));
-    for (const s of this.sky) s.setVisible(showTop);
+    // (each piece of sky only while it's in view: Phaser draws a picture wherever it is)
+    const right = view.left + view.width;
+    for (const s of this.sky) s.setVisible(showTop && s.x < right && s.x + 1024 > view.left);
     this.skyTop.setVisible(showTop);
     // ── light beams from the surface, slowly breathing ──
     for (const r of this.rays) {
@@ -183,6 +192,9 @@ export class SeaLife {
         .setScale(3.2 + Math.sin(t * 0.3 + r.ph) * 0.6, Math.max(64, len) / 128)
         .setRotation(0.22 + Math.sin(t * 0.2 + r.ph) * 0.04)
         .setAlpha(r.a * (0.6 + 0.4 * Math.sin(t * 0.7 + r.ph)) * (1 - this.darkK));
+      // (not drawn while it's out of view: a glowing picture breaks the batch around it into draw calls of its own)
+      const b = r.img.getBounds(this.box);
+      r.img.visible = b.right > view.left && b.x < right && b.bottom > view.top && b.y < view.top + view.height;
     }
     // ── jellyfish, schools of fish, the odd turtle ──
     this.nextSchool -= dt;
@@ -242,6 +254,8 @@ export class SeaLife {
       const sx = d.kind === 'jelly' ? px : view.left + (d.x - view.left * d.k);
       d.img.setPosition(sx, Math.max(this.surfaceY + 40, view.top + d.y * view.height) + Math.sin(d.ph * 1.3) * 4);
       const off = sx - view.left;
+      // (only drawn while it's in view: they swim in from off the screen, and out again)
+      d.img.setVisible(off > -CRITTER_R && off < view.width + CRITTER_R && d.img.y > view.top - CRITTER_R && d.img.y < view.top + view.height + CRITTER_R);
       const gone = d.kind !== 'jelly' && ((d.vx > 0 && off > view.width + 200) || (d.vx < 0 && off < -200) || off < -view.width || off > view.width * 2);
       if (gone) d.img.destroy();
       return !gone;

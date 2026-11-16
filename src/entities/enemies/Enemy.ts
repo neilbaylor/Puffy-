@@ -153,6 +153,11 @@ export abstract class Enemy extends Phaser.Physics.Arcade.Sprite {
     return null;
   }
 
+  /** What it carries along with it (its weapon), skipped by the camera with it while it's off it. */
+  cullParts(cull: (o: Phaser.GameObjects.Image) => void) {
+    this.weapon?.cullWith(cull);
+  }
+
   /** Hand this bad guy a weapon. */
   arm(kind: WeaponKind, size: 'small' | 'big') {
     this.weapon = new Weapon(this.gs, this, kind, size);
@@ -444,6 +449,11 @@ export class Giant extends Enemy {
     this.bouncyTop = true;
     this.setDepth(DEPTH.enemies + 1);
     this.pips = gs.add.image(0, 0, this.pipsTex()).setOrigin(0, 0).setScale(1 / PIP_RES).setDepth(DEPTH.text);
+  }
+
+  cullParts(cull: (o: Phaser.GameObjects.Image) => void) {
+    super.cullParts(cull);
+    if (this.pips.active) cull(this.pips);
   }
 
   wake() {

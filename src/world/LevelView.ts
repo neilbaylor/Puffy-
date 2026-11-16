@@ -4,7 +4,7 @@ import { rng } from '../gfx/draw';
 import { FB_FIELD_TILES } from '../gfx/football';
 import type { Pt } from '../gfx/handdrawn';
 import { PROP_RES, TERRAIN_RES, addCanvas, ensureSeaArt, hires, kelpBends } from '../gfx/textures';
-import { GRASS_FILLS, KELP_H, PIER_HEAD, PIER_HEAD_MODERN, SEA_PROPS, SWAY_N, drawModernPier, drawPier } from '../gfx/sea';
+import { GRASS_FILLS, KELP_H, KELP_W, PIER_HEAD, PIER_HEAD_MODERN, SEA_PROPS, SWAY_N, drawModernPier, drawPier } from '../gfx/sea';
 import { DEFAULT_PALETTE, PALETTES, drawCloudPlatform, drawPuffTree, drawTerrainPiece, roundPoly, traceCells, type TerrainKind, type WorldPalette } from '../gfx/world';
 import { drawPine } from '../gfx/mountain';
 import type { Cell, LevelData } from '../level/builder';
@@ -15,6 +15,8 @@ const PAD = 34; // room around each terrain piece for grass blades / roots
 const CHUNK = 800;
 /** …and no taller than this (tall levels: a cliff wall would otherwise make one picture thousands of px tall). */
 const CHUNK_V = 1024;
+/** How far under a level's bottom its ground pictures go (px): the camera shows 28 px at most there. */
+const TRIM_KEEP = 64;
 /** Colour of the deep rock under each terrain chunk (sampled once, when the chunk is drawn). */
 const DEEP_FILL = new Map<string, number>();
 /** Each level's terrain pieces (outline + bounds), worked out once (see LevelView.pieces). */
@@ -93,7 +95,7 @@ export function levelPieces(d: LevelData, kind: TerrainKind): { outline: Pt[]; x
  */
 export function groundPaintJobs(scene: Phaser.Scene, data: LevelData): (() => string | null)[] {
   const before = new Set(scene.children.list);
-  const view = new LevelView(scene, data, { lazyNear: -1e9, lazySpan: [0, 0], ahead: false });
+  const view = new LevelView(scene, data, { lazyNear: -1e9, lazySpan: [0, 0], ahead: false, trim: true });
   for (const o of scene.children.list.filter((c) => !before.has(c))) o.destroy();
   return view.paintJobs();
 }
@@ -124,6 +126,12 @@ export class LevelView {
    * the camera's own filter, so it never touches what other code shows or hides.
    */
   private readonly cullOff: boolean;
+  /**
+   * A level (the game, its start-screen fly-over): the ground's pictures stop a little under the
+   * level's bottom, where its camera never goes (see TRIM_KEEP). Not a battle arena: its camera can
+   * show the whole arena and more on a tall screen.
+   */
+  private readonly trim: boolean;
   /** Each scenery picture's box (from when it was put up) and each deep-rock strip's, and whether it's being skipped now. */
   private boxes: { o: Phaser.GameObjects.GameObject; x0: number; x1: number; y0: number; y1: number; off: boolean }[] = [];
   /** How many of `scenery` have a box so far. */
@@ -136,8 +144,9 @@ export class LevelView {
     /** keep: leave other levels' terrain alone (a battle watched while the start screen still shows). */
     /** free: free other levels' terrain (the game; default when not lazy). */
     /** lazySpan: how far before / after `lazyNear` the terrain is drawn straight away (default 900 / 1800). */
-    opts?: { lazyNear?: number; keep?: boolean; free?: boolean; lazySpan?: [number, number]; ahead?: boolean; cull?: boolean },
+    opts?: { lazyNear?: number; keep?: boolean; free?: boolean; lazySpan?: [number, number]; ahead?: boolean; cull?: boolean; trim?: boolean },
   ) {
+    this.trim = opts?.trim ?? false;
     this.ahead = opts?.ahead ?? true;
     this.cullOff = opts?.cull ?? false;
     this.lazy = opts?.lazyNear !== undefined;
@@ -241,9 +250,15 @@ export class LevelView {
       // (a hair of tilt following the same sway smooths the step from frame to frame)
       w.img.setRotation(Math.sin((c / SWAY_N) * Math.PI * 2) * 0.03 * (w.img.flipX ? -1 : 1));
     }
+    // (the start screen: a strand out of view isn't drawn either — each is a draw call of its own, and
+    // they all share one small picture, so there's nothing to get onto the graphics chip first; the
+    // game and battles skip them with the rest of the scenery, see cull)
+    const camId = this.cullOff ? 0 : this.scene.cameras.main.id;
     for (const r of this.ropes) {
       const rope = r.rope;
-      if (rope.x < left - 80 || rope.x > right + 80) continue;
+      const off = rope.x < left - 80 || rope.x > right + 80;
+      if (camId) rope.cameraFilter = off ? rope.cameraFilter | camId : rope.cameraFilter & ~camId;
+      if (off) continue;
       // (the same sway the frames were drawn with: the tip 16 across at full bend, the foot still)
       const bend = Math.sin((t * r.speed + r.ph) * Math.PI * 2) * 16 * PROP_RES * (rope.flipX ? -1 : 1);
       const pts = rope.points as Phaser.Math.Vector2[];
@@ -472,7 +487,12 @@ export class LevelView {
           /** Just the picture (the start screen draws a level's in quiet moments, ahead of Play). */
           const paint = () => {
           if (!this.scene.textures.exists(key)) {
-            const c = hires(cw + PAD * 2, ch, TERRAIN_RES, (ctx) => {
+            // (a level's camera never shows more than a few px below its bottom — the start screen's
+            // drift and the climbs' lean, 28 px at most measured — but every piece runs 3 tiles past
+            // it: the picture stops TRIM_KEEP px under the bottom, drawn just as it would be in full)
+            const keepH = this.trim ? Math.max(1, Math.min(ch, this.heightPx + TRIM_KEEP - ty0)) : ch;
+            const fullPx = Math.ceil(ch * TERRAIN_RES);
+            const c = hires(cw + PAD * 2, keepH, TERRAIN_RES, (ctx) => {
               ctx.translate(PAD - cx0, -ty0);
               drawTerrainPiece(ctx, { kind, outline, pal, seed: Math.round(x0 + y0), floorY: this.heightPx, clip: { x0: cx0 - PAD, x1: cx0 + cw + PAD, y0: ty0, y1: cyEnd + (last ? PAD : 1) } });
             });
@@ -484,7 +504,7 @@ export class LevelView {
               DEEP_FILL.set(key, fillCol);
               const cctx = c.getContext('2d')!;
               const fadeH = Math.round(90 * TERRAIN_RES);
-              const g2 = cctx.createLinearGradient(0, c.height - fadeH, 0, c.height);
+              const g2 = cctx.createLinearGradient(0, fullPx - fadeH, 0, fullPx);
               g2.addColorStop(0, hex + '00');
               g2.addColorStop(0.75, hex + 'ff');
               g2.addColorStop(1, hex + 'ff');
@@ -492,7 +512,7 @@ export class LevelView {
               cctx.setTransform(1, 0, 0, 1, 0, 0);
               cctx.globalCompositeOperation = 'source-atop';
               cctx.fillStyle = g2;
-              cctx.fillRect(0, c.height - fadeH, c.width, fadeH);
+              cctx.fillRect(0, fullPx - fadeH, c.width, fadeH);
               cctx.restore();
             }
             addCanvas(this.scene, key, c, undefined, { release: true });
@@ -622,6 +642,13 @@ export class LevelView {
               .setDepth(DEPTH.decor - 0.5);
             if (i % 2 === 1) rope.flipX = true;
             this.ropes.push({ rope, speed: 0.42 + (i % 3) * 0.06, ph: i * 0.37 });
+            if (this.cullOff) {
+              // (off the camera it isn't drawn either: each strand is a draw call of its own, on
+              // screen or not. Its box: the strip's half width plus the tip's full bend either side,
+              // from the tip down to the foot)
+              const half = (KELP_W / 2 + 16) * (0.85 + 0.15 * k);
+              this.boxes.push({ o: rope, x0: rope.x - half, x1: rope.x + half, y0: rope.y - (KELP_H + 20 + KELP_W / 2) * k, y1: rope.y + (4 + KELP_W / 2) * k, off: false });
+            }
             return;
           }
           const img = this.scene.add

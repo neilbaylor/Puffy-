@@ -10,6 +10,20 @@ type Emitter = Phaser.GameObjects.Particles.ParticleEmitter;
  */
 const fontMetrics = new Map<number, Phaser.Types.GameObjects.Text.TextMetrics>();
 
+/**
+ * Emitters with nothing in the air aren't drawn: Phaser still visits an empty one every frame, and
+ * one with a different blend from its neighbours (the glowing ones) breaks the batch of pictures
+ * around it into another draw call. Each frame, just before drawing, an emitter is shown only while
+ * it has bits alive (nothing else shows or hides these), so what's on screen is the same.
+ */
+export function drawOnlyWhenBusy(scene: Phaser.Scene, emitters: Emitter[]) {
+  const check = () => {
+    for (const e of emitters) e.visible = e.getAliveParticleCount() > 0;
+  };
+  scene.events.on(Phaser.Scenes.Events.PRE_RENDER, check);
+  scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => scene.events.off(Phaser.Scenes.Events.PRE_RENDER, check));
+}
+
 /** Particle + juice effects. One emitter per effect type, fired with explode(). */
 export class Fx {
   private dustE: Emitter;
@@ -168,6 +182,7 @@ export class Fx {
       alpha: { start: 0.55, end: 0 },
       tint: [0xdedee6, 0xc4c4cc],
     }, DEPTH.projectiles - 1);
+    drawOnlyWhenBusy(scene, [this.dustE, this.smokeE, this.fireE, this.sparkE, this.debrisE, this.starE, this.trailE, this.fluffE, this.auraE, this.burnE, this.emberE, this.ashE, this.goopE, this.pooE, this.crumbE]);
   }
 
   /** How many bits a burst has (about half when thin). */

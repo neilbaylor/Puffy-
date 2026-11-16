@@ -306,6 +306,15 @@ export class FootballGame {
     if (!on) this.mark?.setVisible(false);
   }
 
+  /** Each player (and the number on his back) skipped by the camera while he's off it (see GameScene.cullOffCamera). */
+  cullWith(cull: (o: Phaser.GameObjects.Image | Phaser.GameObjects.Sprite) => void) {
+    if (!this.shown) return;
+    for (const p of this.players) {
+      cull(p.img);
+      cull(p.num);
+    }
+  }
+
   // ── the game ──
 
   update(dt: number) {

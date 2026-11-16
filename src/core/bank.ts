@@ -2,14 +2,26 @@
  * What a player keeps between plays (in this browser): root beer bottles banked, every
  * nuggie ever eaten and every bad guy ever defeated. A signed-in player's account keeps them too (see account.ts).
  */
+/**
+ * What's been read so far (a read from storage is slow, and the HUD asks for the root beer every
+ * frame the stamina bar moves): a write here clears it, and so does one from another tab.
+ */
+const seen = new Map<string, number>();
+if (typeof window !== 'undefined') window.addEventListener('storage', () => seen.clear());
 const num = (k: string) => {
+  const had = seen.get(k);
+  if (had !== undefined) return had;
+  let v = 0;
   try {
-    return Number(localStorage.getItem(k) ?? 0) || 0;
+    v = Number(localStorage.getItem(k) ?? 0) || 0;
   } catch {
     return 0;
   }
+  seen.set(k, v);
+  return v;
 };
 const put = (k: string, v: number) => {
+  seen.delete(k);
   try {
     localStorage.setItem(k, String(v));
   } catch {
