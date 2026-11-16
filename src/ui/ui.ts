@@ -126,6 +126,8 @@ const SPEAKER_ON = `<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden=
 const SPEAKER_OFF = `<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M16 9.5l5 5M21 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>`;
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
+/** (lite mode) the in-game badge's glances: left, a little right, right. */
+const LITE_LOOKS = [-0.75, 0.4, 0.9];
 
 /**
  * Little bits of life for a hero's face: now and then the eyes blink or glance
@@ -178,8 +180,12 @@ class FaceLife {
     // (the in-game badge's glances stop at one of 7 heights, not anywhere: each new face is a full
     // redraw of the portrait — a hitch every few seconds on a phone — and with set heights almost
     // every face has been drawn before after the first minute; the start screen's stay free)
-    const lookY = this.calm ? -0.9 + Math.floor(Math.random() * 7) * 0.25 : rand(-0.9, 0.6);
-    this.set({ lookX: looks[Math.floor(Math.random() * looks.length)], lookY });
+    // (lite mode: the badge glances just three ways at one height — few enough faces that all of
+    // them stay drawn, so after the first few it never has to redraw the portrait)
+    const lite = this.calm && LIGHT;
+    const lookY = lite ? -0.4 : this.calm ? -0.9 + Math.floor(Math.random() * 7) * 0.25 : rand(-0.9, 0.6);
+    const lookX = lite ? LITE_LOOKS[Math.floor(Math.random() * LITE_LOOKS.length)] : looks[Math.floor(Math.random() * looks.length)];
+    this.set({ lookX, lookY });
     const hold = this.calm ? rand(600, 1300) : rand(700, 1800);
     this.after(hold, () => this.set({ lookX: 0, lookY: 0, blink: Math.random() < 0.3 }));
     this.after(hold + 120, () => this.set({ blink: false }));
