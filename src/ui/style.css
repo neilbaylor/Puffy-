@@ -2038,6 +2038,23 @@ kbd {
 }
 .bhud-bombs[hidden] { display: none; }
 .bhud-time.low { color: #ff6b5e; animation: next-pulse 0.5s ease-in-out infinite; }
+/* the connection's round trip, small under the clock, with a dot: green / amber / red */
+.bhud-ping {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: -2px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: #1c0f3a99;
+  color: #fff;
+  font: 800 10px / 1.6 var(--body);
+  letter-spacing: 0.04em;
+}
+.bhud-ping[hidden] { display: none; }
+.bhud-ping::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #6fdc6a; }
+.bhud-ping[data-q='ok']::before { background: #ffc94a; }
+.bhud-ping[data-q='bad']::before { background: #ff5b4f; }
 /* everyone's score: along the bottom, in the middle (between the touch controls) */
 .bhud-chips {
   position: fixed;

@@ -653,6 +653,7 @@ export class BattleUI {
     this.hud?.remove();
     this.hud = h(`<div class="bhud">
       <div class="bhud-time">2:00</div>
+      <div class="bhud-ping" hidden></div>
       <div class="bhud-bombs" hidden></div>
       <div class="bhud-chips"></div>
       <button class="icon-btn bhud-leave" aria-label="Pause"><svg class="pause-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="5.6" y="4.5" width="4.8" height="15" rx="1.4"/><rect x="13.6" y="4.5" width="4.8" height="15" rx="1.4"/></svg></button>
@@ -745,6 +746,16 @@ export class BattleUI {
     const time = this.hud.querySelector<HTMLElement>('.bhud-time')!;
     time.textContent = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
     time.classList.toggle('low', t <= 10);
+    // the connection: how long a message takes to the server and back (green under 80 ms, amber under
+    // 160, red above): lag in a battle is mostly this
+    const ping = this.hud.querySelector<HTMLElement>('.bhud-ping')!;
+    const rtt = Math.round(this.net?.rtt ?? 0);
+    ping.hidden = rtt <= 0;
+    const pt = `${rtt} ms`;
+    if (rtt > 0 && ping.textContent !== pt) {
+      ping.textContent = pt;
+      ping.dataset.q = rtt < 80 ? 'good' : rtt < 160 ? 'ok' : 'bad';
+    }
     // bombs you're carrying: a counter (with the key to press on a keyboard), and the touch button
     const bombs = this.hud.querySelector<HTMLElement>('.bhud-bombs')!;
     bombs.hidden = s.bombs <= 0 || usingTouchNow();

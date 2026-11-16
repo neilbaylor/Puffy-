@@ -26,10 +26,11 @@ export function buildArena(): LevelData {
   b.spawn('tree', 1.2, 3);
   b.spawn('tree', ARENA_W - 1.6, 3);
 
+  // (the low walls stand 2 tiles clear of the islands: a grown hero has to fit up through the gap)
   // 1. the meadow
   let o = 0;
-  b.rock(o + 8, o + 8, 3, 4);
-  b.rock(o + 19, o + 19, 3, 4);
+  b.rock(o + 7, o + 7, 3, 4);
+  b.rock(o + 20, o + 20, 3, 4);
   b.cloud(o + 4, 5, 6);
   b.cloud(o + 20, 5, 6);
   b.cloud(o + 2, 4, 10);
@@ -51,8 +52,8 @@ export function buildArena(): LevelData {
 
   // 3. the steps
   o = S * 2;
-  b.rock(o + 2, o + 2, 3, 4);
-  b.rock(o + 25, o + 25, 3, 4);
+  b.rock(o + 1, o + 1, 3, 4);
+  b.rock(o + 26, o + 26, 3, 4);
   b.island(o + 4, o + 8, 7, 1);
   b.island(o + 11, o + 16, 10, 1);
   b.island(o + 19, o + 23, 7, 1);
@@ -63,7 +64,7 @@ export function buildArena(): LevelData {
 
   // 4. the cliffs
   o = S * 3;
-  b.rock(o + 5, o + 5, 3, 4);
+  b.rock(o + 4, o + 4, 3, 4);
   b.rock(o + 17, o + 18, 3, 5);
   b.island(o + 7, o + 14, 8, 1);
   b.spawn('tree', o + 9, 8, { h: 70 });
@@ -100,7 +101,7 @@ export const ARENA_SPAWNS: [number, number][] = [
   // the steps
   [ARENA_SECTION * 2 + 5, 2], [ARENA_SECTION * 2 + 22, 2], [ARENA_SECTION * 2 + 13, 10], [ARENA_SECTION * 2 + 6, 7], [ARENA_SECTION * 2 + 21, 7],
   // the cliffs
-  [ARENA_SECTION * 3 + 3, 2], [ARENA_SECTION * 3 + 22, 2], [ARENA_SECTION * 3 + 11, 8], [ARENA_SECTION * 3 + 17, 5], [ARENA_SECTION * 3 + 3, 11],
+  [ARENA_SECTION * 3 + 2, 2], [ARENA_SECTION * 3 + 22, 2], [ARENA_SECTION * 3 + 11, 8], [ARENA_SECTION * 3 + 17, 5], [ARENA_SECTION * 3 + 3, 11],
 ];
 
 /** Where the heroes start (by slot): a stretch each, as far apart as the arena allows. */

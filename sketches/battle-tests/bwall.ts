@@ -1,4 +1,4 @@
-// Shooting through walls: A fires at B with a wall between them (the 1-tile pillar at x 58, 2 tiles tall, and
+// Shooting through walls: A fires at B with a wall between them (the 1-tile pillar at x 57, 2 tiles tall, and
 // the step at x 40-47), at a few distances; does B get hurt? Also A standing right up against the wall, and grown.
 import { BattleSim, BTN, POWER, TILE_PX } from '../wt-battle/src/shared/battle/sim';
 import { buildArena } from '../wt-battle/src/shared/battle/arena';
@@ -6,7 +6,7 @@ const T = TILE_PX;
 const out: string[] = [];
 for (const hero of ['puffy', 'scruffy', 'muscles'])
   for (const grown of [false, true])
-    for (const [ax, bx, label] of [[56.5, 59.5, 'pillar, both 1.5 tiles off'], [57.4, 58.9, 'pillar, A against it'], [57.4, 60.5, 'pillar, B 2.5 off'], [56.0, 61.5, 'pillar, far']] as [number, number, string][]) {
+    for (const [ax, bx, label] of [[55.5, 58.5, 'pillar, both 1.5 tiles off'], [56.4, 57.9, 'pillar, A against it'], [56.4, 59.5, 'pillar, B 2.5 off'], [55.0, 60.5, 'pillar, far']] as [number, number, string][]) {
       const sim: any = new BattleSim(buildArena());
       sim.add('a', hero, 0); sim.add('b', 'puffy', 1);
       sim.timeLeft = 100; sim.chairAt = []; sim.prizes = []; sim.hazards = []; sim.enemies = []; sim.spawnEnemy = () => {}; sim.hazardIn = 1e9;
