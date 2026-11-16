@@ -321,3 +321,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.316: E2 efficiency round (movable-only ground checks; off-camera nuggies, root beer and bad guys not drawn).
 - v0.317: E3 efficiency round (hero sheets and battle still pictures release their canvases; battle canvas memory 15.9→3.3 MB).
 - v0.318: Lite mode: cheaper HUD portrait (three glance directions, no mid-play redraws).
+- v0.319: Part 6 a touch harder; the Fat Fish swims away instead of fading out.

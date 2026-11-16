@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.318)
+## Where things stand (v0.319)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -31,6 +31,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   Home screen (yellow).
 - Start screen: drone fly-over behind, logo hop, hero cards (pick = hop / backflip), Play, Part picker once a
   level is beaten, mute (top-left), full screen + **Battle** buttons (top-right, same height, side by side).
+- v0.319: Part 6 a touch harder (FishChase TAIL 240, LUNGE_EVERY 3.2-5.0, AIM_V 260); Fat Fish 'off' phase swims away (OFF_V 300, level, bubbles, 'hmph!') until off the view instead of fading. Longer level: the football agent (branch claude/football) adds a new 60-80 tile section for the field.
 - v0.318: LIGHT only: the HUD badge's FaceLife (calm) glances use LITE_LOOKS [-0.75, 0.4, 0.9] at lookY -0.4 (ui.ts) — 5 faces × 2 idle poses stay in drawPortrait's 96-entry cache, so no mid-play portrait redraws. Full mode unchanged (user OK'd this for lite).
 - v0.317: E3 efficiency round (merged claude/perf-e3): textures.ts keepPixels now only char-<id>-carry (the one sheet Battle reads back, carryTextureFor); hero frame/face sheets and Battle's still pictures (prizes, chutes, bomb, rock, anvil, chair, halo, fireball, poo, ice) addCanvas release:true. Canvas memory kept: 2-player battle 15.9→3.3 MB, Part 1 8.1→4.4, Plop King 12.5→8.7. Not done (measured): HUD portrait (no identical cheaper path), start-screen culling (needs a texture-warm step), load times (all real one-off work), FishChase ~0.6 ms of an 8.7 ms frame at 4×. Series E1–E3 complete. User decisions: NO pre-drawing hero/bad-guy sheets on the start screen; HUD portrait cache (bigger cache ~90 KB/face, or fewer poses) still open.
 - v0.316: E2 efficiency round (merged claude/perf-e2): GameScene gEnemiesOnTiles / gAurasOnTiles — only bad guys that are awake or whose body moves (checked on PRE_UPDATE, once in they stay) and scattered nuggies collide with the tile layer; cullOffCamera on POST_UPDATE sets the camera filter bit on nuggies (+glow), root beer (+glint) and bad guys entirely off the view (+64 px and the object's own size). Measured (4× CPU, median update+render): light Part 4 7.3→5.2 ms, full Part 5 7.1→5.5. Left (owner decisions): HUD portrait cache misses (~1.6 ms/frame at 4× in Part 1; bigger cache = ~90 KB per face, or fewer poses), drawing hero/bad-guy sheets on the start screen to shorten Play→running (~10 s at 4×) at the cost of start-screen memory; start-screen culling design.
