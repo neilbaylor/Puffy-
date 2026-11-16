@@ -241,9 +241,15 @@ export class LevelView {
       // (a hair of tilt following the same sway smooths the step from frame to frame)
       w.img.setRotation(Math.sin((c / SWAY_N) * Math.PI * 2) * 0.03 * (w.img.flipX ? -1 : 1));
     }
+    // (the start screen: a strand out of view isn't drawn either — each is a draw call of its own, and
+    // they all share one small picture, so there's nothing to get onto the graphics chip first; the
+    // game and battles skip them with the rest of the scenery, see cull)
+    const camId = this.cullOff ? 0 : this.scene.cameras.main.id;
     for (const r of this.ropes) {
       const rope = r.rope;
-      if (rope.x < left - 80 || rope.x > right + 80) continue;
+      const off = rope.x < left - 80 || rope.x > right + 80;
+      if (camId) rope.cameraFilter = off ? rope.cameraFilter | camId : rope.cameraFilter & ~camId;
+      if (off) continue;
       // (the same sway the frames were drawn with: the tip 16 across at full bend, the foot still)
       const bend = Math.sin((t * r.speed + r.ph) * Math.PI * 2) * 16 * PROP_RES * (rope.flipX ? -1 : 1);
       const pts = rope.points as Phaser.Math.Vector2[];
