@@ -2038,21 +2038,26 @@ kbd {
 }
 .bhud-bombs[hidden] { display: none; }
 .bhud-time.low { color: #ff6b5e; animation: next-pulse 0.5s ease-in-out infinite; }
-/* the connection's round trip, small under the clock, with a dot: green / amber / red */
+/* the connection's round trip: bottom left, level with the score chips (as tall as one), with a dot:
+   green / amber / red */
 .bhud-ping {
+  position: fixed;
+  left: calc(12px + var(--safe-l));
+  bottom: calc(12px + var(--safe-b));
+  box-sizing: border-box;
+  height: calc(clamp(17px, 4vmin, 21px) + 10px);
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin-top: -2px;
-  padding: 0 7px;
+  gap: 6px;
+  padding: 0 11px 0 9px;
   border-radius: 999px;
-  background: #1c0f3a99;
+  background: #3a2418cc;
   color: #fff;
-  font: 800 10px / 1.6 var(--body);
-  letter-spacing: 0.04em;
+  font: 800 clamp(12px, 3vmin, 15px) / 1 var(--body);
+  letter-spacing: 0.03em;
 }
 .bhud-ping[hidden] { display: none; }
-.bhud-ping::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #6fdc6a; }
+.bhud-ping::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #6fdc6a; }
 .bhud-ping[data-q='ok']::before { background: #ffc94a; }
 .bhud-ping[data-q='bad']::before { background: #ff5b4f; }
 /* everyone's score: along the bottom, in the middle (between the touch controls) */
@@ -2240,6 +2245,8 @@ kbd {
   .bhud-chip i { width: 28px; height: 28px; border-width: 3px; }
   .bhud-chip b { font-size: 34px; }
   .bhud-chip.me { box-shadow: 0 0 0 4px var(--sc); }
+  .bhud-ping { bottom: calc(16px + var(--safe-b)); height: 46px; padding: 0 16px 0 13px; font-size: 18px; gap: 8px; }
+  .bhud-ping::before { width: 11px; height: 11px; }
 }
 
 /* the end-of-level hero is the live one from the pick-a-player cards (its own standing animation) */
