@@ -1,11 +1,10 @@
 import Phaser from 'phaser';
 import { DEPTH } from '../config';
-import { LIGHT } from '../core/light';
 
 type Emitter = Phaser.GameObjects.Particles.ParticleEmitter;
 
 /**
- * Light mode: the pop-up words' font measurements, by size. Phaser measures a fixed test string
+ * The pop-up words' font measurements, by size. Phaser measures a fixed test string
  * for every new Text, so it's the same answer each time for the same font and size (and the
  * measuring was most of what a new word cost).
  */
@@ -29,7 +28,7 @@ export class Fx {
   private pooE: Emitter;
   private crumbE: Emitter;
 
-  /** Light mode: finished pop-up words kept to show again (a new one is a canvas, a font measure and a texture each time). */
+  /** Finished pop-up words kept to show again (a new one is a canvas, a font measure and a texture each time). */
   private spareText = new Map<string, Phaser.GameObjects.Text[]>();
 
   /**
@@ -307,11 +306,10 @@ export class Fx {
   }
 
   /**
-   * Light mode: make pop-up words ahead (while the level is loading), so the first of each in play
-   * is one already made. [text, colour, size] as for popText.
+   * Make pop-up words ahead (while the level is loading), so the first of each in play is one
+   * already made. [text, colour, size] as for popText.
    */
   warmText(words: [string, string, number][]) {
-    if (!LIGHT) return;
     for (const [text, color, size] of words) {
       const key = `${text}|${color}|${size}`;
       if (this.spareText.get(key)?.length) continue;
@@ -327,17 +325,17 @@ export class Fx {
         color,
         stroke: '#2a1e2e',
         strokeThickness: 5,
-        metrics: LIGHT ? fontMetrics.get(size) : undefined,
+        metrics: fontMetrics.get(size),
       })
       .setOrigin(0.5)
       .setDepth(DEPTH.text);
-    if (LIGHT && !fontMetrics.has(size)) fontMetrics.set(size, t.style.getTextMetrics());
+    if (!fontMetrics.has(size)) fontMetrics.set(size, t.style.getTextMetrics());
     return t;
   }
 
   popText(x: number, y: number, text: string, color = '#ffffff', size = 18) {
     const key = `${text}|${color}|${size}`;
-    const spare = LIGHT ? this.spareText.get(key)?.pop() : undefined;
+    const spare = this.spareText.get(key)?.pop();
     const t = spare?.setPosition(x, y).setAlpha(1).setVisible(true) ?? this.makeText(x, y, text, color, size);
     this.scene.tweens.add({
       targets: t,
@@ -346,8 +344,7 @@ export class Fx {
       duration: 800,
       ease: 'Cubic.easeOut',
       onComplete: () => {
-        if (!LIGHT) return t.destroy();
-        // (light mode: put by to show again, a few of each at most)
+        // (put by to show again, a few of each at most)
         t.setVisible(false);
         const list = this.spareText.get(key) ?? [];
         if (list.length >= 3) return t.destroy();

@@ -777,7 +777,7 @@ export class BattleScene extends Phaser.Scene {
     const fired = stepMove(me, b, this.map, ev, () => !this.myChair() && this.myRockets() < max);
     for (const e of ev) if (e.k === 'jump') this.jumpFx(me.x, me.y, e.air, true);
     // (your shot leaves now, on your screen — the same shot the server makes, flying the same way)
-    if (fired) this.shots.push({ n: ++this.shotN, r: heroShot(me, fired), sid: null, born: performance.now(), hit: null });
+    if (fired) this.shots.push({ n: ++this.shotN, r: heroShot(me, fired, this.map), sid: null, born: performance.now(), hit: null });
     this.flyShots();
     if (fired) {
       const c = characterById(me.hero);

@@ -509,18 +509,33 @@ export function landingY(map: ArenaMap, x: number) {
   return ry !== null && ry < y ? ry : y;
 }
 
+/** Nothing solid on the straight line between two points (sampled every 6 px)? */
+export function clearLine(map: ArenaMap, x0: number, y0: number, x1: number, y1: number) {
+  const n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 6));
+  for (let i = 1; i < n; i++) if (map.solidAt(x0 + ((x1 - x0) * i) / n, y0 + ((y1 - y0) * i) / n)) return false;
+  return true;
+}
+
 /** The whole match (server side). */
 /**
  * A hero's shot, just fired (fire: 1 = their weapon, 2 = a bomb): a rocket, or a fireball with the
  * fire power, or a lobbed bomb. The server makes it; your own phone makes the same one at once, so
  * your shots go off the moment you press (rather than when the server's word comes back).
  */
-export function heroShot(p: BPlayer, fire: 1 | 2): Omit<BRocket, 'id'> {
+export function heroShot(p: BPlayer, fire: 1 | 2, map?: ArenaMap): Omit<BRocket, 'id'> {
   const c = charOf(p.hero);
   const k = sizeOf(p);
   const s = c.scale * k;
-  const x = p.x + p.facing * 18 * s;
+  let x = p.x + p.facing * 18 * s;
   const y = p.y - (c.muzzleY ?? 18) * k;
+  // (right up against a wall, the muzzle can be in it, or past a thin one: the shot starts on your side
+  // of the wall instead, so it goes off against it rather than coming out the other side)
+  if (map)
+    for (let sx = p.x; (sx - x) * p.facing < 0; sx += p.facing * 4)
+      if (map.solidAt(sx + p.facing * 6, y)) {
+        x = Math.min(x * p.facing, sx * p.facing) * p.facing;
+        break;
+      }
   const big = p.power === POWER.grow;
   // a lobbed bomb: bounces about, then a big blast
   if (fire === 2) return { owner: p.id, kind: 'bomb', x, y, vx: p.facing * 300 + p.vx * 0.35, vy: -430, dir: p.facing, age: 0, speed: 0, radius: 118 * (big ? 1.25 : 1), damage: 2 };
@@ -703,7 +718,7 @@ export class BattleSim {
       if (swingPress && chair && chair.swing <= 0) this.swingChair(p, chair, ev);
       if (fire) {
         if (fire === 2) p.bombs--;
-        const shot = heroShot(p, fire);
+        const shot = heroShot(p, fire, this.map);
         this.rockets.push({ id: this.nextRocket++, ...shot });
         ev.push({ k: 'fire', id: p.id, x: shot.x, y: shot.y, dir: p.facing, ...(fire === 2 ? { bomb: true } : {}) });
       }
@@ -749,12 +764,22 @@ export class BattleSim {
   private explode(r: BRocket, ev: BEvent[]) {
     const bx = r.x + (r.kind === 'rocket' ? r.dir * 6 : 0);
     ev.push({ k: 'boom', x: bx, y: r.y, r: r.radius });
+    // a blast doesn't go through walls: only what it can "see" from where it went off (on the near side
+    // of the wall it hit — backed out of it if it got a little way in)
+    let ox = r.x;
+    let oy = r.y;
+    const back = Math.hypot(r.vx, r.vy) || 1;
+    for (let i = 0; i < 10 && this.map.solidAt(ox, oy); i++) {
+      ox -= (r.vx / back) * 4 || r.dir * 4;
+      oy -= (r.vy / back) * 4;
+    }
+    const sees = (x: number, top: number, bot: number) => clearLine(this.map, ox, oy, x, (top + bot) / 2) || clearLine(this.map, ox, oy, x, top + 4) || clearLine(this.map, ox, oy, x, bot - 4);
     // heroes' blasts pop the bad guys too
     if (r.kind !== 'pellet' && r.kind !== 'poo' && r.kind !== 'saw')
       for (const e of this.enemies) {
         const [w, h] = ENEMY_BOX[e.kind];
         const d = Math.hypot(e.x - bx, e.y - h / 2 - r.y);
-        if (d < r.radius + Math.max(w, h) / 2) this.hurtEnemy(e, r.damage, ev);
+        if (d < r.radius + Math.max(w, h) / 2 && sees(e.x, e.y - h, e.y)) this.hurtEnemy(e, r.damage, ev);
       }
     for (const p of this.players.values()) {
       if (p.id === r.owner || p.respawn > 0) continue;
@@ -763,6 +788,7 @@ export class BattleSim {
       const cy = p.y - boxH(c, k) / 2;
       const d = Math.hypot(p.x - bx, cy - r.y);
       if (d > r.radius + Math.max(boxW(c, k), boxH(c, k)) / 2) continue;
+      if (!sees(p.x, p.y - boxH(c, k), p.y)) continue;
       this.hurt(p, r.owner, bx, r.damage, r.damage > 1 ? 1.3 : 1, ev);
     }
   }

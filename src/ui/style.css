@@ -2424,6 +2424,8 @@ kbd {
 .battle-lobby.watching .bl-heroes { display: grid; grid-template-columns: repeat(3, 1fr); }
 .battle-lobby.watching .bl-preview { width: min(92vw, calc(34vh * 2.2), 640px); }
 .battle-lobby.watching { --rowh: clamp(42px, 9.5vh, 56px); }
+/* (nothing down there while watching: the live window gets the room — see sizePreview) */
+.battle-lobby.watching > .bl-foot { min-height: 0; margin-top: 0; }
 
 /* only one here: waiting for someone else */
 .bl-waitmsg {

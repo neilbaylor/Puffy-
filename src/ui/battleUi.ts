@@ -440,6 +440,7 @@ export class BattleUI {
     const watching = r.phase === 'battle' && !playing;
     lobby.classList.toggle('watching', watching);
     lobby.querySelector<HTMLElement>('.bl-preview')!.hidden = !watching;
+    this.sizePreview();
     this.watch(watching);
     const sub = lobby.querySelector<HTMLElement>('.bl-sub')!;
     sub.innerHTML = watching
@@ -531,7 +532,34 @@ export class BattleUI {
   // ── watching a battle you're not in (a live window in the lobby) ──
 
   private spectating = false;
-  private onResize = () => this.placePreview();
+  private onResize = () => {
+    this.sizePreview();
+    this.placePreview();
+  };
+
+  /**
+   * Watching a battle: the live window as big as the screen allows — all the height between the title
+   * and your name and heroes (with a little room at the bottom), at the arena's shape; your name and
+   * heroes as wide as it (up to their usual 640 px). Not watching: back to the usual sizes.
+   */
+  private sizePreview() {
+    const lobby = this.lobby;
+    if (!lobby) return;
+    const box = lobby.querySelector<HTMLElement>('.bl-preview')!;
+    const me = lobby.querySelector<HTMLElement>('.bl-me')!;
+    if (!lobby.classList.contains('watching')) {
+      box.style.width = '';
+      me.style.width = '';
+      return;
+    }
+    const head = lobby.querySelector<HTMLElement>('.bl-head')!;
+    const gap = parseFloat(getComputedStyle(lobby).rowGap) || 12;
+    const bottom = Math.max(16, innerHeight * 0.035);
+    const room = innerHeight - head.getBoundingClientRect().bottom - gap * 2 - me.offsetHeight - bottom;
+    const w = Math.round(Math.max(260, Math.min(innerWidth * 0.94, room * 2.2)));
+    box.style.width = `${w}px`;
+    me.style.width = `${Math.min(w, 640)}px`;
+  }
 
   private watch(on: boolean) {
     const g = this.host.game;

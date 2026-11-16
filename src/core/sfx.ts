@@ -3,8 +3,6 @@
  * Browsers only allow audio after a user gesture, so `unlockAudio()` is called
  * from the first tap/click/key.
  */
-import { LIGHT } from './light';
-
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 /** Sound on/off, remembered between visits. */
@@ -24,9 +22,9 @@ export function unlockAudio() {
     master = ctx.createGain();
     master.gain.value = muted ? 0 : 0.5;
     master.connect(ctx.destination);
-    // (light mode: the noise is made now, on the tap, not mid-game on the first shot: a second of
-    // random samples was most of the first rocket's stall on a slow phone)
-    if (LIGHT) noiseBuffer(ctx);
+    // (the noise is made now, on the tap, not mid-game on the first shot: a second of random samples
+    // was most of the first rocket's stall on a slow phone)
+    noiseBuffer(ctx);
   }
   if (ctx.state === 'suspended') void ctx.resume();
 }
