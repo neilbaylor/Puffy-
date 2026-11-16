@@ -359,7 +359,7 @@ export class GameScene extends Phaser.Scene {
     const spawnAt = data.spawns.find((sp) => sp.type === 'player');
     const startCol = this.startCheckpoint >= 0 && cpsAt[this.startCheckpoint] ? cpsAt[this.startCheckpoint].x : (spawnAt?.x ?? 0);
     const firstX = this.retry ? startCol * TILE : data.width * TILE - 300;
-    this.level = new LevelView(this, data, { lazyNear: firstX - 500, free: true, cull: true });
+    this.level = new LevelView(this, data, { lazyNear: firstX - 500, free: true, cull: true, trim: true });
     const { widthPx, heightPx } = this.level;
     this.physics.world.setBounds(0, -400, widthPx, heightPx + 800, true, true, false, false);
     // this level's looks (drawn now if the start screen didn't already); the others are freed

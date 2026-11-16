@@ -143,7 +143,7 @@ export class MenuScene extends Phaser.Scene {
       () => !gone() && levelPieces(data, 'rock'),
       step(() => {
         // (no ground drawn by the view itself: the next steps draw it a piece at a time)
-        level = new LevelView(this, data, { lazyNear: x0, lazySpan: [-1e9, -1e9], ahead: false });
+        level = new LevelView(this, data, { lazyNear: x0, lazySpan: [-1e9, -1e9], ahead: false, trim: true });
         loopEnd.v = x0 + Math.max(level.widthPx * 0.2, 1800);
         level.trimPending(loopEnd.v + vw + 400);
         // its opening ground (what the fly-over would draw in its first frames), a piece per step,
@@ -365,7 +365,7 @@ export class MenuScene extends Phaser.Scene {
     // (built ahead, out of sight: a little more of its ground, everything the fly-over would
     // otherwise draw in its first frames — LevelView draws what's within 400 px of the view at once)
     const span = this.firstSpan();
-    const level = new LevelView(this, data, { lazyNear: x0, lazySpan: ahead ? [span[0] + 400, span[1] + 400] : span, ahead: false });
+    const level = new LevelView(this, data, { lazyNear: x0, lazySpan: ahead ? [span[0] + 400, span[1] + 400] : span, ahead: false, trim: true });
     // loop over about a fifth of the level (at least a good stretch); nothing past it is drawn
     const vw = this.scale.width / Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W);
     const loopEnd = x0 + Math.max(level.widthPx * 0.2, 1800);
