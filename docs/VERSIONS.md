@@ -319,3 +319,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.314: E1 efficiency round (physics without the body tree, off-camera scenery culling, boss canvases released, idle battle server sleeps).
 - v0.315: Part 6 round 3: gang heads straight for you, longer level (360), aiming Fat Fish with earlier warning, modern pier at the left edge, Ferris wheel.
 - v0.316: E2 efficiency round (movable-only ground checks; off-camera nuggies, root beer and bad guys not drawn).
+- v0.317: E3 efficiency round (hero sheets and battle still pictures release their canvases; battle canvas memory 15.9→3.3 MB).
