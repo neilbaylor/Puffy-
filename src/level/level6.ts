@@ -17,10 +17,10 @@ import { LevelBuilder, type LevelData } from './builder';
  *   0-7     The (modern) pier you dive off, at the very start; the gang come in from off the left
  *   8-33    Open water ahead
  *   34-74   The kelp meadow: a gentle start, low rocks, a floating slab (Fat Fish #1, open water)
- *   75-116  The slabs: rock slabs floating in the water, over or under them; bad guy fish (checkpoint)
+ *   75-116  The slabs: rock slabs floating in the water, then a sandbar (the bed comes up: shallow water) (checkpoint)
  *   117-162 The reef narrows: a shelf hangs under the surface, low rocks below (checkpoint)
  *   163-208 The open blue: wide water, bad guys (checkpoint, Fat Fish #2)
- *   209-278 The Reef Bowl: underwater football on the sea bed (the Snappers v the Stallions), and
+ *   209-278 The Reef Bowl: underwater football on the sea bed (the Snappers v the Stallions) under a reef roof, and
  *           they throw at you as you swim over (checkpoint just before the field)
  *   279-332 The kelp weave: rock slabs high and low by turns — up, down, up (checkpoint)
  *   333-360 The narrows: a tunnel under the reef, the gang squeezing in after you
@@ -43,7 +43,7 @@ export function buildLevel6(): LevelData {
     [375, 10],
     [346, 8.5],
     [305, 9],
-    [240, 9.5],
+    [240, 6.5],
     [170, 10],
     [110, 9.5],
     [52, 13],
@@ -94,15 +94,19 @@ export function buildLevel6(): LevelData {
   L.auraArc(79.6, 3, 6, 0.4, true);
   L.spawn('checkpoint', 88, 3);
   L.spawn('tree', 91, 3, { h: 220 });
-  slab(95, 102, 11, 12);
-  L.rock(97, 99, 4, 5);
+  L.rock(96, 97, 4, 5);
   L.auraArc(95.6, 3, 8, 0.6);
-  L.aura(98.5, 14.5, true);
-  L.spawn('fish', 99, 15);
-  L.spawn('bigfish', 110, 8);
-  L.rock(108, 109, 4, 5);
-  L.rootbeer(113, 13);
-  L.aura(114, 7);
+  L.spawn('fish', 97, 12);
+  // the sandbar: the sea bed comes up near the surface — the water's shallow over it, the gang right on you
+  L.ground(100, 101, 6);
+  L.ground(102, 103, 9);
+  L.ground(104, 111, 11);
+  L.ground(112, 113, 9);
+  L.ground(114, 116, 6);
+  L.aura(103, 12.5, true);
+  L.spawn('bigfish', 108, 14);
+  L.rootbeer(111.5, 14.5);
+  L.aura(115, 9.5);
 
   // ── The reef narrows: a shelf under the surface, low rocks below ─
   L.ground(117, 162, 3);
@@ -145,9 +149,11 @@ export function buildLevel6(): LevelData {
   L.auraArc(211, 3, 9, 1, true);
   L.spawn('checkpoint', 215, 2);
   L.football(220, 2);
-  L.auraArc(227, 3, 10, 1.2, true);
-  L.auraArc(245, 3, 11, 1.4, true);
-  L.spawn('fish', 251, 13);
+  // (a reef roof over the field: the water's shallower here — you swim right over the players' heads)
+  shelf(216, 260, 9);
+  L.auraArc(227, 3, 6.5, 0.8, true);
+  L.auraArc(245, 3, 6.5, 0.8, true);
+  L.spawn('fish', 251, 7);
   L.spawn('tree', 261, 2, { h: 220 });
   L.rock(264, 266, 3, 4);
   slab(268, 272, 10, 10);
