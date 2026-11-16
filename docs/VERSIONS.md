@@ -323,3 +323,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.318: Lite mode: cheaper HUD portrait (three glance directions, no mid-play redraws).
 - v0.319: Part 6 a touch harder; the Fat Fish swims away instead of fading out.
 - v0.320: Part 6: the Reef Bowl — underwater football (turtles vs seahorses), a new section; level 430 tiles.
+- v0.321: Part 6: fewer nuggies (100 → 71); open water where the Fat Fish comes down (no landing on rocks above you).
