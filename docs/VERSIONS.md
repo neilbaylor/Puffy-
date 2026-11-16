@@ -330,3 +330,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.325: Part 6 fly-over 6.5 s.
 - v0.326: Part 6: shallow water twice (a reef roof over the football field, a sandbar).
 - v0.327: Perf: Part 6 draws about half as much per frame (and less memory); savings across the app.
+- v0.328: Under the sea: the light beams no longer vanish partway into Parts 5 and 6.
