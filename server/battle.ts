@@ -437,12 +437,16 @@ export const cleanCode = (c: unknown) =>
     .replace(/[^a-z0-9-]/g, '')
     .slice(0, 12) || 'birchcliff';
 
+/** Starts the tick loop again when it's asleep (set by attachBattle). */
+let wakeLoop: (() => void) | null = null;
+
 function roomFor(code: string) {
   let r = rooms.get(code);
   if (!r) {
     if (rooms.size >= MAX_ROOMS) return null;
     r = { room: new Room(), emptySince: 0 };
     rooms.set(code, r);
+    wakeLoop?.();
   }
   return r.room;
 }
@@ -481,14 +485,24 @@ export function attachBattle(server: Server) {
   // a steady 30 ticks a second (catching up if the timer runs late): each tick has its due time and
   // the timer is set for the next one. (A timer every half tick, counting up, put a tick a whole half
   // tick late about twice a second: Node's timers run in whole milliseconds, 16 not 16.7.)
-  let due = performance.now() + DT * 1000;
+  let due = 0;
+  let running = false;
   const loop = () => {
     // (the next tick is always set, even if something here throws: a dead loop would stop every battle)
     try {
       step();
     } finally {
-      setTimeout(loop, Math.max(0, due - performance.now()));
+      // (with no rooms at all the loop sleeps until one is made, rather than waking 30 times a
+      // second for nothing, around the clock)
+      if (rooms.size) setTimeout(loop, Math.max(0, due - performance.now()));
+      else running = false;
     }
+  };
+  wakeLoop = () => {
+    if (running) return;
+    running = true;
+    due = performance.now() + DT * 1000;
+    setTimeout(loop, DT * 1000);
   };
   const step = () => {
     const now = performance.now();
@@ -519,6 +533,5 @@ export function attachBattle(server: Server) {
       else if (t - r.emptySince > 60000) rooms.delete(code);
     }
   };
-  setTimeout(loop, DT * 1000);
   console.log('Battle server ready at /battle');
 }

@@ -286,7 +286,7 @@ export class BattleScene extends Phaser.Scene {
     const arena = buildArena();
     this.map = new ArenaMap(arena);
     // (keep the start screen's terrain while it's still on screen: the curtain slides it away)
-    this.level = new LevelView(this, arena, { keep: this.spectate || this.scene.isActive('Menu') });
+    this.level = new LevelView(this, arena, { keep: this.spectate || this.scene.isActive('Menu'), cull: true });
     this.drawRamps();
     // (battles use Part 1's looks: all drawn now, during the countdown, not mid-battle)
     ensureLevelLooks(this, 1);

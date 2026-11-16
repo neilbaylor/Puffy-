@@ -117,6 +117,16 @@ export class LevelView {
   private readonly lazySpan: [number, number];
   /** Lazy: also draw the terrain coming up, a chunk per frame (the game); off on the start screen, whose slow glide only needs what's about to come into view. */
   private readonly ahead: boolean;
+  /**
+   * The game and battles: pictures entirely off the camera aren't drawn (Phaser draws everything in
+   * the scene otherwise, and most of a level's ground, plants and props are off screen). Done with
+   * the camera's own filter, so it never touches what other code shows or hides.
+   */
+  private readonly cullOff: boolean;
+  /** Each scenery picture's box (from when it was put up) and each deep-rock strip's, and whether it's being skipped now. */
+  private boxes: { o: Phaser.GameObjects.GameObject; x0: number; x1: number; y0: number; y1: number; off: boolean }[] = [];
+  /** How many of `scenery` have a box so far. */
+  private boxed = 0;
 
   constructor(
     private scene: Phaser.Scene,
@@ -125,9 +135,10 @@ export class LevelView {
     /** keep: leave other levels' terrain alone (a battle watched while the start screen still shows). */
     /** free: free other levels' terrain (the game; default when not lazy). */
     /** lazySpan: how far before / after `lazyNear` the terrain is drawn straight away (default 900 / 1800). */
-    opts?: { lazyNear?: number; keep?: boolean; free?: boolean; lazySpan?: [number, number]; ahead?: boolean },
+    opts?: { lazyNear?: number; keep?: boolean; free?: boolean; lazySpan?: [number, number]; ahead?: boolean; cull?: boolean },
   ) {
     this.ahead = opts?.ahead ?? true;
+    this.cullOff = opts?.cull ?? false;
     this.lazy = opts?.lazyNear !== undefined;
     this.lazyNear = opts?.lazyNear ?? 0;
     this.lazySpan = opts?.lazySpan ?? [900, 1800];
@@ -242,6 +253,47 @@ export class LevelView {
       if (s.img.x < left - 80 || s.img.x > right + 80) continue;
       // a wave of wind rolls across the level (phase follows x)
       s.img.setAngle(s.amp * gust * Math.sin(t * s.speed - s.img.x * 0.004 + s.ph));
+    }
+    if (this.cullOff) this.cull();
+  }
+
+  /** A deep-rock shape for one terrain chunk (x0…x1, from y down to the bottom), skipped while off camera. */
+  private deepStrip(x0: number, x1: number, y: number) {
+    const g = this.scene.add.graphics().setDepth(DEPTH.tiles - 0.01);
+    // (the outline runs a few pixels either side of the fill)
+    this.boxes.push({ o: g, x0: x0 - 8, x1: x1 + 8, y0: y, y1: this.heightPx + 200, off: false });
+    return g;
+  }
+
+  /** Skip drawing the scenery that's entirely off the camera (see cullOff). Called after the camera is placed. */
+  private cull() {
+    const cam = this.scene.cameras.main;
+    // (new pictures since last time: terrain drawn lazily, trench decor)
+    for (; this.boxed < this.scenery.length; this.boxed++) {
+      const o = this.scenery[this.boxed];
+      const b = o.getBounds();
+      this.boxes.push({ o, x0: b.x, x1: b.right, y0: b.y, y1: b.bottom, off: false });
+    }
+    // the view as the camera will draw it (centerOn has set the scroll; the zoom shrinks or grows
+    // it), grown so a tilted view's corners, a shake and the plants' sway are still covered
+    const w = cam.width / cam.zoom;
+    const h = cam.height / cam.zoom;
+    const cx = cam.scrollX + cam.width / 2;
+    const cy = cam.scrollY + cam.height / 2;
+    // (Phaser's typings leave the camera's rotation out)
+    const r = (cam as unknown as { rotation: number }).rotation ? Math.hypot(w, h) / 2 : 0;
+    const m = 64;
+    const vx0 = cx - Math.max(w / 2, r) - m;
+    const vx1 = cx + Math.max(w / 2, r) + m;
+    const vy0 = cy - Math.max(h / 2, r) - m;
+    const vy1 = cy + Math.max(h / 2, r) + m;
+    const id = cam.id;
+    for (const bx of this.boxes) {
+      const off = bx.x1 < vx0 || bx.x0 > vx1 || bx.y1 < vy0 || bx.y0 > vy1;
+      if (off === bx.off) continue;
+      bx.off = off;
+      if (off) bx.o.cameraFilter |= id;
+      else bx.o.cameraFilter &= ~id;
     }
   }
 
@@ -465,10 +517,11 @@ export class LevelView {
             // the deep rock: from just above the cut down to the bottom of the level, with
             // the piece's outline continuing down its sides
             // (all of them in one shape: dozens of separate ones cost more to draw every frame)
-            this.deepG ??= this.scene.add.graphics().setDepth(DEPTH.tiles - 0.01);
-            const g = this.deepG;
             const gx0 = Math.max(cx0, x0 + 3);
             const gx1 = Math.min(cx0 + cw, x1 - 3);
+            // (the game and battles: a shape per chunk instead, the same drawing in the same order,
+            // so the ones off camera can be skipped: Part 5's is thousands of rectangles)
+            const g = this.cullOff ? this.deepStrip(gx0, gx1, cut - 6) : (this.deepG ??= this.scene.add.graphics().setDepth(DEPTH.tiles - 0.01));
             // (under the sea, with a trench going down through the deep rock: only the solid tiles,
             // an inked edge and a lighter rim along every face onto the water)
             if (this.data.water !== undefined) {

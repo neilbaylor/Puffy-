@@ -107,7 +107,11 @@ function start(refreshMs: number) {
     scale: { mode: Phaser.Scale.NONE, zoom: 1 / dpr() },
     render: { antialias: true, pixelArt: false, roundPixels: false, powerPreference: 'high-performance' },
     input: { activePointers: 4 },
-    physics: { default: 'arcade', arcade: { gravity: { x: 0, y: 1600 }, debug: false } },
+    // (no tree of moving bodies: Phaser rebuilt it from every body on every physics step, a few
+    // times a frame on a slow phone, to speed up checks among a few dozen bodies that mostly sit
+    // still — nuggies, sleeping bad guys. Checking each one directly finds the same overlaps,
+    // for a fraction of the cost. Nothing here searches the tree: no overlapRect / overlapCirc.)
+    physics: { default: 'arcade', arcade: { gravity: { x: 0, y: 1600 }, debug: false, useTree: false } },
     fps: { target: 60, limit: fpsLimitFor(refreshMs), smoothStep: true },
     scene: [BootScene, MenuScene, GameScene, HoopsScene, BattleScene, WrestleScene, FishingScene],
   });
