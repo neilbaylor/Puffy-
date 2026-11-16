@@ -278,24 +278,24 @@ export class HoopsScene extends Phaser.Scene {
         addCanvas(this, key, c, (t) => PLOP_FRAMES.forEach((f, i) => t.add(f, 0, g.x(i), g.y(i), fw, fh)), { release: true });
       }
     }
-    if (!this.textures.exists('kingcrown')) addCanvas(this, 'kingcrown', hires(64, 44, KING_RES, (ctx) => drawKingCrown(ctx, 32, 40)));
+    if (!this.textures.exists('kingcrown')) addCanvas(this, 'kingcrown', hires(64, 44, KING_RES, (ctx) => drawKingCrown(ctx, 32, 40)), undefined, { release: true });
     if (!this.textures.exists(this.k('crowd'))) addCanvas(this, this.k('crowd'), hires(ARENA_W, CROWD_H, ARENA_RES, (ctx) => drawCrowd(ctx, false)), undefined, { release: true });
     if (!this.textures.exists(this.k('crowd2'))) addCanvas(this, this.k('crowd2'), hires(ARENA_W, CROWD_H, ARENA_RES, (ctx) => drawCrowd(ctx, true)), undefined, { release: true });
     if (!this.textures.exists(this.k('arenafront'))) addCanvas(this, this.k('arenafront'), hires(ARENA_W, FRONT_H, ARENA_RES, (ctx) => drawArenaFront(ctx)), undefined, { release: true });
-    if (!this.textures.exists('camflash')) addCanvas(this, 'camflash', hires(48, 48, 1, (ctx) => drawCameraFlash(ctx, 24)));
-    if (!this.textures.exists('hball')) addCanvas(this, 'hball', hires(52, 52, 3, (ctx) => drawBall(ctx, 26, 26, 24)));
+    if (!this.textures.exists('camflash')) addCanvas(this, 'camflash', hires(48, 48, 1, (ctx) => drawCameraFlash(ctx, 24)), undefined, { release: true });
+    if (!this.textures.exists('hball')) addCanvas(this, 'hball', hires(52, 52, 3, (ctx) => drawBall(ctx, 26, 26, 24)), undefined, { release: true });
     if (!this.textures.exists(this.k('backboard'))) {
       // drawn in stage coordinates around the hoop, then cropped
       addCanvas(this, this.k('backboard'), hires(320, 420, 3, (ctx) => {
         ctx.translate(160 - HOOP.rimX, 220 - HOOP.rimY);
         drawBackboard(ctx);
         drawRimBack(ctx, false);
-      }));
+      }), undefined, { release: true });
     }
-    if (!this.textures.exists('rimf')) addCanvas(this, 'rimf', hires(140, 40, 3, (ctx) => drawRimFrontTube(ctx, 70, 16)));
-    if (!this.textures.exists('spot')) addCanvas(this, 'spot', hires(300, 700, 1, (ctx) => drawSpotlight(ctx, 300, 700)));
-    if (!this.textures.exists('softshadow')) addCanvas(this, 'softshadow', hires(128, 40, 1, (ctx) => drawSoftShadow(ctx, 128, 40)));
-    if (!this.textures.exists('spotbrush')) addCanvas(this, 'spotbrush', hires(256, 256, 1, (ctx) => drawSpotBrush(ctx, 256)));
+    if (!this.textures.exists('rimf')) addCanvas(this, 'rimf', hires(140, 40, 3, (ctx) => drawRimFrontTube(ctx, 70, 16)), undefined, { release: true });
+    if (!this.textures.exists('spot')) addCanvas(this, 'spot', hires(300, 700, 1, (ctx) => drawSpotlight(ctx, 300, 700)), undefined, { release: true });
+    if (!this.textures.exists('softshadow')) addCanvas(this, 'softshadow', hires(128, 40, 1, (ctx) => drawSoftShadow(ctx, 128, 40)), undefined, { release: true });
+    if (!this.textures.exists('spotbrush')) addCanvas(this, 'spotbrush', hires(256, 256, 1, (ctx) => drawSpotBrush(ctx, 256)), undefined, { release: true });
   }
 
   create() {
@@ -927,7 +927,7 @@ export class HoopsScene extends Phaser.Scene {
         drawBoomFrame(ctx, i);
         ctx.restore();
       });
-      addCanvas(this, 'kingboom', c, (t) => BOOM_FRAMES.forEach((f, i) => t.add(f, 0, (i % COLS) * fw, Math.floor(i / COLS) * fw, fw, fw)));
+      addCanvas(this, 'kingboom', c, (t) => BOOM_FRAMES.forEach((f, i) => t.add(f, 0, (i % COLS) * fw, Math.floor(i / COLS) * fw, fw, fw)), { release: true });
     }
     // the flash and the spiky starburst (the first frames of the hand-drawn BOOM); after that it's
     // a real fireball, rolling smoke, embers and bits of the King flying off
@@ -1009,10 +1009,10 @@ export class HoopsScene extends Phaser.Scene {
    */
   private blastFx(cx: number, cy: number, floor: number) {
     const R = 2;
-    if (!this.textures.exists('fx-fire')) addCanvas(this, 'fx-fire', hires(160, 160, R, (ctx) => drawFireball(ctx, 160)));
-    for (let i = 0; i < 3; i++) if (!this.textures.exists(`fx-smoke${i}`)) addCanvas(this, `fx-smoke${i}`, hires(140, 140, R, (ctx) => drawSmoke(ctx, 140, 11 + i * 7)));
-    if (!this.textures.exists('fx-ember')) addCanvas(this, 'fx-ember', hires(24, 24, R, (ctx) => drawEmber(ctx, 24)));
-    for (let i = 0; i < 4; i++) if (!this.textures.exists(`fx-chunk${i}`)) addCanvas(this, `fx-chunk${i}`, hires(40, 40, R, (ctx) => drawFluffChunk(ctx, 40, 31 + i * 13)));
+    if (!this.textures.exists('fx-fire')) addCanvas(this, 'fx-fire', hires(160, 160, R, (ctx) => drawFireball(ctx, 160)), undefined, { release: true });
+    for (let i = 0; i < 3; i++) if (!this.textures.exists(`fx-smoke${i}`)) addCanvas(this, `fx-smoke${i}`, hires(140, 140, R, (ctx) => drawSmoke(ctx, 140, 11 + i * 7)), undefined, { release: true });
+    if (!this.textures.exists('fx-ember')) addCanvas(this, 'fx-ember', hires(24, 24, R, (ctx) => drawEmber(ctx, 24)), undefined, { release: true });
+    for (let i = 0; i < 4; i++) if (!this.textures.exists(`fx-chunk${i}`)) addCanvas(this, `fx-chunk${i}`, hires(40, 40, R, (ctx) => drawFluffChunk(ctx, 40, 31 + i * 13)), undefined, { release: true });
     const rnd = (a: number, b: number) => a + Math.random() * (b - a);
     // the fireball: a few lumps of fire, swelling and cooling
     for (const [delay, tint, s1, dur] of [[0, 0xffffff, 2.4, 700], [40, 0xffe7a0, 3.0, 850], [90, 0xffb050, 3.4, 950], [150, 0xff7a3a, 3.6, 1050]] as const) {
@@ -1441,7 +1441,7 @@ export class HoopsScene extends Phaser.Scene {
   /** A few soft puffs of smoke from (x, y), drifting off along `dir` (radians), and fading. */
   private puffs(x: number, y: number, n: number, dir: number, s: number, tint = 0xffffff) {
     const R = 2;
-    for (let i = 0; i < 3; i++) if (!this.textures.exists(`fx-smoke${i}`)) addCanvas(this, `fx-smoke${i}`, hires(140, 140, R, (ctx) => drawSmoke(ctx, 140, 11 + i * 7)));
+    for (let i = 0; i < 3; i++) if (!this.textures.exists(`fx-smoke${i}`)) addCanvas(this, `fx-smoke${i}`, hires(140, 140, R, (ctx) => drawSmoke(ctx, 140, 11 + i * 7)), undefined, { release: true });
     for (let i = 0; i < n; i++) {
       const a = dir + (Math.random() - 0.5) * 1.1;
       const d = 30 + Math.random() * 40;

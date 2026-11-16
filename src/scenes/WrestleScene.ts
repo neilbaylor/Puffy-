@@ -762,7 +762,7 @@ export class WrestleScene extends Phaser.Scene {
         ctx.translate(-RING_BOX.x, -RING_BOX.y);
         drawRing(ctx);
       }), undefined, { release: true });
-    if (!T.exists(this.tk('wr-post'))) addCanvas(this, this.tk('wr-post'), hires(POST_BOX.w, POST_BOX.h, RES, (ctx) => drawFrontPost(ctx)));
+    if (!T.exists(this.tk('wr-post'))) addCanvas(this, this.tk('wr-post'), hires(POST_BOX.w, POST_BOX.h, RES, (ctx) => drawFrontPost(ctx)), undefined, { release: true });
     if (!T.exists('wr-ringside'))
       addCanvas(this, 'wr-ringside', hires(1600, 230, 1.5, (ctx) => {
         ctx.translate(160, -500);
@@ -789,12 +789,12 @@ export class WrestleScene extends Phaser.Scene {
       // (his own art has the Plop drawn 25, 34 into its box: moved to where the Queen's sheet has it)
       sheetOf('wr-pking', (ctx, f) => (ctx.translate(Q_PAD - 25, Q_TOP - 34), drawPlopKing(ctx, f, { jet: true })));
       sheetOf('wr-pking-robe', (ctx, f) => (ctx.translate(Q_PAD - 25, Q_TOP - 34), drawPlopKing(ctx, f, { robe: true })));
-      if (!T.exists('wr-robe')) addCanvas(this, 'wr-robe', hires(ROBE_W, ROBE_H, 2, (ctx) => drawRobeHeap(ctx)));
+      if (!T.exists('wr-robe')) addCanvas(this, 'wr-robe', hires(ROBE_W, ROBE_H, 2, (ctx) => drawRobeHeap(ctx)), undefined, { release: true });
       makeJetFx(this);
       makePlopChutes(this);
       for (const k of ['small', 'medium', 'large'] as const) makePlops(this, k);
       makeWeaponArt(this);
-      if (!T.exists('wr-duck')) addCanvas(this, 'wr-duck', hires(28, 24, 3, (ctx) => drawDuck(ctx)));
+      if (!T.exists('wr-duck')) addCanvas(this, 'wr-duck', hires(28, 24, 3, (ctx) => drawDuck(ctx)), undefined, { release: true });
       if (!T.exists('wr-boom')) {
         const R = 1.2;
         const fw = Math.round(BOOM_SIZE * R);
@@ -828,8 +828,8 @@ export class WrestleScene extends Phaser.Scene {
       });
       addCanvas(this, 'wr-queen-ko', c, (t) => QUEEN_KO_FRAMES.forEach((f, i) => t.add(f, 0, (i % 2) * fw, Math.floor(i / 2) * fh, fw, fh)), { release: true });
     }
-    if (!T.exists('camflash')) addCanvas(this, 'camflash', hires(48, 48, 1, (ctx) => drawCameraFlash(ctx, 24)));
-    if (!T.exists('spot')) addCanvas(this, 'spot', hires(300, 700, 1, (ctx) => drawSpotlight(ctx, 300, 700)));
+    if (!T.exists('camflash')) addCanvas(this, 'camflash', hires(48, 48, 1, (ctx) => drawCameraFlash(ctx, 24)), undefined, { release: true });
+    if (!T.exists('spot')) addCanvas(this, 'spot', hires(300, 700, 1, (ctx) => drawSpotlight(ctx, 300, 700)), undefined, { release: true });
     if (!T.exists('softshadow'))
       addCanvas(this, 'softshadow', hires(128, 40, 1, (ctx) => {
         const g = ctx.createRadialGradient(64, 20, 2, 64, 20, 64);
@@ -838,7 +838,7 @@ export class WrestleScene extends Phaser.Scene {
         ctx.fillStyle = g;
         ctx.scale(1, 0.3125);
         ctx.fillRect(0, 0, 128, 128);
-      }));
+      }), undefined, { release: true });
     if (!T.exists('wr-poowave')) {
       const { c, ctx } = canvas(POOWAVE_W * 3 * 4, POOWAVE_H * 3);
       for (let i = 0; i < 4; i++) {
@@ -848,12 +848,12 @@ export class WrestleScene extends Phaser.Scene {
         drawPooWave(ctx, i);
         ctx.restore();
       }
-      addCanvas(this, 'wr-poowave', c, (t) => [0, 1, 2, 3].forEach((i) => t.add(`w${i}`, 0, i * POOWAVE_W * 3, 0, POOWAVE_W * 3, POOWAVE_H * 3)));
+      addCanvas(this, 'wr-poowave', c, (t) => [0, 1, 2, 3].forEach((i) => t.add(`w${i}`, 0, i * POOWAVE_W * 3, 0, POOWAVE_W * 3, POOWAVE_H * 3)), { release: true });
     }
-    if (!T.exists('wr-poo')) addCanvas(this, 'wr-poo', hires(26, 24, ART_RES, (ctx) => drawPoo(ctx, 13, 22, 1)));
-    if (!T.exists('prize-heart')) addCanvas(this, 'prize-heart', hires(30, 30, ART_RES, (ctx) => drawPrize(ctx, 'heart')));
-    if (!T.exists('wr-chair')) addCanvas(this, 'wr-chair', hires(CHAIR_W + 8, CHAIR_H + 4, ART_RES, (ctx) => (ctx.translate(4, 2), drawFoldingChair(ctx))));
-    if (!T.exists('wr-chair-bent')) addCanvas(this, 'wr-chair-bent', hires(CHAIR_W + 8, CHAIR_H + 4, ART_RES, (ctx) => (ctx.translate(4, 2), drawFoldingChair(ctx, true))));
+    if (!T.exists('wr-poo')) addCanvas(this, 'wr-poo', hires(26, 24, ART_RES, (ctx) => drawPoo(ctx, 13, 22, 1)), undefined, { release: true });
+    if (!T.exists('prize-heart')) addCanvas(this, 'prize-heart', hires(30, 30, ART_RES, (ctx) => drawPrize(ctx, 'heart')), undefined, { release: true });
+    if (!T.exists('wr-chair')) addCanvas(this, 'wr-chair', hires(CHAIR_W + 8, CHAIR_H + 4, ART_RES, (ctx) => (ctx.translate(4, 2), drawFoldingChair(ctx))), undefined, { release: true });
+    if (!T.exists('wr-chair-bent')) addCanvas(this, 'wr-chair-bent', hires(CHAIR_W + 8, CHAIR_H + 4, ART_RES, (ctx) => (ctx.translate(4, 2), drawFoldingChair(ctx, true))), undefined, { release: true });
   }
 
   // ───────────────────────────────────────────── the hero's side ──
