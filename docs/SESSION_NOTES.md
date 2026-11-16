@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.325)
+## Where things stand (v0.326)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -31,6 +31,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   Home screen (yellow).
 - Start screen: drone fly-over behind, logo hop, hero cards (pick = hop / backflip), Play, Part picker once a
   level is beaten, mute (top-left), full screen + **Battle** buttons (top-right, same height, side by side).
+- v0.326: Part 6 shallow water twice: shelf(216, 260, 9) over the football field (aura arcs 227/245 at h6.5, fish 251 h7, flyPath [240, 6.5]); a sandbar in the slabs (ground 100-101 h6, 102-103 h9, 104-111 h11, 112-113 h9, 114-116 h6; slab 95-102 and rock 108-109 gone; bigfish 108 h14, root beer 111.5 h14.5).
 - v0.325: Part 6 flyMs 6500.
 - v0.324: Part 6 flyMs 11500 → 7500. Fly-over lengths: Parts 1-3 6.4 s, Part 4 9 s, Part 5 6.2 s, Part 6 7.5 s.
 - v0.323: BATTLE LATENCY (merged claude/battle-latency): server plays each input exactly once — late buttons wait (MAX_WAIT 4 ticks), then catch up 2 steps/tick to a CUSHION of 1 (MAX_OWED 8); sim.step takes 0..2 button steps per player. Client: others drawn by each player's own input clock (ack), adaptive delay ≈1.3 ticks + p90 lateness (3 s), extrapolated up to 3 ticks with faded corrections; own hero drawn part-way to the next tick with current buttons (buttons read every frame, missed ticks caught up ≤0.25 s); own wall/fuse/age blasts instant, hits tested on predicted positions, shots fly on when the server says miss; fire count uses own shots in flight; prizes picked up at touch (reverted if the server disagrees); battle-to-battle prize/shot id reset fix. Measured: own-hero corrections 1.6/s → 0.1/s, others' delay 347→170 ms (0 lag) / 559→394 ms (100 ms), blasts instant. Not done: 60 Hz (rule change, ~2× server). Kit: sketches/battle/latency (proxy.mjs, tfunc.cjs, meas.cjs, netsim.cjs). Part 6 FishChase HERO_K puffy 1.04 / scruffy 1.08 / muscles 0.93 (× base and chase cap).
