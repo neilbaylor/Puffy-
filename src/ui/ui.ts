@@ -1511,29 +1511,36 @@ export class UI {
     for (const pose of ['idle0', 'idle1'] as const) drawPortrait(scratch, hero, pose, undefined, 'idle0', wear);
   }
 
+  /** The HUD's numbers and stamina bar, looked up once (it's sent every frame the stamina moves). */
+  private hudEls: { aura: HTMLElement; auraN: HTMLElement; rb: HTMLElement; rbN: HTMLElement; lives: HTMLElement; livesN: HTMLElement; bar: HTMLElement } | null = null;
+
   private renderHud(s: HudState) {
-    this.hud.querySelector('.hud-aura span')!.textContent = String(s.aura);
-    this.hud.querySelector('.hud-aura')!.classList.toggle('has', s.aura > 0);
-    const rb = this.hud.querySelector('.hud-rb span')!;
-    if ((rb as HTMLElement).dataset.n !== String(s.rootbeer)) {
-      (rb as HTMLElement).dataset.n = String(s.rootbeer);
+    const q = (sel: string) => this.hud.querySelector<HTMLElement>(sel)!;
+    const el = (this.hudEls ??= { aura: q('.hud-aura'), auraN: q('.hud-aura span'), rb: q('.hud-rb'), rbN: q('.hud-rb span'), lives: q('.hud-lives'), livesN: q('.hud-lives span'), bar: q('.hud-stamina') });
+    // (only what's changed is written: putting the same text back still makes the browser lay the HUD out again)
+    const auraN = el.auraN;
+    if (auraN.textContent !== String(s.aura)) auraN.textContent = String(s.aura);
+    el.aura.classList.toggle('has', s.aura > 0);
+    const rb = el.rbN;
+    if (rb.dataset.n !== String(s.rootbeer)) {
+      rb.dataset.n = String(s.rootbeer);
       rb.textContent = shortCount(s.rootbeer);
-      const box = this.hud.querySelector('.hud-rb')!;
+      const box = el.rb;
       box.classList.remove('bump');
-      void (box as HTMLElement).offsetWidth;
+      void box.offsetWidth;
       box.classList.add('bump');
     }
-    const lv = this.hud.querySelector('.hud-lives span')!;
+    const lv = el.livesN;
     if (lv.textContent !== String(s.lives)) {
       lv.textContent = String(s.lives);
-      const box = this.hud.querySelector('.hud-lives')!;
+      const box = el.lives;
       box.classList.toggle('last', s.lives === 0);
       box.classList.remove('bump');
-      void (box as HTMLElement).offsetWidth;
+      void box.offsetWidth;
       box.classList.add('bump');
     }
-    const bar = this.hud.querySelector<HTMLElement>('.hud-stamina')!;
-    bar.style.setProperty('--v', String(s.stamina));
+    const bar = el.bar;
+    if (bar.style.getPropertyValue('--v') !== String(s.stamina)) bar.style.setProperty('--v', String(s.stamina));
     bar.classList.toggle('low', s.stamina < 0.35 && !s.exhausted);
     bar.classList.toggle('exhausted', s.exhausted);
     bar.classList.toggle('running', s.running);
