@@ -34,7 +34,7 @@ const GAP = 74;
 /** Never further behind you than this along your trail (on the screen, or only just off it). */
 const MAX_LEAD = 560;
 /** Where they like to be along your trail behind you (px): right on your tail. The further ahead you get, the harder they swim. */
-const TAIL = 250;
+const TAIL = 240;
 /** How much harder they swim for each px you're ahead of TAIL (px/s per px). */
 const PULL = 1.1;
 /** Close enough for the lead fish to lunge (a wind-up, then a dash). */
@@ -44,7 +44,7 @@ const WINDUP = 0.42;
 const DASH_SECS = 0.55;
 const DASH_K = 2.4;
 /** Time between lunges (s). */
-const LUNGE_EVERY: [number, number] = [3.4, 5.4];
+const LUNGE_EVERY: [number, number] = [3.2, 5.0];
 /** Just after you've been hit they hang back this much further. */
 const WARY = 130;
 /** How long each fish leads before the next one takes over (s). */
@@ -58,7 +58,7 @@ const SIGN_SCALE = 1.5 / 3;
 /** The warning before the Fat Fish comes down (s). */
 const WARN_SECS = 4.6;
 /** While the warning's up (and it hangs in the sky) the spot follows you — aiming where you're going — at up to this speed (px/s); it locks once it drops. */
-const AIM_V = 240;
+const AIM_V = 260;
 /** The camera tips up to show this much sky over the spot as it comes (px), from this long before it appears (s). */
 const SKY = 180;
 const SKY_LEAD = 1.3;
@@ -69,6 +69,8 @@ const DROP_G = 700;
 const DROP_MAX = 640;
 /** Down through the water, at about this speed (px/s). */
 const SINK_V = 270;
+/** Swimming away once it's shaken off the landing (px/s, top speed). */
+const OFF_V = 300;
 
 /**
  * Which look the Fat Fish warning and the "they're behind you" marker have, while we try a few (a dev
@@ -734,18 +736,25 @@ export class FishChase {
       case 'daze':
         if (F.fish) F.fish.setRotation(Math.PI / 2 + Math.sin(F.t * 9) * 0.08);
         if (F.t > 1.1) {
-          // it rights itself and swims off, back the way you came, sinking out of sight
+          // it shakes itself off, turns level and swims away (back the way you came), off the screen
           F.phase = 'off';
           F.t = 0;
+          F.vy = 0;
           F.fish?.setFlipX(true);
-          if (F.fish) this.gs.tweens.add({ targets: F.fish, rotation: 0.15, duration: 400, ease: 'Sine.easeOut' });
+          if (F.fish) this.gs.tweens.add({ targets: F.fish, rotation: -0.12, duration: 500, ease: 'Sine.easeOut' });
+          this.gs.fx.popText(F.x, F.y - this.fatHalfH(), 'hmph!', '#ffffff', 14);
         }
         break;
-      case 'off':
-        F.x -= 160 * dt;
-        F.y -= 30 * dt;
-        F.fish?.setAlpha(Math.max(0, 1 - F.t / 1.6));
-        if (F.t > 1.6) {
+      case 'off': {
+        // (picking up speed, rising a little off the bottom as it goes)
+        F.vy = Math.min(OFF_V, F.vy + OFF_V * 1.4 * dt);
+        F.x -= F.vy * dt;
+        F.y -= Math.max(0, 40 - F.t * 18) * dt;
+        if (F.fish && F.t > 0.5) F.fish.setRotation(-0.12 + Math.sin(F.t * 7) * 0.05);
+        if (Math.random() < dt * 6) this.gs.sea?.bubbles(F.x + this.fatHalfH() * 0.8, F.y, 1);
+        const v = this.gs.viewRect;
+        // (gone once it's well off the screen, or after a while whatever happens)
+        if (F.x + this.fatHalfH() * 1.2 < v.left || F.x - this.fatHalfH() * 1.2 > v.left + v.width || F.t > 8) {
           F.fish?.destroy();
           F.streaks?.destroy();
           F.col.destroy();
@@ -754,6 +763,7 @@ export class FishChase {
           return;
         }
         break;
+      }
     }
     if (F.fish) {
       F.fish.setPosition(F.x, F.y);
