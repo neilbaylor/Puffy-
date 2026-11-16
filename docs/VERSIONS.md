@@ -313,3 +313,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.308: Battle always runs its full time (no early end at 5 KOs).
 - v0.309: Battle: grown heroes fit up the gaps by the low walls; connection readout under the clock.
 - v0.310: Battle: ping readout bottom left, level with the scores.
+- v0.311: Part 6 (testers): the underwater chase — King Bob's gang after you, the Fat Fish falling from the sky.
