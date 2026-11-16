@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.309)
+## Where things stand (v0.310)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -31,6 +31,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   Home screen (yellow).
 - Start screen: drone fly-over behind, logo hop, hero cards (pick = hop / backflip), Play, Part picker once a
   level is beaten, mute (top-left), full screen + **Battle** buttons (top-right, same height, side by side).
+- v0.310: .bhud-ping moved to the bottom left (fixed, left 12px + safe-l, bottom like .bhud-chips), height = a chip's (clamp(17px,4vmin,21px) + 10px; 46 px in the big-screen media rule), chip-style brown pill. Phone 844×390 and iPad 1180×820: same top and height as the chips.
 - v0.309: Big Muscles 'stuck when big' = the 1-tile gaps between a low wall (rock, 2 tiles tall) and an island end (meadow rocks 8/19, steps rocks o+2/o+25, cliffs rock o+5): small heroes jump up through them, grown Muscles (49×88) / grown Puffy (40×72) can't, and under the island (96 px gap) a grown 88-px hero can't jump at all. arena.ts: rocks moved one tile out (meadow 7/20, steps o+1/o+26, cliffs o+4), cliffs spawn o+3 → o+2. Tests bhole.ts (from each ground spot: highest reachable, small vs grown), breach.ts (random-run reachability map), bwall.ts (pillar now 57). Battle HUD: .bhud-ping under the clock = BattleNet.rtt (ping every 2 s, smoothed), data-q good <80 / ok <160 / bad.
 - v0.308: Battle always runs MATCH_SECS (150 s): BattleSim.over = timeLeft <= 0 only; WIN_KOS removed (user: no early end at 5 KOs). Winner as before: most KOs, ties to fewest deaths. Test: sketches/battle-tests/bover.ts.
 - v0.307: Battle through-wall fix: explode() only hurts players/enemies with a clear line (clearLine every 6 px) from the blast origin (r.x,r.y backed out of any wall along −velocity) to their middle, top+4 or bottom−4; heroShot(p, fire, map) pulls the muzzle back to the shooter's side of a wall (server + client prediction). Test bwall.ts: 23/24 through-wall hits → 0; bgrow still hits in the open. Lobby watching: sizePreview() sets .bl-preview width = min(94vw, (innerHeight − head bottom − 2 gaps − .bl-me height − max(16, 3.5vh)) × 2.2), .bl-me width min(that, 640); foot min-height 0 while watching; on resize too. Phone 844×390: 292×108 → 362×163; iPad 1180×820: 613×279 → 1058×481. Full mode now has L2's popText reuse/warmText/font metrics and noise on first tap. Big Muscles 'stuck when big': not reproduced — bstuck4.ts grows each hero at all 896 standable spots (via a prize, makeRoom) and walks/jumps out: 0 stuck; random 10-min battles grown: never pinned >0.2 s with nothing ahead. Asked the user where it happens. Battles end early by design when someone reaches WIN_KOS 5 (or MATCH_SECS 150 runs out).

@@ -312,3 +312,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.307: Battle: no shooting through walls, bigger live window when watching; full mode gets the first-pop/first-shot smoothing.
 - v0.308: Battle always runs its full time (no early end at 5 KOs).
 - v0.309: Battle: grown heroes fit up the gaps by the low walls; connection readout under the clock.
+- v0.310: Battle: ping readout bottom left, level with the scores.
