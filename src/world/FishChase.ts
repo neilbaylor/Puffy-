@@ -96,6 +96,14 @@ const STYLE = (() => {
 
 type TrailPt = { x: number; y: number; s: number };
 
+/**
+ * How hard the gang swim for each hero (× their pace, which already follows the hero's own speed):
+ * so the chase feels about as hard whoever you are — Scruffy's quick and small (they push harder),
+ * Big Muscles is big and slower round the rocks (a little easier on him).
+ */
+const HERO_K: Record<string, number> = { puffy: 1.04, scruffy: 1.08, muscles: 0.93 };
+const heroK = (p: Player) => HERO_K[p.char.id] ?? 1.04;
+
 const NAMES: Record<string, string> = { stone: 'Stone', slinger: 'Slinger', kai: 'Kai', zippy: 'Zippy' };
 
 interface PackFish {
@@ -331,7 +339,7 @@ export class FishChase {
 
   /** The gang's own pace: just under yours at an easy swim. */
   private baseSpeed(p: Player) {
-    return p.char.walkSpeed * SWIM_WALK * 0.96;
+    return p.char.walkSpeed * SWIM_WALK * 0.96 * heroK(p);
   }
   /** Your pace swimming flat out. */
   private runSpeed(p: Player) {
@@ -484,7 +492,7 @@ export class FishChase {
       this.lungeCool = LUNGE_EVERY[0] + Math.random() * (LUNGE_EVERY[1] - LUNGE_EVERY[0]);
       if (leader.img.visible && this.onScreen(leader.x, leader.y)) this.gs.fx.popText(leader.x, leader.y - leader.ry * 1.7, '!', '#ff5a4a', 24);
     }
-    const chase = Phaser.Math.Clamp(base + (lead - TAIL - (wary ? WARY : 0)) * PULL, base * 0.7, this.runSpeed(p) * 1.15);
+    const chase = Phaser.Math.Clamp(base + (lead - TAIL - (wary ? WARY : 0)) * PULL, base * 0.7, this.runSpeed(p) * 1.15 * heroK(p));
     const want = this.lunge > 0 ? Math.max(chase, base) * DASH_K : this.windup > 0 ? base * 0.45 : chase;
     this.v += (want - this.v) * (1 - Math.exp(-dt * (this.lunge > 0 || this.windup > 0 ? 10 : 3)));
     // the head swims for it (holding still a moment after a bite)
