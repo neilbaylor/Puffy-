@@ -808,9 +808,9 @@ export class FishChase {
     const gs = this.gs;
     const water = this.waterY();
     // just ahead of you (where you'll be in a moment), over open water
-    // (to start with, a little way ahead of you: it follows you from there)
+    // (to start with, a little way ahead of you, over open water down to below you: it follows you from there)
     let x = p.x + 240;
-    for (let i = 0; i < 20 && gs.isSolidAt(x, water + 12); i++) x += 40;
+    for (let i = 0; i < 30 && (gs.isSolidAt(x, water + 12) || !this.clearDown(x, water, p)); i++) x += 32;
     const bed = gs.groundUnder(x, water + 8) ?? water + 14 * TILE;
     const colW = this.fatHalfW() * 2;
     const col = gs.add
@@ -881,7 +881,8 @@ export class FishChase {
     const want = p.x + p.body.velocity.x * toYou;
     const dx = Phaser.Math.Clamp(want - F.x, -AIM_V * dt, AIM_V * dt);
     const nx = F.x + dx;
-    if (this.gs.isSolidAt(nx, water + 12)) return;
+    // (not over a rock that'd stop it short of you: a clear way down to below where you are)
+    if (this.gs.isSolidAt(nx, water + 12) || !this.clearDown(nx, water, p)) return;
     F.x = nx;
     F.col.x = nx;
     F.target.x = nx;
@@ -889,6 +890,12 @@ export class FishChase {
     if (F.shadow) F.shadow.x = nx;
     // (the column down to the sea bed under it, as the bed rises and falls)
     if (Math.abs(dx) > 0.5) this.fitColumn(F, water);
+  }
+
+  /** Nothing solid from the surface at x down to the hero's head (the Fat Fish would land on it first). */
+  private clearDown(x: number, water: number, p: Player) {
+    const bed = this.gs.groundUnder(x, water + 8);
+    return bed === null || bed > p.body.top;
   }
 
   /** The column down to the sea bed under the spot (and where it lands): as the spot moves, and once it drops and the spot is fixed. */
