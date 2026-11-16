@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.321)
+## Where things stand (v0.322)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -31,6 +31,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   Home screen (yellow).
 - Start screen: drone fly-over behind, logo hop, hero cards (pick = hop / backflip), Play, Part picker once a
   level is beaten, mute (top-left), full screen + **Battle** buttons (top-right, same height, side by side).
+- v0.322: Battle bomb blast radius 118 → 136 (sim.ts heroShot fire 2; ×1.25 when big; the boom event's r drives the explosion picture). Running: perf agent (claude/perf-f1: Part 6 then the app, not battle) and battle-latency agent (claude/battle-latency).
 - v0.321: Part 6 nuggies 100 → 71 (rows trimmed, the kelp weave's 302.6 row and 3 loose ones removed). Fat Fish: FishChase.clearDown(x) — groundUnder from the surface must be below the hero's body top; aimFall won't move onto a blocked column, startFall searches ahead (32 px steps) for a clear one. Drop 1 moved 58 → 40 and slab 57-61 removed; slab 203-206 removed. Bot: 89 s, 3 faints, all three drops reach the bed.
 - v0.320: THE REEF BOWL (merged claude/football): src/entities/Football.ts (FootballGame: two teams of 6 on lanes, no physics bodies; huddle/snap/routes/pass/tackle/touchdown; throwers QB + receiver when you're ahead, safety + linebacker when you're coming — wind-up '!' then a slowing spiral aimed ahead, ≥1.2 s between throws, none while FishChase.falling; rockets THWACK a ball / flatten a player 3 s; hit → gs.hitPlayer), art src/gfx/football.ts (field, stands, driftwood posts, REEF BOWL scoreboard, Snappers turtles red / Stallions seahorses blue-gold 16-frame sheets, number decals, ball), textures via BADDIES_FOR[6]/BADDIE_KEYS.football (released, sized from getFrame). Level 6 W 430: new section 209-278 (cp 215, field 220-256), everything after shifted +70 (cps 88/145/185/215/280/364, drops 58/190/370, goal 424), flyMs 11500. GameScene.camFloor keeps the field in view while over it (off during camSky / camLook). LevelView keeps plants off the field. Test: sketches/level6/tfootball.cjs. Bots: full 102 s 2 faints, light Muscles 95 s 1 faint. Textures +5.2 MB full / +2.2 MB light.
 - v0.319: Part 6 a touch harder (FishChase TAIL 240, LUNGE_EVERY 3.2-5.0, AIM_V 260); Fat Fish 'off' phase swims away (OFF_V 300, level, bubbles, 'hmph!') until off the view instead of fading. Longer level: the football agent (branch claude/football) adds a new 60-80 tile section for the field.
