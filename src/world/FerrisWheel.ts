@@ -17,6 +17,7 @@ export class FerrisWheel {
   private cx: number;
   private cy: number;
   private a = 0;
+  private shown = true;
 
   /** `x`: the hub's x; `deckY`: the top of the deck the stand stands on. */
   constructor(
@@ -40,6 +41,13 @@ export class FerrisWheel {
     // (off the screen: nothing to do)
     const r = FERRIS.R + GONDOLA.h;
     const on = this.cx + r > view.left && this.cx - r < view.left + view.width && this.cy + r > view.top && this.cy - r < view.top + view.height;
+    // (and not drawn: Phaser draws a picture wherever it is)
+    if (on !== this.shown) {
+      this.shown = on;
+      this.wheel.setVisible(on);
+      this.stand.setVisible(on);
+      for (const c of this.cars) c.setVisible(on);
+    }
     if (!on) return;
     this.a += (dt / TURN_SECS) * Math.PI * 2;
     this.place();

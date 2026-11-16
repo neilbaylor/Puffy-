@@ -4,7 +4,7 @@ import { rng } from '../gfx/draw';
 import { FB_FIELD_TILES } from '../gfx/football';
 import type { Pt } from '../gfx/handdrawn';
 import { PROP_RES, TERRAIN_RES, addCanvas, ensureSeaArt, hires, kelpBends } from '../gfx/textures';
-import { GRASS_FILLS, KELP_H, PIER_HEAD, PIER_HEAD_MODERN, SEA_PROPS, SWAY_N, drawModernPier, drawPier } from '../gfx/sea';
+import { GRASS_FILLS, KELP_H, KELP_W, PIER_HEAD, PIER_HEAD_MODERN, SEA_PROPS, SWAY_N, drawModernPier, drawPier } from '../gfx/sea';
 import { DEFAULT_PALETTE, PALETTES, drawCloudPlatform, drawPuffTree, drawTerrainPiece, roundPoly, traceCells, type TerrainKind, type WorldPalette } from '../gfx/world';
 import { drawPine } from '../gfx/mountain';
 import type { Cell, LevelData } from '../level/builder';
@@ -622,6 +622,13 @@ export class LevelView {
               .setDepth(DEPTH.decor - 0.5);
             if (i % 2 === 1) rope.flipX = true;
             this.ropes.push({ rope, speed: 0.42 + (i % 3) * 0.06, ph: i * 0.37 });
+            if (this.cullOff) {
+              // (off the camera it isn't drawn either: each strand is a draw call of its own, on
+              // screen or not. Its box: the strip's half width plus the tip's full bend either side,
+              // from the tip down to the foot)
+              const half = (KELP_W / 2 + 16) * (0.85 + 0.15 * k);
+              this.boxes.push({ o: rope, x0: rope.x - half, x1: rope.x + half, y0: rope.y - (KELP_H + 20 + KELP_W / 2) * k, y1: rope.y + (4 + KELP_W / 2) * k, off: false });
+            }
             return;
           }
           const img = this.scene.add
