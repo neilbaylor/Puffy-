@@ -240,6 +240,14 @@ export class GameScene extends Phaser.Scene {
   private gEnemies!: Group;
   private gRockets!: Group;
   private gAuras!: Group;
+  /**
+   * The bad guys and nuggies the ground has to stop: once they can move (awake, or scattered from a
+   * hit). Sleeping bad guys and nuggies floating in their spots never move, so checking them against
+   * the ground every physics step did nothing (and was most of the ground checks).
+   */
+  private gEnemiesOnTiles!: Group;
+  private gAurasOnTiles!: Group;
+  private onTiles = new WeakSet<Enemy>();
 
   aura = 0;
   private startCheckpoint = -1;
@@ -378,6 +386,12 @@ export class GameScene extends Phaser.Scene {
     this.gEnemies = this.add.group();
     this.gRockets = this.add.group();
     this.gAuras = this.add.group();
+    this.gEnemiesOnTiles = this.add.group();
+    this.gAurasOnTiles = this.add.group();
+    // (before every physics update, whichever of the update paths runs: intro, cut scene or play)
+    const tileBodies = () => this.enemiesOnTiles();
+    this.events.on(Phaser.Scenes.Events.PRE_UPDATE, tileBodies);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.events.off(Phaser.Scenes.Events.PRE_UPDATE, tileBodies));
     this.gRootbeer = this.add.group();
 
     // ── Spawns ──
@@ -564,8 +578,8 @@ export class GameScene extends Phaser.Scene {
     // ── Collisions ──
     const layer = this.level.layer;
     this.physics.add.collider(this.gPlayers, layer, (h, t) => this.onPlayerTile(h as Phaser.GameObjects.GameObject, t as Phaser.Tilemaps.Tile));
-    this.physics.add.collider(this.gEnemies, layer);
-    this.physics.add.collider(this.gAuras, layer);
+    this.physics.add.collider(this.gEnemiesOnTiles, layer);
+    this.physics.add.collider(this.gAurasOnTiles, layer);
     this.physics.add.collider(this.gRockets, layer, (r) => (r as Rocket).explode());
     this.physics.add.overlap(this.gPlayers, this.gEnemies, (h, e) => this.onPlayerEnemy(h as Phaser.GameObjects.GameObject, e as Enemy));
     this.physics.add.overlap(this.gRockets, this.gEnemies, (r) => (r as Rocket).explode());
@@ -618,6 +632,16 @@ export class GameScene extends Phaser.Scene {
   private addAura(a: Aura) {
     this.auras.push(a);
     this.gAuras.add(a);
+    if (a.scattered) this.gAurasOnTiles.add(a);
+  }
+
+  /** Bad guys that can move now join the ground checks (see gEnemiesOnTiles); once in, they stay. */
+  private enemiesOnTiles() {
+    for (const e of this.enemies) {
+      if (this.onTiles.has(e) || !e.active || !e.body || !(e.awake || e.body.moves)) continue;
+      this.onTiles.add(e);
+      this.gEnemiesOnTiles.add(e);
+    }
   }
 
   private reachCheckpoint(cp: Checkpoint) {
