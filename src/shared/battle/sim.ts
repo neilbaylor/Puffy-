@@ -17,7 +17,6 @@ export const TILE_PX = 32;
 export const HEARTS = 3;
 /** 2½ minutes (the battle song is cued to end exactly on 0). */
 export const MATCH_SECS = 150;
-export const WIN_KOS = 5;
 export const RESPAWN_SECS = 2.4;
 /** A respawn spot is safe with no bad guy (their shots, falling rocks) nearer than this (px; ~12 tiles). */
 const SAFE_SPAWN = 380;
@@ -1499,10 +1498,8 @@ export class BattleSim {
     return n;
   }
 
-  /** Someone reached the winning number of knock-outs, or time is up. */
+  /** Time's up (the battle always runs its full time: most knock-outs at the end wins). */
   get over() {
-    if (this.timeLeft <= 0) return true;
-    for (const p of this.players.values()) if (p.kos >= WIN_KOS) return true;
-    return false;
+    return this.timeLeft <= 0;
   }
 }
