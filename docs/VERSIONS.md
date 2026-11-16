@@ -327,3 +327,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.322: Battle: bigger bomb blast (radius 118 → 136).
 - v0.323: Battle feels less laggy (no more snap-backs, others drawn sooner and smoother, your blasts and pickups instant); Part 6 gang speed per hero.
 - v0.324: Part 6 fly-over shorter (11.5 → 7.5 s).
+- v0.325: Part 6 fly-over 6.5 s.
