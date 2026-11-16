@@ -392,6 +392,10 @@ export class GameScene extends Phaser.Scene {
     const tileBodies = () => this.enemiesOnTiles();
     this.events.on(Phaser.Scenes.Events.PRE_UPDATE, tileBodies);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.events.off(Phaser.Scenes.Events.PRE_UPDATE, tileBodies));
+    // (after the update: the camera's placed and everything has moved for this frame)
+    const cull = () => this.cullOffCamera();
+    this.events.on(Phaser.Scenes.Events.POST_UPDATE, cull);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.events.off(Phaser.Scenes.Events.POST_UPDATE, cull));
     this.gRootbeer = this.add.group();
 
     // ── Spawns ──
@@ -633,6 +637,40 @@ export class GameScene extends Phaser.Scene {
     this.auras.push(a);
     this.gAuras.add(a);
     if (a.scattered) this.gAurasOnTiles.add(a);
+  }
+
+  /**
+   * Nuggies (and their glow), root beer (and its glint) and bad guys entirely off the camera aren't
+   * drawn: like the level's scenery (LevelView.cull), with the camera's own filter, so it never
+   * touches what the game shows or hides. A level has dozens of each, mostly off screen.
+   */
+  private cullOffCamera() {
+    const cam = this.cameras.main;
+    const w = cam.width / cam.zoom;
+    const h = cam.height / cam.zoom;
+    const cx = cam.scrollX + cam.width / 2;
+    const cy = cam.scrollY + cam.height / 2;
+    // (grown for a tilted view's corners, a shake, and the size of each thing)
+    const r = (cam as unknown as { rotation: number }).rotation ? Math.hypot(w, h) / 2 : 0;
+    const hw = Math.max(w / 2, r) + 64;
+    const hh = Math.max(h / 2, r) + 64;
+    const id = cam.id;
+    const cull = (o: Phaser.GameObjects.Image | Phaser.GameObjects.Sprite) => {
+      const m = Math.max(o.displayWidth, o.displayHeight);
+      if (Math.abs(o.x - cx) > hw + m || Math.abs(o.y - cy) > hh + m) o.cameraFilter |= id;
+      else o.cameraFilter &= ~id;
+    };
+    for (const a of this.auras) {
+      if (!a.active) continue;
+      cull(a);
+      cull(a.glow);
+    }
+    for (const b of this.rootbeers) {
+      if (!b.active) continue;
+      cull(b);
+      cull(b.glint);
+    }
+    for (const e of this.enemies) if (e.active) cull(e);
   }
 
   /** Bad guys that can move now join the ground checks (see gEnemiesOnTiles); once in, they stay. */

@@ -11,7 +11,8 @@ import { PROP_RES } from '../gfx/textures';
 export class Aura extends Phaser.Physics.Arcade.Image {
   declare body: Phaser.Physics.Arcade.Body;
   taken = false;
-  private glow: Phaser.GameObjects.Image;
+  /** Its glow (the scene leaves both undrawn while they're off the camera). */
+  readonly glow: Phaser.GameObjects.Image;
   private baseX: number;
   private baseY: number;
   private phase: number;
@@ -110,7 +111,8 @@ export class RootBeer extends Phaser.Physics.Arcade.Image {
   taken = false;
   private baseY: number;
   private phase = Math.random() * 10;
-  private glint: Phaser.GameObjects.Image;
+  /** Its glint (the scene leaves both undrawn while they're off the camera). */
+  readonly glint: Phaser.GameObjects.Image;
   constructor(
     scene: Phaser.Scene,
     x: number,
