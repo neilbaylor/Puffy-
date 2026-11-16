@@ -48,7 +48,7 @@ export function buildLevel6(): LevelData {
     [110, 9.5],
     [52, 13],
   ];
-  L.flyMs = 7500;
+  L.flyMs = 6500;
   /** A shelf of reef hanging from the surface over x0..x1, its ragged underside at about height h. */
   const shelf = (x0: number, x1: number, h: number) => {
     const under = [0, -1, 0, 1, 0, -1, -1, 0, 1, 0];
