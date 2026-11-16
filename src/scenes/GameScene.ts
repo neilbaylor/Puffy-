@@ -693,6 +693,13 @@ export class GameScene extends Phaser.Scene {
       cull(b.glint);
     }
     for (const e of this.enemies) if (e.active) cull(e);
+    // (the checkpoint flowers, the gate, Part 6's football players: all a long way off, mostly)
+    for (const cp of this.checkpoints) cull(cp);
+    if (this.goal) {
+      cull(this.goal.gate);
+      cull(this.goal.swirl);
+    }
+    for (const f of this.football) f.cullWith(cull);
   }
 
   /** Bad guys that can move now join the ground checks (see gEnemiesOnTiles); once in, they stay. */

@@ -383,10 +383,13 @@ export class Background {
       const a = this.row(l.a, l.keyA, n, l.depth);
       const b = this.row(l.b, l.keyB, n, l.depth);
       for (let i = 0; i < a.length; i++) {
-        const on = i < n;
+        const x = x0 + i * l.w - 0.3 * i;
+        // (only the ones in view: the row's last picture or two are past the right edge, and Phaser
+        // draws a picture wherever it is)
+        const on = i < n && x < view.left + view.width;
         // (a hair of overlap so no seam shows between neighbours)
-        a[i].setVisible(on).setPosition(x0 + i * l.w - 0.3 * i, l.y);
-        b[i].setVisible(on && this.showB).setAlpha(this.wB).setPosition(x0 + i * l.w - 0.3 * i, l.y);
+        a[i].setVisible(on).setPosition(x, l.y);
+        b[i].setVisible(on && this.showB).setAlpha(this.wB).setPosition(x, l.y);
       }
     }
     // solid fill under the nearest layer so the bottom of the screen is always covered
