@@ -3,7 +3,7 @@ import { DEPTH, TILE } from '../config';
 import { sfx } from '../core/sfx';
 import { ART_RES } from '../gfx/draw';
 import { RINK, drawRinkBack, drawRinkIce } from '../gfx/rink';
-import { addCanvas, hires } from '../gfx/textures';
+import { FIELD_RES, addCanvas, hires } from '../gfx/textures';
 import type { GameScene } from '../scenes/GameScene';
 import type { Player } from './Player';
 import { SoccerBig, SoccerPuff, type Coach, type SoccerMember } from './Soccer';
@@ -53,10 +53,10 @@ export class HockeyMatch implements Coach {
     const W = rinkW + RINK.END * 2;
     const back = `rink-back-${rinkW}`;
     const ice = `rink-ice-${rinkW}`;
-    if (!gs.textures.exists(back)) addCanvas(gs, back, hires(W, RINK.ABOVE + RINK.BELOW, 2, (ctx) => drawRinkBack(ctx, rinkW)), undefined, { release: true });
-    if (!gs.textures.exists(ice)) addCanvas(gs, ice, hires(W, RINK.ICE_UP + RINK.ICE_DOWN, 2, (ctx) => drawRinkIce(ctx, rinkW)), undefined, { release: true });
-    gs.add.image(this.left - RINK.END, ground, back).setOrigin(0, RINK.ABOVE / (RINK.ABOVE + RINK.BELOW)).setScale(1 / 2).setDepth(DEPTH.decor - 1);
-    gs.add.image(this.left - RINK.END, ground, ice).setOrigin(0, RINK.ICE_UP / (RINK.ICE_UP + RINK.ICE_DOWN)).setScale(1 / 2).setDepth(DEPTH.tiles + 0.5);
+    if (!gs.textures.exists(back)) addCanvas(gs, back, hires(W, RINK.ABOVE + RINK.BELOW, FIELD_RES, (ctx) => drawRinkBack(ctx, rinkW)), undefined, { release: true });
+    if (!gs.textures.exists(ice)) addCanvas(gs, ice, hires(W, RINK.ICE_UP + RINK.ICE_DOWN, FIELD_RES, (ctx) => drawRinkIce(ctx, rinkW)), undefined, { release: true });
+    gs.add.image(this.left - RINK.END, ground, back).setOrigin(0, RINK.ABOVE / (RINK.ABOVE + RINK.BELOW)).setScale(1 / FIELD_RES).setDepth(DEPTH.decor - 1);
+    gs.add.image(this.left - RINK.END, ground, ice).setOrigin(0, RINK.ICE_UP / (RINK.ICE_UP + RINK.ICE_DOWN)).setScale(1 / FIELD_RES).setDepth(DEPTH.tiles + 0.5);
     gs.add.image(this.left - 4, ground + 1, 'hockeynet').setOrigin(4 / 64, 40 / 44).setScale(1 / 2).setDepth(DEPTH.decor);
     gs.add.image(this.right + 4, ground + 1, 'hockeynet').setOrigin(4 / 64, 40 / 44).setScale(-1 / 2, 1 / 2).setDepth(DEPTH.decor);
 

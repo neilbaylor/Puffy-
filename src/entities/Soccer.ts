@@ -3,7 +3,7 @@ import { DEPTH, TILE } from '../config';
 import { sfx } from '../core/sfx';
 import { ART_RES } from '../gfx/draw';
 import { PITCH, drawPitchBack, drawPitchFront } from '../gfx/pitch';
-import { addCanvas, hires } from '../gfx/textures';
+import { FIELD_RES, addCanvas, hires } from '../gfx/textures';
 import type { GameScene } from '../scenes/GameScene';
 import { BigPuff, Puffball } from './enemies/Enemy';
 import type { Player } from './Player';
@@ -72,10 +72,10 @@ export class SoccerMatch implements Coach {
       const x0 = this.left - 28 - PITCH.END;
       const front = `pitch-front-${pitchW}`;
       const back = `pitch-back-${pitchW}`;
-      if (!gs.textures.exists(front)) addCanvas(gs, front, hires(W, PITCH.FRONT_UP + PITCH.FRONT_DOWN, 2, (ctx) => drawPitchFront(ctx, pitchW)), undefined, { release: true });
-      if (!gs.textures.exists(back)) addCanvas(gs, back, hires(W, PITCH.BACK_UP + 2, 2, (ctx) => drawPitchBack(ctx, pitchW)), undefined, { release: true });
-      gs.add.image(x0, ground, back).setOrigin(0, PITCH.BACK_UP / (PITCH.BACK_UP + 2)).setScale(1 / 2).setDepth(DEPTH.decor - 1);
-      gs.add.image(x0, ground, front).setOrigin(0, PITCH.FRONT_UP / (PITCH.FRONT_UP + PITCH.FRONT_DOWN)).setScale(1 / 2).setDepth(DEPTH.tiles + 0.5);
+      if (!gs.textures.exists(front)) addCanvas(gs, front, hires(W, PITCH.FRONT_UP + PITCH.FRONT_DOWN, FIELD_RES, (ctx) => drawPitchFront(ctx, pitchW)), undefined, { release: true });
+      if (!gs.textures.exists(back)) addCanvas(gs, back, hires(W, PITCH.BACK_UP + 2, FIELD_RES, (ctx) => drawPitchBack(ctx, pitchW)), undefined, { release: true });
+      gs.add.image(x0, ground, back).setOrigin(0, PITCH.BACK_UP / (PITCH.BACK_UP + 2)).setScale(1 / FIELD_RES).setDepth(DEPTH.decor - 1);
+      gs.add.image(x0, ground, front).setOrigin(0, PITCH.FRONT_UP / (PITCH.FRONT_UP + PITCH.FRONT_DOWN)).setScale(1 / FIELD_RES).setDepth(DEPTH.tiles + 0.5);
     }
 
     // spread the team over the pitch (a two-player team stands in between the others)

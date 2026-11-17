@@ -380,6 +380,9 @@ export class GameScene extends Phaser.Scene {
       const has = (type: string) => data.spawns.some((s) => s.type === type);
       if (!has('soccer')) for (const p of ['pitch-front-', 'pitch-back-']) dropTextures(this, p);
       if (!has('hockey')) for (const p of ['rink-back-', 'rink-ice-']) dropTextures(this, p);
+      // (and Part 5's tennis courts and Part 3's beach-volleyball sand: the same)
+      if (!has('tennis')) for (const p of ['court-front-', 'court-back-']) dropTextures(this, p);
+      if (!has('volley')) for (const p of ['volleysand-', 'volleyboard-']) dropTextures(this, p);
     }
     this.lookNext = 0;
     if (!this.scene.isActive('Menu') && !this.scene.isActive('Battle')) freeLooksExcept(this, themesFor(this.levelId));

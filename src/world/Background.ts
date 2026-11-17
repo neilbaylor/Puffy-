@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { DEPTH } from '../config';
 import { BG_LAYERS, BG_RES, bgKey, ensureLook } from '../gfx/textures';
 import { rng } from '../gfx/draw';
+import { liveCanvas } from '../gfx/liveCanvas';
 import { LIGHT } from '../core/light';
 import { PALETTES } from '../gfx/world';
 import { hex, lerpRgb, mixSea, type ThemeId, type ThemeMix } from './theme';
@@ -216,7 +217,7 @@ export class Background {
       // (each cloud's own picture, shared by every scene that shows this sky)
       const key = `bgcloud-${seed}-${i}`;
       const T = this.scene.textures;
-      const tex = (T.exists(key) ? T.get(key) : T.createCanvas(key, Math.ceil(CB.w * cs * CLOUD_RES), Math.ceil(CB.h * cs * CLOUD_RES))) as Phaser.Textures.CanvasTexture;
+      const tex = liveCanvas(T, key, Math.ceil(CB.w * cs * CLOUD_RES), Math.ceil(CB.h * cs * CLOUD_RES));
       clouds.push({ x: (i / n) * width + r() * 90, y: ys[0] + r() * (ys[1] - ys[0]), s: cs, drift: (r() - 0.5) * 18, bob: r() * 6.28, lumps, tex, imgs: [], next: -1 - r() * CLOUD_EVERY });
     }
     return { clouds, depth, fx, fy, anchor, width, alpha };
