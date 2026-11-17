@@ -630,16 +630,39 @@ export class BattleUI {
     const g = this.host.game;
     if (on && !this.spectating && this.net) {
       this.spectating = true;
+      this.watchRate(true);
       g.scene.start('Battle', { net: this.net, spectate: true });
       window.addEventListener('resize', this.onResize);
       // (once the scene has started)
       requestAnimationFrame(() => requestAnimationFrame(() => this.placePreview()));
     } else if (!on && this.spectating) {
       this.spectating = false;
+      this.watchRate(false);
       window.removeEventListener('resize', this.onResize);
       if (!this.inBattle) g.scene.stop('Battle');
     }
   }
+
+  /**
+   * Light mode: watching from the lobby, the game draws 30 times a second, not 60 (the live window is
+   * all that moves; on an older device it took twice the time a frame of playing does). Phaser picks
+   * its frame-rate limit when its loop starts, so the loop is put to sleep and woken with the new one.
+   */
+  private watchRate(on: boolean) {
+    if (!LIGHT) return;
+    const loop = this.host.game.loop as unknown as { fpsLimit: number; hasFpsLimit: boolean; _limitRate: number; sleep(): void; wake(seamless?: boolean): void };
+    if (on && this.fpsBefore === null) this.fpsBefore = loop.fpsLimit;
+    // (drawn once 25 ms have added up: every 2nd refresh at 60 Hz, every 4th at 120 Hz)
+    const limit = on ? 40 : this.fpsBefore ?? loop.fpsLimit;
+    if (!on) this.fpsBefore = null;
+    if (loop.fpsLimit === limit) return;
+    loop.fpsLimit = limit;
+    loop.hasFpsLimit = limit > 0;
+    loop._limitRate = limit > 0 ? 1000 / limit : 0;
+    loop.sleep();
+    loop.wake(true);
+  }
+  private fpsBefore: number | null = null;
 
   private placePreview() {
     const box = this.lobby?.querySelector<HTMLElement>('.bl-preview');
@@ -655,6 +678,7 @@ export class BattleUI {
     if (!this.net) return;
     if (this.spectating) {
       this.spectating = false;
+      this.watchRate(false);
       window.removeEventListener('resize', this.onResize);
     }
     this.inBattle = true;
