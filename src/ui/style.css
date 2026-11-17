@@ -2634,6 +2634,17 @@ kbd {
   font: 400 clamp(16px, 3.1vmin, 22px) / 1 var(--display);
   color: #8a5a2a;
 }
+.acct-off-panel { max-width: min(100%, 600px); }
+.acct-off-msg {
+  margin: 4px 0 6px;
+  font-weight: 800;
+  font-size: clamp(16px, 3.2vmin, 20px);
+  line-height: 1.35;
+  color: var(--ink);
+  text-align: center;
+  text-wrap: balance;
+}
+.acct-off-msg b { display: block; margin-bottom: 8px; font-weight: 900; }
 .acct-off {
   margin-left: 4px;
   padding: 3px 8px;

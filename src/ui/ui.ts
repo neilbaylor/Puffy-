@@ -769,9 +769,9 @@ export class UI {
     const saved = account.savedName;
     if (!u && saved) {
       const off = h(`<div class="screen modal acct">
-      <div class="panel acct-panel">
+      <div class="panel acct-panel acct-off-panel">
         <h2>Hi ${esc(saved)}!</h2>
-        <p class="acct-err ask">${navigator.onLine === false ? 'You’re offline.' : 'Can’t reach the server just now.'}\nKeep playing: your progress is saved on this device, and to your account as soon as you’re back online.</p>
+        <p class="acct-off-msg"><b>You’re offline.</b>Your progress is saved on this device and will be added to your account when you’re back online.</p>
         <div class="row acct-main"><button class="btn btn-go" data-act="back">Done</button></div>
       </div>
     </div>`);
