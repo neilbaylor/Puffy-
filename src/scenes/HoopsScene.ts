@@ -54,6 +54,7 @@ import type { GameData, GameOverState, ResultState } from './GameScene';
 import { loseLife } from '../core/lives';
 import { NetSim } from './hoopsNet';
 import { SimpleConfetti } from '../world/SimpleConfetti';
+import { shrinkCaptureTarget } from '../core/renderTargets';
 import { PLOP_FRAMES, PLOP_H, PLOP_KINDS, PLOP_SCALE, PLOP_W, drawPlop, type PlopKind } from '../gfx/plops';
 import { STYLES } from '../gfx/handdrawn';
 
@@ -398,6 +399,8 @@ export class HoopsScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       window.removeEventListener('pointerdown', this.tapListener);
       this.dom.remove();
+      // (the lights-out darkness sized the renderer's capture surface to the arena: back to a pixel)
+      shrinkCaptureTarget(this.game);
     });
 
     this.game.events.emit('hoops-start', this);

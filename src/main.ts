@@ -12,6 +12,7 @@ import { UI } from './ui/ui';
 import { LIGHT, LIGHT_KEY } from './core/light';
 import { savedResCap, saveResCap } from './core/res';
 import { trackBossArt } from './gfx/textures';
+import { trimRenderTargets } from './core/renderTargets';
 
 installInput();
 
@@ -106,6 +107,9 @@ function start(refreshMs: number) {
     height: h,
     scale: { mode: Phaser.Scale.NONE, zoom: 1 / dpr() },
     render: { antialias: true, pixelArt: false, roundPixels: false, powerPreference: 'high-performance' },
+    // (no pre-effects — glow, shadow… on a sprite — anywhere: without them Phaser doesn't keep their
+    // dozens of drawing surfaces on the graphics chip; see also trimRenderTargets)
+    disablePreFX: true,
     input: { activePointers: 4 },
     // (no tree of moving bodies: Phaser rebuilt it from every body on every physics step, a few
     // times a frame on a slow phone, to speed up checks among a few dozen bodies that mostly sit
@@ -133,6 +137,7 @@ function start(refreshMs: number) {
     resize();
   };
   game.events.once(Phaser.Core.Events.READY, () => {
+    trimRenderTargets(game);
     trackBossArt(game);
     const ev = game.scene.getScene('Menu').events;
     ev.on(Phaser.Scenes.Events.START, () => setHome(true));
