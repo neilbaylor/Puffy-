@@ -55,6 +55,7 @@ import { loseLife } from '../core/lives';
 import { NetSim } from './hoopsNet';
 import { SimpleConfetti } from '../world/SimpleConfetti';
 import { dropDepthBuffer, shrinkCaptureTarget } from '../core/renderTargets';
+import { liveCanvas } from '../gfx/liveCanvas';
 import { PLOP_H, PLOP_KINDS, PLOP_SCALE, PLOP_W, drawPlop, type PlopFrame, type PlopKind } from '../gfx/plops';
 import { STYLES } from '../gfx/handdrawn';
 
@@ -373,10 +374,10 @@ export class HoopsScene extends Phaser.Scene {
 
     // the live jumbotron screen (glows even when the lights are down)
     const JR = 2;
-    this.jumboTex = (this.textures.exists('jumbo') ? this.textures.get('jumbo') : this.textures.createCanvas('jumbo', JUMBO.w * JR, JUMBO.h * JR)) as Phaser.Textures.CanvasTexture;
+    this.jumboTex = liveCanvas(this.textures, 'jumbo', JUMBO.w * JR, JUMBO.h * JR);
     const jp = A(JUMBO.x, JUMBO.y);
     this.add.image(jp.x, jp.y, 'jumbo').setOrigin(0, 0).setScale(JUMBO.s / JR).setDepth(11.6);
-    this.ribbonTex = (this.textures.exists('ribbon') ? this.textures.get('ribbon') : this.textures.createCanvas('ribbon', RIBBON.w * JR, RIBBON.h * JR)) as Phaser.Textures.CanvasTexture;
+    this.ribbonTex = liveCanvas(this.textures, 'ribbon', RIBBON.w * JR, RIBBON.h * JR);
     const rp = A(RIBBON.x, RIBBON.y);
     this.add.image(rp.x, rp.y, 'ribbon').setOrigin(0, 0).setScale(1 / JR).setDepth(2.05);
     this.ribbonMsg = null;
