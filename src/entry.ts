@@ -4,6 +4,7 @@
  * already cached (the home-screen app, a return visit) the screen stayed blank until it was done.
  * (The game's code is fetched alongside this from the start: see the modulepreload in vite.config.)
  */
+import './ui/fonts.css';
 import './ui/style.css';
 // (the screen's refresh rate: measured from now on, while the game's code loads)
 import './core/refresh';

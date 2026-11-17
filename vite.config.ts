@@ -4,15 +4,20 @@ import { viteSingleFile } from 'vite-plugin-singlefile';
 /**
  * The page starts with a tiny script (src/entry.ts) that lets the loading screen paint before it
  * runs the game's code; that code is fetched from the very start all the same (a modulepreload in
- * the page), not only once the first script asks for it.
+ * the page), not only once the first script asks for it. The loading screen's font too (a preload:
+ * otherwise it's only asked for once the page's styles are in).
  */
 const preloadGame: Plugin = {
   name: 'preload-game',
   apply: 'build',
   transformIndexHtml: {
     order: 'post',
-    handler: (_html, { chunk }) =>
-      (chunk?.dynamicImports ?? []).map((file) => ({ tag: 'link', attrs: { rel: 'modulepreload', crossorigin: '', href: `./${file}` }, injectTo: 'head' as const })),
+    handler: (_html, { chunk, bundle }) => [
+      ...(chunk?.dynamicImports ?? []).map((file) => ({ tag: 'link', attrs: { rel: 'modulepreload', crossorigin: '', href: `./${file}` }, injectTo: 'head' as const })),
+      ...Object.keys(bundle ?? {})
+        .filter((file) => /\/lilita-one-latin-[\w-]{8}\.woff2$/.test(file))
+        .map((file) => ({ tag: 'link', attrs: { rel: 'preload', as: 'font', type: 'font/woff2', crossorigin: '', href: `./${file}` }, injectTo: 'head' as const })),
+    ],
   },
 };
 
