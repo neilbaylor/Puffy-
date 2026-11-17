@@ -347,6 +347,8 @@ export class BattleScene extends Phaser.Scene {
   /** The zoom that fits the whole arena; playing, the camera is a little closer and follows you. */
   private fitZoom = 1;
   private camC: { x: number; y: number } | null = null;
+  /** The players' pictures still to make ahead (see create). */
+  private prep: (() => void)[] = [];
 
   constructor() {
     super('Battle');
@@ -408,6 +410,15 @@ export class BattleScene extends Phaser.Scene {
     this.bg.setTheme(m);
     this.level.setTint(mixTint(m));
     this.fitCamera();
+    // each player's pictures — their hero in their colour, and its faces — made ahead, one a frame, while
+    // the arena's built during the countdown (they were all made at once on the battle's first frame, under
+    // the curtain: a stutter as it went up)
+    this.prep = [];
+    for (const rp of this.net.room?.players ?? [])
+      if (rp.slot >= 0 && rp.connected) {
+        const wear = rp.wear ?? '';
+        this.prep.push(() => this.textureFor(rp.hero, rp.slot, wear), () => this.textureFor(rp.hero, rp.slot, wear, true));
+      }
     this.scale.on('resize', this.fitCamera, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.scale.off('resize', this.fitCamera, this);
@@ -819,6 +830,8 @@ export class BattleScene extends Phaser.Scene {
 
   update(_t: number, deltaMs: number) {
     const dt = Math.min(deltaMs / 1000, 0.1);
+    // (one picture made ahead, if any are still to make)
+    this.prep.shift()?.();
     // names from the room list
     for (const rp of this.net.room?.players ?? []) {
       this.names.set(rp.id, rp.name);
