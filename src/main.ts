@@ -1,5 +1,4 @@
 import Phaser from 'phaser';
-import './ui/style.css';
 import { installInput } from './input/devices';
 import { BootScene } from './scenes/BootScene';
 import { GameScene } from './scenes/GameScene';
@@ -12,6 +11,7 @@ import { UI } from './ui/ui';
 import { LIGHT, LIGHT_KEY } from './core/light';
 import { savedResCap, saveResCap } from './core/res';
 import { trackBossArt } from './gfx/textures';
+import { refreshMs } from './core/refresh';
 
 installInput();
 
@@ -63,31 +63,9 @@ const size = () => ({ w: Math.max(1, Math.round(window.innerWidth * dpr())), h: 
 /**
  * Frame rate: everything runs at 60 fps, the rate the game is tuned for and
  * the rate physics steps at. Most phones refresh at 60Hz anyway; on 120Hz
- * screens we measure the refresh rate first and draw on every 2nd refresh,
+ * screens we measure the refresh rate first (core/refresh) and draw on every 2nd refresh,
  * so motion stays perfectly even (and saves battery).
  */
-function measureRefreshMs(): Promise<number> {
-  return new Promise((resolve) => {
-    const gaps: number[] = [];
-    let last = 0;
-    const done = () => {
-      gaps.sort((a, b) => a - b);
-      resolve(gaps.length >= 6 ? gaps[Math.floor(gaps.length / 2)] : 1000 / 60);
-    };
-    const timeout = setTimeout(done, 700); // e.g. opened in a background tab
-    const tick = (t: number) => {
-      if (last) gaps.push(t - last);
-      last = t;
-      if (gaps.length < 12) requestAnimationFrame(tick);
-      else {
-        clearTimeout(timeout);
-        done();
-      }
-    };
-    requestAnimationFrame(tick);
-  });
-}
-
 /** Phaser draws once the frame times it has added up reach 1000 / limit ms. */
 function fpsLimitFor(refreshMs: number) {
   const hz = 1000 / refreshMs;
@@ -212,4 +190,4 @@ function start(refreshMs: number) {
   (window as unknown as { refreshHz: number }).refreshHz = Math.round(1000 / refreshMs);
 }
 
-void measureRefreshMs().then(start);
+void refreshMs.then(start);
