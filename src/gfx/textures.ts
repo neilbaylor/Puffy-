@@ -660,7 +660,7 @@ function makeBgLayer(scene: Phaser.Scene, id: string, layer: BgLayer) {
   else addCanvas(scene, key, hiresPadV(L.near.w, L.near.h, BG_RES, (ctx) => (look ? drawMountainNear(ctx, L.near.w, L.near.h, look) : drawNearLayer(ctx, L.near.w, L.near.h, pal))), undefined, opts);
 }
 
-const BG_LAYER_IDS: readonly BgLayer[] = ['sky', 'far', 'hills', 'near'];
+export const BG_LAYER_IDS: readonly BgLayer[] = ['sky', 'far', 'hills', 'near'];
 
 
 /** Make sure a look's background layers exist (built right now if the boot hasn't got to them yet). */

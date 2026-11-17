@@ -52,3 +52,42 @@ export function loadArt(steps: Step[], label = 'Loading…'): Promise<void> {
   busy = p;
   return p;
 }
+
+/**
+ * The same small loading card, for a queue of drawing jobs that can grow as it goes (each job may
+ * put more in line): `take` gives the next one (null: all done), `left` how many are waiting.
+ */
+export function loadArtQueue(take: () => (() => void) | null, left: () => number, label = 'Loading…'): Promise<void> {
+  const run = async () => {
+    if (busy) await busy;
+    const el = document.createElement('div');
+    el.className = 'art-loader';
+    el.innerHTML = `<div class="al-card"><p>${label}</p><div class="boot-bar"></div></div>`;
+    document.getElementById('ui')?.appendChild(el);
+    const bar = el.querySelector<HTMLElement>('.boot-bar')!;
+    await nextFrame();
+    await nextFrame();
+    let done = 0;
+    let slice = performance.now();
+    for (let job = take(); job; job = take()) {
+      job();
+      done++;
+      // (never backwards: a job that adds more only slows the bar down)
+      const p = done / (done + left());
+      bar.style.setProperty('--p', String(Math.max(Number(bar.style.getPropertyValue('--p') || 0), p)));
+      if (performance.now() - slice > 40) {
+        await nextFrame();
+        slice = performance.now();
+      }
+    }
+    bar.style.setProperty('--p', '1');
+    await nextFrame();
+    await nextFrame();
+    el.remove();
+  };
+  const p = run().finally(() => {
+    if (busy === p) busy = null;
+  });
+  busy = p;
+  return p;
+}

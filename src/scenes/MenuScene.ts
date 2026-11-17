@@ -1,10 +1,11 @@
 import Phaser from 'phaser';
 import { MIN_VIEW_W, TILE, VIEW_H } from '../config';
-import { bgKey, ensureLook, freeLooksExcept, lookJobs } from '../gfx/textures';
+import { BG_LAYER_IDS, bgKey, ensureLook, freeLooksExcept, lookJobs } from '../gfx/textures';
 import { buildLevel1 } from '../level/level1';
 import { levelInfo, levelName, pickableLevels, progress } from '../level/levels';
 import { Background } from '../world/Background';
 import { LIGHT } from '../core/light';
+import { loadArtQueue } from '../ui/artLoader';
 import { Ambience } from '../world/Ambience';
 import { LevelView, groundPaintJobs, levelPieces } from '../world/LevelView';
 import { mixTint, themeClock, themeMix, themesFor } from '../world/theme';
@@ -49,6 +50,14 @@ export class MenuScene extends Phaser.Scene {
     this.building = null;
     this.pendingWorld = null;
     this.build(data?.level ?? 1);
+    // back from a level or a boss (not the first start: the loading screen does that): the other
+    // Parts' pictures the level let go are drawn again straight away, behind a small loading bar,
+    // rather than a bit at a time while the start screen glides (a string of hitches). Only when
+    // there's real drawing to do — a neighbour's look is missing — so after a battle (nothing let
+    // go) it just carries on.
+    if (this.game.registry.get('ready') && this.redraw) {
+      void loadArtQueue(() => (this.sys.isActive() ? (this.quiet.shift() ?? null) : null), () => this.quiet.length);
+    }
     // picking a level on the start screen fades the fly-over to that level's world
     const onLevel = (id: number) => {
       // (light mode: the fly-over stays as it is when another Part is picked — only the title
@@ -98,6 +107,8 @@ export class MenuScene extends Phaser.Scene {
    * opening scenery), so switching to them is instant.
    */
   private quiet: (() => void)[] = [];
+  /** The Part's quiet jobs include drawing pictures that were let go (see create). */
+  private redraw = false;
 
   /** Ground pictures drawn ahead in quiet moments (a whole level's, for its fly-over). */
   private painted: string[] = [];
@@ -399,6 +410,8 @@ export class MenuScene extends Phaser.Scene {
 
   /** The quiet-moment jobs for a Part being shown (see `quiet`). */
   private planQuiet(_id: number, near: number[], looks: readonly string[]): (() => void)[] {
+    // (a neighbour's look not drawn: the other Parts' pictures were let go — after a level)
+    this.redraw = near.some((n) => !this.worlds.has(n) && !BG_LAYER_IDS.every((l) => this.textures.exists(bgKey(l, themesFor(n)[0]))));
     const jobs: (() => void)[] = [
       // first, what a click on a neighbouring Part needs: its look and its opening scenery; then
       // the rest of this Part's ground (the level's fly-over sweeps all of it in a few seconds: drawn
