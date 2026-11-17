@@ -72,7 +72,7 @@ async function api(method: string, path: string, body?: unknown): Promise<{ ok: 
     const data = r.status === 204 ? {} : ((await r.json().catch(() => ({}))) as Record<string, unknown>);
     return { ok: r.ok, status: r.status, data };
   } catch {
-    return { ok: false, status: 0, data: { error: 'Can’t reach the server.' } };
+    return { ok: false, status: 0, data: { error: navigator.onLine === false ? 'You’re offline. Sign in once you’re back online (playing works without it).' : 'Can’t reach the server.' } };
   }
 }
 
@@ -164,3 +164,8 @@ export const account = {
     signedOut();
   },
 };
+
+// Played offline while signed in: it was all kept on this device, and it's saved to the account
+// when the connection comes back (signing back in first if the game started offline). Also on the
+// next start-up with a connection, and at the end of the next level.
+window.addEventListener('online', () => void account.restore().catch(() => {}));
