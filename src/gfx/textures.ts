@@ -63,6 +63,8 @@ export const kelpBends = (scene: Phaser.Scene) => scene.game.renderer.type === P
 /** The ground (by far the biggest pictures): lower in light mode. */
 export const TERRAIN_RES = LIGHT ? 1.25 : PROP_RES;
 export const BG_RES = LIGHT ? 1 : 1.25;
+/** The minigames' fields (the pitch, the rink, the ballpark, the courts, the sand): like the ground, lower in light mode. */
+export const FIELD_RES = LIGHT ? TERRAIN_RES : 2;
 
 /**
  * Register a drawn canvas as a (static) texture. Uses a plain image texture —
@@ -944,8 +946,8 @@ export function makeBallpark(scene: Phaser.Scene) {
   const w = BB_FIELD_TILES * TILE;
   const { END, BACK_UP, FRONT_UP, BAND_BOT } = PARK;
   const W = w + END * 2;
-  if (!scene.textures.exists('bbpark-back')) addCanvas(scene, 'bbpark-back', hires(W, BACK_UP, 1.5, (ctx) => drawBallparkBack(ctx, w, [3, 2])), undefined, { release: true });
-  if (!scene.textures.exists('bbpark-front')) addCanvas(scene, 'bbpark-front', hires(W, FRONT_UP + BAND_BOT, 2, (ctx) => drawBallparkFront(ctx, w)), undefined, { release: true });
+  if (!scene.textures.exists('bbpark-back')) addCanvas(scene, 'bbpark-back', hires(W, BACK_UP, Math.min(1.5, FIELD_RES), (ctx) => drawBallparkBack(ctx, w, [3, 2])), undefined, { release: true });
+  if (!scene.textures.exists('bbpark-front')) addCanvas(scene, 'bbpark-front', hires(W, FRONT_UP + BAND_BOT, FIELD_RES, (ctx) => drawBallparkFront(ctx, w)), undefined, { release: true });
   if (!scene.textures.exists('bb-ball')) addCanvas(scene, 'bb-ball', hires(14, 14, ART_RES, (ctx) => drawBaseball(ctx, 7, 7, 5.5)));
   if (!scene.textures.exists('bb-drive')) addCanvas(scene, 'bb-drive', hires(64, 16, ART_RES, (ctx) => drawLineDrive(ctx, 55, 8, 5.5, 1)));
 }

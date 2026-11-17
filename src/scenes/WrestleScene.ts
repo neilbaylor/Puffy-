@@ -17,6 +17,7 @@ import { drawPrize } from '../gfx/prizes';
 import { STYLES } from '../gfx/handdrawn';
 import { CHAIR_H, CHAIR_W, KING_SEAT, PLOP_DOME, PLOP_DOME_RING, POO_PALACE, POO_PALACE_RING, setRingLook, drawFoldingChair, POST_BOX, PUDDLE, RING, RING_BOX, ROPE_COL, TUNNEL, backX, drawArenaPoo, drawFrontPost, drawRing, drawRingFloor, drawRingside, drawTunnel, drawWrestleJumbo } from '../gfx/wrestle';
 import { HERO_SHEET_M, PCHUTE_DOWN, PCHUTE_RES, PCHUTE_UP, PLOP_PAD, PLOP_RES, PLOP_TOP, addCanvas, hires, makeCarrySheet, makeJetFx, makePlopChutes, makePlops, makeWeaponArt } from '../gfx/textures';
+import { liveCanvas } from '../gfx/liveCanvas';
 import { BLASTER, SAW, W_RES } from '../gfx/weapons';
 import { JET_NOZZLES, ROBE_H, ROBE_W, drawDuck, drawPlopKing, drawRobeHeap } from '../gfx/plopking';
 import { BOOM_FRAMES, BOOM_SIZE, drawBoomFrame } from '../gfx/boom';
@@ -632,10 +633,10 @@ export class WrestleScene extends Phaser.Scene {
     this.add.image(0, 0, this.tk('wr-arena')).setOrigin(0).setScale(AS_).setDepth(DEPTH_W.arena);
     this.crowd = this.add.image(0, 0, this.tk('wr-crowd')).setOrigin(0).setScale(AS_).setDepth(DEPTH_W.crowd);
     this.add.image(0, 0, this.tk('wr-front')).setOrigin(0).setScale(AS_).setDepth(DEPTH_W.front);
-    this.jumboTex = this.textures.exists('wr-jumbo') ? (this.textures.get('wr-jumbo') as Phaser.Textures.CanvasTexture) : this.textures.createCanvas('wr-jumbo', JUMBO.w * 2, JUMBO.h * 2)!;
+    this.jumboTex = liveCanvas(this.textures, 'wr-jumbo', JUMBO.w * 2, JUMBO.h * 2);
     // (the screens glow: they're in front of the darkness when the lights go down, like the basketball jumbotron)
     this.add.image(WX(JUMBO.x), WY(JUMBO.y), 'wr-jumbo').setOrigin(0).setScale((JUMBO.s * K) / 2).setDepth(DEPTH_W.dark + 0.05);
-    this.ribbonTex = this.textures.exists('wr-ribbon') ? (this.textures.get('wr-ribbon') as Phaser.Textures.CanvasTexture) : this.textures.createCanvas('wr-ribbon', RIBBON.w * 2, RIBBON.h * 2)!;
+    this.ribbonTex = liveCanvas(this.textures, 'wr-ribbon', RIBBON.w * 2, RIBBON.h * 2);
     this.add.image(WX(RIBBON.x), WY(RIBBON.y), 'wr-ribbon').setOrigin(0).setScale(K / 2).setDepth(DEPTH_W.dark + 0.05);
     this.add.image(WX(RING_BOX.x), WY(RING_BOX.y), this.tk('wr-ring')).setOrigin(0).setScale(K / RES).setDepth(DEPTH_W.ring);
     this.ringside = this.add.image(WX(-160), WY(500), 'wr-ringside').setOrigin(0).setScale(K / 1.5).setDepth(DEPTH_W.ringside);
@@ -769,20 +770,22 @@ export class WrestleScene extends Phaser.Scene {
         drawRingside(ctx);
       }), undefined, { release: true });
     // Queen Plop and the King, all their frames (a grid: one long strip is too wide for some phones)
-    const sheetOf = (key: string, draw: (ctx: CanvasRenderingContext2D, f: PlopFrame) => void) => {
+    // (`frames`: only those, for one that only strikes a few poses)
+    const sheetOf = (key: string, draw: (ctx: CanvasRenderingContext2D, f: PlopFrame) => void, frames: readonly PlopFrame[] = PLOP_FRAMES) => {
       if (T.exists(key)) return;
       const fw = Math.round((PLOP_W + Q_PAD * 2) * Q_RES);
       const fh = Math.round((PLOP_H + Q_TOP) * Q_RES);
-      const COLS = 5;
-      const { c, ctx } = canvas(fw * COLS, fh * Math.ceil(PLOP_FRAMES.length / COLS));
-      PLOP_FRAMES.forEach((f, i) => {
+      // (five across, or as few rows as fit and the frames shared out evenly between them)
+      const COLS = Math.ceil(frames.length / Math.ceil(frames.length / 5));
+      const { c, ctx } = canvas(fw * COLS, fh * Math.ceil(frames.length / COLS));
+      frames.forEach((f, i) => {
         ctx.save();
         ctx.translate((i % COLS) * fw, Math.floor(i / COLS) * fh);
         ctx.scale(Q_RES, Q_RES);
         draw(ctx, f);
         ctx.restore();
       });
-      addCanvas(this, key, c, (t) => PLOP_FRAMES.forEach((f, i) => t.add(f, 0, (i % COLS) * fw, Math.floor(i / COLS) * fh, fw, fh)), { release: true });
+      addCanvas(this, key, c, (t) => frames.forEach((f, i) => t.add(f, 0, (i % COLS) * fw, Math.floor(i / COLS) * fh, fw, fh)), { release: true });
     };
     if (this.kingFight) {
       // the Plop King: in his robe (walking in), and stripped for the fight with his jetpack on his back
@@ -811,7 +814,8 @@ export class WrestleScene extends Phaser.Scene {
       }
     } else {
       sheetOf('wr-queen', (ctx, f) => drawQueen(ctx, Q_PAD, Q_TOP, f));
-      sheetOf('wr-king', (ctx, f) => drawPlop(ctx, Q_PAD, Q_TOP, f, STYLES.polished, 'king'));
+      // (the King's cameo in the front row at the end: just the poses it strikes, see win)
+      sheetOf('wr-king', (ctx, f) => drawPlop(ctx, Q_PAD, Q_TOP, f, STYLES.polished, 'king'), ['idle', 'look', 'grin', 'yell1', 'run0', 'run1']);
     }
     // Queen Plop knocked out (four frames: breathing, eyes spinning)
     if (!this.kingFight && !T.exists('wr-queen-ko')) {

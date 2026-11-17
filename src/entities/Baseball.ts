@@ -4,7 +4,7 @@ import { sfx } from '../core/sfx';
 import { ART_RES } from '../gfx/draw';
 import { BB_ROSTER, BB_SIZE, PARK, parkSpots, type BBPlayer, type BaseballRole } from '../gfx/baseball';
 import { PLOP_H, PLOP_W } from '../gfx/plops';
-import { PLOP_TOP, makeBallPlayer, makeBallpark } from '../gfx/textures';
+import { FIELD_RES, PLOP_TOP, makeBallPlayer, makeBallpark } from '../gfx/textures';
 import type { GameScene } from '../scenes/GameScene';
 import { BigPlop, Plop } from './enemies/Plops';
 import type { Player } from './Player';
@@ -238,8 +238,8 @@ export class BaseballGame {
     // the ballpark: the wall, scoreboard, backstop and lights behind; the turf, infield and bases over the ground
     // (drawn while the level loads; here only if it somehow wasn't)
     makeBallpark(gs);
-    gs.add.image(x0 - END, ground, 'bbpark-back').setOrigin(0, 1).setScale(1 / 1.5).setDepth(DEPTH.decor - 1);
-    gs.add.image(x0 - END, ground - FRONT_UP, 'bbpark-front').setOrigin(0, 0).setScale(1 / 2).setDepth(DEPTH.tiles + 0.5);
+    gs.add.image(x0 - END, ground, 'bbpark-back').setOrigin(0, 1).setScale(1 / Math.min(1.5, FIELD_RES)).setDepth(DEPTH.decor - 1);
+    gs.add.image(x0 - END, ground - FRONT_UP, 'bbpark-front').setOrigin(0, 0).setScale(1 / FIELD_RES).setDepth(DEPTH.tiles + 0.5);
 
     // the players, in their spots (the field's spots are measured from the picture's left edge)
     const sp = parkSpots(w);
