@@ -29,7 +29,17 @@ const decoding = new Map<Track, Promise<AudioBuffer | null>>();
 let recent: Track[] = [];
 
 function fetchBytes(t: Track) {
-  if (!bytes.has(t)) bytes.set(t, fetch(urls[t]).then((r) => r.arrayBuffer()));
+  // (no connection and the song not saved for offline: no song, and asked for again next time)
+  if (!bytes.has(t))
+    bytes.set(
+      t,
+      fetch(urls[t])
+        .then((r) => r.arrayBuffer())
+        .catch((e) => {
+          bytes.delete(t);
+          throw e;
+        }),
+    );
   return bytes.get(t)!;
 }
 
