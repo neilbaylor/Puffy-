@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.337)
+## Where things stand (v0.338)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -31,6 +31,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   Home screen (yellow).
 - Start screen: drone fly-over behind, logo hop, hero cards (pick = hop / backflip), Play, Part picker once a
   level is beaten, mute (top-left), full screen + **Battle** buttons (top-right, same height, side by side).
+- v0.338: account.savedName (creds name while user not loaded) → account button shows name + "offline" tag; tapping shows an offline card. Offline song warm-up (7 MB) and 3.5 s page wait kept as is (user ok).
 - v0.337: BT3 merged: after battle the menu shows the picked Part; full battle uses one look; lite other heroes at res 1.5 (makeHeroSheet optional res); Plops res per size (full 1/1.5/2, lite 1/1.25/1.25); lite lobby backdrop still (MenuScene.setStill); lite spectator 30 fps.
 - v0.336: Reverted v0.333 (boss no longer frees start-screen ground/looks). User: no freeing of start-screen art for bosses or battle (dislikes slow start-screen redraw). Levels unchanged (they still free neighbours' art at level start, as always; return redraws neighbours over ~10 s — user offered keep-in-memory (+~95 MB full) or gentler delayed redraw).
 - v0.335: BT2 merged: server packs snapshots straight from sim + bytes once (CPU/room −26%), ws heartbeat 30 s; client lateness window kept sorted, hero keys cached, lobby squares rebuilt only on change; leaving battle frees battle-only textures + stops warm arena; other heroes drawn during countdown; chairViews cleared (chairs off). Open: free start-screen scenery during battle (full ~100 MB); menu shows Part 1 after battle; proposals (arena ground res, one battle look, lite bchar res, Plop res, lite still lobby flyover, lite spectator 30 fps).
