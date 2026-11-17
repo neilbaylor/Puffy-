@@ -101,8 +101,8 @@ type TrailPt = { x: number; y: number; s: number };
  * so the chase feels about as hard whoever you are — Scruffy's quick and small (they push harder),
  * Big Muscles is big and slower round the rocks (a little easier on him).
  */
-const HERO_K: Record<string, number> = { puffy: 1.04, scruffy: 1.08, muscles: 0.93 };
-const heroK = (p: Player) => HERO_K[p.char.id] ?? 1.04;
+const HERO_K: Record<string, number> = { puffy: 1.06, scruffy: 1.15, muscles: 0.93 };
+const heroK = (p: Player) => HERO_K[p.char.id] ?? 1.06;
 
 const NAMES: Record<string, string> = { stone: 'Stone', slinger: 'Slinger', kai: 'Kai', zippy: 'Zippy' };
 

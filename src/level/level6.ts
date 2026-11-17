@@ -19,16 +19,16 @@ import { LevelBuilder, type LevelData } from './builder';
  *   34-74   The kelp meadow: a gentle start, low rocks, a floating slab (Fat Fish #1, open water)
  *   75-116  The slabs: rock slabs floating in the water, then a sandbar (the bed comes up: shallow water) (checkpoint)
  *   117-162 The reef narrows: a shelf hangs under the surface, low rocks below (checkpoint)
- *   163-208 The open blue: wide water, bad guys (checkpoint, Fat Fish #2)
- *   209-278 The Reef Bowl: underwater football on the sea bed (the Snappers v the Stallions) under a reef roof, and
+ *   163-233 The open blue: wide water, bad guys (checkpoint, Fat Fish #2 — room for it before the Reef Bowl)
+ *   234-303 The Reef Bowl: underwater football on the sea bed (the Snappers v the Stallions) under a reef roof, and
  *           they throw at you as you swim over (checkpoint just before the field)
- *   279-332 The kelp weave: rock slabs high and low by turns — up, down, up (checkpoint)
- *   333-360 The narrows: a tunnel under the reef, the gang squeezing in after you
- *   361-390 The deep blue: out into open water again (checkpoint, Fat Fish #3)
- *   391-429 The sprint home: up the slope to the gate
+ *   304-357 The kelp weave: rock slabs high and low by turns — up, down, up (checkpoint)
+ *   358-385 The narrows: a tunnel under the reef, the gang squeezing in after you
+ *   386-415 The deep blue: out into open water again (checkpoint, Fat Fish #3)
+ *   416-454 The sprint home: up the slope to the gate
  */
 export function buildLevel6(): LevelData {
-  const W = 430;
+  const W = 455;
   const H = 22;
   const SURF = 17;
   const L = new LevelBuilder('The Rise of King Bob · Part 2', 'World 3', W, H);
@@ -39,11 +39,11 @@ export function buildLevel6(): LevelData {
   // there's more to see. (Its last point well clear of the pier: right beside the hero, the
   // flight's curve swung on past him and back.)
   L.flyPath = [
-    [424, 11],
-    [375, 10],
-    [346, 8.5],
-    [305, 9],
-    [240, 6.5],
+    [449, 11],
+    [400, 10],
+    [371, 8.5],
+    [330, 9],
+    [265, 6.5],
     [170, 10],
     [110, 9.5],
     [52, 13],
@@ -140,73 +140,81 @@ export function buildLevel6(): LevelData {
   // (open water: the second Fat Fish's way down)
   L.aura(204.5, 7, true);
 
+  // ── More open blue: the second Fat Fish's water, before the Reef Bowl ──
+  // (it comes down on you here, out in the open — not over the reef roof)
+  L.ground(209, 233, 2);
+  L.spawn('tree', 213, 2, { h: 240 });
+  L.spawn('fish', 220, 10);
+  L.auraArc(224, 3, 9, 1, true);
+  L.spawn('tree', 230, 2, { h: 200 });
+
   // ── The Reef Bowl: underwater football on the sea bed ───────
   // (the Snappers and the Stallions playing as you swim over, and throwing at you: see
-  // entities/Football.ts. The field's end lines are at 220 and 256, its stands and posts a little
+  // entities/Football.ts. The field's end lines are at 245 and 281, its stands and posts a little
   // past both; a checkpoint just before it, nothing standing on it)
-  L.ground(209, 278, 2);
-  L.spawn('tree', 210, 2, { h: 230 });
-  L.auraArc(211, 3, 9, 1, true);
-  L.spawn('checkpoint', 215, 2);
-  L.football(220, 2);
+  L.ground(234, 303, 2);
+  L.spawn('tree', 235, 2, { h: 230 });
+  L.auraArc(236, 3, 9, 1, true);
+  L.spawn('checkpoint', 240, 2);
+  L.football(245, 2);
   // (a reef roof over the field: the water's shallower here — you swim right over the players' heads)
-  shelf(216, 260, 9);
-  L.auraArc(227, 3, 6.5, 0.8, true);
-  L.auraArc(245, 3, 6.5, 0.8, true);
-  L.spawn('fish', 251, 7);
-  L.spawn('tree', 261, 2, { h: 220 });
-  L.rock(264, 266, 3, 4);
-  slab(268, 272, 10, 10);
-  L.aura(270, 7, true);
-  L.spawn('fish', 274, 9);
-  L.rootbeer(276, 12);
+  shelf(241, 285, 9);
+  L.auraArc(252, 3, 6.5, 0.8, true);
+  L.auraArc(270, 3, 6.5, 0.8, true);
+  L.spawn('fish', 276, 7);
+  L.spawn('tree', 286, 2, { h: 220 });
+  L.rock(289, 291, 3, 4);
+  slab(293, 297, 10, 10);
+  L.aura(295, 7, true);
+  L.spawn('fish', 299, 9);
+  L.rootbeer(301, 12);
 
   // ── The kelp weave: slabs high and low by turns ──────────────
-  L.ground(279, 332, 3);
-  L.spawn('checkpoint', 280, 3);
-  slab(284, 288, 10, 13);
-  L.auraArc(284.6, 3, 7, 0.5, true);
-  L.spawn('tree', 290, 3, { h: 230 });
-  slab(293, 297, 4, 7);
-  L.auraArc(293.6, 3, 11, 0.5, true);
-  slab(302, 306, 10, 13);
-  L.spawn('fish', 308, 9);
-  slab(311, 315, 4, 7);
-  L.auraArc(311.6, 3, 11, 0.5, true);
-  L.rootbeer(313, 14);
-  slab(320, 324, 10, 13);
-  L.spawn('tree', 327, 3, { h: 200 });
-  L.aura(329, 9, true);
+  L.ground(304, 357, 3);
+  L.spawn('checkpoint', 305, 3);
+  slab(309, 313, 10, 13);
+  L.auraArc(309.6, 3, 7, 0.5, true);
+  L.spawn('tree', 315, 3, { h: 230 });
+  slab(318, 322, 4, 7);
+  L.auraArc(318.6, 3, 11, 0.5, true);
+  slab(327, 331, 10, 13);
+  L.spawn('fish', 333, 9);
+  slab(336, 340, 4, 7);
+  L.auraArc(336.6, 3, 11, 0.5, true);
+  L.rootbeer(338, 14);
+  slab(345, 349, 10, 13);
+  L.spawn('tree', 352, 3, { h: 200 });
+  L.aura(354, 9, true);
 
   // ── The narrows: a tunnel under the reef ─────────────────────
-  L.ground(333, 360, 5);
-  shelf(334, 359, 12);
-  L.auraArc(336, 4, 8.5, 0.6, true);
-  L.rock(342, 343, 6, 6);
-  L.spawn('fish', 348, 9);
-  L.auraArc(350, 3, 8.5, 0.6, true);
-  L.rock(355, 356, 11, 11);
+  L.ground(358, 385, 5);
+  shelf(359, 384, 12);
+  L.auraArc(361, 4, 8.5, 0.6, true);
+  L.rock(367, 368, 6, 6);
+  L.spawn('fish', 373, 9);
+  L.auraArc(375, 3, 8.5, 0.6, true);
+  L.rock(380, 381, 11, 11);
 
   // ── The deep blue: open water again ──────────────────────────
-  L.ground(361, 390, 2);
-  L.spawn('checkpoint', 364, 2);
-  L.auraArc(367, 3, 10, 1.4, true);
-  L.fatDrop(370);
-  L.spawn('bigfish', 376, 10);
-  L.spawn('tree', 379, 2, { h: 250 });
-  L.rock(382, 384, 3, 4);
-  L.auraArc(385, 3, 12, 1, true);
-  L.spawn('fish', 388, 7);
+  L.ground(386, 415, 2);
+  L.spawn('checkpoint', 389, 2);
+  L.auraArc(392, 3, 10, 1.4, true);
+  L.fatDrop(395);
+  L.spawn('bigfish', 401, 10);
+  L.spawn('tree', 404, 2, { h: 250 });
+  L.rock(407, 409, 3, 4);
+  L.auraArc(410, 3, 12, 1, true);
+  L.spawn('fish', 413, 7);
 
   // ── The sprint home: up the slope to the gate ────────────────
-  L.ground(391, 396, 4);
-  L.ground(397, 403, 6);
-  L.ground(404, 429, 8);
-  L.auraArc(393, 2, 9, 1, true);
-  L.rootbeer(400, 12);
-  L.spawn('tree', 407, 8, { h: 180 });
-  L.spawn('fish', 414, 13);
-  L.aura(418, 12, true);
-  L.spawn('goal', 424, 8);
+  L.ground(416, 421, 4);
+  L.ground(422, 428, 6);
+  L.ground(429, 454, 8);
+  L.auraArc(418, 2, 9, 1, true);
+  L.rootbeer(425, 12);
+  L.spawn('tree', 432, 8, { h: 180 });
+  L.spawn('fish', 439, 13);
+  L.aura(443, 12, true);
+  L.spawn('goal', 449, 8);
   return L.build();
 }
