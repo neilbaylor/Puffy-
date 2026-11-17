@@ -342,3 +342,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.337: Battle: you go back to the Part you picked afterwards; battles use less memory; the lobby is smoother on lite devices.
 - v0.338: Signed in but offline: the account button still shows your name, marked offline.
 - v0.339: Coming back to the home screen after a level: a short loading bar, then a smooth home screen (no more stuttering while it redraws).
+- v0.340: Clearer offline message on the account card.
