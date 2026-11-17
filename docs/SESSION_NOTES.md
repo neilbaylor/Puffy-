@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.328)
+## Where things stand (v0.329)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -31,6 +31,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   Home screen (yellow).
 - Start screen: drone fly-over behind, logo hop, hero cards (pick = hop / backflip), Play, Part picker once a
   level is beaten, mute (top-left), full screen + **Battle** buttons (top-right, same height, side by side).
+- v0.329: Part 6 now 455 tiles: new open water 209-233 (Fat Fish #2 at 190 lands there instead of on the reef roof); everything from the Reef Bowl on +25 (football 245, shelf 241-285, fatDrop 395, goal 449). FishChase HERO_K puffy 1.06, scruffy 1.15, muscles 0.93. Scruffy bot: game over at the football field (bot is weaker than a human).
 - v0.328: Sea.ts light beams: true modulo wrap (they slid off the left partway into Parts 5-6). Full-mode HUD portrait left as is (user: low priority); other Parts trees/piers memory still undecided.
 - v0.327: PERF F1 (merged claude/perf-f1): Fx/Sea emitters hidden while empty (drawOnlyWhenBusy, PRE_RENDER); under the sea kelp ropes, Ferris wheel, sky strip pieces, light beams, far critters culled off view; checkpoints/gate/football players/shadows/last bg pictures culled; HUD writes only changes, bank.ts caches reads (cleared on put / storage event); Part 6 no longer makes fish-kai; start-screen kelp culled; bad-guy weapons + Giant pips culled with their owner; LevelView trim: ground pictures stop TRIM_KEEP 64 px under the level bottom (not arenas). Part 6: draw calls 27 → ~6, render JS 4.6 → 2.5 ms (4×), textures 140 → 122 MB full / 59 → 50 light. Owner decisions pending: full-mode HUD portrait hitches (worker / 3× / fewer glance heights); light beams under the sea drift off screen partway into Parts 5-6 (bug, fixing changes the look); other Parts' trees/piers kept in memory in full mode (~14 MB in Part 6).
 - v0.326: Part 6 shallow water twice: shelf(216, 260, 9) over the football field (aura arcs 227/245 at h6.5, fish 251 h7, flyPath [240, 6.5]); a sandbar in the slabs (ground 100-101 h6, 102-103 h9, 104-111 h11, 112-113 h9, 114-116 h6; slab 95-102 and rock 108-109 gone; bigfish 108 h14, root beer 111.5 h14.5).

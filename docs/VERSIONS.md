@@ -331,3 +331,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.326: Part 6: shallow water twice (a reef roof over the football field, a sandbar).
 - v0.327: Perf: Part 6 draws about half as much per frame (and less memory); savings across the app.
 - v0.328: Under the sea: the light beams no longer vanish partway into Parts 5 and 6.
+- v0.329: Part 6: a stretch of open water before the football game (the second Fat Fish can get you there); the gang is quicker after Scruffy, a touch quicker after Puffy.
