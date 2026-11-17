@@ -27,8 +27,12 @@ export const refreshMs: Promise<number> = new Promise((resolve) => {
     }, WAIT);
   };
   let timeout = arm();
+  // (the first frames, the loading screen's first paint, aren't counted: they can run long; nor is
+  // a gap over 100 ms — no screen is that slow: that's the page busy, e.g. the game's code starting)
+  let skip = 2;
   const tick = (t: number) => {
-    if (last) gaps.push(t - last);
+    if (skip > 0) skip--;
+    else if (last && t - last <= 100) gaps.push(t - last);
     last = t;
     if (gaps.length < 12) requestAnimationFrame(tick);
     else {
