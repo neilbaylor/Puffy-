@@ -71,7 +71,7 @@ export const BG_RES = LIGHT ? 1 : 1.25;
  * so nothing separate: the keys are the shared ones.)
  */
 export const HOME_LO = !LIGHT;
-export const TERRAIN_LO_RES = 1.25;
+export const TERRAIN_LO_RES = 1;
 export const HOME_BG_RES = 1;
 /** The minigames' fields (the pitch, the rink, the ballpark, the courts, the sand): like the ground, lower in light mode. */
 export const FIELD_RES = LIGHT ? TERRAIN_RES : 2;
