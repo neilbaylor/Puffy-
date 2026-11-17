@@ -339,3 +339,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.334: The game starts its engine sooner after downloading, and its fonts now come from Puffy's own server (a little quicker on phones, and they work offline).
 - v0.335: Battle: the server does about a quarter less work per room, dropped connections are noticed, the lobby is lighter, no hitch when a battle starts, and memory is freed when you leave.
 - v0.336: Bosses keep the home screen ready again, so coming back from one is instant.
+- v0.337: Battle: you go back to the Part you picked afterwards; battles use less memory; the lobby is smoother on lite devices.
