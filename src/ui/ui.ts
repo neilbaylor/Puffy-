@@ -1352,6 +1352,14 @@ export class UI {
     this.game.scene.stop('Wrestle');
     this.game.scene.stop('Fishing');
     this.game.scene.stop('Game');
+    // the start screen's ground and background looks let go, as a level does when it starts (a
+    // boss's arena uses neither: ~100 MB of graphics memory in full mode); the start screen draws
+    // them again when you're back. (Its trees and piers are kept: quick to come back to.)
+    // (once the start screen's scene has really stopped: nothing of it still drawing them)
+    this.game.scene.getScene(boss.scene).events.once(Phaser.Scenes.Events.CREATE, () => {
+      if (this.game.scene.isActive('Menu')) return;
+      for (const k of this.game.textures.getTextureKeys()) if (k.startsWith('terrain-') || /^bg-[a-z]+:/.test(k)) this.game.textures.remove(k);
+    });
     this.game.scene.start(boss.scene, bossData(this.session, hero.id, level));
   }
 
