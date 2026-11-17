@@ -752,7 +752,10 @@ export class UI {
   /** The account button's label: your name once signed in, else "Sign in". */
   private accountLabel() {
     const u = account.user;
-    return u ? `${PERSON}<span>${esc(u.name)}</span><small class="acct-rb"><i class="rb-ico"></i>${shortCount(bank.rootbeerLeft)}</small>` : `${PERSON}<span>Sign in</span>`;
+    if (u) return `${PERSON}<span>${esc(u.name)}</span><small class="acct-rb"><i class="rb-ico"></i>${shortCount(bank.rootbeerLeft)}</small>`;
+    // (signed in on this device, the server not reached yet — offline, say: still your name)
+    const saved = account.savedName;
+    return saved ? `${PERSON}<span>${esc(saved)}</span><small class="acct-off">offline</small>` : `${PERSON}<span>Sign in</span>`;
   }
 
   /**
@@ -762,6 +765,23 @@ export class UI {
    */
   private showAccount() {
     const u = account.user;
+    // signed in here but the server not reached (offline): who you are, and that it'll catch up
+    const saved = account.savedName;
+    if (!u && saved) {
+      const off = h(`<div class="screen modal acct">
+      <div class="panel acct-panel">
+        <h2>Hi ${esc(saved)}!</h2>
+        <p class="acct-err ask">${navigator.onLine === false ? 'You’re offline.' : 'Can’t reach the server just now.'}\nKeep playing: your progress is saved on this device, and to your account as soon as you’re back online.</p>
+        <div class="row acct-main"><button class="btn btn-go" data-act="back">Done</button></div>
+      </div>
+    </div>`);
+      off.querySelector('[data-act=back]')!.addEventListener('click', () => {
+        sfx.back();
+        this.showStart();
+      });
+      this.setScreen(off);
+      return;
+    }
     // signed in: like the end-of-level card — your hero on the left, your player's stats on the right
     const el = u
       ? h(`<div class="screen modal acct">

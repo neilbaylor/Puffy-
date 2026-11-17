@@ -2634,6 +2634,15 @@ kbd {
   font: 400 clamp(16px, 3.1vmin, 22px) / 1 var(--display);
   color: #8a5a2a;
 }
+.acct-off {
+  margin-left: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #e8e2d8;
+  box-shadow: inset 0 0 0 2px #b9ad9a;
+  font: 400 clamp(13px, 2.6vmin, 17px) / 1 var(--display);
+  color: #6d6252;
+}
 .acct-rb .rb-ico { display: inline-block; width: 0.8em; height: 1em; margin: 0.07em 0 0.2em; background: var(--rootbeer-img) center / contain no-repeat; }
 /* signed in: the battle name is your player's (not editable) */
 .bl-namebox.locked input { cursor: default; }

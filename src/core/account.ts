@@ -109,6 +109,14 @@ export const account = {
   get signedIn() {
     return !!token && !!user;
   },
+  /**
+   * Signed in on this device but the server not reached yet (offline, say): the name kept here, so
+   * the start screen can still show who you are. Null once the account is loaded, or signed out.
+   */
+  get savedName(): string | null {
+    if (user) return null;
+    return savedCreds()?.name ?? null;
+  },
   /** Something about the account changed (signed in or out, progress saved). */
   onChange(fn: () => void) {
     listeners.add(fn);
