@@ -17,6 +17,7 @@ import { freeBossArtExcept, gameArtJobs } from '../gfx/textures';
 import { loadArt } from './artLoader';
 import { BattleNet, battleUrl, type NetStatus } from '../net/battleNet';
 import { freeBattleArt, type BattleHud } from '../scenes/BattleScene';
+import { LIGHT } from '../core/light';
 
 /** The results card's Leave button ignores taps this long after it shows (mashed shoot taps). */
 const RESULTS_GUARD_MS = 1500;
@@ -180,6 +181,7 @@ export class BattleUI {
     this.host.game.events.off('battle-hud', this.onHud);
     this.stopBattle();
     this.dropWarm();
+    this.homeStill(false);
     this.lobby = null;
     this.askCode();
   }
@@ -198,8 +200,19 @@ export class BattleUI {
     // (done with battles for now: the pictures only a battle shows go — they're drawn again, as the first
     // time, if you come back)
     freeBattleArt(this.host.game);
+    this.homeStill(false);
     this.lobby = null;
     this.host.home();
+  }
+
+  /**
+   * Light mode: the start screen's fly-over stands still behind the lobby (a still picture: no gliding,
+   * no scenery drawn as it would glide on — an older device's time goes to the lobby, and to the live
+   * window when watching). The countdown's rumble still shakes it.
+   */
+  private homeStill(on: boolean) {
+    if (!LIGHT) return;
+    (this.host.game.scene.getScene('Menu') as unknown as { setStill?: (on: boolean) => void } | null)?.setStill?.(on);
   }
 
   /**
@@ -308,6 +321,7 @@ export class BattleUI {
 
   private showLobby() {
     this.stopBattle();
+    this.homeStill(true);
     const el = h(`<div class="screen battle-lobby">
       <button class="icon-btn bl-back" aria-label="Back">‹</button>
       <button class="bl-roomtag" aria-label="Room code (change room)">Room <b>${esc(this.code)}</b></button>

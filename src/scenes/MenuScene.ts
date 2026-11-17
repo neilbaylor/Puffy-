@@ -44,6 +44,7 @@ export class MenuScene extends Phaser.Scene {
 
   create(data?: { silent?: boolean; level?: number }) {
     // (a fresh start: anything kept from before went with the scene)
+    this.still = this.held = false;
     this.worlds.clear();
     this.building = null;
     this.pendingWorld = null;
@@ -79,6 +80,16 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private levelId = 0;
+  /**
+   * Standing still (light mode, behind the battle lobby: see BattleUI): after one more whole frame
+   * (so the view's in place), the fly-over isn't moved, nor its scenery drawn as it would glide on.
+   */
+  private still = false;
+  private held = false;
+  setStill(on: boolean) {
+    this.still = on;
+    if (!on) this.held = false;
+  }
   /** The level shown before this one (kept drawn too: hopping back to it is instant). */
   private prevId = 0;
   /**
@@ -461,6 +472,8 @@ export class MenuScene extends Phaser.Scene {
       // Parts are ready sooner)
       this.nextQuiet = performance.now() + (took < 12 ? 0 : Math.min(250, took * 6));
     }
+    if (this.still && this.held) return;
+    this.held = this.still;
     const cam = this.cameras.main;
     const zoom = Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W);
     cam.setZoom(zoom);
