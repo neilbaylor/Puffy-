@@ -651,6 +651,7 @@ export class BattleUI {
     playBattleMusic(() => this.lastTimeLeft, MATCH_SECS);
     if (!curtainUp) this.host.touch(true);
     this.hud?.remove();
+    this.chipsHtml = '';
     this.hud = h(`<div class="bhud">
       <div class="bhud-time">2:00</div>
       <div class="bhud-ping" hidden></div>
@@ -739,6 +740,8 @@ export class BattleUI {
   }
 
   private lastTimeLeft = MATCH_SECS;
+  /** The scoreboard's last contents. */
+  private chipsHtml = '';
   private renderHud(s: BattleHud) {
     this.lastTimeLeft = s.timeLeft;
     if (!this.hud) return;
@@ -768,7 +771,11 @@ export class BattleUI {
       .sort((a, b) => a.slot - b.slot)
       .map((p) => `<span class="bhud-chip${p.id === this.net?.myId ? ' me' : ''}${p.down ? ' down' : ''}" style="--sc:${SLOT_COLORS[p.slot]}"><i></i>${esc(names.get(p.id) ?? '')}<b>${p.kos}</b></span>`)
       .join('');
-    if (chips.innerHTML !== html) chips.innerHTML = html;
+    // (against what was put there last: reading innerHTML back writes the whole scoreboard out again)
+    if (this.chipsHtml !== html) {
+      this.chipsHtml = html;
+      chips.innerHTML = html;
+    }
   }
 
   private showResults(r: RoomState) {

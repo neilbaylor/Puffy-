@@ -132,6 +132,9 @@ interface HeroView {
   ice: Phaser.GameObjects.Image;
   /** Off screen: an arrow at the edge pointing to them, with their name (not for you). */
   arrow?: Phaser.GameObjects.Container;
+  /** Their pictures' keys (textureFor: worked out once, not twice a frame — it reads what you've got on from storage). */
+  bodyKey: string;
+  faceKey: string;
 }
 
 const PRIZE_TEXT: Record<PrizeKind, [string, string]> = {
@@ -274,6 +277,8 @@ export class BattleScene extends Phaser.Scene {
   private interp = 3;
   /** When recent snapshots came, less their tick's time (ms; the earliest of them: `lateBase`). */
   private lateness: number[] = [];
+  /** (`lateness`, smallest first) */
+  private lateSorted: number[] = [];
   private lateBase: number | null = null;
   /** The others carried on past the newest snapshot (by the rules, with their last buttons): a few ticks of it, worked out once per snapshot. */
   private ahead: { tick: number; players: Map<string, BPlayer[]> } | null = null;
@@ -350,6 +355,7 @@ export class BattleScene extends Phaser.Scene {
     this.otherClock = null;
     this.interp = 3;
     this.lateness = [];
+    this.lateSorted = [];
     this.lateBase = null;
     this.ahead = this.aheadPrev = null;
     this.otherFix.clear();
@@ -763,10 +769,11 @@ export class BattleScene extends Phaser.Scene {
     if (!v) {
       const c = characterById(p.hero);
       const col = SLOT_COLORS[p.slot % SLOT_COLORS.length];
-      const sprite = this.add.sprite(p.x, p.y, this.textureFor(p.hero, p.slot, wear), 'idle0').setOrigin(0.5, 1).setScale(c.scale / ART_RES).setDepth(DEPTH.players);
+      const bodyKey = this.textureFor(p.hero, p.slot, wear);
+      const sprite = this.add.sprite(p.x, p.y, bodyKey, 'idle0').setOrigin(0.5, 1).setScale(c.scale / ART_RES).setDepth(DEPTH.players);
       // (and their faces now too, while the curtain's still up: drawn the first time they blinked, it
       // was a stutter in the middle of the battle)
-      this.textureFor(p.hero, p.slot, wear, true);
+      const faceKey = this.textureFor(p.hero, p.slot, wear, true);
       const tag = this.add
         .text(p.x, p.y, this.names.get(p.id) ?? '', { fontFamily: 'Nunito, sans-serif', fontSize: '13px', fontStyle: '900', color: '#ffffff', stroke: col, strokeThickness: 4 })
         .setOrigin(0.5, 1)
@@ -775,7 +782,7 @@ export class BattleScene extends Phaser.Scene {
       const hearts = this.add.image(0, 0, this.heartsTex(HEARTS)).setScale(1 / HEART_RES).setDepth(DEPTH.text);
       const halo = p.id === this.net.myId ? this.add.image(p.x, p.y, 'bhalo').setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.players - 0.05) : undefined;
       const ice = this.add.image(p.x, p.y, 'bice').setOrigin(0.5, 1).setScale(1 / ART_RES).setDepth(DEPTH.players + 0.2).setVisible(false);
-      v = { wear, cheer: -1, sprite, tag, hearts, anim: 0, tilt: 0, slot: p.slot, hero: p.hero, size: 1, sparkT: 0, face: new FaceClock(), halo, ice, chairA: null };
+      v = { wear, cheer: -1, sprite, tag, hearts, anim: 0, tilt: 0, slot: p.slot, hero: p.hero, size: 1, sparkT: 0, face: new FaceClock(), halo, ice, chairA: null, bodyKey, faceKey };
       if (p.id !== this.net.myId) v.arrow = this.makeArrow(this.names.get(p.id) ?? '', col);
       this.views.set(p.id, v);
     }
@@ -1065,13 +1072,25 @@ export class BattleScene extends Phaser.Scene {
     // lasting change — the server stalled and skipped ticks, the clocks drifting apart, a new route —
     // is forgotten within 3 seconds rather than counted as lateness for good)
     const ideal = s.at - s.tick * TICK_MS;
+    // (the same numbers kept in order as well, one in and one out per snapshot: sorting all 90 again for
+    // every snapshot, and the copies for it, was the most time a snapshot took)
+    const sorted = this.lateSorted;
     this.lateness.push(ideal);
-    if (this.lateness.length > 90) this.lateness.shift();
-    this.lateBase = Math.min(...this.lateness);
+    let i = sorted.length;
+    sorted.push(ideal);
+    for (; i > 0 && sorted[i - 1] > ideal; i--) sorted[i] = sorted[i - 1];
+    sorted[i] = ideal;
+    if (this.lateness.length > 90) {
+      const old = this.lateness.shift()!;
+      let j = 0;
+      while (sorted[j] !== old) j++;
+      for (; j < sorted.length - 1; j++) sorted[j] = sorted[j + 1];
+      sorted.pop();
+    }
+    this.lateBase = sorted[0];
     // (all but the latest few: a rare later one is covered by carrying on for a moment)
     const base = this.lateBase;
-    const sorted = this.lateness.map((v) => (v - base) / TICK_MS).sort((a, b) => a - b);
-    const want = Phaser.Math.Clamp(0.8 + sorted[Math.floor(sorted.length * 0.9)], INTERP_MIN, INTERP_MAX);
+    const want = Phaser.Math.Clamp(0.8 + (sorted[Math.floor(sorted.length * 0.9)] - base) / TICK_MS, INTERP_MIN, INTERP_MAX);
     this.interp += (want - this.interp) * (want > this.interp ? 0.3 : 0.02);
   }
 
@@ -1335,8 +1354,11 @@ export class BattleScene extends Phaser.Scene {
       // standing about: blink, glance around, breathe (the face frames, as in the levels)
       v.face.tick(dt);
       const fk = frame.startsWith('idle') && v.chairA === null ? v.face.key : null;
-      const bodyKey = v.chairA !== null ? this.carryTextureFor(p.hero, v.slot) : this.textureFor(p.hero, v.slot, v.wear);
-      if (fk) v.sprite.setTexture(this.textureFor(p.hero, v.slot, v.wear, true), fk);
+      // (made again if they're ever gone)
+      if (!this.textures.exists(v.bodyKey)) v.bodyKey = this.textureFor(p.hero, v.slot, v.wear);
+      if (!this.textures.exists(v.faceKey)) v.faceKey = this.textureFor(p.hero, v.slot, v.wear, true);
+      const bodyKey = v.chairA !== null ? this.carryTextureFor(p.hero, v.slot) : v.bodyKey;
+      if (fk) v.sprite.setTexture(v.faceKey, fk);
       else if (v.sprite.texture.key !== bodyKey) v.sprite.setTexture(bodyKey, frame);
       const targetTilt = (p.vx / c.runSpeed) * (p.onGround ? 0.14 : 0.06);
       v.tilt += (targetTilt - v.tilt) * Math.min(1, dt * 12);
@@ -1529,10 +1551,11 @@ export class BattleScene extends Phaser.Scene {
       pv.glow.setPosition(ix, iy - 15 * PRIZE_SCALE).setScale(1.45 + Math.sin(t * 4) * 0.15).setAlpha(0.6);
       // the shadow on the ground tightens and darkens as it gets near
       const near = Math.max(0, Math.min(1, 1 - (pv.landY - py) / 420));
-      pv.shadow
-        .setPosition(ix, pv.landY + 1)
-        .setSize(16 + near * 20 - (falling ? 0 : 4), 5 + near * 3)
-        .setAlpha(0.12 + near * 0.22);
+      // (its outline worked out again only when its size changes: a landed one's stays put)
+      const sw = 16 + near * 20 - (falling ? 0 : 4);
+      const sh = 5 + near * 3;
+      if (pv.shadow.width !== sw || pv.shadow.height !== sh) pv.shadow.setSize(sw, sh);
+      pv.shadow.setPosition(ix, pv.landY + 1).setAlpha(0.12 + near * 0.22);
       const blink = age > PRIZE_LIFE - 2 && Math.floor(this.time.now / (age > PRIZE_LIFE - 0.8 ? 70 : 130)) % 2 === 0;
       pv.img.setVisible(!blink);
       pv.glow.setVisible(!blink);
