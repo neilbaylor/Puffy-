@@ -5,10 +5,10 @@ import { sfx } from '../core/sfx';
 import { characterById } from '../data/characters';
 import { ART_RES, CARRY_SWING, CHAR_H, CHAR_W, WALK_FRAMES, bodyLift, carryHand, gearUp } from '../gfx/draw';
 import { recolorForSlot, slotRecolors } from '../gfx/recolor';
-import { HERO_SHEET_M, addCanvas, ensureLevelLooks, frameGrid, hires, makeCarrySheet, makeHeroSheet } from '../gfx/textures';
+import { HERO_SHEET_M, addCanvas, ensureLook, frameGrid, hires, makeCarrySheet, makeHeroSheet } from '../gfx/textures';
 import { wardrobe } from '../core/wardrobe';
 import { PRIZE_COLOR, drawBombBall, drawChute, drawFireball, drawPrize } from '../gfx/prizes';
-import { PLOP_FRAMES, PLOP_H, PLOP_W, drawPlop, type PlopKind } from '../gfx/plops';
+import { PLOP_FRAMES, PLOP_H, PLOP_W, drawPlop } from '../gfx/plops';
 import { canvas } from '../gfx/draw';
 import { STYLES } from '../gfx/handdrawn';
 import { BLASTER, SAW } from '../gfx/weapons';
@@ -24,7 +24,7 @@ import { Background } from '../world/Background';
 import { Fx } from '../world/Fx';
 import { LevelView } from '../world/LevelView';
 import { FaceClock } from '../gfx/face';
-import { mixTint, themeClock, themeMix } from '../world/theme';
+import { THEMES, mixTint, themeClock, themeMix } from '../world/theme';
 
 /**
  * How far behind the server's clock the other players are shown (ticks): a tick (to have the next
@@ -67,6 +67,12 @@ type PrizeView = {
 const PLOP_PAD = 16;
 /** Headroom over the art (the big Plops' swirl tip pokes up past the art's frame). */
 const PLOP_TOP = 22;
+
+/** Light mode: the other players' hero sheets' resolution (see sheetRes). */
+const OTHER_HERO_RES = 1.5;
+
+/** The battle's background look (just the one). */
+const BATTLE_LOOKS = [THEMES[0]] as const;
 
 /** Playing, the camera is this much closer in than the whole-arena view. */
 const FOLLOW_ZOOM = 1.2;
@@ -149,13 +155,17 @@ const PRIZE_TEXT: Record<PrizeKind, [string, string]> = {
 const PRIZE_KINDS: PrizeKind[] = ['bomb', 'star', 'grow', 'rapid', 'heart', 'ice', 'fire'];
 
 /** Plops drawn for each size of bad guy: which Plop, and how big. */
-const PLOP_ART: Record<EnemyKind, { kind: PlopKind; scale: number }> = {
+const PLOP_ART: Record<EnemyKind, { kind: 'small' | 'medium' | 'large'; scale: number }> = {
   small: { kind: 'small', scale: 0.4 },
   medium: { kind: 'medium', scale: 0.72 },
   big: { kind: 'large', scale: 1.6 },
 };
-/** The battle Plops' pictures' resolution (light mode, drawn at 1x on an older device: a little under half the memory). */
-const PLOP_RES = LIGHT ? 1.25 : 2;
+/**
+ * The battle Plops' pictures' resolution, by size: each about what the camera shows of it (the small
+ * ones are drawn at 0.4 of their art's size, the big ones at 1.6), so the small and middle ones' sheets
+ * aren't several times sharper than the screen. (Light mode, drawn at 1x: 1.25, the small ones 1.)
+ */
+const PLOP_RES: Record<'small' | 'medium' | 'large', number> = LIGHT ? { small: 1, medium: 1.25, large: 1.25 } : { small: 1, medium: 1.5, large: 2 };
 
 /** How each kind of bad guy is drawn: texture, scale, feet origin, gun size. */
 const ENEMY_ART: Record<EnemyKind, { tex: string; scale: number; ox: number; oy: number; gun: number }> = {
@@ -368,8 +378,9 @@ export class BattleScene extends Phaser.Scene {
     // (keep the start screen's terrain while it's still on screen: the curtain slides it away)
     this.level = new LevelView(this, arena, { keep: this.spectate || this.scene.isActive('Menu'), cull: true });
     this.drawRamps();
-    // (battles use Part 1's looks: all drawn now, during the countdown, not mid-battle)
-    ensureLevelLooks(this, 1);
+    // (battles use Part 1's first look — one look, as light mode always had: the others were ~11 MB more in
+    // full mode, drawn during the countdown, for the sky slowly drifting through them)
+    ensureLook(this, BATTLE_LOOKS[0]);
     // (still clouds: they drift and bob but keep their shape — no new cloud pictures to send to the
     // graphics chip ~20 times a second, which a battle's phones can do without)
     this.bg = new Background(this, this.level.heightPx - VIEW_H, true);
@@ -406,7 +417,7 @@ export class BattleScene extends Phaser.Scene {
     this.mineSeen.clear();
     this.lastSeen = null;
     this.net.inbox = [];
-    const m = themeMix(themeClock.t);
+    const m = themeMix(themeClock.t, BATTLE_LOOKS);
     this.bg.setTheme(m);
     this.level.setTint(mixTint(m));
     this.fitCamera();
@@ -521,18 +532,19 @@ export class BattleScene extends Phaser.Scene {
     if (!this.textures.exists('bfire')) addCanvas(this, 'bfire', hires(40, 26, R, (ctx) => drawFireball(ctx, 26, 13, 9, 1)), undefined, REL);
     if (!this.textures.exists('bpoo')) addCanvas(this, 'bpoo', hires(26, 24, R, (ctx) => drawPoo(ctx, 13, 21, 1)), undefined, REL);
     if (!this.textures.exists('bice')) addCanvas(this, 'bice', hires(60, 70, R, (ctx) => drawIceBlock(ctx, 60, 70)), undefined, REL);
-    for (const kind of ['small', 'medium', 'large'] as PlopKind[]) {
+    for (const kind of ['small', 'medium', 'large'] as const) {
       const key = `bplop-${kind}`;
       if (this.textures.exists(key)) continue;
       // (a margin each side: the leaf arms reach past the art's own frame)
-      const fw = Math.round((PLOP_W + PLOP_PAD * 2) * PLOP_RES);
-      const fh = Math.round((PLOP_H + PLOP_TOP) * PLOP_RES);
+      const R2 = PLOP_RES[kind];
+      const fw = Math.round((PLOP_W + PLOP_PAD * 2) * R2);
+      const fh = Math.round((PLOP_H + PLOP_TOP) * R2);
       const g = frameGrid(PLOP_FRAMES.length, fw, fh);
       const { c, ctx } = canvas(g.w, g.h);
       PLOP_FRAMES.forEach((f, i) => {
         ctx.save();
         ctx.translate(g.x(i), g.y(i));
-        ctx.scale(PLOP_RES, PLOP_RES);
+        ctx.scale(R2, R2);
         drawPlop(ctx, PLOP_PAD, PLOP_TOP, f, STYLES.polished, kind);
         ctx.restore();
       });
@@ -759,8 +771,18 @@ export class BattleScene extends Phaser.Scene {
     const mine = !recolor && wardrobe.wearKey === wear;
     const f = face ? '-face' : '';
     const key = mine ? `char-${hero}${f}` : `bchar-${hero}-w${wear ? wear.replace(/,/g, '+') : 'none'}${recolor ? `-${slot}` : ''}${f}`;
-    if (!this.textures.exists(key)) makeHeroSheet(this, key, characterById(hero), face, wear, recolor ? (c) => recolorForSlot(c, slot) : undefined);
+    if (!this.textures.exists(key)) makeHeroSheet(this, key, characterById(hero), face, wear, recolor ? (c) => recolorForSlot(c, slot) : undefined, BattleScene.sheetRes(key));
     return key;
+  }
+
+  /**
+   * The resolution a hero sheet is drawn at. Light mode: the other players' (`bchar-`) at 1.5 — on a 1x
+   * screen the camera shows a hero at about a third of their sheet's full 3, so a quarter of the memory
+   * (~2.9 MB less a player) and a quarter of the drawing and recolouring at the start, for a picture a
+   * 1x screen can show just the same.
+   */
+  private static sheetRes(key: string) {
+    return LIGHT && key.startsWith('bchar-') && !key.endsWith('-carry') ? OTHER_HERO_RES : ART_RES;
   }
 
   /** The hero's chair-carrying frames (arms up, both hands on it; the swing) in this player's colour. */
@@ -809,7 +831,7 @@ export class BattleScene extends Phaser.Scene {
       const c = characterById(p.hero);
       const col = SLOT_COLORS[p.slot % SLOT_COLORS.length];
       const bodyKey = this.textureFor(p.hero, p.slot, wear);
-      const sprite = this.add.sprite(p.x, p.y, bodyKey, 'idle0').setOrigin(0.5, 1).setScale(c.scale / ART_RES).setDepth(DEPTH.players);
+      const sprite = this.add.sprite(p.x, p.y, bodyKey, 'idle0').setOrigin(0.5, 1).setScale(c.scale / BattleScene.sheetRes(bodyKey)).setDepth(DEPTH.players);
       // (and their faces now too, while the curtain's still up: drawn the first time they blinked, it
       // was a stutter in the middle of the battle)
       const faceKey = this.textureFor(p.hero, p.slot, wear, true);
@@ -1440,11 +1462,13 @@ export class BattleScene extends Phaser.Scene {
         }
       }
       if (v.sprite.texture.key === bodyKey) v.sprite.setFrame(frame);
+      // (the picture showing — body, faces or carrying — and the resolution it was drawn at)
+      const sres = BattleScene.sheetRes(v.sprite.texture.key);
       v.sprite
         .setPosition(x + hx, y + 2 + hy)
         .setFlipX(p.facing < 0)
         .setRotation(rot)
-        .setScale((c.scale / ART_RES) * v.size * wob * sx, ((c.scale / ART_RES) * v.size / wob) * sy)
+        .setScale((c.scale / sres) * v.size * wob * sx, ((c.scale / sres) * v.size / wob) * sy)
         .setAlpha(p.invuln > 0 && !star ? (Math.floor(this.time.now / 70) % 2 ? 0.45 : 1) : 1);
       // invincible: rainbow shimmer and sparkles; rapid fire: sparks off the bazooka
       v.sparkT -= dt;
@@ -1611,7 +1635,7 @@ export class BattleScene extends Phaser.Scene {
       }
     // scenery + HUD (the looks drift slowly, like in the levels)
     themeClock.t += dt;
-    const look = themeMix(themeClock.t);
+    const look = themeMix(themeClock.t, BATTLE_LOOKS);
     this.bg.setTheme(look);
     this.level.setTint(mixTint(look));
     this.followCamera(dt, cur.players);
@@ -1649,7 +1673,7 @@ export class BattleScene extends Phaser.Scene {
         let spr: Phaser.GameObjects.Sprite;
         if (plop) {
           const pa = PLOP_ART[kind];
-          spr = this.add.sprite(x, y, `bplop-${pa.kind}`, 'idle').setOrigin((50 + PLOP_PAD) / (PLOP_W + PLOP_PAD * 2), (100 + PLOP_TOP) / (PLOP_H + PLOP_TOP)).setScale(pa.scale / PLOP_RES).setDepth(DEPTH.enemies);
+          spr = this.add.sprite(x, y, `bplop-${pa.kind}`, 'idle').setOrigin((50 + PLOP_PAD) / (PLOP_W + PLOP_PAD * 2), (100 + PLOP_TOP) / (PLOP_H + PLOP_TOP)).setScale(pa.scale / PLOP_RES[pa.kind]).setDepth(DEPTH.enemies);
         } else {
           const art = ENEMY_ART[kind];
           spr = this.add.sprite(x, y, art.tex, 'w0').setOrigin(art.ox, art.oy).setScale(art.scale).setDepth(DEPTH.enemies);
@@ -1731,7 +1755,7 @@ export class BattleScene extends Phaser.Scene {
           sy *= 1 - q;
           sx *= 1 + q;
         }
-        const base = PLOP_ART[kind].scale / PLOP_RES;
+        const base = PLOP_ART[kind].scale / PLOP_RES[PLOP_ART[kind].kind];
         v.spr.setScale(base * sx, base * sy).setRotation(rot);
       } else frame = kind === 'big' && !onGround && !chute ? 'air' : Math.floor(v.anim) % 2 ? 'w1' : 'w0';
       // just hit: a Plop squeezes its eyes shut ("ow!") for a moment

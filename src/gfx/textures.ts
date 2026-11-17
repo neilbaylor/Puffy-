@@ -190,7 +190,7 @@ function makeCharacter(scene: Phaser.Scene, ch: (typeof CHARACTERS)[number], fac
  * over their head for a hat or the skateboard if there's one (gearUp), the hero at the bottom as
  * always. `recolor`: a battle player's colour, put on before the sunglasses so they stay orange.
  */
-export function makeHeroSheet(scene: Phaser.Scene, key: string, ch: (typeof CHARACTERS)[number], face: boolean, wear: string, recolor?: (c: HTMLCanvasElement) => HTMLCanvasElement) {
+export function makeHeroSheet(scene: Phaser.Scene, key: string, ch: (typeof CHARACTERS)[number], face: boolean, wear: string, recolor?: (c: HTMLCanvasElement) => HTMLCanvasElement, res = ART_RES) {
   const M = HERO_M;
   const up = gearUp(wear);
   const layered = !!recolor && gearOf(wear).eyes;
@@ -198,9 +198,9 @@ export function makeHeroSheet(scene: Phaser.Scene, key: string, ch: (typeof CHAR
     face ? drawCharacter(ctx, M, up, ch, 'idle0', faceFromKey(f), wear, layer) : drawCharacter(ctx, M, up, ch, f as Pose, undefined, wear, layer);
   // (in the dive gear the walk frames are the swim cycle: see drawCharacter)
   const frames: readonly string[] = face ? FACE_FRAMES : POSES;
-  if (!recolor) sheet(scene, key, CHAR_W + M * 2, CHAR_H + up, frames, (ctx, f) => draw(ctx, f, 'all'));
+  if (!recolor) sheet(scene, key, CHAR_W + M * 2, CHAR_H + up, frames, (ctx, f) => draw(ctx, f, 'all'), res);
   else
-    sheet(scene, key, CHAR_W + M * 2, CHAR_H + up, frames, (ctx, f) => draw(ctx, f, layered ? 'body' : 'all'), ART_RES, {
+    sheet(scene, key, CHAR_W + M * 2, CHAR_H + up, frames, (ctx, f) => draw(ctx, f, layered ? 'body' : 'all'), res, {
       swap: recolor,
       over: (ctx, f) => layered && draw(ctx, f, 'eyes'),
     });
