@@ -1,5 +1,13 @@
 // Tiny static server for the built game (dist/), plus the online battle server.
 // Used by Railway: `npm start`. Gzips text files once and caches them in memory.
+//
+// Caching: every file has an ETag (a fingerprint of its contents, worked out once when it's read into
+// memory). The page, the app manifest, the icons and the offline helper (sw.js) are "no-cache":
+// the browser asks every time, sending the fingerprint it has (If-None-Match), and gets a tiny
+// "304 Not Modified" when nothing changed, or the new file when it did. So a new version shows on
+// the very next load. The game's code, styles and music (under /assets/) have the fingerprint in
+// their name and never change: the browser keeps those for a year without asking.
+import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve } from 'node:path';
@@ -33,7 +41,10 @@ async function load(path) {
   if (cache.has(path)) return cache.get(path);
   const body = await readFile(path);
   const ext = extname(path);
-  const entry = { body, gz: COMPRESS.has(ext) ? gzipSync(body) : null, br: null, type: TYPES[ext] ?? 'application/octet-stream' };
+  // (one fingerprint of the file; each encoding gets its own ETag from it — "…", "…-gz", "…-br" —
+  // since gzip and brotli are different bytes, as strong ETags must be)
+  const hash = createHash('sha256').update(body).digest('base64url').slice(0, 27);
+  const entry = { body, hash, gz: COMPRESS.has(ext) ? gzipSync(body) : null, br: null, type: TYPES[ext] ?? 'application/octet-stream' };
   cache.set(path, entry);
   // brotli as well (about a fifth smaller than gzip for the game's code: a quicker first load on
   // phones), made in the background at its best setting; gzip is served until it's ready
@@ -62,6 +73,21 @@ try {
   /* (no build yet) */
 }
 
+/**
+ * The ETag (of any encoding of this file) that the browser already has, from If-None-Match: it's
+ * sent back with the 304, so the copy it keeps stays labelled as it was. Null: it has none of them.
+ */
+function alreadyHas(inm, hash) {
+  if (!inm) return null;
+  for (const raw of inm.split(',')) {
+    const tag = raw.trim();
+    if (tag === '*') return `"${hash}"`;
+    // (If-None-Match compares weakly: a W/ prefix doesn't matter)
+    if (tag.replace(/^W\//, '').replace(/-(?:gz|br)"$/, '"') === `"${hash}"`) return tag;
+  }
+  return null;
+}
+
 const server = createServer(async (req, res) => {
   try {
     if (userApi && (await userApi(req, res))) return;
@@ -69,32 +95,46 @@ const server = createServer(async (req, res) => {
     let path = normalize(join(ROOT, decodeURIComponent(url.pathname)));
     if (!path.startsWith(ROOT)) return void res.writeHead(403).end();
     const info = await stat(path).catch(() => null);
+    // a missing file (it has a file extension: an old build's /assets/ file, say) is a 404, not the
+    // page in its place (a page labelled as a script or a song would break whatever asked for it,
+    // and the offline helper would keep it); any other address is the game's page
+    if (!info && extname(url.pathname)) return void res.writeHead(404, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-cache' }).end('Not found');
     if (!info || info.isDirectory()) path = join(info ? path : ROOT, 'index.html');
     const f = await load(path);
     const headers = {
-      'Content-Type': f.type,
-      // hashed build assets can be cached forever; the page itself should always be fresh
+      // hashed build assets can be cached forever; everything else (the page above all) is checked
+      // with the server on every use: a 304 when it hasn't changed
       'Cache-Control': path.includes('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache',
+      // (gzip, brotli or neither, depending on what the browser takes)
+      ...(f.gz ? { Vary: 'Accept-Encoding' } : {}),
     };
+    const has = alreadyHas(req.headers['if-none-match'], f.hash);
+    if (has) return void res.writeHead(304, { ...headers, ETag: has }).end();
+    headers['Content-Type'] = f.type;
     const range = req.headers.range;
-    if (range && f.type.startsWith('audio/')) {
-      // audio seeking on iOS needs byte ranges
-      const [a, b] = range.replace('bytes=', '').split('-');
-      const start = Number(a) || 0;
-      const end = b ? Number(b) : f.body.length - 1;
-      res.writeHead(206, { ...headers, 'Accept-Ranges': 'bytes', 'Content-Range': `bytes ${start}-${end}/${f.body.length}`, 'Content-Length': end - start + 1 });
-      return void res.end(f.body.subarray(start, end + 1));
+    const ifRange = req.headers['if-range'];
+    if (range && f.type.startsWith('audio/') && (!ifRange || ifRange === `"${f.hash}"`)) {
+      // audio seeking on iOS needs byte ranges ("bytes=a-b", "bytes=a-" or the last n: "bytes=-n")
+      const m = /^bytes=(\d*)-(\d*)$/.exec(range.trim());
+      const len = f.body.length;
+      if (m && (m[1] || m[2])) {
+        const start = m[1] ? Number(m[1]) : Math.max(0, len - Number(m[2]));
+        const end = m[1] && m[2] ? Math.min(Number(m[2]), len - 1) : len - 1;
+        if (start > end || start >= len) return void res.writeHead(416, { ...headers, 'Content-Range': `bytes */${len}` }).end();
+        res.writeHead(206, { ...headers, ETag: `"${f.hash}"`, 'Accept-Ranges': 'bytes', 'Content-Range': `bytes ${start}-${end}/${len}`, 'Content-Length': end - start + 1 });
+        return void res.end(f.body.subarray(start, end + 1));
+      }
     }
     const accept = req.headers['accept-encoding'] ?? '';
     if (f.br && /\bbr\b/.test(accept)) {
-      res.writeHead(200, { ...headers, 'Content-Encoding': 'br', Vary: 'Accept-Encoding' });
+      res.writeHead(200, { ...headers, ETag: `"${f.hash}-br"`, 'Content-Encoding': 'br' });
       return void res.end(f.br);
     }
     if (f.gz && /\bgzip\b/.test(accept)) {
-      res.writeHead(200, { ...headers, 'Content-Encoding': 'gzip', Vary: 'Accept-Encoding' });
+      res.writeHead(200, { ...headers, ETag: `"${f.hash}-gz"`, 'Content-Encoding': 'gzip' });
       return void res.end(f.gz);
     }
-    res.writeHead(200, { ...headers, 'Accept-Ranges': 'bytes' });
+    res.writeHead(200, { ...headers, ETag: `"${f.hash}"`, 'Accept-Ranges': 'bytes' });
     res.end(f.body);
   } catch (e) {
     res.writeHead(500).end('Server error');

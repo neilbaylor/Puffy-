@@ -1,5 +1,6 @@
 import { defineConfig, type Plugin } from 'vite';
 import { viteSingleFile } from 'vite-plugin-singlefile';
+import { offline } from './scripts/offline-plugin';
 
 /**
  * The page starts with a tiny script (src/entry.ts) that lets the loading screen paint before it
@@ -25,7 +26,7 @@ const preloadGame: Plugin = {
 // `npm run build:single` -> one self-contained HTML file (easy to share / host anywhere)
 export default defineConfig(({ mode }) => ({
   base: './',
-  plugins: mode === 'single' ? [viteSingleFile()] : [preloadGame],
+  plugins: mode === 'single' ? [viteSingleFile()] : [preloadGame, offline()],
   // Phaser without the Matter physics engine (the game only uses Arcade physics): ~110 kB less
   // code for phones to download and parse at start-up
   resolve: { alias: [{ find: /^phaser$/, replacement: 'phaser/dist/phaser-arcade-physics.js' }] },

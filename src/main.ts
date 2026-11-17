@@ -8,6 +8,8 @@ import { BattleScene } from './scenes/BattleScene';
 import { WrestleScene } from './scenes/WrestleScene';
 import { FishingScene } from './scenes/FishingScene';
 import { UI } from './ui/ui';
+// (offline play: set up once the start screen is up)
+import './core/offline';
 import { LIGHT, LIGHT_KEY } from './core/light';
 import { savedResCap, saveResCap } from './core/res';
 import { trackBossArt } from './gfx/textures';
