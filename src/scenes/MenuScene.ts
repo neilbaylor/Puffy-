@@ -400,13 +400,19 @@ export class MenuScene extends Phaser.Scene {
           return [...lookJobs(this, a), () => this.warmLook(a), ...this.prewarmJobs(n)];
         }),
     ];
-    jobs.push(
-      // (the rest of this Part's ground isn't drawn here any more: the loading card before the
-      // level draws whatever's missing — doing it here was a string of hitches after every switch)
-      // (this Part's other looks last: the game only drifts into them 20 seconds in)
-      ...looks.slice(1).flatMap((l) => [...lookJobs(this, l), () => this.warmLook(l)]),
-    );
+    // PROPOSAL (level loader): this Part's other looks aren't drawn here any more (the start screen
+    // only shows its first look; the game drifts into the others 20 s in): the level's loading card
+    // draws them (see lookLoadJobs)
+    void looks;
     return jobs;
+  }
+
+  /** A level's other looks not drawn yet, as steps for the loading card before it (each shown once, invisibly). */
+  lookLoadJobs(id: number): { name: string; run: () => void }[] {
+    return themesFor(id)
+      .slice(1)
+      .filter((l) => (['sky', 'far', 'hills', 'near'] as const).some((layer) => !this.textures.exists(bgKey(layer, l))))
+      .flatMap((l) => [...lookJobs(this, l).map((run, i) => ({ name: `look ${l} ${i}`, run })), { name: `look ${l} warm`, run: () => this.warmLook(l) }]);
   }
 
   /**

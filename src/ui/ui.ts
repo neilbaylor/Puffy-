@@ -1412,14 +1412,14 @@ export class UI {
     // (the bosses' arenas let go first: all but this one's in a rematch, or the one at the end of this level)
     const next = level !== null ? BOSSES.find((b) => b.level === level) : undefined;
     freeBossArtExcept(this.game, boss ?? (next && `${next.scene}:${level}`));
-    const scene = this.game.scene.getScene('Menu') as unknown as Phaser.Scene & { groundJobs?: (id: number) => { name: string; run: () => void }[] };
+    const scene = this.game.scene.getScene('Menu') as unknown as Phaser.Scene & { groundJobs?: (id: number) => { name: string; run: () => void }[]; lookLoadJobs?: (id: number) => { name: string; run: () => void }[] };
     // (and the level's ground, for its opening fly-over, if the start screen hasn't drawn it yet)
     let ground: { name: string; run: () => void }[] = [];
     const build = level !== null ? levelInfo(level).build : undefined;
     // (straight on from a results card over a boss's arena: no ground on show there, so the last
     // level's is let go first — memory stays flat — and the arena's scene works the pictures out)
     const host = ['Hoops', 'Wrestle', 'Fishing'].map((k) => this.game.scene.getScene(k)).find((sc) => sc?.sys.isActive());
-    if (level !== null && this.game.scene.isActive('Menu')) ground = scene.groundJobs?.(level) ?? [];
+    if (level !== null && this.game.scene.isActive('Menu')) ground = [...(scene.lookLoadJobs?.(level) ?? []), ...(scene.groundJobs?.(level) ?? [])];
     else if (build && host) {
       const data = build();
       for (const k of this.game.textures.getTextureKeys())
