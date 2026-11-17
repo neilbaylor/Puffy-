@@ -14,6 +14,7 @@ import './core/offline';
 import { LIGHT, LIGHT_KEY } from './core/light';
 import { savedResCap, saveResCap } from './core/res';
 import { trackBossArt } from './gfx/textures';
+import { trimRenderTargets } from './core/renderTargets';
 
 installInput();
 
@@ -98,16 +99,50 @@ function fpsLimitFor(refreshMs: number) {
   return every > 1 ? 1000 / ((every - 0.5) * refreshMs) : 0;
 }
 
+/**
+ * The WebGL context, made here rather than by Phaser: its settings, but no depth or stencil buffer.
+ * Phaser asks for both; nothing here uses them (no depth testing in 2D, and the stencil is only for
+ * geometry masks: there are none), and the screen-sized buffer they share — four samples a pixel
+ * with antialiasing, ~21 MB at 2x on a phone — was kept and cleared every frame for nothing.
+ * Null where WebGL can't be had: Phaser then picks its canvas renderer as before.
+ */
+function makeGl(): { canvas: HTMLCanvasElement; context: WebGLRenderingContext } | null {
+  try {
+    const canvas = document.createElement('canvas');
+    const attrs: WebGLContextAttributes = {
+      alpha: false,
+      desynchronized: false,
+      depth: false,
+      stencil: false,
+      antialias: true,
+      premultipliedAlpha: true,
+      failIfMajorPerformanceCaveat: false,
+      powerPreference: 'high-performance',
+      preserveDrawingBuffer: false,
+    };
+    const context = (canvas.getContext('webgl', attrs) ?? canvas.getContext('experimental-webgl', attrs)) as WebGLRenderingContext | null;
+    return context && !context.isContextLost() ? { canvas, context } : null;
+  } catch {
+    return null;
+  }
+}
+
 function start(refreshMs: number) {
   const { w, h } = size();
+  const gl = makeGl();
   const game = new Phaser.Game({
-    type: Phaser.AUTO, // WebGL, with Canvas fallback
+    // WebGL (on our own context), with Canvas fallback
+    // (Phaser types `context` as a 2D one; it takes a WebGL one for the WebGL renderer)
+    ...(gl ? { type: Phaser.WEBGL, canvas: gl.canvas, context: gl.context as unknown as CanvasRenderingContext2D } : { type: Phaser.AUTO }),
     parent: 'game',
     backgroundColor: '#8fd3ff',
     width: w,
     height: h,
     scale: { mode: Phaser.Scale.NONE, zoom: 1 / dpr() },
     render: { antialias: true, pixelArt: false, roundPixels: false, powerPreference: 'high-performance' },
+    // (no pre-effects — glow, shadow… on a sprite — anywhere: without them Phaser doesn't keep their
+    // dozens of drawing surfaces on the graphics chip; see also trimRenderTargets)
+    disablePreFX: true,
     input: { activePointers: 4 },
     // (no tree of moving bodies: Phaser rebuilt it from every body on every physics step, a few
     // times a frame on a slow phone, to speed up checks among a few dozen bodies that mostly sit
@@ -135,6 +170,7 @@ function start(refreshMs: number) {
     resize();
   };
   game.events.once(Phaser.Core.Events.READY, () => {
+    trimRenderTargets(game);
     trackBossArt(game);
     const ev = game.scene.getScene('Menu').events;
     ev.on(Phaser.Scenes.Events.START, () => setHome(true));

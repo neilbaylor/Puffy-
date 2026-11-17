@@ -1,12 +1,16 @@
 import Phaser from 'phaser';
 import { DEPTH, TILE } from '../config';
 import { sfx } from '../core/sfx';
+import { LIGHT } from '../core/light';
 import { ART_RES } from '../gfx/draw';
 import { SAND, drawCourtBoard, drawRefChair, drawVolleySand } from '../gfx/plopworld';
-import { addCanvas, hires } from '../gfx/textures';
+import { FIELD_RES, addCanvas, hires } from '../gfx/textures';
 import type { GameScene } from '../scenes/GameScene';
 import { Plop } from './enemies/Plops';
 import type { Player } from './Player';
+
+/** The court's sand band's resolution (light mode: the fields' lower one). */
+const SAND_RES = LIGHT ? FIELD_RES : 3;
 
 /** They spot you once you're this close to one of them. */
 const SPOT = 330;
@@ -58,8 +62,8 @@ export class VolleyMatch {
     // (side on: a padded post, the net band and its antenna) in front of everyone
     const sw = Math.round(half * 2);
     const skey = `volleysand-${sw}`;
-    if (!gs.textures.exists(skey)) addCanvas(gs, skey, hires(sw + SAND.END * 2, SAND.UP + SAND.DOWN, 3, (ctx) => drawVolleySand(ctx, sw)), undefined, { release: true });
-    gs.add.image(this.left - SAND.END, ground, skey).setOrigin(0, SAND.UP / (SAND.UP + SAND.DOWN)).setScale(1 / 3).setDepth(DEPTH.tiles + 0.5);
+    if (!gs.textures.exists(skey)) addCanvas(gs, skey, hires(sw + SAND.END * 2, SAND.UP + SAND.DOWN, SAND_RES, (ctx) => drawVolleySand(ctx, sw)), undefined, { release: true });
+    gs.add.image(this.left - SAND.END, ground, skey).setOrigin(0, SAND.UP / (SAND.UP + SAND.DOWN)).setScale(1 / SAND_RES).setDepth(DEPTH.tiles + 0.5);
     const bw = Math.round(half - 46);
     const bkey = `volleyboard-${bw}`;
     if (!gs.textures.exists(bkey)) addCanvas(gs, bkey, hires(bw, 22, 3, (ctx) => drawCourtBoard(ctx, bw, 16, 'PLOP BEACH TOUR')), undefined, { release: true });
