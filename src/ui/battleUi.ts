@@ -207,7 +207,8 @@ export class BattleUI {
     this.lobby!.classList.toggle('loading', loading);
     const lc = this.lobby!.querySelector<HTMLElement>('.bl-loading')!;
     lc.hidden = !loading;
-    lc.querySelector('p')!.textContent = s === 'offline' ? 'Lost the connection — reconnecting…' : 'Connecting to the arena…';
+    // (no internet at all: say so; it joins by itself once it's back)
+    lc.querySelector('p')!.textContent = navigator.onLine === false ? 'You’re offline: battles need the internet. You’ll join as soon as it’s back.' : s === 'offline' ? 'Lost the connection — reconnecting…' : 'Connecting to the arena…';
     // a full arena: its own screen; knock again every few seconds until a spot opens
     this.lobby!.classList.toggle('full', s === 'full');
     this.lobby!.querySelector<HTMLElement>('.bl-fullcard')!.hidden = s !== 'full';
