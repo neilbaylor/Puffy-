@@ -380,6 +380,17 @@ export class GameScene extends Phaser.Scene {
       const has = (type: string) => data.spawns.some((s) => s.type === type);
       if (!has('soccer')) for (const p of ['pitch-front-', 'pitch-back-']) dropTextures(this, p);
       if (!has('hockey')) for (const p of ['rink-back-', 'rink-ice-']) dropTextures(this, p);
+      // (and Part 5's tennis courts and Part 3's beach-volleyball sand: the same)
+      if (!has('tennis')) for (const p of ['court-front-', 'court-back-']) dropTextures(this, p);
+      if (!has('volley')) for (const p of ['volleysand-', 'volleyboard-']) dropTextures(this, p);
+      // Light mode: the other Parts' trees and piers, and the sea's pictures on dry land, go too (the
+      // start screen there never switches Parts: it shows the one just played, and a level draws its
+      // own again if they're gone; full mode keeps them, so switching Parts on the start screen stays quick)
+      if (LIGHT && !this.scene.isActive('Menu')) {
+        for (const k of this.textures.getTextureKeys())
+          if ((k.startsWith('tree-') || k.startsWith('cloud-')) && !k.startsWith(`tree-${data.name}-`) && !k.startsWith(`cloud-${data.name}-`)) this.textures.remove(k);
+        if (data.water === undefined) dropTextures(this, 'sea-');
+      }
     }
     this.lookNext = 0;
     if (!this.scene.isActive('Menu') && !this.scene.isActive('Battle')) freeLooksExcept(this, themesFor(this.levelId));
