@@ -783,7 +783,8 @@ export class BattleUI {
     const g = this.host.game;
     g.scene.stop('Battle');
     // the start screen's fly-over behind the lobby again
-    if (!g.scene.isActive('Menu')) g.scene.start('Menu', { silent: true });
+    // (the Part you'd picked, as before the battle: it opened on Part 1)
+    if (!g.scene.isActive('Menu')) g.scene.start('Menu', { silent: true, level: this.host.level() });
     this.hud?.remove();
     this.hud = null;
     this.host.bombs(0);

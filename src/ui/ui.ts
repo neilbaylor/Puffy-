@@ -252,7 +252,7 @@ export class UI {
     setScreen: (el) => this.setScreen(el),
     home: () => {
       if (this.game.scene.isActive('Menu')) this.showStart();
-      else this.game.scene.start('Menu');
+      else this.game.scene.start('Menu', { level: this.level });
     },
     hero: () => CHARACTERS[this.selected]?.id ?? 'puffy',
     touch: (on) => {
