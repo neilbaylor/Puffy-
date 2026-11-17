@@ -337,3 +337,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.332: A device switched to light mode by a graphics hiccup gets full mode back with the next version; hiccups while the game is in the background no longer switch it.
 - v0.333: Bosses started from the start screen use about 100 MB less graphics memory in full mode.
 - v0.334: The game starts its engine sooner after downloading, and its fonts now come from Puffy's own server (a little quicker on phones, and they work offline).
+- v0.335: Battle: the server does about a quarter less work per room, dropped connections are noticed, the lobby is lighter, no hitch when a battle starts, and memory is freed when you leave.

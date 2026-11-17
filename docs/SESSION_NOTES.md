@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.334)
+## Where things stand (v0.335)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -31,6 +31,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   Home screen (yellow).
 - Start screen: drone fly-over behind, logo hop, hero cards (pick = hop / backflip), Play, Part picker once a
   level is beaten, mute (top-left), full screen + **Battle** buttons (top-right, same height, side by side).
+- v0.335: BT2 merged: server packs snapshots straight from sim + bytes once (CPU/room −26%), ws heartbeat 30 s; client lateness window kept sorted, hero keys cached, lobby squares rebuilt only on change; leaving battle frees battle-only textures + stops warm arena; other heroes drawn during countdown; chairViews cleared (chairs off). Open: free start-screen scenery during battle (full ~100 MB); menu shows Part 1 after battle; proposals (arena ground res, one battle look, lite bchar res, Plop res, lite still lobby flyover, lite spectator 30 fps).
 - v0.334: LD1 merged: src/entry.ts tiny first script (main-*.js fetched alongside), core/refresh.ts refresh check during download (skips first 2 frames + gaps >100 ms), self-hosted fonts (ui/fonts.css, assets/fonts), Phaser audio noAudio. Open: build other Parts' fly-overs after the start screen (−4.8 s slow phone, cost: glide hitches + ~1 s first switch in first 20 s); proposals on claude/load-proposals (other looks / game-only art to level loader, boss/battle chunks).
 - v0.333: ui.ts launchBoss frees terrain-* and bg-* looks on the boss scene's CREATE (start screen stopped); trees/piers kept. Hoops 2 full: ~107 MB of ground+looks gone; start screen redraws them on return (checked, no errors).
 - v0.332: Light mode auto-switch (graphics loss) now stores `auto:<version>` (LIGHT_AUTO) and expires next version; legacy '1' cleared once on real devices (not navigator.webdriver, marker puffy.lightRetried). Context loss while hidden / <2 s after showing → quiet reload when visible, no light switch. Tests setting puffy.light='1' unaffected.
