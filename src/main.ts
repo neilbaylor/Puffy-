@@ -11,7 +11,7 @@ import { FishingScene } from './scenes/FishingScene';
 import { UI } from './ui/ui';
 // (offline play: set up once the start screen is up)
 import './core/offline';
-import { LIGHT, LIGHT_KEY } from './core/light';
+import { LIGHT, LIGHT_AUTO, LIGHT_KEY } from './core/light';
 import { savedResCap, saveResCap } from './core/res';
 import { trackBossArt } from './gfx/textures';
 import { trimRenderTargets } from './core/renderTargets';
@@ -226,14 +226,33 @@ function start(refreshMs: number) {
   (window as unknown as { __res: () => unknown }).__res = () => ({ dpr: dpr(), cap: resCap, home, renderer: game.renderer.type === Phaser.WEBGL ? 'WebGL' : 'Canvas' });
 
   new UI(game);
-  // the graphics chip gave up (out of memory, usually): switch this device to light mode
+  // the graphics chip gave up (out of memory, usually): switch this device to light mode (until the
+  // next version). But not when it happened in the background: phones and tablets take the graphics
+  // away from an app that's been put aside for a while, memory or not — then the game just starts
+  // again, as it was, once it's back on screen.
+  let shownAt = document.hidden ? 0 : performance.now();
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) shownAt = performance.now();
+  });
   game.canvas.addEventListener('webglcontextlost', () => {
+    // (in the background, or within a moment of coming back: the loss belongs to the background)
+    const background = document.hidden || performance.now() - shownAt < 2000;
+    if (background) {
+      const again = () => {
+        if (document.hidden) return;
+        document.removeEventListener('visibilitychange', again);
+        location.reload();
+      };
+      document.addEventListener('visibilitychange', again);
+      again();
+      return;
+    }
     if (!LIGHT) {
       const note = document.createElement('div');
       note.className = 'gl-lost';
-      // the first time: switch this device to light mode (remembered) and start again
+      // the first time: switch this device to light mode (until the next version) and start again
       try {
-        localStorage.setItem(LIGHT_KEY, '1');
+        localStorage.setItem(LIGHT_KEY, LIGHT_AUTO);
       } catch {
         /* private mode */
       }
