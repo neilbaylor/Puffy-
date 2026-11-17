@@ -184,6 +184,31 @@ interface EnemyView {
 /** Plop walk speed, in steps of the four-step walk per second: the small ones scurry, the big ones plod. */
 const PLOP_STEP_FPS: Record<EnemyKind, number> = { small: 11, medium: 8.5, big: 6.5 };
 
+/**
+ * The pictures only a battle shows: each player's hero in their colour (and its chair-carrying frames),
+ * the Plops, the bonuses and their parachutes, the rocks, anvils, bombs and the rest, the hearts and
+ * pointers, and the arena's own ground, clouds, trees and ramp.
+ */
+const BATTLE_ONLY = /^(bchar-|bplop-|prize-|bramp-|barrow-|bhearts|cloud-arena-|tree-arena-|terrain-arena-)|^(bbomb|brock|banvil|bhalo|bfire|bpoo|bice|bpellet)$|^char-[a-z]+-carry$/;
+
+/**
+ * Leaving the battles (back to the start screen): free the battle's own pictures, so they don't stay
+ * in memory through the start screen and the levels. Anything a running scene still shows is kept.
+ */
+export function freeBattleArt(game: Phaser.Game) {
+  const shown = new Set<string>();
+  const look = (list: Phaser.GameObjects.GameObject[]) => {
+    for (const o of list) {
+      const t = (o as { texture?: Phaser.Textures.Texture }).texture;
+      if (t) shown.add(t.key);
+      const kids = (o as { list?: Phaser.GameObjects.GameObject[] }).list;
+      if (kids) look(kids);
+    }
+  };
+  for (const sc of game.scene.getScenes(true)) look(sc.children.list);
+  for (const k of game.textures.getTextureKeys()) if (BATTLE_ONLY.test(k) && !shown.has(k)) game.textures.remove(k);
+}
+
 export interface BattleHud {
   timeLeft: number;
   players: { id: string; kos: number; hp: number; slot: number; down: boolean }[];

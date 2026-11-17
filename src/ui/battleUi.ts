@@ -16,7 +16,7 @@ import { gearOf } from '../core/wardrobe';
 import { freeBossArtExcept, gameArtJobs } from '../gfx/textures';
 import { loadArt } from './artLoader';
 import { BattleNet, battleUrl, type NetStatus } from '../net/battleNet';
-import type { BattleHud } from '../scenes/BattleScene';
+import { freeBattleArt, type BattleHud } from '../scenes/BattleScene';
 
 /** The results card's Leave button ignores taps this long after it shows (mashed shoot taps). */
 const RESULTS_GUARD_MS = 1500;
@@ -179,6 +179,7 @@ export class BattleUI {
     this.net = null;
     this.host.game.events.off('battle-hud', this.onHud);
     this.stopBattle();
+    this.dropWarm();
     this.lobby = null;
     this.askCode();
   }
@@ -193,8 +194,22 @@ export class BattleUI {
     this.net = null;
     this.host.game.events.off('battle-hud', this.onHud);
     this.stopBattle();
+    this.dropWarm();
+    // (done with battles for now: the pictures only a battle shows go — they're drawn again, as the first
+    // time, if you come back)
+    freeBattleArt(this.host.game);
     this.lobby = null;
     this.host.home();
+  }
+
+  /**
+   * The arena built ahead during the countdown, if it's still up (left the room in its last seconds): it
+   * went on running, hidden, behind the start screen, every frame, until the next battle.
+   */
+  private dropWarm() {
+    const g = this.host.game;
+    this.warmed = false;
+    if (!this.inBattle && g.scene.isActive('Battle')) g.scene.stop('Battle');
   }
 
   private status(s: NetStatus, text?: string) {
