@@ -55,7 +55,7 @@ import { loseLife } from '../core/lives';
 import { NetSim } from './hoopsNet';
 import { SimpleConfetti } from '../world/SimpleConfetti';
 import { dropDepthBuffer, shrinkCaptureTarget } from '../core/renderTargets';
-import { PLOP_FRAMES, PLOP_H, PLOP_KINDS, PLOP_SCALE, PLOP_W, drawPlop, type PlopKind } from '../gfx/plops';
+import { PLOP_H, PLOP_KINDS, PLOP_SCALE, PLOP_W, drawPlop, type PlopFrame, type PlopKind } from '../gfx/plops';
 import { STYLES } from '../gfx/handdrawn';
 
 export interface HoopsData {
@@ -106,6 +106,8 @@ const ARENA_RES = LIGHT ? 1 : 1.25;
  */
 const KING_RES = LIGHT ? 1.25 : 2.5;
 const PARADE_RES = LIGHT ? 1.25 : 2.5;
+/** The poses the Plop family's parade strikes (see plopInvasion): only those are drawn. */
+const PARADE_FRAMES: readonly PlopFrame[] = ['idle', 'run0', 'run1', 'yell0', 'yell1'];
 /** Stage (1280 × 720) → arena texture coordinates. */
 /** The screen's safe-area insets (notch, rounded corners) in CSS px (re-read on resize). */
 const readSafe = () => {
@@ -261,22 +263,24 @@ export class HoopsScene extends Phaser.Scene {
       });
       addCanvas(this, 'king', c, (t) => KING_FRAMES.forEach((f, i) => t.add(f, 0, g.x(i), g.y(i), fw, fh)), { release: true });
     }
+    // (the Plop family's parade: Part 2's ending only, so only there; and only the poses it strikes)
+    if (this.hard)
     for (const kind of PLOP_KINDS) {
       const key = `plop-${kind}`;
       if (!this.textures.exists(key)) {
         const R = PARADE_RES;
         const fw = Math.round(PLOP_W * R);
         const fh = Math.round(PLOP_H * R);
-        const g = frameGrid(PLOP_FRAMES.length, fw, fh);
+        const g = frameGrid(PARADE_FRAMES.length, fw, fh);
         const { c, ctx } = canvas(g.w, g.h);
-        PLOP_FRAMES.forEach((f, i) => {
+        PARADE_FRAMES.forEach((f, i) => {
           ctx.save();
           ctx.translate(g.x(i), g.y(i));
           ctx.scale(R, R);
           drawPlop(ctx, 0, 0, f, STYLES.polished, kind);
           ctx.restore();
         });
-        addCanvas(this, key, c, (t) => PLOP_FRAMES.forEach((f, i) => t.add(f, 0, g.x(i), g.y(i), fw, fh)), { release: true });
+        addCanvas(this, key, c, (t) => PARADE_FRAMES.forEach((f, i) => t.add(f, 0, g.x(i), g.y(i), fw, fh)), { release: true });
       }
     }
     if (!this.textures.exists('kingcrown')) addCanvas(this, 'kingcrown', hires(64, 44, KING_RES, (ctx) => drawKingCrown(ctx, 32, 40)), undefined, { release: true });
