@@ -334,3 +334,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.329: Part 6: a stretch of open water before the football game (the second Fat Fish can get you there); the gang is quicker after Scruffy, a touch quicker after Puffy.
 - v0.330: Puffy works offline (levels, bosses, music); online players still get the newest version on every load. The server now answers "no change" (304) when nothing is new.
 - v0.331: Every level and boss uses about half the graphics memory, in full and lite mode, with nothing looking different.
+- v0.332: A device switched to light mode by a graphics hiccup gets full mode back with the next version; hiccups while the game is in the background no longer switch it.

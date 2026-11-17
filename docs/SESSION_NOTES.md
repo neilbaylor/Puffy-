@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.331)
+## Where things stand (v0.332)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -31,6 +31,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   Home screen (yellow).
 - Start screen: drone fly-over behind, logo hop, hero cards (pick = hop / backflip), Play, Part picker once a
   level is beaten, mute (top-left), full screen + **Battle** buttons (top-right, same height, side by side).
+- v0.332: Light mode auto-switch (graphics loss) now stores `auto:<version>` (LIGHT_AUTO) and expires next version; legacy '1' cleared once on real devices (not navigator.webdriver, marker puffy.lightRetried). Context loss while hidden / <2 s after showing → quiet reload when visible, no light switch. Tests setting puffy.light='1' unaffected.
 - v0.331: Perf G4 merged: own WebGL context without depth/stencil (main.ts makeGl), disablePreFX, core/renderTargets.ts shrinks unused Phaser render targets + patches framebuffer destroy; Hoops darkness without depth; boss sheets only used poses; light minigame fields at FIELD_RES 1.25; canvases drop Phaser pixel copy; other Parts' courts freed. Graphics MB ~halved (e.g. L1 full 234→95). Open proposals: light ground 1.0x, antialias off, Wrestle screens every 70 ms; decisions: free start-screen ground in bosses (−100 MB full), light free other Parts' trees (rejected-ish), full keep 2 looks.
 - v0.330: Offline play: src/sw.js (built by scripts/offline-plugin.ts into dist/sw.js with the file list), registered by src/core/offline.ts 3 s after the start screen (prod, not single). Page network-first (3.5 s timeout → cached copy), /assets cache-first, /api + battle never touched; songs warmed in the background on the start screen. server.mjs: ETags per encoding + 304s, 404 for missing files with an extension, better audio ranges. account.ts re-syncs on `online`; music.ts retries failed songs; battleUi says "You’re offline". Open decisions: background song download (7 MB), 3.5 s page timeout, account button name offline.
 - v0.329: Part 6 now 455 tiles: new open water 209-233 (Fat Fish #2 at 190 lands there instead of on the reef roof); everything from the Reef Bowl on +25 (football 245, shelf 241-285, fatDrop 395, goal 449). FishChase HERO_K puffy 1.06, scruffy 1.15, muscles 0.93. Scruffy bot: game over at the football field (bot is weaker than a human).
