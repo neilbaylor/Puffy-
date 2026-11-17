@@ -332,3 +332,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.327: Perf: Part 6 draws about half as much per frame (and less memory); savings across the app.
 - v0.328: Under the sea: the light beams no longer vanish partway into Parts 5 and 6.
 - v0.329: Part 6: a stretch of open water before the football game (the second Fat Fish can get you there); the gang is quicker after Scruffy, a touch quicker after Puffy.
+- v0.330: Puffy works offline (levels, bosses, music); online players still get the newest version on every load. The server now answers "no change" (304) when nothing is new.
