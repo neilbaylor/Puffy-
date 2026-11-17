@@ -91,12 +91,23 @@ export type PackedPlayer = [string, string, ...number[]];
 
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
 
-export function packPlayer(p: SnapPlayer): PackedPlayer {
+/**
+ * (straight from the sim's player, with its `ack`: no copies of the player made first — a snapshot goes
+ * out 30 times a second per room, and copying each player twice was most of what a tick allocated)
+ */
+export function packPlayer(p: Omit<SnapPlayer, 'ack'>, ack: number): PackedPlayer {
   let bits = 0;
-  BOOL_FIELDS.forEach((f, i) => {
-    if (p[f]) bits |= 1 << i;
-  });
-  return [p.id, p.hero, ...NUM_FIELDS.map((f) => r3(p[f] as number)), bits];
+  for (let i = 0; i < BOOL_FIELDS.length; i++) if (p[BOOL_FIELDS[i]]) bits |= 1 << i;
+  // (made at its full length: grown a field at a time, it was copied over and over)
+  const out = new Array(NUM_FIELDS.length + 3) as PackedPlayer;
+  out[0] = p.id;
+  out[1] = p.hero;
+  for (let i = 0; i < NUM_FIELDS.length; i++) {
+    const f = NUM_FIELDS[i];
+    out[2 + i] = r3(f === 'ack' ? ack : (p[f] as number));
+  }
+  out[2 + NUM_FIELDS.length] = bits;
+  return out;
 }
 
 export function unpackPlayer(a: PackedPlayer): SnapPlayer {

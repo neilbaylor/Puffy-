@@ -13,7 +13,7 @@ import { CHARACTERS } from '../src/data/characters';
 import { buildArena } from '../src/shared/battle/arena';
 import { BattleSim, BTN, DT } from '../src/shared/battle/sim';
 import { compactQueue } from './inputQueue';
-import { MAX_BATTLERS, START_NOW_SECS, WEAPON_CODE, packPlayer, type ClientMsg, type Phase, type RoomPlayer, type RoomState, type ServerMsg, type SnapChair, type SnapEnemy, type SnapHazard, type SnapPrize } from '../src/shared/battle/protocol';
+import { MAX_BATTLERS, START_NOW_SECS, WEAPON_CODE, packPlayer, type ClientMsg, type PackedPlayer, type Phase, type RoomPlayer, type RoomState, type ServerMsg, type SnapChair, type SnapEnemy, type SnapHazard, type SnapPrize } from '../src/shared/battle/protocol';
 
 /** (BATTLE_COUNTDOWN lengthens it, for taking screenshots) */
 /** Once two or more friends are in, the next battle counts down from this on its own. */
@@ -64,6 +64,8 @@ const ARENA = buildArena();
 /** (BATTLE_LAG_MS adds this much delay each way, to test how it plays on a slow connection) */
 const LAG = Math.max(0, Number(process.env.BATTLE_LAG_MS) || 0);
 const later = (fn: () => void) => (LAG ? setTimeout(fn, LAG) : fn());
+/** (bytes sent as a text message, as a string would be) */
+const TEXT = { binary: false } as const;
 const heroOk = (h: string) => (CHARACTERS.some((c) => c.id === h) ? h : 'puffy');
 /** What's on from the Shop: a few ids (lower case, digits, dashes), sorted; anything else dropped. */
 const wearOk = (w: unknown) =>
@@ -336,9 +338,13 @@ class Room {
   tick() {
     const now = Date.now();
     const hold = (this.phase === 'battle' ? REJOIN_SECS : LOBBY_REJOIN_SECS) * 1000;
-    for (const c of [...this.clients.values()]) if (!c.ws && c.droppedAt && now - c.droppedAt > hold) this.remove(c);
+    // (the list copied only when someone's actually going: remove() changes it)
+    let gone: Client[] | null = null;
+    for (const c of this.clients.values()) if (!c.ws && c.droppedAt && now - c.droppedAt > hold) (gone ??= []).push(c);
+    if (gone) for (const c of gone) this.remove(c);
     if (this.phase === 'lobby' || this.phase === 'countdown') this.promoteWatchers();
-    const ready = [...this.clients.values()].filter((c) => c.ws && c.slot >= 0).length;
+    let ready = 0;
+    for (const c of this.clients.values()) if (c.ws && c.slot >= 0) ready++;
     switch (this.phase) {
       case 'lobby':
         // two or more friends here: the countdown starts by itself
@@ -399,10 +405,8 @@ class Room {
           inputs.set(c.id, steps);
         }
         const events = sim.step(inputs);
-        const players = [...sim.players.values()].map((p) => {
-          const { lastHitBy: _, ...rest } = p;
-          return packPlayer({ ...rest, ack: this.clients.get(p.id)?.lastSeq ?? 0 });
-        });
+        const players: PackedPlayer[] = [];
+        for (const p of sim.players.values()) players.push(packPlayer(p, this.clients.get(p.id)?.lastSeq ?? 0));
         const r1 = (v: number) => Math.round(v * 10) / 10;
         const rockets = sim.rockets.map((r) => ({ id: r.id, owner: r.owner, kind: r.kind, x: r1(r.x), y: r1(r.y), dir: r.dir }));
         const prizes = sim.prizes.map((z): SnapPrize => [z.id, z.kind, r1(z.x), r1(z.y), z.landed ? r1(z.age) : -1]);
@@ -416,7 +420,8 @@ class Room {
         const hazards = sim.hazards.map((z): SnapHazard => [z.id, z.kind, r1(z.x), r1(z.y), r1(z.warn), (z.big ? 1 : 0) | (z.rolling > 0 ? 2 : 0)]);
         const chairs = sim.chairs.map((c): SnapChair => [c.id, r1(c.x), r1(c.y), c.holder ?? '', c.uses, Math.round(c.swing * 100) / 100, c.holder || !c.landed ? -1 : r1(c.age)]);
         this.broadcast({ t: 'snap', k: sim.tick, tl: r1(sim.timeLeft), p: players, r: rockets, z: prizes, n: enemies, h: hazards, c: chairs, e: events });
-        const anyone = [...this.clients.values()].some((c) => c.playing && c.ws);
+        let anyone = false;
+        for (const c of this.clients.values()) if (c.playing && c.ws) anyone = true;
         if (sim.over || !anyone) this.endBattle();
         break;
       }
@@ -446,10 +451,14 @@ class Room {
   }
 
   private broadcast(msg: ServerMsg) {
-    const data = JSON.stringify(msg);
+    // (made into bytes once for everyone, and still sent as text: given the string, each socket turned it
+    // into bytes again for itself)
+    const data = Buffer.from(JSON.stringify(msg));
     for (const c of this.clients.values()) {
       const ws = c.ws;
-      if (ws && ws.readyState === ws.OPEN) later(() => ws.readyState === ws.OPEN && ws.send(data));
+      if (!ws || ws.readyState !== ws.OPEN) continue;
+      if (LAG) later(() => ws.readyState === ws.OPEN && ws.send(data, TEXT));
+      else ws.send(data, TEXT);
     }
   }
 
