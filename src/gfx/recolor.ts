@@ -56,11 +56,18 @@ export function recolorForSlot(src: HTMLCanvasElement | HTMLImageElement, slot: 
   c.height = src.height;
   const ctx = c.getContext('2d', { willReadFrequently: true })!;
   ctx.drawImage(src, 0, 0);
-  const hue = SLOT_HUE[slot % SLOT_HUE.length];
-  if (hue === null) return c;
-  const [ks, kl] = SLOT_TUNE[slot % SLOT_TUNE.length];
+  if (!slotRecolors(slot)) return c;
   const img = ctx.getImageData(0, 0, c.width, c.height);
-  const d = img.data;
+  recolorPixels(img.data, slot);
+  ctx.putImageData(img, 0, 0);
+  return c;
+}
+
+/** The same, in place on a picture's pixels (RGBA, as getImageData gives them). */
+export function recolorPixels(d: Uint8ClampedArray, slot: number) {
+  const hue = SLOT_HUE[slot % SLOT_HUE.length];
+  if (hue === null) return;
+  const [ks, kl] = SLOT_TUNE[slot % SLOT_TUNE.length];
   // remember results for colours we've seen (the art uses a modest palette + gradients)
   const memo = new Map<number, number>();
   for (let i = 0; i < d.length; i += 4) {
@@ -80,6 +87,4 @@ export function recolorForSlot(src: HTMLCanvasElement | HTMLImageElement, slot: 
     d[i + 1] = (out >> 8) & 255;
     d[i + 2] = out & 255;
   }
-  ctx.putImageData(img, 0, 0);
-  return c;
 }

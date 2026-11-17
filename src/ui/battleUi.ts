@@ -11,7 +11,7 @@ import { MATCH_SECS } from '../shared/battle/sim';
 import { CHARACTERS, characterById } from '../data/characters';
 import { drawHeroCard, drawPortrait } from '../gfx/draw';
 import { FaceClock, faceFromKey } from '../gfx/face';
-import { recolorForSlot } from '../gfx/recolor';
+import { recolorForSlot, recolorPixels, slotRecolors } from '../gfx/recolor';
 import { gearOf } from '../core/wardrobe';
 import { freeBossArtExcept, gameArtJobs } from '../gfx/textures';
 import { loadArt } from './artLoader';
@@ -103,9 +103,18 @@ function slotCard(target: HTMLCanvasElement, hero: string, slot: number, pose: '
   const ch = characterById(hero);
   const face = faceKey ? faceFromKey(faceKey) : undefined;
   drawHeroCard(tmp, ch, pose, face, wear, 'body');
-  const out = recolorForSlot(tmp, slot);
-  if (gearOf(wear).eyes) drawHeroCard(out, ch, pose, face, wear, 'eyes');
   const ctx = target.getContext('2d')!;
+  if (!gearOf(wear).eyes) {
+    // (the pixels recoloured where they are and put straight in: the same picture, without a copy of the
+    // canvas made to recolour and then drawn over — this runs a few times a second for each square)
+    ctx.clearRect(0, 0, target.width, target.height);
+    if (!slotRecolors(slot)) return void ctx.drawImage(tmp, 0, 0);
+    const img = tmp.getContext('2d')!.getImageData(0, 0, tmp.width, tmp.height);
+    recolorPixels(img.data, slot);
+    return void ctx.putImageData(img, 0, 0);
+  }
+  const out = recolorForSlot(tmp, slot);
+  drawHeroCard(out, ch, pose, face, wear, 'eyes');
   ctx.clearRect(0, 0, target.width, target.height);
   ctx.drawImage(out, 0, 0);
 }
@@ -367,26 +376,45 @@ export class BattleUI {
   private renderSlots(r: RoomState | null) {
     const box = this.lobby?.querySelector('.bl-slots');
     if (!box) return;
-    box.innerHTML = '';
+    // (a square only made again when what it shows has changed: the room's news comes every second of
+    // the countdown, and each time all four were made afresh — each hero drawn again and recoloured, a
+    // stutter every second on a phone; a square that's the same just has its hero start over, as before)
+    if (this.slotBox !== box) {
+      this.slotBox = box;
+      this.slotCards = [];
+      box.innerHTML = '';
+    }
     // after a battle, each square shows how its player did (and the winner's cup)
     const played = !!r && r.phase !== 'battle' && r.players.some((q) => q.kos > 0 || q.deaths > 0);
     for (let slot = 0; slot < MAX_BATTLERS; slot++) {
       const p = r?.players.find((q) => q.slot === slot);
       const me = p && p.id === this.net?.myId;
-      const el = h(`<div class="bl-slot${p ? '' : ' empty'}${me ? ' me' : ''}${p && !p.connected ? ' away' : ''}" style="--sc:${SLOT_COLORS[slot]}">
+      const html = `<div class="bl-slot${p ? '' : ' empty'}${me ? ' me' : ''}${p && !p.connected ? ' away' : ''}" style="--sc:${SLOT_COLORS[slot]}">
         ${p ? '<canvas width="160" height="200"></canvas>' : '<div class="bl-wait">?</div>'}
         <b>${p ? esc(p.name) : 'Waiting…'}</b>
         <small>${p ? `${me ? 'You · ' : ''}${characterById(p.hero).name}` : SLOT_NAMES[slot]}</small>
         ${p && played && p.kos > 0 ? `<span class="bl-last${p.id === r?.winner ? ' won' : ''}" title="Last battle">${p.id === r?.winner ? '🏆 ' : ''}${p.kos} KO${p.kos === 1 ? '' : 's'}</span>` : ''}
-      </div>`);
-      if (p) this.liveSlot(el.querySelector('canvas')!, p.hero, slot, p.wear ?? '');
-      box.appendChild(el);
+      </div>`;
+      const old = this.slotCards[slot];
+      if (old && old.html === html) {
+        old.restart?.();
+        continue;
+      }
+      const el = h(html);
+      const restart = p ? this.liveSlot(el.querySelector('canvas')!, p.hero, slot, p.wear ?? '') : null;
+      if (old) box.replaceChild(el, old.el);
+      else box.appendChild(el);
+      this.slotCards[slot] = { html, el, restart };
     }
   }
 
+  /** The lobby's squares as they are (see renderSlots). */
+  private slotBox: Element | null = null;
+  private slotCards: { html: string; el: HTMLElement; restart: (() => void) | null }[] = [];
+
   /** The heroes in the squares stand there breathing, blinking and glancing about, like on the start screen. */
   private liveSlot(cv: HTMLCanvasElement, hero: string, slot: number, wear = '') {
-    const face = new FaceClock();
+    let face = new FaceClock();
     let pose: 'idle0' | 'idle1' = 'idle0';
     let shown = '';
     let t = Math.random() * 0.6;
@@ -407,6 +435,13 @@ export class BattleUI {
       }
       draw();
     }, 100);
+    // (starting over, as a square made afresh does: drawn again only if that looks different)
+    return () => {
+      face = new FaceClock();
+      pose = 'idle0';
+      t = Math.random() * 0.6;
+      draw();
+    };
   }
 
   // ── the room changed (someone joined, the match started or ended…) ──
