@@ -344,3 +344,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.339: Coming back to the home screen after a level: a short loading bar, then a smooth home screen (no more stuttering while it redraws).
 - v0.340: Clearer offline message on the account card.
 - v0.341: The home screen uses about a third less memory and starts quicker: other Parts are drawn a touch softer there, and the glide is shorter.
+- v0.342: The loading bar when going back home from a level is about half as long, and usually gone.
