@@ -1449,7 +1449,7 @@ export class UI {
     else if (build && host) {
       const data = build();
       for (const k of this.game.textures.getTextureKeys())
-        if ((k.startsWith('terrain-') && !k.startsWith(`terrain-${data.name}-`)) || k.startsWith('terrainlo-') || (k.startsWith('tree-') && !k.startsWith(`tree-${data.name}-`))) this.game.textures.remove(k);
+        if ((k.startsWith('terrain-') && !k.startsWith(`terrain-${data.name}-`)) || (k.startsWith('tree-') && !k.startsWith(`tree-${data.name}-`))) this.game.textures.remove(k);
       ground = groundPaintJobs(host, data).map((job, i) => ({ name: `ground ${i}`, run: () => void job() }));
     }
     return loadArt([...gameArtJobs(scene, { heroes, level }), ...ground]);

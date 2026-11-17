@@ -710,12 +710,13 @@ export function ensureLevelLooks(scene: Phaser.Scene, level: number) {
  * Free the background looks no longer needed (only the level you're on, or picking, keeps
  * its looks: memory stays the same however many levels there are).
  */
-export function freeLooksExcept(scene: Phaser.Scene, keep: readonly string[], homeKeep: readonly string[] = []) {
-  // (the start screen's own copies, `bgh-`, only by `homeKeep`: a level passes none, so they all go)
+export function freeLooksExcept(scene: Phaser.Scene, keep: readonly string[], homeKeep: readonly string[] | 'all' = []) {
+  // (the start screen's own copies, `bgh-`, only by `homeKeep`; a level keeps them all ('all'): coming
+  // back home then has little to redraw)
   for (const k of scene.textures.getTextureKeys()) {
     const m = /^bg(h?)-[a-z]+:(.+)$/.exec(k);
     if (!m) continue;
-    const ok = m[1] ? homeKeep.includes(m[2]) : keep.includes(m[2]) || (!HOME_LO && homeKeep.includes(m[2]));
+    const ok = m[1] ? homeKeep === 'all' || homeKeep.includes(m[2]) : keep.includes(m[2]) || (!HOME_LO && homeKeep !== 'all' && homeKeep.includes(m[2]));
     if (!ok) scene.textures.remove(k);
   }
 }

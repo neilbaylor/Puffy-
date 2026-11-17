@@ -385,7 +385,7 @@ export class GameScene extends Phaser.Scene {
       if (!has('volley')) for (const p of ['volleysand-', 'volleyboard-']) dropTextures(this, p);
     }
     this.lookNext = 0;
-    if (!this.scene.isActive('Menu') && !this.scene.isActive('Battle')) freeLooksExcept(this, themesFor(this.levelId));
+    if (!this.scene.isActive('Menu') && !this.scene.isActive('Battle')) freeLooksExcept(this, themesFor(this.levelId), 'all');
     this.bg = new Background(this, (data.bgBottom ?? heightPx) - VIEW_H, false, !!data.vertical, data.water !== undefined);
     this.amb = new Ambience(this, this.levelId, (x, y, max) => {
       for (let d = 0; d <= max; d += 6) if (this.level.isSolidAt(x, y + d)) return Math.floor((y + d) / TILE) * TILE;

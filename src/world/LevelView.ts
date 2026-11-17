@@ -161,7 +161,9 @@ export class LevelView {
     // otherwise); the start screen's lazy views keep theirs (they only draw a little)
     if ((opts?.free ?? opts?.lazyNear === undefined) && !opts?.keep)
       for (const k of scene.textures.getTextureKeys())
-      if ((k.startsWith('terrain-') && !k.startsWith(`terrain-${data.name}-`)) || k.startsWith('terrainlo-')) scene.textures.remove(k);
+      // (the start screen's own softer copies, `terrainlo-`, are kept: coming back home then has
+      // little to redraw behind its loading bar)
+      if (k.startsWith('terrain-') && !k.startsWith(`terrain-${data.name}-`)) scene.textures.remove(k);
     this.map = scene.make.tilemap({ data: data.tiles.map((r) => [...r]), tileWidth: TILE, tileHeight: TILE });
     const tileset = this.map.addTilesetImage('tiles', 'tiles', TILE, TILE, 1, 2)!;
     this.layer = this.map.createLayer(0, tileset, 0, 0)!.setVisible(false);
