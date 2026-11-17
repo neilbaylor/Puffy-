@@ -345,3 +345,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.340: Clearer offline message on the account card.
 - v0.341: The home screen uses about a third less memory and starts quicker: other Parts are drawn a touch softer there, and the glide is shorter.
 - v0.342: The loading bar when going back home from a level is about half as long, and usually gone.
+- v0.343: Other Parts on the home screen drawn a little softer: a bit less memory and a shorter loading bar.
