@@ -343,3 +343,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.338: Signed in but offline: the account button still shows your name, marked offline.
 - v0.339: Coming back to the home screen after a level: a short loading bar, then a smooth home screen (no more stuttering while it redraws).
 - v0.340: Clearer offline message on the account card.
+- v0.341: The home screen uses about a third less memory and starts quicker: other Parts are drawn a touch softer there, and the glide is shorter.
