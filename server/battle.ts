@@ -81,6 +81,8 @@ const cleanName = (n: unknown, slot: number) => {
   const s = String(n ?? '').replace(/[^\p{L}\p{N} _'!.-]/gu, '').trim().slice(0, 10);
   return s || (slot >= 0 ? `Player ${slot + 1}` : 'Fan');
 };
+/** How often each connection is checked for still being there (see the heartbeat in attachBattle). */
+const HEARTBEAT_MS = 30000;
 /** When the arena's full, this many more can watch (they get the next free spot). */
 const MAX_WATCHERS = 8;
 
@@ -528,7 +530,38 @@ export function attachBattle(server: Server) {
       if (me && me.ws === ws) room.dropped(me);
     });
     ws.on('error', () => {});
+    ws.on('pong', () => unanswered.delete(ws));
+    heartbeat();
   });
+  // A phone that vanished without closing its connection (out of signal, battery died) never says it's
+  // gone: its square stayed taken in the lobby (a ghost player) and, in a battle, the snapshots meant for
+  // it piled up in the server's memory until the network gave up on it, many minutes later. Every
+  // HEARTBEAT_MS each connection is pinged (the browser answers by itself, even from a background tab);
+  // one that hasn't answered the last ping by the next is closed — and dropped like any other (its place
+  // is kept for a rejoin as usual). (Only while anyone's connected.)
+  const unanswered = new Set<WebSocket>();
+  let beat: ReturnType<typeof setInterval> | null = null;
+  const heartbeat = () => {
+    if (beat) return;
+    beat = setInterval(() => {
+      if (!wss.clients.size) {
+        clearInterval(beat!);
+        beat = null;
+        unanswered.clear();
+        return;
+      }
+      for (const ws of wss.clients) {
+        if (unanswered.has(ws)) {
+          unanswered.delete(ws);
+          ws.terminate();
+          continue;
+        }
+        unanswered.add(ws);
+        ws.ping();
+      }
+      for (const ws of unanswered) if (!wss.clients.has(ws)) unanswered.delete(ws);
+    }, HEARTBEAT_MS);
+  };
   // a steady 30 ticks a second (catching up if the timer runs late): each tick has its due time and
   // the timer is set for the next one. (A timer every half tick, counting up, put a tick a whole half
   // tick late about twice a second: Node's timers run in whole milliseconds, 16 not 16.7.)
