@@ -54,7 +54,7 @@ import type { GameData, GameOverState, ResultState } from './GameScene';
 import { loseLife } from '../core/lives';
 import { NetSim } from './hoopsNet';
 import { SimpleConfetti } from '../world/SimpleConfetti';
-import { shrinkCaptureTarget } from '../core/renderTargets';
+import { dropDepthBuffer, shrinkCaptureTarget } from '../core/renderTargets';
 import { PLOP_FRAMES, PLOP_H, PLOP_KINDS, PLOP_SCALE, PLOP_W, drawPlop, type PlopKind } from '../gfx/plops';
 import { STYLES } from '../gfx/handdrawn';
 
@@ -360,6 +360,7 @@ export class HoopsScene extends Phaser.Scene {
 
     // darkness with spotlights cut out of it, plus the visible beams from the rafters
     this.darkRT = this.add.renderTexture(0, 0, ARENA_W, ARENA_H).setOrigin(0, 0).setDepth(11).setVisible(false);
+    dropDepthBuffer(this.game, (this.darkRT.texture as Phaser.Textures.DynamicTexture).renderTarget);
     this.brush = this.make.image({ key: 'spotbrush', add: false }).setOrigin(0.5);
     for (const src of [A(230, -90), A(1330, -90)]) {
       const beam = this.add.image(src.x, src.y, 'spot').setOrigin(0.5, 0).setBlendMode(Phaser.BlendModes.ADD).setDepth(11.4).setVisible(false);
