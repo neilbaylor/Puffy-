@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { DEPTH } from '../config';
-import { BG_LAYERS, BG_RES, bgKey, ensureLook } from '../gfx/textures';
+import { BG_LAYERS, bgKey, bgRes, ensureLook } from '../gfx/textures';
 import { rng } from '../gfx/draw';
 import { liveCanvas } from '../gfx/liveCanvas';
 import { LIGHT } from '../core/light';
@@ -129,9 +129,12 @@ export class Background {
     private vertical = false,
     /** Under the sea: no clouds; little bubbles drift up instead of puff seeds. */
     private sea = false,
+    /** The start screen's copy of another Part's sky (lower resolution, keys a level never uses: see bgKey). */
+    private home = false,
   ) {
-    this.skyA = scene.add.image(0, 0, bgKey('sky', 'puff')).setOrigin(0, 0).setDepth(DEPTH.sky);
-    this.skyB = scene.add.image(0, 0, bgKey('sky', 'puff')).setOrigin(0, 0).setDepth(DEPTH.sky).setVisible(false);
+    this.res = bgRes(home);
+    this.skyA = scene.add.image(0, 0, bgKey('sky', 'puff', home)).setOrigin(0, 0).setDepth(DEPTH.sky);
+    this.skyB = scene.add.image(0, 0, bgKey('sky', 'puff', home)).setOrigin(0, 0).setDepth(DEPTH.sky).setVisible(false);
     this.add('far', BG_LAYERS.far.h, 0.08, 0.04, 0.3, 0, DEPTH.far);
     // two bands of living clouds: small far ones up high, big slow ones lower down
     if (!sea) {
@@ -154,35 +157,38 @@ export class Background {
     this.setTheme({ a: 'puff', b: 'puff', w: 0 });
   }
 
+  /** The resolution its layers' pictures are drawn at. */
+  private readonly res: number;
+
   private add(id: LayerId, h: number, fx: number, fy: number, anchor: number, drift: number, depth: number) {
-    const key = bgKey(id, 'puff');
-    this.layers.push({ id, a: [], b: [], keyA: key, keyB: key, depth, w: BG_LAYERS[id].w, y: 0, fx, fy, anchor, drift, offset: 0, h: h + 4 / BG_RES });
+    const key = bgKey(id, 'puff', this.home);
+    this.layers.push({ id, a: [], b: [], keyA: key, keyB: key, depth, w: BG_LAYERS[id].w, y: 0, fx, fy, anchor, drift, offset: 0, h: h + 4 / this.res });
   }
 
   /** Make sure a row has `n` pictures (they're only ever added: a handful at most). */
   private row(imgs: Phaser.GameObjects.Image[], key: string, n: number, depth: number) {
-    while (imgs.length < n) imgs.push(this.scene.add.image(0, 0, key).setOrigin(0, 0).setScale(1 / BG_RES).setDepth(depth));
+    while (imgs.length < n) imgs.push(this.scene.add.image(0, 0, key).setOrigin(0, 0).setScale(1 / this.res).setDepth(depth));
     return imgs;
   }
 
   /** Show look `a`, with look `b` faded in on top by `w`. */
   setTheme(m: ThemeMix) {
-    if (m.a !== this.themeA) ensureLook(this.scene, m.a);
-    if (m.b !== this.themeB && m.w > 0.001) ensureLook(this.scene, m.b);
+    if (m.a !== this.themeA) ensureLook(this.scene, m.a, this.home);
+    if (m.b !== this.themeB && m.w > 0.001) ensureLook(this.scene, m.b, this.home);
     if (m.a !== this.themeA) {
       this.themeA = m.a;
-      this.skyA.setTexture(bgKey('sky', m.a));
+      this.skyA.setTexture(bgKey('sky', m.a, this.home));
       for (const l of this.layers) {
-        l.keyA = bgKey(l.id, m.a);
+        l.keyA = bgKey(l.id, m.a, this.home);
         for (const img of l.a) img.setTexture(l.keyA);
       }
     }
     const showB = m.w > 0.001 && m.b !== m.a;
     if (showB && m.b !== this.themeB) {
       this.themeB = m.b;
-      this.skyB.setTexture(bgKey('sky', m.b));
+      this.skyB.setTexture(bgKey('sky', m.b, this.home));
       for (const l of this.layers) {
-        l.keyB = bgKey(l.id, m.b);
+        l.keyB = bgKey(l.id, m.b, this.home);
         for (const img of l.b) img.setTexture(l.keyB);
       }
     }

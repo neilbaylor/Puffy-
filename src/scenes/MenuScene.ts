@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { MIN_VIEW_W, TILE, VIEW_H } from '../config';
-import { BG_LAYER_IDS, bgKey, ensureLook, freeLooksExcept, lookJobs } from '../gfx/textures';
+import { BG_LAYER_IDS, HOME_LO, bgKey, ensureLook, freeLooksExcept, lookJobs } from '../gfx/textures';
 import { buildLevel1 } from '../level/level1';
 import { levelInfo, levelName, pickableLevels, progress } from '../level/levels';
 import { Background } from '../world/Background';
@@ -29,7 +29,24 @@ interface World {
   top: number | null;
   lastSurf: number;
   t: number;
+  /**
+   * The start screen's own lower-resolution pictures (full mode: another Part's fly-over, built
+   * ahead or picked on the start screen — see HOME_LO): never a level's. The Part shown when the
+   * start screen opens (at boot, back from a level) has the level's own, full-resolution ones.
+   */
+  lo: boolean;
 }
+
+/**
+ * How far the fly-over glides before it fades back to its start (world px; less on a short level,
+ * at least a view's width on a very wide screen): only that much of the level's ground is drawn.
+ */
+const GLIDE = 1200;
+/**
+ * The climb's glide (Plop Invasion · Part 2), straight up from the bottom: this far (its ground
+ * higher up than the glide ever shows isn't put up: see skipAbove).
+ */
+const CLIMB = 1200;
 
 export class MenuScene extends Phaser.Scene {
   private bg!: Background;
@@ -49,7 +66,12 @@ export class MenuScene extends Phaser.Scene {
     this.worlds.clear();
     this.building = null;
     this.pendingWorld = null;
-    this.build(data?.level ?? 1);
+    // (the Part the start screen opens on has the level's own, full-resolution pictures — drawn at
+    // boot, or left by the level you've just played, which reuses them — unless only the start
+    // screen's own lower-resolution ones are there: back from a boss fought from a Part picked here)
+    const id = data?.level ?? 1;
+    const look0 = themesFor(id)[0];
+    this.build(id, !this.textures.exists(bgKey('far', look0)) && this.textures.exists(bgKey('far', look0, true)));
     // back from a level or a boss (not the first start: the loading screen does that): the other
     // Parts' pictures the level let go are drawn again straight away, behind a small loading bar,
     // rather than a bit at a time while the start screen glides (a string of hitches). Only when
@@ -71,7 +93,7 @@ export class MenuScene extends Phaser.Scene {
       cam.fadeOut(240, c[0], c[1], c[2]);
       cam.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
         this.stashWorld();
-        this.build(id);
+        this.build(id, true);
         cam.fadeIn(320, c[0], c[1], c[2]);
       });
     };
@@ -165,8 +187,8 @@ export class MenuScene extends Phaser.Scene {
       () => !gone() && levelPieces(data, 'rock'),
       step(() => {
         // (no ground drawn by the view itself: the next steps draw it a piece at a time)
-        level = new LevelView(this, data, { lazyNear: x0, lazySpan: [-1e9, -1e9], ahead: false, trim: true });
-        loopEnd.v = x0 + Math.max(level.widthPx * 0.2, 1800);
+        level = new LevelView(this, data, { lazyNear: x0, lazySpan: [-1e9, -1e9], ahead: false, trim: true, lo: true, skipAbove: this.skipAbove(data) });
+        loopEnd.v = x0 + Math.max(GLIDE, vw);
         level.trimPending(loopEnd.v + vw + 400);
         // its opening ground (what the fly-over would draw in its first frames), a piece per step,
         // put next in line
@@ -175,9 +197,9 @@ export class MenuScene extends Phaser.Scene {
       }),
       step(() => {
         const lv = level!;
-        const bg = new Background(this, (data.bgBottom ?? lv.heightPx) - VIEW_H, true, !!data.vertical, data.water !== undefined);
         const look0 = themesFor(id)[0];
-        ensureLook(this, look0);
+        ensureLook(this, look0, true);
+        const bg = new Background(this, (data.bgBottom ?? lv.heightPx) - VIEW_H, true, !!data.vertical, data.water !== undefined, true);
         const mix = themeMix(0, themesFor(id));
         bg.setTheme(mix);
         lv.setTint(mixTint(mix));
@@ -185,7 +207,7 @@ export class MenuScene extends Phaser.Scene {
           for (let d = 0; d <= max; d += 8) if (lv.isSolidAt(x, y + d)) return Math.floor((y + d) / TILE) * TILE;
           return null;
         }, data.water !== undefined ? { surface: data.water, width: lv.widthPx, dark: data.dark } : undefined);
-        this.pendingWorld = { id, w: { objs, level: lv, bg, amb, x0, x: x0, loopEnd: loopEnd.v, top: null, lastSurf: 0, t: 0 } };
+        this.pendingWorld = { id, w: { objs, level: lv, bg, amb, x0, x: x0, loopEnd: loopEnd.v, top: null, lastSurf: 0, t: 0, lo: lv.lo } };
       }),
       () => {
         const pw = this.pendingWorld;
@@ -242,9 +264,9 @@ export class MenuScene extends Phaser.Scene {
   }
 
   /** A look drawn now (if it isn't already) and shown once invisibly, so its first real showing is instant. */
-  private warmLook(id: string) {
-    ensureLook(this, id);
-    const keys = (['sky', 'far', 'clouds', 'hills', 'near'] as const).map((l) => bgKey(l, id)).filter((k) => this.textures.exists(k) && !shown.has(this.textures.get(k)));
+  private warmLook(id: string, home = false) {
+    ensureLook(this, id, home);
+    const keys = (['sky', 'far', 'clouds', 'hills', 'near'] as const).map((l) => bgKey(l, id, home)).filter((k) => this.textures.exists(k) && !shown.has(this.textures.get(k)));
     for (const k of keys) shown.add(this.textures.get(k));
     if (keys.length) this.warmOnGpu(keys.map((k) => this.add.image(0, 0, k).setOrigin(0).setScrollFactor(0).setScale(0.05)));
   }
@@ -256,6 +278,13 @@ export class MenuScene extends Phaser.Scene {
   private firstSpan(): [number, number] {
     const vw = this.scale.width / Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W);
     return [100, vw + 150];
+  }
+
+  /** A climb: how high its start-screen glide's ground goes (see CLIMB; a good margin over it, for the drone's sway and a taller screen). */
+  private skipAbove(data: { vertical?: boolean; height: number }) {
+    if (!data.vertical) return -Infinity;
+    const vh = this.scale.height / Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W);
+    return data.height * TILE - vh - CLIMB - 300;
   }
 
   private startX(id: number) {
@@ -277,7 +306,8 @@ export class MenuScene extends Phaser.Scene {
     const info = levelInfo(id);
     if (!info.build) return [];
     // (another Part than the one showing, e.g. in light mode: a view of it just for its pictures)
-    const jobs = this.levelId === id && this.level ? this.level.paintJobs() : groundPaintJobs(this, info.build());
+    // (nor the start screen's own lower-resolution picture of it: the level has its own, see HOME_LO)
+    const jobs = this.levelId === id && this.level && !this.level.lo ? this.level.paintJobs() : groundPaintJobs(this, info.build());
     return jobs.map((job, i) => ({
       name: `ground ${i}`,
       run: () => {
@@ -300,7 +330,7 @@ export class MenuScene extends Phaser.Scene {
     const others = new Set([...this.worlds.values()].flatMap((w) => w.objs));
     const objs = this.children.list.filter((o) => !others.has(o));
     for (const o of objs) (o as unknown as { setVisible?: (v: boolean) => void }).setVisible?.(false);
-    this.worlds.set(this.levelId, { objs, level: this.level, bg: this.bg, amb: this.amb, x0: this.x0, x: this.x, loopEnd: this.loopEnd, top: this.top, lastSurf: this.lastSurf, t: this.t });
+    this.worlds.set(this.levelId, { objs, level: this.level, bg: this.bg, amb: this.amb, x0: this.x0, x: this.x, loopEnd: this.loopEnd, top: this.top, lastSurf: this.lastSurf, t: this.t, lo: this.level.lo });
   }
 
   /** A kept fly-over, if everything in it is still there (its pictures may have been freed meanwhile). */
@@ -324,7 +354,11 @@ export class MenuScene extends Phaser.Scene {
     this.worlds.delete(id);
   }
 
-  private build(id: number) {
+  /**
+   * Show Part `id`. `lo`: if its fly-over has to be built, with the start screen's own
+   * lower-resolution pictures (see World.lo); a kept fly-over is shown as it was.
+   */
+  private build(id: number, lo = false) {
     if (this.levelId !== id) this.prevId = this.levelId;
     this.levelId = id;
     // the fly-over starts somewhere that shows off the level (Part 2: up in the snow, not the
@@ -338,7 +372,6 @@ export class MenuScene extends Phaser.Scene {
     // the start screen shows each level in its first look, still (no drifting between looks here:
     // only one look per level to draw and keep); the game starts from that look too
     themeClock.t = 0;
-    ensureLook(this, looks[0]);
     // (kept drawn: the Parts next to this one in the picker, and the one you just came from)
     const near = LIGHT ? [] : [...new Set([...this.neighbours(id), this.prevId])].filter((n) => n && n !== id && levelInfo(n).build);
     const data = (levelInfo(id).build ?? buildLevel1)();
@@ -346,6 +379,10 @@ export class MenuScene extends Phaser.Scene {
     // (memory: two whole levels at once is too much for phones)
     // (kept fly-overs of Parts that aren't next to this one any more are let go)
     for (const wid of [...this.worlds.keys()]) if (wid !== id && !near.includes(wid)) this.dropWorld(wid);
+    // this Part's fly-over as it was left, if it's kept (its pictures are all still there)
+    const kept = this.keptWorld(id);
+    const shownLo = kept ? kept.lo : lo && HOME_LO;
+    ensureLook(this, looks[0], shownLo);
     // (pictures a kept fly-over is showing are never freed here)
     const inUse = new Set<string>();
     for (const w of this.worlds.values())
@@ -357,14 +394,26 @@ export class MenuScene extends Phaser.Scene {
     for (const k of stale) if (this.textures.exists(k)) this.textures.remove(k);
     this.painted = this.painted.filter((k) => !stale.includes(k));
     if (!this.scene.isActive('Battle') && !this.scene.isActive('Game')) {
-      freeLooksExcept(this, [...looks, ...near.map((n) => themesFor(n)[0])]);
+      // the looks: this Part's (its other looks are the game's, drawn ahead for it), and the Parts
+      // next to it — the start screen's own lower-resolution copies (`bgh-`), but a kept fly-over
+      // drawn at full resolution (the Part the start screen opened on) keeps the level's own
+      const fullNear = near.filter((n) => this.worlds.get(n)?.lo === false);
+      freeLooksExcept(
+        this,
+        [...(shownLo ? looks.slice(1) : looks), ...fullNear.map((n) => themesFor(n)[0])],
+        [...(shownLo ? [looks[0]] : []), ...near.filter((n) => !fullNear.includes(n)).map((n) => themesFor(n)[0])],
+      );
       const keep = [data.name, ...near.map((n) => levelName(n))];
+      // (the start screen's own ground pictures, `terrainlo-`, of this Part only while it shows them)
+      const keepLo = shownLo ? keep : keep.slice(1);
       for (const k of this.textures.getTextureKeys())
-        if ((k.startsWith('terrain-') || k.startsWith('tree-')) && !inUse.has(k) && !keep.some((name) => k.startsWith(`terrain-${name}-`) || k.startsWith(`tree-${name}-`))) this.textures.remove(k);
+        if (inUse.has(k)) continue;
+        else if (k.startsWith('terrainlo-')) {
+          if (!keepLo.some((name) => k.startsWith(`terrainlo-${name}-`))) this.textures.remove(k);
+        } else if ((k.startsWith('terrain-') || k.startsWith('tree-')) && !keep.some((name) => k.startsWith(`terrain-${name}-`) || k.startsWith(`tree-${name}-`))) this.textures.remove(k);
     }
-    // this Part's fly-over as it was left, if it's kept: just shown again
-    const kept = this.keptWorld(id);
     if (kept) {
+      // just shown again
       this.worlds.delete(id);
       for (const o of kept.objs) if (o.scene && (o as unknown as { alpha?: number }).alpha !== 0.003) (o as unknown as { setVisible?: (v: boolean) => void }).setVisible?.(true);
       ({ level: this.level, bg: this.bg, amb: this.amb, x0: this.x0, x: this.x, loopEnd: this.loopEnd, top: this.top, lastSurf: this.lastSurf, t: this.t } = kept);
@@ -373,30 +422,31 @@ export class MenuScene extends Phaser.Scene {
       this.quiet = this.planQuiet(id, near, looks);
       return;
     }
-    const w = this.createWorld(id);
+    const w = this.createWorld(id, shownLo);
     ({ level: this.level, bg: this.bg, amb: this.amb, x0: this.x0, x: this.x, loopEnd: this.loopEnd, top: this.top, lastSurf: this.lastSurf, t: this.t } = w);
     this.wrapping = false;
     this.quiet = this.planQuiet(id, near, looks);
   }
 
-  /** A Part's fly-over: its scenery (only what its first view shows; the rest as it glides on), sky and wildlife. */
-  private createWorld(id: number, ahead = false): World {
+  /**
+   * A Part's fly-over: its scenery (only what its first view shows; the rest as it glides on), sky
+   * and wildlife. `lo`: with the start screen's own lower-resolution pictures (see World.lo).
+   */
+  private createWorld(id: number, lo = false): World {
     const before = new Set(this.children.list);
     const data = (levelInfo(id).build ?? buildLevel1)();
     const x0 = this.startX(id);
-    // (built ahead, out of sight: a little more of its ground, everything the fly-over would
-    // otherwise draw in its first frames — LevelView draws what's within 400 px of the view at once)
     const span = this.firstSpan();
-    const level = new LevelView(this, data, { lazyNear: x0, lazySpan: ahead ? [span[0] + 400, span[1] + 400] : span, ahead: false, trim: true });
-    // loop over about a fifth of the level (at least a good stretch); nothing past it is drawn
+    const level = new LevelView(this, data, { lazyNear: x0, lazySpan: span, ahead: false, trim: true, lo, skipAbove: this.skipAbove(data) });
+    // loop over the level's first stretch only (see GLIDE); nothing past it is drawn
     const vw = this.scale.width / Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W);
-    const loopEnd = x0 + Math.max(level.widthPx * 0.2, 1800);
+    const loopEnd = x0 + Math.max(GLIDE, vw);
     level.trimPending(loopEnd + vw + 400);
-    // (still clouds on the start screen: re-drawing their shapes is a constant job it doesn't need)
-    const bg = new Background(this, (data.bgBottom ?? level.heightPx) - VIEW_H, true, !!data.vertical, data.water !== undefined);
     // (in its own look from the start, even built ahead out of sight)
     const look0 = themesFor(id)[0];
-    ensureLook(this, look0);
+    ensureLook(this, look0, level.lo);
+    // (still clouds on the start screen: re-drawing their shapes is a constant job it doesn't need)
+    const bg = new Background(this, (data.bgBottom ?? level.heightPx) - VIEW_H, true, !!data.vertical, data.water !== undefined, level.lo);
     const mix = themeMix(0, themesFor(id));
     bg.setTheme(mix);
     level.setTint(mixTint(mix));
@@ -405,13 +455,14 @@ export class MenuScene extends Phaser.Scene {
       return null;
     }, data.water !== undefined ? { surface: data.water, width: level.widthPx, dark: data.dark } : undefined);
     const objs = this.children.list.filter((o) => !before.has(o));
-    return { objs, level, bg, amb, x0, x: x0, loopEnd, top: null, lastSurf: 0, t: 0 };
+    return { objs, level, bg, amb, x0, x: x0, loopEnd, top: null, lastSurf: 0, t: 0, lo: level.lo };
   }
 
   /** The quiet-moment jobs for a Part being shown (see `quiet`). */
   private planQuiet(_id: number, near: number[], looks: readonly string[]): (() => void)[] {
     // (a neighbour's look not drawn: the other Parts' pictures were let go — after a level)
-    this.redraw = near.some((n) => !this.worlds.has(n) && !BG_LAYER_IDS.every((l) => this.textures.exists(bgKey(l, themesFor(n)[0]))));
+    // (their fly-overs are built with the start screen's own lower-resolution pictures: see World.lo)
+    this.redraw = near.some((n) => !this.worlds.has(n) && !BG_LAYER_IDS.every((l) => this.textures.exists(bgKey(l, themesFor(n)[0], true))));
     const jobs: (() => void)[] = [
       // first, what a click on a neighbouring Part needs: its look and its opening scenery; then
       // the rest of this Part's ground (the level's fly-over sweeps all of it in a few seconds: drawn
@@ -421,7 +472,7 @@ export class MenuScene extends Phaser.Scene {
         .filter((n) => !this.worlds.has(n))
         .flatMap((n) => {
           const a = themesFor(n)[0];
-          return [...lookJobs(this, a), () => this.warmLook(a), ...this.prewarmJobs(n)];
+          return [...lookJobs(this, a, true), () => this.warmLook(a, true), ...this.prewarmJobs(n)];
         }),
     ];
     jobs.push(
@@ -443,7 +494,8 @@ export class MenuScene extends Phaser.Scene {
     this.t += dt;
     const t = this.t;
     this.x += dt * (34 + 8 * Math.sin(t * 0.21));
-    const maxRise = Math.min(H - vh, 2600);
+    // (never higher than its ground is put up, even on a screen made taller since: see skipAbove)
+    const maxRise = Math.max(0, Math.min(H - vh, CLIMB, H - vh - 60 - this.level.skipAbove));
     if (this.x > maxRise && !this.wrapping) {
       this.wrapping = true;
       cam.fadeOut(450, 255, 248, 236);

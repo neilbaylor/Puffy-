@@ -3,7 +3,7 @@ import { DEPTH, TILE } from '../config';
 import { rng } from '../gfx/draw';
 import { FB_FIELD_TILES } from '../gfx/football';
 import type { Pt } from '../gfx/handdrawn';
-import { PROP_RES, TERRAIN_RES, addCanvas, ensureSeaArt, hires, kelpBends } from '../gfx/textures';
+import { HOME_LO, PROP_RES, TERRAIN_LO_RES, TERRAIN_RES, addCanvas, ensureSeaArt, hires, kelpBends } from '../gfx/textures';
 import { GRASS_FILLS, KELP_H, KELP_W, PIER_HEAD, PIER_HEAD_MODERN, SEA_PROPS, SWAY_N, drawModernPier, drawPier } from '../gfx/sea';
 import { DEFAULT_PALETTE, PALETTES, drawCloudPlatform, drawPuffTree, drawTerrainPiece, roundPoly, traceCells, type TerrainKind, type WorldPalette } from '../gfx/world';
 import { drawPine } from '../gfx/mountain';
@@ -144,8 +144,13 @@ export class LevelView {
     /** keep: leave other levels' terrain alone (a battle watched while the start screen still shows). */
     /** free: free other levels' terrain (the game; default when not lazy). */
     /** lazySpan: how far before / after `lazyNear` the terrain is drawn straight away (default 900 / 1800). */
-    opts?: { lazyNear?: number; keep?: boolean; free?: boolean; lazySpan?: [number, number]; ahead?: boolean; cull?: boolean; trim?: boolean },
+    /** lo: the start screen's picture of another Part (its ground at TERRAIN_LO_RES, under `terrainlo-` keys a level never uses). */
+    /** skipAbove: lazy views — ground pictures wholly above this height are never put up (a climb's start-screen glide never goes that high). */
+    opts?: { lazyNear?: number; keep?: boolean; free?: boolean; lazySpan?: [number, number]; ahead?: boolean; cull?: boolean; trim?: boolean; lo?: boolean; skipAbove?: number },
   ) {
+    this.skipAbove = opts?.lazyNear !== undefined ? (opts?.skipAbove ?? -Infinity) : -Infinity;
+    this.lo = !!opts?.lo && HOME_LO;
+    this.res = this.lo ? TERRAIN_LO_RES : TERRAIN_RES;
     this.trim = opts?.trim ?? false;
     this.ahead = opts?.ahead ?? true;
     this.cullOff = opts?.cull ?? false;
@@ -156,7 +161,7 @@ export class LevelView {
     // otherwise); the start screen's lazy views keep theirs (they only draw a little)
     if ((opts?.free ?? opts?.lazyNear === undefined) && !opts?.keep)
       for (const k of scene.textures.getTextureKeys())
-      if (k.startsWith('terrain-') && !k.startsWith(`terrain-${data.name}-`)) scene.textures.remove(k);
+      if ((k.startsWith('terrain-') && !k.startsWith(`terrain-${data.name}-`)) || k.startsWith('terrainlo-')) scene.textures.remove(k);
     this.map = scene.make.tilemap({ data: data.tiles.map((r) => [...r]), tileWidth: TILE, tileHeight: TILE });
     const tileset = this.map.addTilesetImage('tiles', 'tiles', TILE, TILE, 1, 2)!;
     this.layer = this.map.createLayer(0, tileset, 0, 0)!.setVisible(false);
@@ -194,6 +199,13 @@ export class LevelView {
 
   /** The plain deep rock under every terrain chunk (one shape for the whole level). */
   private deepG: Phaser.GameObjects.Graphics | null = null;
+
+  /** The start screen's lower-resolution picture of another Part (see the `lo` option): its ground is never a level's. */
+  readonly lo: boolean;
+  /** The resolution its ground is drawn at. */
+  private readonly res: number;
+  /** Ground pictures wholly above this height aren't put up (see the `skipAbove` option). */
+  readonly skipAbove: number;
 
   /** Every terrain chunk's picture, drawn or not (see `paintJobs`). */
   private paints: { key: string; paint: () => boolean }[] = [];
@@ -483,7 +495,9 @@ export class LevelView {
           // (the first tile has room above for grass blades; the rest overlap the one above by a pixel)
           const ty0 = first ? cy0 - PAD : cy0 - 1;
           const ch = cyEnd - ty0 + (last ? 0 : 1);
-          const key = vi === 0 ? `terrain-${d.name}-${kind}-${pieceId}-${ci}` : `terrain-${d.name}-${kind}-${pieceId}-${ci}-${vi}`;
+          const pre = this.lo ? 'terrainlo' : 'terrain';
+          const key = vi === 0 ? `${pre}-${d.name}-${kind}-${pieceId}-${ci}` : `${pre}-${d.name}-${kind}-${pieceId}-${ci}-${vi}`;
+          const res = this.res;
           /** Just the picture (the start screen draws a level's in quiet moments, ahead of Play). */
           const paint = () => {
           if (!this.scene.textures.exists(key)) {
@@ -491,8 +505,8 @@ export class LevelView {
             // drift and the climbs' lean, 28 px at most measured — but every piece runs 3 tiles past
             // it: the picture stops TRIM_KEEP px under the bottom, drawn just as it would be in full)
             const keepH = this.trim ? Math.max(1, Math.min(ch, this.heightPx + TRIM_KEEP - ty0)) : ch;
-            const fullPx = Math.ceil(ch * TERRAIN_RES);
-            const c = hires(cw + PAD * 2, keepH, TERRAIN_RES, (ctx) => {
+            const fullPx = Math.ceil(ch * res);
+            const c = hires(cw + PAD * 2, keepH, res, (ctx) => {
               ctx.translate(PAD - cx0, -ty0);
               drawTerrainPiece(ctx, { kind, outline, pal, seed: Math.round(x0 + y0), floorY: this.heightPx, clip: { x0: cx0 - PAD, x1: cx0 + cw + PAD, y0: ty0, y1: cyEnd + (last ? PAD : 1) } });
             });
@@ -503,7 +517,7 @@ export class LevelView {
               const fillCol = Phaser.Display.Color.HexStringToColor(hex).color;
               DEEP_FILL.set(key, fillCol);
               const cctx = c.getContext('2d')!;
-              const fadeH = Math.round(90 * TERRAIN_RES);
+              const fadeH = Math.round(90 * res);
               const g2 = cctx.createLinearGradient(0, fullPx - fadeH, 0, fullPx);
               g2.addColorStop(0, hex + '00');
               g2.addColorStop(0.75, hex + 'ff');
@@ -521,13 +535,16 @@ export class LevelView {
           return false;
           };
           this.paints.push({ key, paint });
+          // (still one of the level's pictures, for its loading card: see paintJobs; never the bottom
+          // one of a cut piece, whose plain deep rock runs on down from it)
+          if (cyEnd + PAD < this.skipAbove && !(last && cut < y1 + PAD)) continue;
           const make = () => {
           paint();
           const fillCol = last ? DEEP_FILL.get(key) : undefined;
           const chunk = this.scene.add
             .image(cx0 - PAD, ty0, key)
             .setOrigin(0, 0)
-            .setScale(1 / TERRAIN_RES)
+            .setScale(1 / res)
             .setDepth(DEPTH.tiles);
           // (drawn later, in lazy mode: it joins the colour grade too)
           if (this.scenery) {

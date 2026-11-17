@@ -9,7 +9,8 @@ import { BattleUI } from './battleUi';
 import { loadArt } from './artLoader';
 import { LIGHT } from '../core/light';
 import { savedResCap } from '../core/res';
-import { dropHeroSheets, freeBossArtExcept, gameArtJobs, seaWear, swimLevel } from '../gfx/textures';
+import { dropHeroSheets, freeBossArtExcept, gameArtJobs, missingLookSteps, seaWear, swimLevel } from '../gfx/textures';
+import { themesFor } from '../world/theme';
 import { SHOP, wardrobe } from '../core/wardrobe';
 import { groundPaintJobs } from '../world/LevelView';
 import { gamepadSources } from '../input/gamepad';
@@ -1439,11 +1440,16 @@ export class UI {
     // (straight on from a results card over a boss's arena: no ground on show there, so the last
     // level's is let go first — memory stays flat — and the arena's scene works the pictures out)
     const host = ['Hoops', 'Wrestle', 'Fishing'].map((k) => this.game.scene.getScene(k)).find((sc) => sc?.sys.isActive());
-    if (level !== null && this.game.scene.isActive('Menu')) ground = scene.groundJobs?.(level) ?? [];
+    if (level !== null && this.game.scene.isActive('Menu')) {
+      ground = scene.groundJobs?.(level) ?? [];
+      // (and its first look, if the start screen only had its own lower-resolution copy of it: a
+      // Part picked on the start screen, see HOME_LO — the level's is drawn here, not as it starts)
+      if (!boss) ground.push(...missingLookSteps(scene, themesFor(level)[0]));
+    }
     else if (build && host) {
       const data = build();
       for (const k of this.game.textures.getTextureKeys())
-        if ((k.startsWith('terrain-') && !k.startsWith(`terrain-${data.name}-`)) || (k.startsWith('tree-') && !k.startsWith(`tree-${data.name}-`))) this.game.textures.remove(k);
+        if ((k.startsWith('terrain-') && !k.startsWith(`terrain-${data.name}-`)) || k.startsWith('terrainlo-') || (k.startsWith('tree-') && !k.startsWith(`tree-${data.name}-`))) this.game.textures.remove(k);
       ground = groundPaintJobs(host, data).map((job, i) => ({ name: `ground ${i}`, run: () => void job() }));
     }
     return loadArt([...gameArtJobs(scene, { heroes, level }), ...ground]);

@@ -63,6 +63,16 @@ export const kelpBends = (scene: Phaser.Scene) => scene.game.renderer.type === P
 /** The ground (by far the biggest pictures): lower in light mode. */
 export const TERRAIN_RES = LIGHT ? 1.25 : PROP_RES;
 export const BG_RES = LIGHT ? 1 : 1.25;
+/**
+ * The start screen's pictures of the other Parts (full mode): their fly-overs, built ahead so
+ * switching Parts is instant, draw their ground and their sky at these lower resolutions, under
+ * keys of their own (`terrainlo-…`, `bgh-…`) that a level never uses — a level draws its own, at
+ * full resolution, behind its loading card, and frees these. (Light mode: the same as a level's,
+ * so nothing separate: the keys are the shared ones.)
+ */
+export const HOME_LO = !LIGHT;
+export const TERRAIN_LO_RES = 1.25;
+export const HOME_BG_RES = 1;
 /** The minigames' fields (the pitch, the rink, the ballpark, the courts, the sand): like the ground, lower in light mode. */
 export const FIELD_RES = LIGHT ? TERRAIN_RES : 2;
 
@@ -634,14 +644,20 @@ function hiresPadV(w: number, h: number, res: number, fn: (ctx: Ctx) => void) {
   return c;
 }
 
-/** Background textures for one look, keyed `bg-<layer>:<palette id>` (the scenery drifts between looks). */
-export const bgKey = (layer: 'sky' | 'far' | 'clouds' | 'hills' | 'near', theme: string) => `bg-${layer}:${theme}`;
+/**
+ * Background textures for one look, keyed `bg-<layer>:<palette id>` (the scenery drifts between looks).
+ * `home`: the start screen's lower-resolution copy for another Part's fly-over, `bgh-…` (see HOME_LO).
+ */
+export const bgKey = (layer: 'sky' | 'far' | 'clouds' | 'hills' | 'near', theme: string, home = false) => `${home && HOME_LO ? 'bgh' : 'bg'}-${layer}:${theme}`;
+/** The resolution a look's layers are drawn at (`home`: see bgKey). */
+export const bgRes = (home = false) => (home && HOME_LO ? HOME_BG_RES : BG_RES);
 
 type BgLayer = 'sky' | 'far' | 'hills' | 'near';
 
 /** One background layer of one look (Part 1/3 looks and Part 2's mountain looks alike). */
-function makeBgLayer(scene: Phaser.Scene, id: string, layer: BgLayer) {
-  const key = bgKey(layer, id);
+function makeBgLayer(scene: Phaser.Scene, id: string, layer: BgLayer, home = false) {
+  const key = bgKey(layer, id, home);
+  const res = bgRes(home);
   const look = MOUNTAIN_LOOKS.find((l) => l.pal.id === id);
   const pal = look?.pal ?? PALETTES[id];
   if (!pal) return;
@@ -652,30 +668,37 @@ function makeBgLayer(scene: Phaser.Scene, id: string, layer: BgLayer) {
     // (under the sea: hazy rock pillars, the reef, the sandy sea bed)
     const L2 = L[layer];
     const draw = layer === 'far' ? drawSeaFar : layer === 'hills' ? drawSeaMid : drawSeaNear;
-    addCanvas(scene, key, hiresPadV(L2.w, L2.h, BG_RES, (ctx) => draw(ctx, L2.w, L2.h, pal)), undefined, opts);
+    addCanvas(scene, key, hiresPadV(L2.w, L2.h, res, (ctx) => draw(ctx, L2.w, L2.h, pal)), undefined, opts);
   } else if (layer === 'far')
-    addCanvas(scene, key, hiresPadV(L.far.w, L.far.h, BG_RES, (ctx) => (look ? drawMountainFar(ctx, L.far.w, L.far.h, look) : drawFarLayer(ctx, L.far.w, L.far.h, pal))), undefined, opts);
+    addCanvas(scene, key, hiresPadV(L.far.w, L.far.h, res, (ctx) => (look ? drawMountainFar(ctx, L.far.w, L.far.h, look) : drawFarLayer(ctx, L.far.w, L.far.h, pal))), undefined, opts);
   else if (layer === 'hills')
-    addCanvas(scene, key, hiresPadV(L.hills.w, L.hills.h, BG_RES, (ctx) => (look ? drawMountainMid(ctx, L.hills.w, L.hills.h, look) : drawHillsLayer(ctx, L.hills.w, L.hills.h, pal))), undefined, opts);
-  else addCanvas(scene, key, hiresPadV(L.near.w, L.near.h, BG_RES, (ctx) => (look ? drawMountainNear(ctx, L.near.w, L.near.h, look) : drawNearLayer(ctx, L.near.w, L.near.h, pal))), undefined, opts);
+    addCanvas(scene, key, hiresPadV(L.hills.w, L.hills.h, res, (ctx) => (look ? drawMountainMid(ctx, L.hills.w, L.hills.h, look) : drawHillsLayer(ctx, L.hills.w, L.hills.h, pal))), undefined, opts);
+  else addCanvas(scene, key, hiresPadV(L.near.w, L.near.h, res, (ctx) => (look ? drawMountainNear(ctx, L.near.w, L.near.h, look) : drawNearLayer(ctx, L.near.w, L.near.h, pal))), undefined, opts);
 }
 
 export const BG_LAYER_IDS: readonly BgLayer[] = ['sky', 'far', 'hills', 'near'];
 
 
 /** Make sure a look's background layers exist (built right now if the boot hasn't got to them yet). */
-export function ensureLook(scene: Phaser.Scene, id: string) {
-  for (const l of BG_LAYER_IDS) if (!scene.textures.exists(bgKey(l, id))) makeBgLayer(scene, id, l);
+export function ensureLook(scene: Phaser.Scene, id: string, home = false) {
+  for (const l of BG_LAYER_IDS) if (!scene.textures.exists(bgKey(l, id, home))) makeBgLayer(scene, id, l, home);
 }
 
 /**
  * A look's missing layers as separate little jobs (the start screen draws them between taps:
  * a layer at a time keeps each pause short, so a tap is never kept waiting long).
  */
-export function lookJobs(scene: Phaser.Scene, id: string): (() => void)[] {
+export function lookJobs(scene: Phaser.Scene, id: string, home = false): (() => void)[] {
   return BG_LAYER_IDS.map((l) => () => {
-    if (!scene.textures.exists(bgKey(l, id))) makeBgLayer(scene, id, l);
+    if (!scene.textures.exists(bgKey(l, id, home))) makeBgLayer(scene, id, l, home);
   });
+}
+
+/** A look's layers not drawn yet, as loading-card steps (none if it's all there). */
+export function missingLookSteps(scene: Phaser.Scene, id: string): Step[] {
+  return BG_LAYER_IDS.filter((l) => !scene.textures.exists(bgKey(l, id))).map((l) => ({ name: `bg-${l}:${id}`, run: () => {
+    if (!scene.textures.exists(bgKey(l, id))) makeBgLayer(scene, id, l);
+  } }));
 }
 
 /** All the looks (backgrounds) one level cycles through, drawn now if they aren't already. */
@@ -687,10 +710,13 @@ export function ensureLevelLooks(scene: Phaser.Scene, level: number) {
  * Free the background looks no longer needed (only the level you're on, or picking, keeps
  * its looks: memory stays the same however many levels there are).
  */
-export function freeLooksExcept(scene: Phaser.Scene, keep: readonly string[]) {
+export function freeLooksExcept(scene: Phaser.Scene, keep: readonly string[], homeKeep: readonly string[] = []) {
+  // (the start screen's own copies, `bgh-`, only by `homeKeep`: a level passes none, so they all go)
   for (const k of scene.textures.getTextureKeys()) {
-    const m = /^bg-[a-z]+:(.+)$/.exec(k);
-    if (m && !keep.includes(m[1])) scene.textures.remove(k);
+    const m = /^bg(h?)-[a-z]+:(.+)$/.exec(k);
+    if (!m) continue;
+    const ok = m[1] ? homeKeep.includes(m[2]) : keep.includes(m[2]) || (!HOME_LO && homeKeep.includes(m[2]));
+    if (!ok) scene.textures.remove(k);
   }
 }
 
