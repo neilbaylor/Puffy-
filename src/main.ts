@@ -91,6 +91,9 @@ function start(refreshMs: number) {
     // for a fraction of the cost. Nothing here searches the tree: no overlapRect / overlapCirc.)
     physics: { default: 'arcade', arcade: { gravity: { x: 0, y: 1600 }, debug: false, useTree: false } },
     fps: { target: 60, limit: fpsLimitFor(refreshMs), smoothStep: true },
+    // (Phaser's own sound system isn't used: the music and sound effects have their own audio
+    // context, see core/sfx. Without this it made a second one at start-up, for nothing.)
+    audio: { noAudio: true },
     scene: [BootScene, MenuScene, GameScene, HoopsScene, BattleScene, WrestleScene, FishingScene],
   });
 
