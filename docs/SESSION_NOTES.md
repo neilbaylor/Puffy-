@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.343)
+## Where things stand (v0.344)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -31,6 +31,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   Home screen (yellow).
 - Start screen: drone fly-over behind, logo hop, hero cards (pick = hop / backflip), Play, Part picker once a
   level is beaten, mute (top-left), full screen + **Battle** buttons (top-right, same height, side by side).
+- v0.344: textures.homeKeepKeys: ui.ts launchGame (full mode) records the Menu children's terrain-*/bg-* textures; LevelView and freeLooksExcept skip them. MenuScene.planQuiet builds a neighbour from those full-res pictures (prewarmJobs lo=false) when present. Result: no return-from-level bar in the tested cases; in-level memory Part 2 full 143 → 174 MB.
 - v0.343: TERRAIN_LO_RES 1.25 → 1 (home-only ground of other Parts). Return bar 1.36 → 1.16 s at 4×; home 87 → 79 MB, in level 151 → 143. One-line revert if the user finds it too soft.
 - v0.342: Levels keep terrainlo-* and bgh-* (LevelView no longer frees terrainlo; GameScene freeLooksExcept(..., 'all'); ui.ts arena path keeps terrainlo). Return bar at 4×: 2.5 s → 1.3 s after playing a switched-to Part (only the boot Part's soft copy is drawn); none after playing the boot Part. Cost: +~28 MB during a level in full mode (Part 2: 123 → 151).
 - v0.341: home-light merged: neighbours' home ground as terrainlo-* at TERRAIN_LO_RES 1.25 (LevelView lo option, never used in levels; all freeing paths drop them), home-only looks bgh-* at HOME_BG_RES 1 (freeLooksExcept homeKeep), glide loop x0+max(1200, vw), climb rise 1200 + skipAbove. Boot/return-to Part stays full-res. Full home 127→87 MB, boot −1.5 s, return bar −0.6 s at 4×; Play on a Part picked on the home screen +1 s loader.
