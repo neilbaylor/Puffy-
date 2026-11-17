@@ -375,6 +375,9 @@ export class BattleScene extends Phaser.Scene {
     this.views.clear();
     this.rocketViews.clear();
     this.prizeViews.clear();
+    // (the last battle's chairs: their pictures went with it — kept here, a chair numbered the same in
+    // this battle would have been one of those, gone)
+    this.chairViews.clear();
     this.makePrizeTextures();
     this.snaps = [];
     this.otherClock = null;
