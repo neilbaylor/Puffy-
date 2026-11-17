@@ -9,7 +9,7 @@ import { BattleUI } from './battleUi';
 import { loadArt } from './artLoader';
 import { LIGHT } from '../core/light';
 import { savedResCap } from '../core/res';
-import { dropHeroSheets, freeBossArtExcept, gameArtJobs, missingLookSteps, seaWear, swimLevel } from '../gfx/textures';
+import { HOME_LO, dropHeroSheets, freeBossArtExcept, gameArtJobs, homeKeepKeys, missingLookSteps, seaWear, swimLevel } from '../gfx/textures';
 import { themesFor } from '../world/theme';
 import { SHOP, wardrobe } from '../core/wardrobe';
 import { groundPaintJobs } from '../world/LevelView';
@@ -1479,6 +1479,16 @@ export class UI {
     this.introEl = null;
     this.session = session;
     this.setScreen(null);
+    // (full mode: the start screen's full-sharpness ground and sky it's showing for another Part —
+    // the one it opened on — kept through the level, so there's nothing to redraw on the way home)
+    homeKeepKeys.clear();
+    if (HOME_LO) {
+      const menu = this.game.scene.getScene('Menu');
+      for (const o of menu?.children.list ?? []) {
+        const k = (o as unknown as { texture?: Phaser.Textures.Texture }).texture?.key;
+        if (k && (k.startsWith('terrain-') || /^bg-[a-z]+:/.test(k))) homeKeepKeys.add(k);
+      }
+    }
     this.game.scene.stop('Menu');
     this.game.scene.stop('Hoops');
     this.game.scene.stop('Wrestle');

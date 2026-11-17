@@ -71,6 +71,12 @@ export const BG_RES = LIGHT ? 1 : 1.25;
  * so nothing separate: the keys are the shared ones.)
  */
 export const HOME_LO = !LIGHT;
+/**
+ * Full-sharpness pictures the start screen was showing when a level started (full mode): the Part
+ * it opened on, if you'd switched away from it. A level keeps them (they'd otherwise have to be
+ * drawn again, behind a loading bar, on the way home). Filled when a level starts (see ui.ts).
+ */
+export const homeKeepKeys = new Set<string>();
 export const TERRAIN_LO_RES = 1;
 export const HOME_BG_RES = 1;
 /** The minigames' fields (the pitch, the rink, the ballpark, the courts, the sand): like the ground, lower in light mode. */
@@ -717,7 +723,7 @@ export function freeLooksExcept(scene: Phaser.Scene, keep: readonly string[], ho
     const m = /^bg(h?)-[a-z]+:(.+)$/.exec(k);
     if (!m) continue;
     const ok = m[1] ? homeKeep === 'all' || homeKeep.includes(m[2]) : keep.includes(m[2]) || (!HOME_LO && homeKeep !== 'all' && homeKeep.includes(m[2]));
-    if (!ok) scene.textures.remove(k);
+    if (!ok && !homeKeepKeys.has(k)) scene.textures.remove(k);
   }
 }
 

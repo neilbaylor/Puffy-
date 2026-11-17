@@ -3,7 +3,7 @@ import { DEPTH, TILE } from '../config';
 import { rng } from '../gfx/draw';
 import { FB_FIELD_TILES } from '../gfx/football';
 import type { Pt } from '../gfx/handdrawn';
-import { HOME_LO, PROP_RES, TERRAIN_LO_RES, TERRAIN_RES, addCanvas, ensureSeaArt, hires, kelpBends } from '../gfx/textures';
+import { HOME_LO, homeKeepKeys, PROP_RES, TERRAIN_LO_RES, TERRAIN_RES, addCanvas, ensureSeaArt, hires, kelpBends } from '../gfx/textures';
 import { GRASS_FILLS, KELP_H, KELP_W, PIER_HEAD, PIER_HEAD_MODERN, SEA_PROPS, SWAY_N, drawModernPier, drawPier } from '../gfx/sea';
 import { DEFAULT_PALETTE, PALETTES, drawCloudPlatform, drawPuffTree, drawTerrainPiece, roundPoly, traceCells, type TerrainKind, type WorldPalette } from '../gfx/world';
 import { drawPine } from '../gfx/mountain';
@@ -163,7 +163,7 @@ export class LevelView {
       for (const k of scene.textures.getTextureKeys())
       // (the start screen's own softer copies, `terrainlo-`, are kept: coming back home then has
       // little to redraw behind its loading bar)
-      if (k.startsWith('terrain-') && !k.startsWith(`terrain-${data.name}-`)) scene.textures.remove(k);
+      if (k.startsWith('terrain-') && !k.startsWith(`terrain-${data.name}-`) && !homeKeepKeys.has(k)) scene.textures.remove(k);
     this.map = scene.make.tilemap({ data: data.tiles.map((r) => [...r]), tileWidth: TILE, tileHeight: TILE });
     const tileset = this.map.addTilesetImage('tiles', 'tiles', TILE, TILE, 1, 2)!;
     this.layer = this.map.createLayer(0, tileset, 0, 0)!.setVisible(false);
