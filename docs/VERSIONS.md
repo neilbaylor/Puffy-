@@ -336,3 +336,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.331: Every level and boss uses about half the graphics memory, in full and lite mode, with nothing looking different.
 - v0.332: A device switched to light mode by a graphics hiccup gets full mode back with the next version; hiccups while the game is in the background no longer switch it.
 - v0.333: Bosses started from the start screen use about 100 MB less graphics memory in full mode.
+- v0.334: The game starts its engine sooner after downloading, and its fonts now come from Puffy's own server (a little quicker on phones, and they work offline).
