@@ -14,6 +14,7 @@ import Phaser from 'phaser';
 export function trimRenderTargets(game: Phaser.Game) {
   const r = game.renderer;
   if (!(r instanceof Phaser.Renderer.WebGL.WebGLRenderer)) return;
+  guardFramebufferDestroy();
   const unused = [r.maskTarget, r.maskSource, ...(r.pipelines.UTILITY_PIPELINE?.renderTargets ?? [])];
   for (const rt of unused) {
     if (!rt) continue;
@@ -56,4 +57,35 @@ export function dropDepthBuffer(game: Phaser.Game, rt: Phaser.Renderer.WebGL.Ren
 export function shrinkCaptureTarget(game: Phaser.Game) {
   const r = game.renderer;
   if (r instanceof Phaser.Renderer.WebGL.WebGLRenderer) r.renderTarget.resize(1, 1);
+}
+
+type FbWrapper = { gl: WebGLRenderingContext | null; webGLFramebuffer: WebGLFramebuffer | null; renderTexture: unknown; addDepthStencilBuffer: boolean; destroy(): void };
+
+/**
+ * Phaser's framebuffer clean-up asks WebGL what depth buffer is attached even when there isn't one,
+ * which WebGL answers with an error (and logs): for the ones made without one (above), the same
+ * clean-up without that question.
+ */
+function guardFramebufferDestroy() {
+  const W = Phaser.Renderer.WebGL.Wrappers.WebGLFramebufferWrapper.prototype as unknown as FbWrapper & { __guarded?: boolean };
+  if (W.__guarded) return;
+  W.__guarded = true;
+  const destroy = W.destroy;
+  W.destroy = function (this: FbWrapper) {
+    if (this.addDepthStencilBuffer || this.webGLFramebuffer === null || !this.gl) return destroy.call(this);
+    const gl = this.gl;
+    if (!gl.isContextLost()) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.webGLFramebuffer);
+      const color = gl.getFramebufferAttachmentParameter(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.FRAMEBUFFER_ATTACHMENT_OBJECT_NAME) as WebGLTexture | null;
+      if (color !== null) {
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, null, 0);
+        gl.deleteTexture(color);
+      }
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.deleteFramebuffer(this.webGLFramebuffer);
+    }
+    this.renderTexture = null;
+    this.webGLFramebuffer = null;
+    this.gl = null;
+  };
 }
