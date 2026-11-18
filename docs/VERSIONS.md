@@ -347,3 +347,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.342: The loading bar when going back home from a level is about half as long, and usually gone.
 - v0.343: Other Parts on the home screen drawn a little softer: a bit less memory and a shorter loading bar.
 - v0.344: No loading bar when going back home from a level.
+- v0.345: The ground is drawn a little lighter (full and lite): levels use about a third less memory and load faster, with no visible change at play size.
