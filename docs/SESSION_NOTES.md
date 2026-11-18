@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.345)
+## Where things stand (v0.346)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -31,6 +31,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   Home screen (yellow).
 - Start screen: drone fly-over behind, logo hop, hero cards (pick = hop / backflip), Play, Part picker once a
   level is beaten, mute (top-left), full screen + **Battle** buttons (top-right, same height, side by side).
+- v0.346: BG_RES 1 in both modes; HOME_BG_RES = BG_RES; HOME_SKY_SEP false so no bgh- keys (bgKey/bgRes/freeLooksExcept/MenuScene use HOME_SKY_SEP). ui.ts launchGame also puts every Part's first-look bg- keys into homeKeepKeys. Full: home 66 MB, Part 2 level ~105 MB; no return bar.
 - v0.345: TERRAIN_RES full 2→1.25, light 1.25→1; TERRAIN_LO_RES = TERRAIN_RES so LevelView.lo is off (shared terrain- keys); FIELD_RES light pinned 1.25. MenuScene World.lo now means "uses bgh- skies" (shownLo field), not the ground. Full: home 71 MB, Part 2 level 113 MB (was 174). No return bar; ~40 cheap quiet jobs after return (a couple of ~110 ms frames at 4×).
 - v0.344: textures.homeKeepKeys: ui.ts launchGame (full mode) records the Menu children's terrain-*/bg-* textures; LevelView and freeLooksExcept skip them. MenuScene.planQuiet builds a neighbour from those full-res pictures (prewarmJobs lo=false) when present. Result: no return-from-level bar in the tested cases; in-level memory Part 2 full 143 → 174 MB.
 - v0.343: TERRAIN_LO_RES 1.25 → 1 (home-only ground of other Parts). Return bar 1.36 → 1.16 s at 4×; home 87 → 79 MB, in level 151 → 143. One-line revert if the user finds it too soft.
