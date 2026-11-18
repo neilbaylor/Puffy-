@@ -1488,6 +1488,13 @@ export class UI {
         const k = (o as unknown as { texture?: Phaser.Textures.Texture }).texture?.key;
         if (k && (k.startsWith('terrain-') || /^bg-[a-z]+:/.test(k))) homeKeepKeys.add(k);
       }
+      // (and every Part's start-screen sky — its first look — that's drawn: the start screen's
+      // fly-overs of them are built from it on the way back)
+      const firstLooks = new Set<string>(pickableLevels().map((l) => themesFor(l.id)[0]));
+      for (const k of this.game.textures.getTextureKeys()) {
+        const m = /^bg-[a-z]+:(.+)$/.exec(k);
+        if (m && firstLooks.has(m[1])) homeKeepKeys.add(k);
+      }
     }
     this.game.scene.stop('Menu');
     this.game.scene.stop('Hoops');

@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { MIN_VIEW_W, TILE, VIEW_H } from '../config';
-import { BG_LAYER_IDS, HOME_LO, bgKey, ensureLook, freeLooksExcept, lookJobs } from '../gfx/textures';
+import { BG_LAYER_IDS, HOME_SKY_SEP, bgKey, ensureLook, freeLooksExcept, lookJobs } from '../gfx/textures';
 import { buildLevel1 } from '../level/level1';
 import { levelInfo, levelName, pickableLevels, progress } from '../level/levels';
 import { Background } from '../world/Background';
@@ -209,7 +209,7 @@ export class MenuScene extends Phaser.Scene {
           for (let d = 0; d <= max; d += 8) if (lv.isSolidAt(x, y + d)) return Math.floor((y + d) / TILE) * TILE;
           return null;
         }, data.water !== undefined ? { surface: data.water, width: lv.widthPx, dark: data.dark } : undefined);
-        this.pendingWorld = { id, w: { objs, level: lv, bg, amb, x0, x: x0, loopEnd: loopEnd.v, top: null, lastSurf: 0, t: 0, lo: lo && HOME_LO } };
+        this.pendingWorld = { id, w: { objs, level: lv, bg, amb, x0, x: x0, loopEnd: loopEnd.v, top: null, lastSurf: 0, t: 0, lo: lo && HOME_SKY_SEP } };
       }),
       () => {
         const pw = this.pendingWorld;
@@ -383,7 +383,7 @@ export class MenuScene extends Phaser.Scene {
     for (const wid of [...this.worlds.keys()]) if (wid !== id && !near.includes(wid)) this.dropWorld(wid);
     // this Part's fly-over as it was left, if it's kept (its pictures are all still there)
     const kept = this.keptWorld(id);
-    const shownLo = kept ? kept.lo : lo && HOME_LO;
+    const shownLo = kept ? kept.lo : lo && HOME_SKY_SEP;
     this.shownLo = shownLo;
     ensureLook(this, looks[0], shownLo);
     // (pictures a kept fly-over is showing are never freed here)
@@ -458,7 +458,7 @@ export class MenuScene extends Phaser.Scene {
       return null;
     }, data.water !== undefined ? { surface: data.water, width: level.widthPx, dark: data.dark } : undefined);
     const objs = this.children.list.filter((o) => !before.has(o));
-    return { objs, level, bg, amb, x0, x: x0, loopEnd, top: null, lastSurf: 0, t: 0, lo: lo && HOME_LO };
+    return { objs, level, bg, amb, x0, x: x0, loopEnd, top: null, lastSurf: 0, t: 0, lo: lo && HOME_SKY_SEP };
   }
 
   /** The quiet-moment jobs for a Part being shown (see `quiet`). */

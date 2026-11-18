@@ -64,7 +64,8 @@ export const kelpBends = (scene: Phaser.Scene) => scene.game.renderer.type === P
 // (1.25 in full mode, 1 in light: the ground is the biggest picture by far, and at these the
 // difference from 2 can't really be seen at play size — a level's ground ~60% smaller)
 export const TERRAIN_RES = LIGHT ? 1 : 1.25;
-export const BG_RES = LIGHT ? 1 : 1.25;
+// (1 in both modes: skies and hills are soft shapes; at 1 the start screen and the levels share them)
+export const BG_RES = 1;
 /**
  * The start screen's pictures of the other Parts (full mode): their fly-overs, built ahead so
  * switching Parts is instant, draw their ground and their sky at these lower resolutions, under
@@ -81,7 +82,9 @@ export const HOME_LO = !LIGHT;
 export const homeKeepKeys = new Set<string>();
 // (the same as a level's now, so the start screen and the levels share one set of ground pictures)
 export const TERRAIN_LO_RES = TERRAIN_RES;
-export const HOME_BG_RES = 1;
+export const HOME_BG_RES = BG_RES;
+/** The start screen keeps separate (lower-resolution) skies for the other Parts only if they differ from a level's. */
+export const HOME_SKY_SEP = HOME_LO && HOME_BG_RES !== BG_RES;
 /** The minigames' fields (the pitch, the rink, the ballpark, the courts, the sand): like the ground, lower in light mode. */
 export const FIELD_RES = LIGHT ? 1.25 : 2;
 
@@ -657,9 +660,9 @@ function hiresPadV(w: number, h: number, res: number, fn: (ctx: Ctx) => void) {
  * Background textures for one look, keyed `bg-<layer>:<palette id>` (the scenery drifts between looks).
  * `home`: the start screen's lower-resolution copy for another Part's fly-over, `bgh-…` (see HOME_LO).
  */
-export const bgKey = (layer: 'sky' | 'far' | 'clouds' | 'hills' | 'near', theme: string, home = false) => `${home && HOME_LO ? 'bgh' : 'bg'}-${layer}:${theme}`;
+export const bgKey = (layer: 'sky' | 'far' | 'clouds' | 'hills' | 'near', theme: string, home = false) => `${home && HOME_SKY_SEP ? 'bgh' : 'bg'}-${layer}:${theme}`;
 /** The resolution a look's layers are drawn at (`home`: see bgKey). */
-export const bgRes = (home = false) => (home && HOME_LO ? HOME_BG_RES : BG_RES);
+export const bgRes = (home = false) => (home && HOME_SKY_SEP ? HOME_BG_RES : BG_RES);
 
 type BgLayer = 'sky' | 'far' | 'hills' | 'near';
 
@@ -725,7 +728,7 @@ export function freeLooksExcept(scene: Phaser.Scene, keep: readonly string[], ho
   for (const k of scene.textures.getTextureKeys()) {
     const m = /^bg(h?)-[a-z]+:(.+)$/.exec(k);
     if (!m) continue;
-    const ok = m[1] ? homeKeep === 'all' || homeKeep.includes(m[2]) : keep.includes(m[2]) || (!HOME_LO && homeKeep !== 'all' && homeKeep.includes(m[2]));
+    const ok = m[1] ? homeKeep === 'all' || homeKeep.includes(m[2]) : keep.includes(m[2]) || (!HOME_SKY_SEP && homeKeep !== 'all' && homeKeep.includes(m[2]));
     if (!ok && !homeKeepKeys.has(k)) scene.textures.remove(k);
   }
 }
