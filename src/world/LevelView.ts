@@ -149,7 +149,8 @@ export class LevelView {
     opts?: { lazyNear?: number; keep?: boolean; free?: boolean; lazySpan?: [number, number]; ahead?: boolean; cull?: boolean; trim?: boolean; lo?: boolean; skipAbove?: number },
   ) {
     this.skipAbove = opts?.lazyNear !== undefined ? (opts?.skipAbove ?? -Infinity) : -Infinity;
-    this.lo = !!opts?.lo && HOME_LO;
+    // (only when its resolution differs from a level's: otherwise the same pictures are shared)
+    this.lo = !!opts?.lo && HOME_LO && TERRAIN_LO_RES !== TERRAIN_RES;
     this.res = this.lo ? TERRAIN_LO_RES : TERRAIN_RES;
     this.trim = opts?.trim ?? false;
     this.ahead = opts?.ahead ?? true;

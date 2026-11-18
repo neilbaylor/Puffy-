@@ -61,7 +61,9 @@ export const PROP_RES = 2;
 /** The tall kelp bends smoothly (a Rope) where the renderer can draw one: WebGL. */
 export const kelpBends = (scene: Phaser.Scene) => scene.game.renderer.type === Phaser.WEBGL;
 /** The ground (by far the biggest pictures): lower in light mode. */
-export const TERRAIN_RES = LIGHT ? 1.25 : PROP_RES;
+// (1.25 in full mode, 1 in light: the ground is the biggest picture by far, and at these the
+// difference from 2 can't really be seen at play size — a level's ground ~60% smaller)
+export const TERRAIN_RES = LIGHT ? 1 : 1.25;
 export const BG_RES = LIGHT ? 1 : 1.25;
 /**
  * The start screen's pictures of the other Parts (full mode): their fly-overs, built ahead so
@@ -77,10 +79,11 @@ export const HOME_LO = !LIGHT;
  * drawn again, behind a loading bar, on the way home). Filled when a level starts (see ui.ts).
  */
 export const homeKeepKeys = new Set<string>();
-export const TERRAIN_LO_RES = 1;
+// (the same as a level's now, so the start screen and the levels share one set of ground pictures)
+export const TERRAIN_LO_RES = TERRAIN_RES;
 export const HOME_BG_RES = 1;
 /** The minigames' fields (the pitch, the rink, the ballpark, the courts, the sand): like the ground, lower in light mode. */
-export const FIELD_RES = LIGHT ? TERRAIN_RES : 2;
+export const FIELD_RES = LIGHT ? 1.25 : 2;
 
 /**
  * Register a drawn canvas as a (static) texture. Uses a plain image texture —

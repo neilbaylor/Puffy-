@@ -131,6 +131,8 @@ export class MenuScene extends Phaser.Scene {
   private quiet: (() => void)[] = [];
   /** The Part's quiet jobs include drawing pictures that were let go (see create). */
   private redraw = false;
+  /** The Part shown uses the start screen's own skies (`bgh-`): see World.lo. */
+  private shownLo = false;
 
   /** Ground pictures drawn ahead in quiet moments (a whole level's, for its fly-over). */
   private painted: string[] = [];
@@ -207,7 +209,7 @@ export class MenuScene extends Phaser.Scene {
           for (let d = 0; d <= max; d += 8) if (lv.isSolidAt(x, y + d)) return Math.floor((y + d) / TILE) * TILE;
           return null;
         }, data.water !== undefined ? { surface: data.water, width: lv.widthPx, dark: data.dark } : undefined);
-        this.pendingWorld = { id, w: { objs, level: lv, bg, amb, x0, x: x0, loopEnd: loopEnd.v, top: null, lastSurf: 0, t: 0, lo: lv.lo } };
+        this.pendingWorld = { id, w: { objs, level: lv, bg, amb, x0, x: x0, loopEnd: loopEnd.v, top: null, lastSurf: 0, t: 0, lo: lo && HOME_LO } };
       }),
       () => {
         const pw = this.pendingWorld;
@@ -330,7 +332,7 @@ export class MenuScene extends Phaser.Scene {
     const others = new Set([...this.worlds.values()].flatMap((w) => w.objs));
     const objs = this.children.list.filter((o) => !others.has(o));
     for (const o of objs) (o as unknown as { setVisible?: (v: boolean) => void }).setVisible?.(false);
-    this.worlds.set(this.levelId, { objs, level: this.level, bg: this.bg, amb: this.amb, x0: this.x0, x: this.x, loopEnd: this.loopEnd, top: this.top, lastSurf: this.lastSurf, t: this.t, lo: this.level.lo });
+    this.worlds.set(this.levelId, { objs, level: this.level, bg: this.bg, amb: this.amb, x0: this.x0, x: this.x, loopEnd: this.loopEnd, top: this.top, lastSurf: this.lastSurf, t: this.t, lo: this.shownLo });
   }
 
   /** A kept fly-over, if everything in it is still there (its pictures may have been freed meanwhile). */
@@ -382,6 +384,7 @@ export class MenuScene extends Phaser.Scene {
     // this Part's fly-over as it was left, if it's kept (its pictures are all still there)
     const kept = this.keptWorld(id);
     const shownLo = kept ? kept.lo : lo && HOME_LO;
+    this.shownLo = shownLo;
     ensureLook(this, looks[0], shownLo);
     // (pictures a kept fly-over is showing are never freed here)
     const inUse = new Set<string>();
@@ -455,7 +458,7 @@ export class MenuScene extends Phaser.Scene {
       return null;
     }, data.water !== undefined ? { surface: data.water, width: level.widthPx, dark: data.dark } : undefined);
     const objs = this.children.list.filter((o) => !before.has(o));
-    return { objs, level, bg, amb, x0, x: x0, loopEnd, top: null, lastSurf: 0, t: 0, lo: level.lo };
+    return { objs, level, bg, amb, x0, x: x0, loopEnd, top: null, lastSurf: 0, t: 0, lo: lo && HOME_LO };
   }
 
   /** The quiet-moment jobs for a Part being shown (see `quiet`). */
