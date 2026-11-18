@@ -1613,6 +1613,10 @@ kbd {
   left: 50%;
   bottom: calc(18px + var(--safe-b));
   transform: translateX(-50%);
+  /* (as wide as its line needs, like the start screen's: positioned from the middle, it would
+     otherwise only get half the screen and wrap early) */
+  width: max-content;
+  max-width: calc(100vw - 32px);
   z-index: 5;
   pointer-events: none;
   transition: opacity 0.7s, transform 0.7s;
