@@ -352,3 +352,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.347: The controls tip at the start of a level stays on one line on computers, like the home screen.
 - v0.348: Devices too slow for full mode now switch to light mode by themselves (checked on the home screen and in play).
 - v0.349: Slow devices are spotted properly now; the home screen's speed shows next to the version number, and tapping the version switches between full and light mode.
+- v0.350: Light mode kicks in more readily on slower devices.
