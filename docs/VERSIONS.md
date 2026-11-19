@@ -350,3 +350,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.345: The ground is drawn a little lighter (full and lite): levels use about a third less memory and load faster, with no visible change at play size.
 - v0.346: Skies drawn a little lighter in full mode (shared by the home screen and the levels): less memory, no visible change.
 - v0.347: The controls tip at the start of a level stays on one line on computers, like the home screen.
+- v0.348: Devices too slow for full mode now switch to light mode by themselves (checked on the home screen and in play).
