@@ -8,11 +8,14 @@
  * back, once).
  *
  * `puffy.light`: '1' on, '0' off (set by hand, for testing), 'auto:<version>' switched on by a
- * graphics loss in that version.
+ * graphics loss in that version, 'slow' switched on because the device was measured too slow for
+ * full mode (the start screen or play running under ~35 fps: see main.ts) — kept for good.
  */
 import { VERSION } from '../version';
 
 export const LIGHT_KEY = 'puffy.light';
+/** What main.ts stores when the device is measured too slow for full mode (kept for good: a slow chip stays slow). */
+export const LIGHT_SLOW = 'slow';
 /** What main.ts stores when the graphics run out of memory: light mode for this version. */
 export const LIGHT_AUTO = `auto:${VERSION}`;
 
@@ -31,7 +34,7 @@ export const LIGHT: boolean = (() => {
       localStorage.removeItem(LIGHT_KEY); // (an older version's switch: full mode again)
       v = null;
     }
-    if (v === '1') return true;
+    if (v === '1' || v === LIGHT_SLOW) return true;
     if (v === '0') return false;
   } catch {
     /* private mode */

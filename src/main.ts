@@ -10,7 +10,7 @@ import { FishingScene } from './scenes/FishingScene';
 import { UI } from './ui/ui';
 // (offline play: set up once the start screen is up)
 import './core/offline';
-import { LIGHT, LIGHT_AUTO, LIGHT_KEY } from './core/light';
+import { LIGHT, LIGHT_AUTO, LIGHT_KEY, LIGHT_SLOW } from './core/light';
 import { savedResCap, saveResCap } from './core/res';
 import { trackBossArt } from './gfx/textures';
 import { refreshMs } from './core/refresh';
@@ -165,6 +165,73 @@ function start(refreshMs: number) {
    * this version (see core/res).
    */
   const PLAY = ['Game', 'Hoops', 'Wrestle', 'Battle', 'Fishing'];
+  /**
+   * Too slow for full mode even so (the start screen, or play at the lowest resolution, under ~35
+   * fps): light mode for this device, for good. On the start screen it starts again in light mode
+   * straight away (a moment's note); during play, from the next start (nothing lost mid-level).
+   * Not where full mode was picked by hand ('0'), nor in test browsers.
+   */
+  const canGoLight = (() => {
+    try {
+      return !LIGHT && !navigator.webdriver && localStorage.getItem(LIGHT_KEY) !== '0';
+    } catch {
+      return false;
+    }
+  })();
+  let wentLight = false;
+  const goLight = (now: boolean) => {
+    if (wentLight || !canGoLight) return;
+    wentLight = true;
+    try {
+      localStorage.setItem(LIGHT_KEY, LIGHT_SLOW);
+    } catch {
+      return; // (private mode: can't remember it)
+    }
+    if (!now) return;
+    const note = document.createElement('div');
+    note.className = 'gl-lost';
+    note.textContent = 'Switching to light mode for this device…';
+    document.body.appendChild(note);
+    setTimeout(() => location.reload(), 900);
+  };
+  const slowDeltas = (deltas: number[]) => {
+    deltas.sort((a, b) => a - b);
+    const median = deltas[deltas.length >> 1];
+    // (a steady 30 fps is a cap, e.g. an iPhone in Low Power Mode, not a struggling device)
+    const capped30 = deltas.filter((d) => d > 30.5 && d < 36.5).length > deltas.length * 0.8;
+    return { median, capped30 };
+  };
+  /**
+   * The start screen, a few seconds after it's settled (nothing loading, nothing being drawn ahead),
+   * timed for 5 seconds once: under ~35 fps, light mode (see goLight).
+   */
+  const watchHome = () => {
+    const deltas: number[] = [];
+    let since = 0;
+    let last = 0;
+    let calm = 0; // when the start screen last became settled
+    const onStep = () => {
+      const t = performance.now();
+      const delta = last ? t - last : 0;
+      last = t;
+      const menu = game.scene.getScene('Menu') as unknown as { quietLeft?: number } | null;
+      const settled = home && !document.hidden && game.scene.isActive('Menu') && !(menu?.quietLeft ?? 0) && !document.querySelector('.art-loader') && !document.body.classList.contains('booting');
+      if (!settled) {
+        calm = 0;
+        return;
+      }
+      if (!calm) calm = t;
+      if (!delta || delta > 1000 || t - calm < 3000) return;
+      deltas.push(delta);
+      since += delta;
+      if (since < 5000 || deltas.length < 20) return;
+      game.events.off('step', onStep);
+      const { median, capped30 } = slowDeltas(deltas);
+      if (median > 28 && !capped30) goLight(true);
+    };
+    game.events.on('step', onStep);
+  };
+  if (canGoLight) watchHome();
   const watchSpeed = (rounds: number) => {
     const deltas: number[] = [];
     let since = 0;
@@ -199,7 +266,7 @@ function start(refreshMs: number) {
         saveResCap(resCap);
         resize();
         setTimeout(() => watchSpeed(rounds - 1), 1500);
-      }
+      } else if (median > 28 && !capped30) goLight(false); // (as low as it goes and still slow)
     };
     game.events.on('step', onStep);
   };
