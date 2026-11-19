@@ -231,17 +231,14 @@ function start(refreshMs: number) {
       since += delta;
       if (since < 5000 || deltas.length < 20) return;
       game.events.off('step', onStep);
-      const long = deltas.filter((d) => d > 50).length / deltas.length;
+      const long = deltas.filter((d) => d > 40).length / deltas.length;
       const { median, capped30 } = slowDeltas(deltas);
-      // (the start screen's speed, shown next to the version number)
-      window.dispatchEvent(new CustomEvent('puffy-fps', { detail: { fps: Math.round(1000 / median), stutter: Math.round(long * 100) } }));
-      // (slow on the whole — under ~40 fps — or stuttering: one frame in seven a long one)
-      if ((median > 25 && !capped30) || long > 0.15) goLight(true);
+      // (slow on the whole — under ~50 fps — or stuttering: one frame in ten a long one)
+      if ((median > 20 && !capped30) || long > 0.1) goLight(true);
     };
     game.events.on('step', onStep);
   };
-  // (measured in full mode even when it was picked by hand: the speed shows next to the version)
-  if (!LIGHT) watchHome();
+  if (canGoLight) watchHome();
   const watchSpeed = (rounds: number) => {
     const deltas: number[] = [];
     let since = 0;
@@ -277,7 +274,7 @@ function start(refreshMs: number) {
         saveResCap(resCap);
         resize();
         setTimeout(() => watchSpeed(rounds - 1), 1500);
-      } else if (median > 28 && !capped30) goLight(false); // (as low as it goes and still slow)
+      } else if (median > 20 && !capped30) goLight(false); // (as low as it goes and still slow)
     };
     game.events.on('step', onStep);
   };
