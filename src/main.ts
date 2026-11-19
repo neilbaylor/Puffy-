@@ -11,6 +11,7 @@ import { UI } from './ui/ui';
 // (offline play: set up once the start screen is up)
 import './core/offline';
 import { LIGHT, LIGHT_AUTO, LIGHT_KEY, LIGHT_SLOW } from './core/light';
+import { diag, showDiag } from './core/diag';
 import { savedResCap, saveResCap } from './core/res';
 import { trackBossArt } from './gfx/textures';
 import { refreshMs } from './core/refresh';
@@ -223,9 +224,11 @@ function start(refreshMs: number) {
       const settled = shown && (!(menu?.quietLeft ?? 0) || t - up > 15000);
       if (!settled) {
         calm = 0;
+        diag.home = !shown ? 'waiting for the start screen' : `waiting: ${menu?.quietLeft ?? 0} drawing jobs left`;
         return;
       }
       if (!calm) calm = t;
+      diag.home = 'measuring…';
       if (!delta || delta > 1000 || t - calm < 3000) return;
       deltas.push(delta);
       since += delta;
@@ -234,11 +237,16 @@ function start(refreshMs: number) {
       const long = deltas.filter((d) => d > 40).length / deltas.length;
       const { median, capped30 } = slowDeltas(deltas);
       // (slow on the whole — under ~50 fps — or stuttering: one frame in ten a long one)
-      if ((median > 20 && !capped30) || long > 0.1) goLight(true);
+      const slow = (median > 20 && !capped30) || long > 0.1;
+      diag.home = `${Math.round(1000 / median)} fps, ${Math.round(long * 100)}% long frames → ${slow ? 'light mode' : 'stays full'}`;
+      if (slow) goLight(true);
     };
     game.events.on('step', onStep);
   };
+  diag.check = LIGHT ? 'off (already light mode)' : canGoLight ? 'on' : 'off (full mode picked by hand, or a test browser)';
+  diag.refresh = `${Math.round(1000 / refreshMs)} Hz${refreshMs > 28 ? ' (30 fps cap)' : ''}`;
   if (canGoLight) watchHome();
+  showDiag();
   const watchSpeed = (rounds: number) => {
     const deltas: number[] = [];
     let since = 0;

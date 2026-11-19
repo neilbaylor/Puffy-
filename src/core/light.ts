@@ -19,7 +19,33 @@ export const LIGHT_SLOW = 'slow';
 /** What main.ts stores when the graphics run out of memory: light mode for this version. */
 export const LIGHT_AUTO = `auto:${VERSION}`;
 
+/**
+ * Hidden links for a device that needs it: `?lite` puts this device in light mode for good, `?full`
+ * in full mode for good (both as if picked by hand: the automatic checks leave it alone). Taken
+ * out of the address straight away, so the saved home-screen link stays plain.
+ */
+function hiddenSwitch() {
+  try {
+    const q = new URLSearchParams(location.search);
+    const pick = q.has('lite') ? '1' : q.has('full') ? '0' : null;
+    if (!pick) return;
+    localStorage.setItem(LIGHT_KEY, pick);
+    // (picked here, not the old automatic '1' that gets one more try at full mode: see below)
+    localStorage.setItem('puffy.lightRetried', '1');
+    q.delete('lite');
+    q.delete('full');
+    const rest = q.toString();
+    history.replaceState(null, '', location.pathname + (rest ? `?${rest}` : '') + location.hash);
+  } catch {
+    /* private mode */
+  }
+}
+
+/** The graphics chip's biggest picture size (0: no WebGL), for the light-mode check and ?diag. */
+export let maxTextureSize = 0;
+
 export const LIGHT: boolean = (() => {
+  hiddenSwitch();
   try {
     let v = localStorage.getItem(LIGHT_KEY);
     // (before v0.332 a graphics loss stored '1', for good: those devices get one more try at full
@@ -44,6 +70,7 @@ export const LIGHT: boolean = (() => {
   try {
     const gl = document.createElement('canvas').getContext('webgl');
     const max = gl ? (gl.getParameter(gl.MAX_TEXTURE_SIZE) as number) : 0;
+    maxTextureSize = max;
     gl?.getExtension('WEBGL_lose_context')?.loseContext();
     if (max && max <= 4096) return true;
   } catch {
