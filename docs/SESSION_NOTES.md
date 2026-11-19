@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.348)
+## Where things stand (v0.349)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -31,6 +31,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   Home screen (yellow).
 - Start screen: drone fly-over behind, logo hop, hero cards (pick = hop / backflip), Play, Part picker once a
   level is beaten, mute (top-left), full screen + **Battle** buttons (top-right, same height, side by side).
+- v0.349: Slow check fixes: capped30 now = refresh measured >28 ms at boot (a struggling 60 Hz device lands on 33 ms frames too — v0.348 wrongly skipped it); switch if median >25 ms or >15% frames >50 ms; home check no longer waits on quiet jobs after 15 s. Home fps shown by the version (puffy-fps event). Tap .version → confirm → puffy.light 0/1 + reload.
 - v0.348: Speed-based light mode: main.ts watchHome (start screen settled 3 s, timed 5 s once; median frame > 28 ms and not a 30 fps cap → puffy.light='slow' + note + reload) and watchSpeed (still slow at lowest res → 'slow' for next start). 'slow' is kept for good (light.ts LIGHT_SLOW). Skipped for '0' (manual full) and navigator.webdriver (tests).
 - v0.347: .ctl-tip width:max-content (max 100vw-32px): the in-game controls tip no longer wraps at half the screen.
 - v0.346: BG_RES 1 in both modes; HOME_BG_RES = BG_RES; HOME_SKY_SEP false so no bgh- keys (bgKey/bgRes/freeLooksExcept/MenuScene use HOME_SKY_SEP). ui.ts launchGame also puts every Part's first-look bg- keys into homeKeepKeys. Full: home 66 MB, Part 2 level ~105 MB; no return bar.
