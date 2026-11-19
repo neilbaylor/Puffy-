@@ -7,7 +7,7 @@ import { drawHeroCard, drawPortrait, renderPoseSet } from '../gfx/draw';
 import { NEUTRAL_FACE, type Face } from '../gfx/face';
 import { BattleUI } from './battleUi';
 import { loadArt } from './artLoader';
-import { LIGHT } from '../core/light';
+import { LIGHT, LIGHT_KEY } from '../core/light';
 import { savedResCap } from '../core/res';
 import { HOME_LO, dropHeroSheets, freeBossArtExcept, gameArtJobs, homeKeepKeys, missingLookSteps, seaWear, swimLevel } from '../gfx/textures';
 import { themesFor } from '../world/theme';
@@ -271,6 +271,12 @@ export class UI {
   private level = latestLevel();
 
   constructor(private game: Phaser.Game) {
+    window.addEventListener('puffy-fps', (e) => {
+      const d = (e as CustomEvent<{ fps: number; stutter: number }>).detail;
+      this.homeFps = `${d.fps} fps${d.stutter ? ` (${d.stutter}% slow frames)` : ''}`;
+      const v = this.screen?.querySelector('.version');
+      if (v && !v.textContent?.includes(' fps')) v.textContent += ` · ${this.homeFps}`;
+    });
     this.root = document.getElementById('ui')!;
     // still signed in from last time? pick the account back up (and its progress)
     const beatenBefore = progress.beaten;
@@ -581,7 +587,7 @@ export class UI {
         <button class="icon-btn battle-btn" data-act="battle" aria-label="Online battle with friends">Battle</button>
         <button class="icon-btn fs-btn" data-act="fs" aria-label="Full screen" hidden>⛶</button>
       </div>
-      <p class="version">v${VERSION} · ${this.game.renderer.type === Phaser.WEBGL ? 'WebGL' : 'Canvas'}${this.lowRes()}</p>
+      <p class="version" role="button" title="Tap to switch light mode">v${VERSION} · ${this.game.renderer.type === Phaser.WEBGL ? 'WebGL' : 'Canvas'}${this.lowRes()}${this.homeFps ? ` · ${this.homeFps}` : ''}</p>
       <div class="start-foot">
         <button class="btn btn-big btn-go" data-act="play">Play</button>
         ${usingTouch() ? '' : controlsHtml(true)}
@@ -702,6 +708,16 @@ export class UI {
       this.showShop();
     });
     // (temporary, for testing: straight into Queen Plop's ring)
+    // (the version number: tap to switch this device between full and light mode)
+    el.querySelector('.version')?.addEventListener('click', () => {
+      if (!window.confirm(LIGHT ? 'Switch this device to full mode? (Puffy restarts.)' : 'Switch this device to light mode? (Puffy restarts.)')) return;
+      try {
+        localStorage.setItem(LIGHT_KEY, LIGHT ? '0' : '1');
+      } catch {
+        return;
+      }
+      location.reload();
+    });
     el.querySelector('[data-act=bosses]')?.addEventListener('click', () => {
       sfx.select();
       this.showBosses();
@@ -1030,6 +1046,8 @@ export class UI {
     }
   }
 
+  /** The start screen's measured speed (see watchHome in main.ts), shown next to the version number. */
+  private homeFps = '';
   /** ' · lower res' on the version label when this device was found slow and draws at a lower resolution. */
   private lowRes() {
     if (LIGHT) return ' · light';

@@ -197,8 +197,10 @@ function start(refreshMs: number) {
   const slowDeltas = (deltas: number[]) => {
     deltas.sort((a, b) => a - b);
     const median = deltas[deltas.length >> 1];
-    // (a steady 30 fps is a cap, e.g. an iPhone in Low Power Mode, not a struggling device)
-    const capped30 = deltas.filter((d) => d > 30.5 && d < 36.5).length > deltas.length * 0.8;
+    // (a 30 fps cap — an iPhone in Low Power Mode — shows in the refresh rate measured at the start:
+    // frames come every 33 ms however little there is to draw. A struggling device on a 60 Hz screen
+    // also lands on 33 ms frames, but its refresh rate measured 60: that one IS slow)
+    const capped30 = refreshMs > 28;
     return { median, capped30 };
   };
   /**
@@ -210,12 +212,15 @@ function start(refreshMs: number) {
     let since = 0;
     let last = 0;
     let calm = 0; // when the start screen last became settled
+    let up = 0; // when the start screen was first up (drawing ahead that never ends doesn't hold the check off for good)
     const onStep = () => {
       const t = performance.now();
       const delta = last ? t - last : 0;
       last = t;
       const menu = game.scene.getScene('Menu') as unknown as { quietLeft?: number } | null;
-      const settled = home && !document.hidden && game.scene.isActive('Menu') && !(menu?.quietLeft ?? 0) && !document.querySelector('.art-loader') && !document.body.classList.contains('booting');
+      const shown = home && !document.hidden && game.scene.isActive('Menu') && !document.querySelector('.art-loader') && !document.body.classList.contains('booting');
+      if (shown && !up) up = t;
+      const settled = shown && (!(menu?.quietLeft ?? 0) || t - up > 15000);
       if (!settled) {
         calm = 0;
         return;
@@ -226,12 +231,17 @@ function start(refreshMs: number) {
       since += delta;
       if (since < 5000 || deltas.length < 20) return;
       game.events.off('step', onStep);
+      const long = deltas.filter((d) => d > 50).length / deltas.length;
       const { median, capped30 } = slowDeltas(deltas);
-      if (median > 28 && !capped30) goLight(true);
+      // (the start screen's speed, shown next to the version number)
+      window.dispatchEvent(new CustomEvent('puffy-fps', { detail: { fps: Math.round(1000 / median), stutter: Math.round(long * 100) } }));
+      // (slow on the whole — under ~40 fps — or stuttering: one frame in seven a long one)
+      if ((median > 25 && !capped30) || long > 0.15) goLight(true);
     };
     game.events.on('step', onStep);
   };
-  if (canGoLight) watchHome();
+  // (measured in full mode even when it was picked by hand: the speed shows next to the version)
+  if (!LIGHT) watchHome();
   const watchSpeed = (rounds: number) => {
     const deltas: number[] = [];
     let since = 0;
@@ -259,7 +269,8 @@ function start(refreshMs: number) {
       deltas.sort((a, b) => a - b);
       const median = deltas[deltas.length >> 1];
       // (a steady 30 fps is a cap, e.g. an iPhone in Low Power Mode, not a struggling device)
-      const capped30 = deltas.filter((d) => d > 30.5 && d < 36.5).length > deltas.length * 0.8;
+      // (a 30 fps cap — Low Power Mode — measured as such at the start; see slowDeltas)
+      const capped30 = refreshMs > 28;
       const now = dpr();
       if (median > 21 && !capped30 && now > 1.05 && rounds > 0) {
         resCap = now > 1.4 ? 1.25 : 1;

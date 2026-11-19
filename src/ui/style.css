@@ -617,7 +617,10 @@ html:has(body.booting) body { background: #5fc4ff; }
   font: 800 11px/1 var(--body);
   letter-spacing: 0.06em;
   color: #3a241899;
-  pointer-events: none;
+  cursor: pointer;
+  /* (a bigger tap area than the little label itself) */
+  padding: 8px 8px 6px 0;
+  margin-bottom: -6px;
 }
 .hud-row {
   display: flex;
