@@ -236,6 +236,8 @@ export class UI {
   /** A boss fight's intro is playing (no pause button until it's over). */
   private bossIntro = false;
   private pickRaf = 0;
+  /** The start screen's full-screen button keeping up (one listener: each new start screen swaps its own in). */
+  private onFsChange: (() => void) | null = null;
   private hudFace: FaceLife | null = null;
   private hudIdle = 0;
   /** The online battle screens (made the first time you tap Battle). */
@@ -714,6 +716,8 @@ export class UI {
     const fsBtn = el.querySelector<HTMLButtonElement>('[data-act=fs]')!;
     const syncFs = () => (fsBtn.hidden = !canFullscreen() || isFullscreen() || isStandalone());
     syncFs();
+    if (this.onFsChange) document.removeEventListener('fullscreenchange', this.onFsChange);
+    this.onFsChange = syncFs;
     document.addEventListener('fullscreenchange', syncFs);
     fsBtn.addEventListener('click', () => {
       this.goFullscreen();
