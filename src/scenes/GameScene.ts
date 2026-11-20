@@ -801,7 +801,9 @@ export class GameScene extends Phaser.Scene {
         return false;
       }
       if (e.y < this.view.top - 500 || e.y > viewBottom + 700) {
-        e.destroy();
+        // (kill, not destroy: its blaster went too — destroy left it hanging frozen in the air, and the fast
+        // ones are let go below you, right where you're floating down to)
+        e.kill('fall');
         q.img.destroy();
         return false;
       }
