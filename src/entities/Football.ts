@@ -450,7 +450,11 @@ export class FootballGame {
     this.ball = b;
     const [hx, hy] = this.hand(c, false);
     const [qx, qy] = this.hand(this.qb, false);
-    this.fly(b, hx, hy, qx - 10, qy, 6, hot ? 0.22 : 0.3, () => this.hold(b, this.qb, false));
+    // (whistled dead while it's in the air: it falls loose, so it goes back to the pool)
+    this.fly(b, hx, hy, qx - 10, qy, 6, hot ? 0.22 : 0.3, () => {
+      if (this.phase === 'play' && this.ball === b && this.up(this.qb)) this.hold(b, this.qb, false);
+      else this.drop(b, 0, -60, true);
+    });
   }
 
   /** The play's on: routes, blocks; the quarterback drops back and passes (or throws at you). */
