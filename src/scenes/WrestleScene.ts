@@ -577,6 +577,8 @@ export class WrestleScene extends Phaser.Scene {
   private jet: { on: boolean; flames: Phaser.GameObjects.Sprite[]; smokeT: number } | null = null;
   /** The Plops he sends in (every 4 hits he flies off and they parachute into the ring). */
   private minions: Minion[] = [];
+  /** His Plops still to come down this time (they drop in one after another). */
+  private minionsDue = 0;
   private gMinions!: Phaser.Physics.Arcade.Group;
   /** How many times he's flown off so far (1: three small Plops, 2: two medium, 3: two big). */
   private awayCount = 0;
@@ -590,6 +592,7 @@ export class WrestleScene extends Phaser.Scene {
     this.boss = data.level === 4 ? 'king' : 'queen';
     this.jet = null;
     this.minions = [];
+    this.minionsDue = 0;
     this.minionShots = [];
     this.awayCount = 0;
     this.rockets = [];
@@ -2641,8 +2644,10 @@ export class WrestleScene extends Phaser.Scene {
     // five small ones, then three medium, then three big ones
     const kinds: MinionKind[] = n === 1 ? ['small', 'small', 'small', 'small', 'small'] : n === 2 ? ['medium', 'medium', 'medium'] : ['large', 'large', 'large'];
     const xs = kinds.length === 5 ? [WX(340), WX(520), WX(700), WX(880), WX(1060)] : [WX(420), WX(660), WX(900)];
+    this.minionsDue = kinds.length;
     kinds.forEach((k, i) =>
       this.time.delayedCall(i * (kinds.length === 5 ? 380 : 500), () => {
+        this.minionsDue--;
         if (this.ended) return;
         // (not right on top of you)
         let x = xs[i];
@@ -2788,9 +2793,9 @@ export class WrestleScene extends Phaser.Scene {
       } else this.hurtPlayer(spr.x);
     }
     this.minions = this.minions.filter((m) => !m.dead);
-    // all of them done (and he's still up there): back he comes
+    // all of them done, none still to come (and he's still up there): back he comes
     const q = this.queen;
-    if (!this.minions.length && q.mode === 'away' && !this.ended && !q.spr.visible) void this.kingReturn();
+    if (!this.minions.length && !this.minionsDue && q.mode === 'away' && !this.ended && !q.spr.visible) void this.kingReturn();
   }
 
   /** His Plops' pom-poms flying across the ring. */
