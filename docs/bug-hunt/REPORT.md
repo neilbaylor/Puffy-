@@ -1,4 +1,4 @@
-# Puffy: full bug and performance report (7 passes)
+# Puffy: full bug and performance report (7 bug passes, 2 performance passes, 1 combined pass)
 
 **Code:** `neilbaylor/Puffy-`, base `claude/game-base` at `ce8bcb2` (v0.351). That is about 51k lines of TS/JS:
 - the server and shared battle sim
@@ -6,12 +6,12 @@
 - entities, world, all scenes, UI
 - graphics (gfx) and the art page
 
-**Result:** 24 PRs (#1–#24), each on its own branch. They are stacked: each PR's base is the one before it, and #1's base is `claude/game-base`. Every patch also applies **on its own** to `claude/game-base` (checked with `git apply --check`), so any subset can be merged in any order.
-- **1 is a performance change (#1); the other 23 fix 24 bugs.** #23 fixes two related bugs in two commits.
+**Result:** 25 PRs (#1–#25), each on its own branch. They are stacked: each PR's base is the one before it, and #1's base is `claude/game-base`. Every patch also applies **on its own** to `claude/game-base` (checked with `git apply --check`), so any subset can be merged in any order.
+- **2 are performance changes (#1, #25); the other 23 fix 24 bugs.** #23 fixes two related bugs in two commits.
 - Each PR has a fresh-eyes review comment on GitHub (verdict plus inline notes) for whoever decides what to merge.
 - **Checks:**
   - on every branch: `tsc --noEmit` and `tsc --noEmit -p tsconfig.server.json` pass;
-  - on the top branch (#24): `npm run build` passes.
+  - on the top branch (#25): `npm run build` passes.
 - **Tests** are in `tests/`. Run one with `bash tests/run.sh tests/<file>.ts`, which uses esbuild + node, a 60 s timeout, a Phaser stub and a small DOM shim; set `REPO=` to point at a checkout. Each test was run against `claude/game-base` (shows the bug) and the top of the stack (shows the fix).
 
 Severity:
@@ -45,10 +45,11 @@ Where I was unsure, I chose the lower one. No bug reached High: the account data
 | #18 | `fix-music-keep` | bug (memory) | Low | A song stayed decoded (13–21 MB) after it stopped being needed | `t_music.ts` |
 | #19 | `fix-battle-dead-enemies` | bug | Medium | A bad guy killed by a rocket shot and hurt for one more tick | `t_rocketdead.ts` |
 | #20 | `fix-battle-double-open` | bug | Low | Two connections from one tab knocked each other off forever | `t_openTwice.ts`, `t_twonets.ts` |
-| #21 | `fix-battle-pause-key` | bug | Low | Escape after a battle ended under Pause closed the results card | read |
-| #22 | `fix-fishing-boss-song-preload` | bug | Low | King Bob's contest song wasn't decoded ahead (silent intro) | read |
+| #21 | `fix-battle-pause-key` | bug | Low | Escape after a battle ended under Pause closed the results card | browser: `bpause.mjs` |
+| #22 | `fix-fishing-boss-song-preload` | bug | Low | King Bob's contest song wasn't decoded ahead (silent intro) | browser: `preload5.mjs` |
 | #23 | `fix-fishing-bite-paused` | bug ×2 | Low | Taps while paused/frozen counted: BITE! caught from the Paused menu; a Hoops shot wasted | `t_bitepause.ts`, `t_hoopspause.ts` |
-| #24 | `fix-drop-plop-weapon` | bug | Low | A passed-by drop Plop's blaster was left hanging in mid-air | read |
+| #24 | `fix-drop-plop-weapon` | bug | Low | A passed-by drop Plop's blaster was left hanging in mid-air | browser: `drop.mjs` |
+| #25 | `perf-music-mixdown` | perf | — | Songs mixed to mono in one pass: 1.5–2.7× faster at 4× CPU, bit-identical | browser: `mix.mjs` (real songs) |
 
 ## For whoever merges: decisions and caveats (from the reviews)
 - **#3** assumes **exactly one proxy that appends** to X-Forwarded-For (the Railway setup).
@@ -163,6 +164,18 @@ Where I was unsure, I chose the lower one. No bug reached High: the account data
 ### Device check
 **#14 Slow-device thresholds (Low).** The resolution step needed `median > 21`, but light mode fired at `> 20`. Git history: v0.350 lowered light mode from 28 to 20 and left the other step at 21.
 
+## Browser checks (headless Chromium, after the bug passes)
+- **How it was run:** a Playwright Chromium installed in the sandbox; WebGL through the software renderer; canvas drawing on the CPU (`--disable-accelerated-2d-canvas`), because GPU-emulated canvas made everything about 15× slower and unrepresentative; CPU slowed 4× to stand in for a phone. The scripts are in `tests/browser/` and expect the game built and served (`vite build`, `build:server`, `PORT=… node server.mjs`).
+- **Fixes confirmed by reading, now demonstrated before vs after:**
+  - **#21:** with the battle ended under Pause, Escape removed the results card on the base build; it stays on the fixed build.
+  - **#22:** past two-thirds of Part 5 the base build never decoded the boss song; the fix has it ready.
+  - **#24:** after Part 4's long drop the base build left 3–4 blasters frozen in the shaft; the fix leaves none.
+- **Sweeps with no errors:**
+  - all six Parts with a bot, in full and light mode;
+  - all five bosses from the Bosses menu, plus full basketball and fishing contests through to their results;
+  - the Shop (buy, wear, take off: root beer 120 → 25 as expected), Battle lobby, Bosses and Account screens.
+- **Memory:** five round trips start screen → Part 1 → home stay flat (about 820 DOM nodes, 109 listeners, steady heap and textures). An early reading of steady growth was the test tool's own element handles: the heap retainer chain led to "DevTools console" handles.
+
 ## Performance
 - **#1 `levelPieces`** (terrain outlines, worked out behind the loading screen for each level) uses number keys and flat arrays instead of `"x,y"` strings, plus a numeric `traceCellList`. The output is byte-identical for Parts 1–6 and the arena.
 
@@ -178,6 +191,16 @@ Where I was unsure, I chose the lower one. No bug reached High: the account data
   | **Total** | **124.5 ms** | **25.8 ms** |
 
   A later re-run gave 97.5 → 17.5 ms. Expect several times longer on a phone.
+- **#25 music mixdown:** decoded songs were mixed stereo → mono one channel at a time (`o[i] += d[i] / n`, two passes and twice the slices). Now both channels go in one pass (`fround(a/2) + b/2`, the very same float32 sums).
+  - On the game's six real songs in Chrome: **0 differing samples**.
+  - At 4× CPU: 1.5–2.7× faster (231 → 86 ms battle, 120 → 64 ms start-screen song, 157 → 76 ms boss song …).
+  - This runs at every load (the start-screen song) and in slices during play (level and boss songs).
+- **Loading, profiled in Chrome at 4× CPU** (about 9 s to the start screen): most of it is texture uploads (37%) and canvas drawing, native work not measurable fairly here. The art code's own JavaScript is spread thinly (`grain`, `shape`, `boundsOf`, `trace` 1–2.5% each).
+- **Tried and rejected:** skipping repeated canvas state sets in the crayon-grain loops. The pixels stayed identical, but there was no measurable gain (run-to-run noise was larger), so it was dropped.
+- **Checked, no change needed:**
+  - **Cloud re-uploads during play** (about 7 a second): already throttled by design to one per cloud per 1.5 s, and small (about 36k px each).
+  - **Level start** (about 4 s at 4×): native texture work. My first upload log showed one texture made 38 times; that was a grouping mistake in my script (they are 38 different textures, 10 Mpix in all).
+  - **In play and in an online battle, frame JavaScript is small:** idle 50–64% at 4× CPU, no game function over about 1%. The frames are bound by GPU and raster work.
 - **Measured, no change needed:** a 4-player battle tick plus snapshot is 30–53 µs against a 33 ms budget, with snapshots of about 1.4–1.8 kB (`t_tick.ts`).
 - **Not measured:** per-frame rendering cost needs a browser and GPU, so I made no claims or changes there.
 
@@ -191,6 +214,7 @@ Where I was unsure, I chose the lower one. No bug reached High: the account data
   - the logic parts of `src/gfx`
 - **Pass 1, skimmed and grep-checked only:** the pure drawing code in `src/gfx/*` and `src/artpage`.
 - **Pass 2:** a second look at the same files for wrong defaults, return values, dropped branches and constants.
+- **Performance passes 1–2 and the combined pass:** browser profiling of loading, level start, play and battles, texture-upload logging, memory round trips, and the browser sweeps above.
 - **Passes 3–7:** fresh, focused re-reads:
   - battle server lifecycle (rooms, watchers, heartbeat, countdown, results, ties) and the sim (movement, shots, prizes, stomps, chairs, enemies, hazards)
   - static server ranges and ETags; the accounts API; account restore/merge

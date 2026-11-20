@@ -255,3 +255,18 @@ Tests are in `tests/` (run with `bash tests/run.sh tests/t_x.ts`; it uses esbuil
 - **Fix:** `e.kill('fall')`. Its weapon falls and fades (`Weapon.drop()`), the Plop is destroyed with no effects, and it doesn't count as a kill.
 - **Evidence:** confirmed by reading. This is the only direct `destroy()` of a level bad guy; every other removal goes through `kill()`.
 - **Risk:** low.
+
+---
+
+## Performance passes, stacked on #24
+
+### 25. Music: stereo songs mixed down to mono in one pass
+`claude/perf-music-mixdown` → #24 · `src/core/music.ts`
+
+- **What:** each decoded song (all six are stereo) is mixed to mono to halve its memory. That was done one channel at a time (`o[i] += d[i] / n`), with two passes and a `setTimeout` yield every 262,144 samples per channel. Now, for two channels, both go in one pass: `o[i] = Math.fround(a[i] / 2) + b[i] / 2`. That is exactly the float32 value the two-step loop stored, because the first half is rounded to float32 just as the old loop did when it stored it. The loop for other channel counts is kept as it was.
+- **Evidence:**
+  - `tests/p_mix.ts` (node): 4.8 M random samples, including thousands of denormals, are identical, and the new version is about 3× faster.
+  - `tests/browser/mix.mjs` (Chrome) decodes the game's six real songs exactly as `music.ts` does. **0 differing samples** on every song.
+  - Timings at 4× CPU, old → new: battle 231 → 86 ms; start screen 120 → 64 ms; hoops 157 → 76 ms; level-clear 167 → 114 ms; mountain 308 → 179 ms; plop 316 → 171 ms.
+- **Where it matters:** the start screen's song is decoded at every load. Level and boss songs are decoded ahead in slices during play, and those slices are now cheaper and half as many.
+- **Risk:** none. The output is bit-identical, and the slicing and the all-at-once mode under the loading screen are unchanged.
