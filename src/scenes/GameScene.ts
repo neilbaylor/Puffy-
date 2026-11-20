@@ -880,8 +880,8 @@ export class GameScene extends Phaser.Scene {
 
     this.updatePuddles(dt);
     this.updateDrips(dt);
-    // two-thirds of the way through a level with a boss: get the boss's song ready
-    if (!this.bossSongReady && (levelInfo(this.levelId).wrestle || levelInfo(this.levelId).hoops) && (this.players[0]?.x ?? 0) > this.level.widthPx * 0.66) {
+    // two-thirds of the way through a level with a boss: get the boss's song ready (King Bob's contest plays it too)
+    if (!this.bossSongReady && (levelInfo(this.levelId).wrestle || levelInfo(this.levelId).hoops || levelInfo(this.levelId).fishing) && (this.players[0]?.x ?? 0) > this.level.widthPx * 0.66) {
       this.bossSongReady = true;
       preloadHoopsMusic();
     }
