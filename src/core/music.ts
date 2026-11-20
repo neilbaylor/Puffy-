@@ -73,14 +73,25 @@ function decode(t: Track, atOnce = false): Promise<AudioBuffer | null> {
         // (in slices, letting the game breathe between them: a whole song in one go is a stutter)
         const SLICE = 1 << 18;
         const booting = () => atOnce && document.body.classList.contains('booting');
-        for (let c = 0; c < n; c++) {
-          const d = buf.getChannelData(c);
-          for (let s0 = 0, s1 = 0; s0 < d.length; s0 = s1) {
-            s1 = booting() ? d.length : Math.min(d.length, s0 + SLICE);
-            for (let i = s0; i < s1; i++) o[i] += d[i] / n;
+        if (n === 2) {
+          // (stereo, as the songs are: both channels in one pass — the very same sums, bit for bit, as
+          // adding one half and then the other, in a third of the time and half the slices)
+          const a = buf.getChannelData(0);
+          const b = buf.getChannelData(1);
+          for (let s0 = 0, s1 = 0; s0 < o.length; s0 = s1) {
+            s1 = booting() ? o.length : Math.min(o.length, s0 + SLICE);
+            for (let i = s0; i < s1; i++) o[i] = Math.fround(a[i] / 2) + b[i] / 2;
             await new Promise((r) => setTimeout(r, 0));
           }
-        }
+        } else
+          for (let c = 0; c < n; c++) {
+            const d = buf.getChannelData(c);
+            for (let s0 = 0, s1 = 0; s0 < d.length; s0 = s1) {
+              s1 = booting() ? d.length : Math.min(d.length, s0 + SLICE);
+              for (let i = s0; i < s1; i++) o[i] += d[i] / n;
+              await new Promise((r) => setTimeout(r, 0));
+            }
+          }
       }
       decoded.set(t, out);
       keep(t);
