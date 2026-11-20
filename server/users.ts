@@ -281,6 +281,8 @@ function readBody(req: IncomingMessage): Promise<Record<string, unknown>> {
 const attempts = new Map<string, { n: number; at: number }>();
 function tooMany(ip: string) {
   const now = Date.now();
+  // (old entries go: one per address that's ever tried would grow for good)
+  if (attempts.size > 1000) for (const [k, v] of attempts) if (now - v.at > 60_000) attempts.delete(k);
   const a = attempts.get(ip);
   if (!a || now - a.at > 60_000) {
     attempts.set(ip, { n: 1, at: now });
@@ -313,7 +315,9 @@ export async function createUserApi() {
     const route = `${req.method} ${url.pathname}`;
     try {
       if (route === 'POST /api/register' || route === 'POST /api/login') {
-        const ip = String(req.headers['x-forwarded-for'] ?? req.socket.remoteAddress ?? '').split(',')[0].trim();
+        // (the last address in X-Forwarded-For is the one the proxy added; the ones before it are
+        // whatever the caller sent, so keying on the first let anyone skip the limit)
+        const ip = String(req.headers['x-forwarded-for'] ?? req.socket.remoteAddress ?? '').split(',').pop()!.trim();
         if (tooMany(ip)) return void send(res, 429, { error: 'Too many tries. Wait a minute.' }), true;
         const body = await readBody(req);
         const name = String(body.name ?? '').trim();
