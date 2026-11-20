@@ -158,6 +158,10 @@ export class BattleUI {
     this.status('connecting');
     playMenuMusic(); // (the start screen's song carries on in the lobby)
     preloadBattleMusic();
+    // (Let's go pressed again while the first press was still waiting for the art: one connection, not
+    // two — two from the same tab share its rejoin token and kept knocking each other off the server)
+    this.net?.close();
+    this.host.game.events.off('battle-hud', this.onHud);
     this.net = new BattleNet(url, name, this.host.hero());
     this.net.onStatus = (s) => this.status(s);
     this.net.onRoom = (r) => this.room(r);
