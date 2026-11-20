@@ -277,7 +277,7 @@ function start(refreshMs: number) {
       // (a 30 fps cap — Low Power Mode — measured as such at the start; see slowDeltas)
       const capped30 = refreshMs > 28;
       const now = dpr();
-      if (median > 21 && !capped30 && now > 1.05 && rounds > 0) {
+      if (median > 20 && !capped30 && now > 1.05 && rounds > 0) {
         resCap = now > 1.4 ? 1.25 : 1;
         saveResCap(resCap);
         resize();
