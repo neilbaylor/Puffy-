@@ -287,6 +287,8 @@ export class FishingScene extends Phaser.Scene {
     this.biteHit = false;
     this.biteMiss = false;
     this.score = { hero: [], king: [] };
+    this.best = null;
+    this.news = [];
     this.cam = { x: 640, y: 420, zoom: 1 };
     this.camK = 3;
     this.arm = -0.85;
