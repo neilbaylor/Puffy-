@@ -46,7 +46,8 @@ function fetchBytes(t: Track) {
 function keep(t: Track) {
   recent = [t, ...recent.filter((x) => x !== t)];
   for (const old of recent.slice(KEEP)) if (old !== playing?.t) decoded.delete(old);
-  recent = recent.slice(0, KEEP + 1);
+  // (the one playing stays on the list till it's let go: dropped off it still decoded, it was never freed)
+  recent = recent.filter((x) => decoded.has(x));
 }
 
 /** `atOnce`: mixed down in one go while the loading screen is up (nothing on it moves: no stutter to avoid). */
