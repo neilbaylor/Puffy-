@@ -173,6 +173,8 @@ export interface BHazard {
   warn: number;
   /** A big boulder that landed on the ramp rolls down it (and on along the floor a bit): seconds rolling. */
   rolling: number;
+  /** The bad guys it's hit already (each one only once: bad guys have no moment of invincibility). */
+  hit?: Set<number>;
 }
 
 export interface BPrize {
@@ -1440,7 +1442,7 @@ export class BattleSim {
         }
         for (const e of this.enemies) {
           const [w, h] = ENEMY_BOX[e.kind];
-          if (Math.abs(e.x - z.x) < w / 2 + r && e.y > z.y - r * 2 && e.y - h < z.y) this.hurtEnemy(e, 1, ev);
+          if (Math.abs(e.x - z.x) < w / 2 + r && e.y > z.y - r * 2 && e.y - h < z.y && this.firstHit(z, e)) this.hurtEnemy(e, 1, ev);
         }
         if (Math.abs(z.vx) < 25 || z.rolling > 6) {
           ev.push({ k: 'crash', kind: z.kind, x: z.x, y: z.y, big: true });
@@ -1461,7 +1463,7 @@ export class BattleSim {
       }
       for (const e of this.enemies) {
         const [w, h] = ENEMY_BOX[e.kind];
-        if (Math.abs(e.x - z.x) < w / 2 + r && z.y > e.y - h && z.y - r * 2 < e.y) this.hurtEnemy(e, z.kind === 'anvil' ? 3 : dmg, ev);
+        if (Math.abs(e.x - z.x) < w / 2 + r && z.y > e.y - h && z.y - r * 2 < e.y && this.firstHit(z, e)) this.hurtEnemy(e, z.kind === 'anvil' ? 3 : dmg, ev);
       }
       const ty = Math.floor(z.y / T);
       const tx = Math.floor(z.x / T);
@@ -1484,6 +1486,16 @@ export class BattleSim {
       }
     }
     this.hazards = this.hazards.filter((z) => z.warn > -50);
+    // (and the bad guys they finished off go now, not a tick later: still in the snapshot, and in the way of rockets)
+    this.enemies = this.enemies.filter((e) => e.hp > 0);
+  }
+
+  /** A hazard reaching this bad guy for the first time (each one hurts it once, not every tick it overlaps). */
+  private firstHit(z: BHazard, e: BEnemy) {
+    const hit = (z.hit ??= new Set());
+    if (hit.has(e.id)) return false;
+    hit.add(e.id);
+    return true;
   }
 
   /** Which way is downhill on the ramp at x (-1 left, 1 right). */
