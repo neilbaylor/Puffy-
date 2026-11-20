@@ -800,6 +800,8 @@ export class BattleUI {
       this.host.touch(true);
     };
     const onKey = (e: KeyboardEvent) => {
+      // (the battle ended under it: the results card took its place — Escape mustn't close that)
+      if (!el.isConnected) return window.removeEventListener('keydown', onKey);
       if (e.code === 'Escape' || e.code === 'KeyP') close();
     };
     el.querySelector('[data-act=resume]')!.addEventListener('click', close);
