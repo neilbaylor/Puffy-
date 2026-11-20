@@ -763,6 +763,9 @@ export class BattleSim {
       }
     }
     this.rockets = this.rockets.filter((r) => r.age >= 0);
+    // (and the bad guys the rockets finished off go now: they stayed in this tick's snapshot, and got one
+    // more tick to shoot and to hurt whoever was touching them)
+    this.enemies = this.enemies.filter((e) => e.hp > 0);
     return ev;
   }
 
@@ -1248,6 +1251,8 @@ export class BattleSim {
     }
     const T = TILE_PX;
     for (const e of this.enemies) {
+      // (finished off earlier this tick — stomped, a chair: it doesn't move, shoot or hurt anyone now)
+      if (e.hp <= 0) continue;
       const [w, h] = ENEMY_BOX[e.kind];
       e.hurtT = Math.max(0, e.hurtT - DT);
       e.jumpCd -= DT;
