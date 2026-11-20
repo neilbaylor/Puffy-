@@ -210,6 +210,59 @@ export function traceCells(cells: Set<string>): Pt[][] {
   return loops;
 }
 
+/**
+ * traceCells for cells given as a flat [x0, y0, x1, y1, …] list (in the order a Set of them would
+ * hold them) and a test for "is this a cell": the same loops, on number keys (string keys and
+ * splitting them were most of the time it took to put a level's ground up). x, y ≥ −8.
+ */
+export function traceCellList(order: number[], has: (x: number, y: number) => boolean): Pt[][] {
+  const key = (x: number, y: number) => (x + 8) * 65536 + (y + 8);
+  const edges = new Map<number, number[]>(); // start → flat list of end points
+  const add = (x0: number, y0: number, x1: number, y1: number) => {
+    const k = key(x0, y0);
+    let l = edges.get(k);
+    if (!l) edges.set(k, (l = []));
+    l.push(x1, y1);
+  };
+  for (let i = 0; i < order.length; i += 2) {
+    const x = order[i];
+    const y = order[i + 1];
+    if (!has(x, y - 1)) add(x, y, x + 1, y);
+    if (!has(x + 1, y)) add(x + 1, y, x + 1, y + 1);
+    if (!has(x, y + 1)) add(x + 1, y + 1, x, y + 1);
+    if (!has(x - 1, y)) add(x, y + 1, x, y);
+  }
+  const loops: Pt[][] = [];
+  while (edges.size) {
+    const [startKey, list] = edges.entries().next().value as [number, number[]];
+    const start: Pt = [Math.floor(startKey / 65536) - 8, (startKey % 65536) - 8];
+    const ny = list.pop()!;
+    let next: Pt = [list.pop()!, ny];
+    if (!list.length) edges.delete(startKey);
+    const loop: Pt[] = [start];
+    let guard = 0;
+    while (guard++ < 100000) {
+      const cur = next;
+      if (cur[0] === start[0] && cur[1] === start[1]) break;
+      loop.push(cur);
+      const k = key(cur[0], cur[1]);
+      const outs = edges.get(k);
+      if (!outs || !outs.length) break;
+      const y2 = outs.pop()!;
+      next = [outs.pop()!, y2];
+      if (!outs.length) edges.delete(k);
+    }
+    // drop collinear points
+    const simple = loop.filter((p, i) => {
+      const a = loop[(i - 1 + loop.length) % loop.length];
+      const b = loop[(i + 1) % loop.length];
+      return (p[0] - a[0]) * (b[1] - p[1]) - (p[1] - a[1]) * (b[0] - p[0]) !== 0;
+    });
+    if (simple.length >= 3) loops.push(simple);
+  }
+  return loops;
+}
+
 /** Round every corner of a polygon and resample it densely. */
 export function roundPoly(poly: Pt[], r: number): Pt[] {
   const out: Pt[] = [];
