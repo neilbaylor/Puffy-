@@ -5,7 +5,7 @@ import { FB_FIELD_TILES } from '../gfx/football';
 import type { Pt } from '../gfx/handdrawn';
 import { HOME_LO, homeKeepKeys, PROP_RES, TERRAIN_LO_RES, TERRAIN_RES, addCanvas, ensureSeaArt, hires, kelpBends } from '../gfx/textures';
 import { GRASS_FILLS, KELP_H, KELP_W, PIER_HEAD, PIER_HEAD_MODERN, SEA_PROPS, SWAY_N, drawModernPier, drawPier } from '../gfx/sea';
-import { DEFAULT_PALETTE, PALETTES, drawCloudPlatform, drawPuffTree, drawTerrainPiece, roundPoly, traceCells, type TerrainKind, type WorldPalette } from '../gfx/world';
+import { DEFAULT_PALETTE, PALETTES, drawCloudPlatform, drawPuffTree, drawTerrainPiece, roundPoly, traceCellList, type TerrainKind, type WorldPalette } from '../gfx/world';
 import { drawPine } from '../gfx/mountain';
 import type { Cell, LevelData } from '../level/builder';
 import { ONE_WAY_TILES, SOLID_TILES } from '../level/tiles';
@@ -39,39 +39,54 @@ function localTop(outline: Pt[], x0: number, x1: number) {
  * LevelView.pieces). The loading screen works them out as a step of its own.
  */
 export function levelPieces(d: LevelData, kind: TerrainKind): { outline: Pt[]; x0: number; y0: number; x1: number; y1: number }[] {
-  const cell = (x: number, y: number): Cell => d.cells[y]?.[x] ?? null;
+  const W = d.width;
+  const H = d.height;
+  const isKind = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && d.cells[y][x] === kind;
   const ck = `${d.name}|${kind}|${d.width}x${d.height}`;
   const have = PIECES.get(ck);
   if (have) return have;
   const out: { outline: Pt[]; x0: number; y0: number; x1: number; y1: number }[] = [];
-  const seen = new Set<string>();
-  for (let y = 0; y < d.height; y++)
-    for (let x = 0; x < d.width; x++) {
-      if (cell(x, y) !== kind || seen.has(`${x},${y}`)) continue;
-      // flood fill one piece
-      const cells = new Set<string>();
-      const stack: Pt[] = [[x, y]];
+  // (number keys and flat lists throughout: string keys were most of the time this took)
+  const seen = new Uint8Array(W * H);
+  const cellKey = (x: number, y: number) => (x + 8) * 65536 + (y + 8);
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      if (!isKind(x, y) || seen[y * W + x]) continue;
+      // flood fill one piece (its cells in order, flat: x0, y0, x1, y1…)
+      const inPiece = new Set<number>();
+      const order: number[] = [];
+      const addCell = (cx: number, cy: number) => {
+        const k = cellKey(cx, cy);
+        if (inPiece.has(k)) return;
+        inPiece.add(k);
+        order.push(cx, cy);
+      };
+      const stack = [x, y];
       while (stack.length) {
-        const [cx, cy] = stack.pop()!;
-        const k = `${cx},${cy}`;
-        if (seen.has(k) || cell(cx, cy) !== kind) continue;
-        seen.add(k);
-        cells.add(k);
-        stack.push([cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]);
+        const cy = stack.pop()!;
+        const cx = stack.pop()!;
+        if (!isKind(cx, cy) || seen[cy * W + cx]) continue;
+        seen[cy * W + cx] = 1;
+        addCell(cx, cy);
+        stack.push(cx + 1, cy, cx - 1, cy, cx, cy + 1, cx, cy - 1);
       }
       // extend pieces past the level edges so no outline shows at the screen bottom/sides
-      for (const k of [...cells]) {
-        const [cx, cy] = k.split(',').map(Number);
-        if (cy === d.height - 1) for (let e = 1; e <= 3; e++) cells.add(`${cx},${cy + e}`);
-        if (cx === 0) for (let e = 1; e <= 3; e++) cells.add(`${-e},${cy}`);
-        if (cx === d.width - 1) for (let e = 1; e <= 3; e++) cells.add(`${cx + e},${cy}`);
+      const n0 = order.length;
+      for (let i = 0; i < n0; i += 2) {
+        const cx = order[i];
+        const cy = order[i + 1];
+        if (cy === H - 1) for (let e = 1; e <= 3; e++) addCell(cx, cy + e);
+        if (cx === 0) for (let e = 1; e <= 3; e++) addCell(-e, cy);
+        if (cx === W - 1) for (let e = 1; e <= 3; e++) addCell(cx + e, cy);
       }
-      for (const k of [...cells]) {
-        const [cx, cy] = k.split(',').map(Number);
-        if (cx < 0 && cy === d.height - 1) for (let e = 1; e <= 3; e++) cells.add(`${cx},${cy + e}`);
-        if (cx >= d.width && cy === d.height - 1) for (let e = 1; e <= 3; e++) cells.add(`${cx},${cy + e}`);
+      const n1 = order.length;
+      for (let i = 0; i < n1; i += 2) {
+        const cx = order[i];
+        const cy = order[i + 1];
+        if (cx < 0 && cy === H - 1) for (let e = 1; e <= 3; e++) addCell(cx, cy + e);
+        if (cx >= W && cy === H - 1) for (let e = 1; e <= 3; e++) addCell(cx, cy + e);
       }
-      const loops = traceCells(cells);
+      const loops = traceCellList(order, (a, b) => inPiece.has(cellKey(a, b)));
       const outline = roundPoly(loops[0].map(([px, py]) => [px * TILE, py * TILE] as Pt), kind === 'ground' ? 12 : 7);
       let x0 = Infinity;
       let y0 = Infinity;
