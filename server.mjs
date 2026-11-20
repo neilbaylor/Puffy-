@@ -10,7 +10,7 @@
 import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
-import { extname, join, normalize, resolve } from 'node:path';
+import { extname, join, normalize, resolve, sep } from 'node:path';
 import { brotliCompress, constants as zlibConst, gzipSync } from 'node:zlib';
 
 // (Node's built-in SQLite, used for player accounts, is still labelled "experimental" and says so
@@ -92,8 +92,15 @@ const server = createServer(async (req, res) => {
   try {
     if (userApi && (await userApi(req, res))) return;
     const url = new URL(req.url ?? '/', 'http://x');
-    let path = normalize(join(ROOT, decodeURIComponent(url.pathname)));
-    if (!path.startsWith(ROOT)) return void res.writeHead(403).end();
+    let decoded;
+    try {
+      decoded = decodeURIComponent(url.pathname);
+    } catch {
+      return void res.writeHead(400).end('Bad request');
+    }
+    let path = normalize(join(ROOT, decoded));
+    // (inside dist itself: a plain prefix check let ..%2f reach dist-server/ and the like)
+    if (path !== ROOT && !path.startsWith(ROOT + sep)) return void res.writeHead(403).end();
     const info = await stat(path).catch(() => null);
     // a missing file (it has a file extension: an old build's /assets/ file, say) is a 404, not the
     // page in its place (a page labelled as a script or a song would break whatever asked for it,
