@@ -328,7 +328,10 @@ export async function createUserApi() {
         if (route === 'POST /api/register') {
           if (store.byName(name)) return void send(res, 409, { error: 'That name is taken.' }), true;
           const salt = randomBytes(16);
-          const u = store.create(name, await hashPassword(password, salt), salt.toString('hex'));
+          const hash = await hashPassword(password, salt);
+          // (again after the wait: the same name sent twice at once got a 500, and two players in the JSON file)
+          if (store.byName(name)) return void send(res, 409, { error: 'That name is taken.' }), true;
+          const u = store.create(name, hash, salt.toString('hex'));
           return void send(res, 201, { token: newSession(u), user: pub(u) }), true;
         }
         const u = store.byName(name);
