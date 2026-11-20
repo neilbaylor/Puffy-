@@ -325,7 +325,7 @@ class PomPom {
     this.img = gs.add.image(x, y, 'w-bullet').setScale(1 / W_RES).setDepth(25);
     this.onUpdate = (_t, delta) => this.step(Math.min(delta / 1000, 0.05));
     gs.events.on(Phaser.Scenes.Events.UPDATE, this.onUpdate);
-    gs.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.gone());
+    gs.events.once(Phaser.Scenes.Events.SHUTDOWN, this.gone, this);
   }
 
   private step(dt: number) {
@@ -352,6 +352,7 @@ class PomPom {
 
   private gone() {
     this.gs.events.off(Phaser.Scenes.Events.UPDATE, this.onUpdate);
+    this.gs.events.off(Phaser.Scenes.Events.SHUTDOWN, this.gone, this);
     if (this.img.scene) this.img.destroy();
   }
 }
@@ -375,7 +376,7 @@ class ThrownSaw {
     this.img = gs.add.image(x, y, 'w-saw', 's0').setScale(k / W_RES).setDepth(26).setFlipX(vx > 0);
     this.onUpdate = (_t, delta) => this.step(Math.min(delta / 1000, 0.05));
     gs.events.on(Phaser.Scenes.Events.UPDATE, this.onUpdate);
-    gs.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.gone());
+    gs.events.once(Phaser.Scenes.Events.SHUTDOWN, this.gone, this);
   }
 
   private step(dt: number) {
@@ -414,6 +415,7 @@ class ThrownSaw {
 
   private gone() {
     this.gs.events.off(Phaser.Scenes.Events.UPDATE, this.onUpdate);
+    this.gs.events.off(Phaser.Scenes.Events.SHUTDOWN, this.gone, this);
     if (this.img.scene) this.img.destroy();
   }
 }

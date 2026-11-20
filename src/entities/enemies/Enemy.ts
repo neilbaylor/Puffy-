@@ -861,7 +861,7 @@ export class Glob {
     this.img = gs.add.image(x, y, style.tex).setOrigin(style.tex === 'spit' ? 24 / 36 : 0.5, 0.5).setScale(style.scale / ART_RES).setDepth(DEPTH.projectiles);
     this.onUpdate = (_t, delta) => this.step(Math.min(delta / 1000, 0.05));
     gs.events.on(Phaser.Scenes.Events.UPDATE, this.onUpdate);
-    gs.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.gone());
+    gs.events.once(Phaser.Scenes.Events.SHUTDOWN, this.gone, this);
   }
 
   private step(dt: number) {
@@ -912,6 +912,7 @@ export class Glob {
 
   private gone() {
     this.gs.events.off(Phaser.Scenes.Events.UPDATE, this.onUpdate);
+    this.gs.events.off(Phaser.Scenes.Events.SHUTDOWN, this.gone, this);
     if (this.img.scene) this.img.destroy();
   }
 }

@@ -357,7 +357,7 @@ export class FishBubble {
     this.img = gs.add.image(x, y, 'fish-bubble', 'b0').setScale((size * 0.3) / ART_RES).setDepth(DEPTH.projectiles);
     this.onUpdate = (_t, delta) => this.step(Math.min(delta / 1000, 0.05));
     gs.events.on(Phaser.Scenes.Events.UPDATE, this.onUpdate);
-    gs.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.gone());
+    gs.events.once(Phaser.Scenes.Events.SHUTDOWN, this.gone, this);
     // (blown out of the tail: it swells to full size)
     gs.tweens.add({ targets: this.img, scale: size / ART_RES, duration: 220, ease: 'Back.easeOut' });
   }
@@ -399,6 +399,7 @@ export class FishBubble {
 
   private gone() {
     this.gs.events.off(Phaser.Scenes.Events.UPDATE, this.onUpdate);
+    this.gs.events.off(Phaser.Scenes.Events.SHUTDOWN, this.gone, this);
     if (this.img.scene) this.img.destroy();
   }
 }
