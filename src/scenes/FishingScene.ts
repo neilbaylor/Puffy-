@@ -259,6 +259,9 @@ export class FishingScene extends Phaser.Scene {
     // hit. Measured here rather than by what the browser says was under the finger: that was only the
     // white disc as it's drawn that instant (tiny while it pops in, shrinking as it fades), so taps on
     // the ring or just off the edge counted as misses.
+    // (paused — the Paused menu, the phone turned upright: the contest clock has stopped with BITE! still
+    // up, and a tap on the menu over that spot caught the fish)
+    if (!this.sys.isActive()) return;
     const b = this.dom?.querySelector<HTMLElement>('.fsh-bite');
     if (b && !b.hidden && !this.biteHit && !this.biteMiss) {
       const r = b.getBoundingClientRect();
