@@ -1,4 +1,4 @@
-import { latestLevel, progress } from '../level/levels';
+import { progress } from '../level/levels';
 import { bank } from './bank';
 import { wardrobe } from './wardrobe';
 
@@ -77,7 +77,9 @@ async function api(method: string, path: string, body?: unknown): Promise<{ ok: 
 }
 
 /** This browser's progress, as the account keeps it. */
-const local = () => ({ rootbeer: bank.rootbeer, nuggies: bank.nuggies, kills: bank.kills, level: latestLevel(), spent: bank.spent, items: wardrobe.owned.join(','), wear: wardrobe.wearChoice });
+// (level: the next one to play, beaten + 1 — what merge reads back. The furthest unlocked one, saved
+// before, is the same until the last built level's beaten: then it lost that level on a new device)
+const local = () => ({ rootbeer: bank.rootbeer, nuggies: bank.nuggies, kills: bank.kills, level: progress.beaten + 1, spent: bank.spent, items: wardrobe.owned.join(','), wear: wardrobe.wearChoice });
 
 /** Take the bigger of each (this browser vs. the account), then save that to the account. */
 async function merge(u: AccountUser) {
