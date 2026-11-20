@@ -127,7 +127,8 @@ async function openSqlite(file: string): Promise<Store> {
     addItem: db.prepare('INSERT OR IGNORE INTO user_items (user_id, item) VALUES (?, ?)'),
     equip: db.prepare('UPDATE user_items SET equipped = ? WHERE user_id = ? AND item = ?'),
     create: db.prepare('INSERT INTO users (name, hash, salt) VALUES (?, ?, ?)'),
-    progress: db.prepare("UPDATE users SET rootbeer = ?, nuggies = ?, kills = ?, level = ?, spent = ?, updated_at = datetime('now') WHERE id = ?"),
+    // (each only goes up: a device that hasn't caught up yet doesn't take the account back down)
+    progress: db.prepare("UPDATE users SET rootbeer = MAX(rootbeer, ?), nuggies = MAX(nuggies, ?), kills = MAX(kills, ?), level = MAX(level, ?), spent = MAX(spent, ?), updated_at = datetime('now') WHERE id = ?"),
     addSession: db.prepare('INSERT INTO sessions (token_hash, user_id) VALUES (?, ?)'),
     session: db.prepare('SELECT user_id FROM sessions WHERE token_hash = ?'),
     dropSession: db.prepare('DELETE FROM sessions WHERE token_hash = ?'),
@@ -195,7 +196,7 @@ function openJson(file: string): Store {
     },
     setProgress: (id, p) => {
       const u = data.users.find((x) => x.id === id);
-      if (u) Object.assign(u, p);
+      if (u) for (const k of ['rootbeer', 'nuggies', 'kills', 'level', 'spent'] as const) u[k] = Math.max(u[k] ?? 0, p[k]);
       save();
     },
     setItems: (id, items, wear) => {
