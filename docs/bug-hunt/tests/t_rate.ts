@@ -1,0 +1,12 @@
+import { createServer } from 'node:http';
+process.env.DB_PATH = '/tmp/hunt/rate-test.db';
+const { createUserApi } = await import('/workspace/Puffy-/server/users');
+const api = await createUserApi();
+const srv = createServer(async (req, res) => { if (!(await api(req, res))) res.writeHead(404).end(); });
+await new Promise<void>((r) => srv.listen(18940, r));
+const login = (xff?: string) => fetch('http://127.0.0.1:18940/api/login', { method: 'POST', headers: { 'content-type': 'application/json', ...(xff ? { 'x-forwarded-for': xff } : {}) }, body: JSON.stringify({ name: 'victim', password: 'guess' }) }).then((r) => r.status);
+const same: number[] = []; for (let i = 0; i < 15; i++) same.push(await login('203.0.113.9'));
+const spoofed: number[] = []; for (let i = 0; i < 15; i++) spoofed.push(await login(`10.0.${i}.1, 203.0.113.9`));
+console.log('same client, 15 tries:      ', same.join(' '));
+console.log('same client, spoofed XFF:   ', spoofed.join(' '));
+srv.close();
