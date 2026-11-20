@@ -503,9 +503,10 @@ export class UI {
       if (upright && this.rotate.hidden && this.gameScene && !this.screen && !this.introEl) this.pause();
       // basketball has no pause menu: it just freezes while the phone is upright
       const sc = this.game.scene;
+      // (under the Paused menu it stays paused till Resume is pressed)
       for (const k of ['Hoops', 'Fishing']) {
         if (upright && sc.isActive(k)) sc.pause(k);
-        else if (!upright && sc.isPaused(k)) sc.resume(k);
+        else if (!upright && sc.isPaused(k) && !this.screen?.classList.contains('paused')) sc.resume(k);
       }
       this.rotate.hidden = !(portrait && isTouchDevice());
       // the page behind matches the prompt, so no strip of sky shows under it (iOS home screen)
@@ -1595,7 +1596,7 @@ export class UI {
     if (!this.gameScene || this.screen) return;
     this.game.scene.pause(this.gameScene.scene.key);
     this.touch.reset();
-    const el = h(`<div class="screen modal">
+    const el = h(`<div class="screen modal paused">
       <div class="panel">
         <h2>Paused</h2>
         <button class="btn btn-go" data-act="resume">Resume</button>
