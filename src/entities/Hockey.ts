@@ -124,7 +124,7 @@ export class HockeyMatch implements Coach {
     // sticks follow their players (and swing when they shoot)
     for (const [p, s] of this.sticks) {
       if (p.dead || !p.active) {
-        if (s.visible) this.gs.tweens.add({ targets: s, alpha: 0, angle: 120, y: s.y + 20, duration: 400, onComplete: () => s.setVisible(false) });
+        if (s.visible && !this.gs.tweens.isTweening(s)) this.gs.tweens.add({ targets: s, alpha: 0, angle: 120, y: s.y + 20, duration: 400, onComplete: () => s.setVisible(false) });
         continue;
       }
       const face = p.flipX ? 1 : -1;
