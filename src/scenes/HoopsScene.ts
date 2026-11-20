@@ -169,6 +169,9 @@ export class HoopsScene extends Phaser.Scene {
   private dom!: HTMLElement;
   private meter: null | { phase: 'power' | 'aim'; pos: number; dir: number; speed: number; zone: [number, number]; el: HTMLElement } = null;
   private tapListener = (e: Event) => {
+    // (nor taps while it's frozen — the phone turned upright: one on the "turn your phone" prompt was
+    // saved up and locked the meter the moment it was turned back)
+    if (!this.sys.isActive()) return;
     // (taps on the pause button or the pause menu aren't shots)
     const t = e.target as Element | null;
     if (t?.closest?.('.hud, .screen')) return;
