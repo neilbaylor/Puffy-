@@ -89,9 +89,10 @@ export class SimpleConfetti {
     this.burstE.setEmitterAngle({ min: deg - half, max: deg + half });
     this.burstE.setParticleSpeed(sp * 0.35, sp);
     this.burstE.setParticleScale(o.scale ?? 1);
-    if (o.colors) this.burstE.particleTint = o.colors[0];
+    // (the tint is picked at random from a list for each piece: this burst's list, then back to the usual one)
+    if (o.colors) this.burstE.ops.tint.loadConfig({ tint: o.colors });
     this.burstE.explode(count, x, y);
-    if (o.colors) this.burstE.particleTint = 0xffffff;
+    if (o.colors) this.burstE.ops.tint.loadConfig({ tint: COLORS });
   }
 
   /** A burst all around (or in a cone: angle ± spread). */
