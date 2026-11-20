@@ -160,6 +160,9 @@ class Room {
         c.ws?.close();
         c.ws = ws;
         c.droppedAt = 0;
+        // (a reloaded page counts its buttons from 1 again: anything up to the old count was being ignored)
+        c.lastSeq = 0;
+        c.queue = [];
         c.wear = wearOk(msg.wear ?? (msg as { hat?: string }).hat);
         this.send(c, { t: 'welcome', id: c.id });
         this.broadcastRoom();
