@@ -40,6 +40,7 @@ import { LevelView } from '../world/LevelView';
 import { FishChase } from '../world/FishChase';
 import { FerrisWheel } from '../world/FerrisWheel';
 import { roundRectPath, smallTex } from '../gfx/smallTex';
+import { upright } from '../core/uprightUploads';
 
 /** A puddle bubble's picture: radius (world px) and resolution. */
 const BUB_R = 6;
@@ -1634,7 +1635,7 @@ export class GameScene extends Phaser.Scene {
         ctx.globalAlpha = 0.07 + k * 0.066;
         ctx.fillRect(0, 19 + k * 5, w, 5);
       }
-      this.textures.addCanvas(key, c);
+      this.textures.addCanvas(key, upright(c));
     }
     this.add.image(x0 - 2, y + 3, key).setOrigin(0, 0).setScale(1 / R).setDepth(DEPTH.players + 0.59);
     this.add.rectangle(x0 - 2, y + 102, w, this.level.heightPx + 40 - (y + 100), hexOf(POO_DARK.base)).setOrigin(0, 0).setDepth(DEPTH.players + 0.59);

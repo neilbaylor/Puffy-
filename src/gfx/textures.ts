@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { TILE } from '../config';
 import { CHARACTERS } from '../data/characters';
 import { TILE_COUNT } from '../level/tiles';
+import { upright } from '../core/uprightUploads';
 import { BIGPUFF_FRAMES, BIGPUFF_H, BIGPUFF_W, GIANT_FRAMES, GIANT_H, GIANT_W, PUFFBALL_H, PUFFBALL_W, drawBigPuff, drawGiant, drawPuffball } from './baddies';
 import { drawMuzzleFlash, drawRocket } from './bazooka';
 import { drawSoccerBall } from './soccer';
@@ -103,7 +104,7 @@ export function addCanvas(
   opts?: { release?: boolean },
 ) {
   if (scene.textures.exists(key)) scene.textures.remove(key);
-  const tex = scene.textures.addImage(key, c as unknown as HTMLImageElement)!;
+  const tex = scene.textures.addImage(key, upright(c) as unknown as HTMLImageElement)!;
   frames?.(tex);
   if (opts?.release && scene.game.renderer.type === Phaser.WEBGL) {
     c.width = 1;

@@ -17,9 +17,11 @@ import { trackBossArt } from './gfx/textures';
 import { refreshMs } from './core/refresh';
 import { trimRenderTargets } from './core/renderTargets';
 import { fixArcadeGroupWalk } from './core/physicsFix';
+import { installUprightUploads } from './core/uprightUploads';
 
 // (before any scene: see physicsFix)
 fixArcadeGroupWalk();
+installUprightUploads();
 
 installInput();
 

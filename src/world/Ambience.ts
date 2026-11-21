@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { DEPTH } from '../config';
 import { LIGHT } from '../core/light';
+import { upright } from '../core/uprightUploads';
 import { SeaLife } from './Sea';
 
 /**
@@ -48,7 +49,7 @@ function makeTextures(scene: Phaser.Scene) {
     c.width = w;
     c.height = h;
     draw(c.getContext('2d')!);
-    const t = scene.textures.addImage(key, c as unknown as HTMLImageElement)!;
+    const t = scene.textures.addImage(key, upright(c) as unknown as HTMLImageElement)!;
     frames?.forEach((f) => t.add(f.name, 0, f.x, 0, f.w, h));
   };
   // a bird (2× resolution): wings up / wings level / wings down, drawn white with an

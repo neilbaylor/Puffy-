@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { upright } from '../core/uprightUploads';
 
 /**
  * A picture that's redrawn now and then (a cloud, a jumbotron): Phaser's CanvasTexture, less the
@@ -7,7 +8,11 @@ import Phaser from 'phaser';
  */
 export function liveCanvas(textures: Phaser.Textures.TextureManager, key: string, w: number, h: number): Phaser.Textures.CanvasTexture {
   if (textures.exists(key)) return textures.get(key) as Phaser.Textures.CanvasTexture;
-  const t = textures.createCanvas(key, w, h)!;
+  // (our own canvas, not one from Phaser's pool, so it can go to the graphics chip the right way up: see uprightUploads)
+  const c = upright(document.createElement('canvas'));
+  c.width = w;
+  c.height = h;
+  const t = textures.addCanvas(key, c)!;
   const copy = t as unknown as { imageData: ImageData | null; data: Uint8ClampedArray | null; pixels: Uint32Array | null; buffer: ArrayBuffer | null };
   copy.imageData = null;
   copy.data = null;
