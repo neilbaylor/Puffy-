@@ -18,6 +18,7 @@ import { refreshMs } from './core/refresh';
 import { trimRenderTargets } from './core/renderTargets';
 import { fixArcadeGroupWalk } from './core/physicsFix';
 import { installUprightUploads } from './core/uprightUploads';
+import { roundTextureIds } from './core/texIdFix';
 
 // (before any scene: see physicsFix)
 fixArcadeGroupWalk();
@@ -154,6 +155,7 @@ function makeGl(): { canvas: HTMLCanvasElement; context: WebGLRenderingContext }
       preserveDrawingBuffer: false,
     };
     const context = (canvas.getContext('webgl', attrs) ?? canvas.getContext('experimental-webgl', attrs)) as WebGLRenderingContext | null;
+    if (context) roundTextureIds(context);
     return context && !context.isContextLost() ? { canvas, context } : null;
   } catch {
     return null;
