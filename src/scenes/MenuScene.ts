@@ -189,8 +189,8 @@ export class MenuScene extends Phaser.Scene {
       () => !gone() && levelPieces(data, 'rock'),
       step(() => {
         // (no ground drawn by the view itself: the next steps draw it a piece at a time)
-        level = new LevelView(this, data, { lazyNear: x0, lazySpan: [-1e9, -1e9], ahead: false, trim: true, lo, skipAbove: this.skipAbove(data) });
         loopEnd.v = x0 + Math.max(GLIDE, vw);
+        level = new LevelView(this, data, { lazyNear: x0, lazySpan: [-1e9, -1e9], ahead: false, trim: true, lo, skipAbove: this.skipAbove(data), only: this.onlySpan(data, x0, loopEnd.v, vw) });
         level.trimPending(loopEnd.v + vw + 400);
         // its opening ground (what the fly-over would draw in its first frames), a piece per step,
         // put next in line
@@ -287,6 +287,15 @@ export class MenuScene extends Phaser.Scene {
     if (!data.vertical) return -Infinity;
     const vh = this.scale.height / Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W);
     return data.height * TILE - vh - CLIMB - 300;
+  }
+
+  /**
+   * The stretch of a level its fly-over here can ever show (from its start to the end of its loop,
+   * with the same room to spare as its ground: see trimPending), for LevelView's `only` — trees and
+   * cloud platforms outside it aren't put up. (A climb's glide wanders more: all of it, as before.)
+   */
+  private onlySpan(data: { vertical?: boolean }, x0: number, loopEnd: number, vw: number): [number, number] | undefined {
+    return data.vertical ? undefined : [x0 - 400, loopEnd + vw + 400];
   }
 
   private startX(id: number) {
@@ -440,10 +449,10 @@ export class MenuScene extends Phaser.Scene {
     const data = (levelInfo(id).build ?? buildLevel1)();
     const x0 = this.startX(id);
     const span = this.firstSpan();
-    const level = new LevelView(this, data, { lazyNear: x0, lazySpan: span, ahead: false, trim: true, lo, skipAbove: this.skipAbove(data) });
     // loop over the level's first stretch only (see GLIDE); nothing past it is drawn
     const vw = this.scale.width / Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W);
     const loopEnd = x0 + Math.max(GLIDE, vw);
+    const level = new LevelView(this, data, { lazyNear: x0, lazySpan: span, ahead: false, trim: true, lo, skipAbove: this.skipAbove(data), only: this.onlySpan(data, x0, loopEnd, vw) });
     level.trimPending(loopEnd + vw + 400);
     // (in its own look from the start, even built ahead out of sight)
     const look0 = themesFor(id)[0];
@@ -488,6 +497,9 @@ export class MenuScene extends Phaser.Scene {
       // level draws whatever's missing — doing it here was a string of hitches after every switch)
       // (this Part's other looks last: the game only drifts into them 20 seconds in)
       ...looks.slice(1).flatMap((l) => [...lookJobs(this, l), () => this.warmLook(l)]),
+      // (and last, this Part's trees and cloud platforms past its fly-over's loop: the level needs
+      // them, and drawing them now saves its loading card the time)
+      ...this.level.laterJobs(),
     );
     return jobs;
   }

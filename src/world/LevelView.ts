@@ -161,8 +161,10 @@ export class LevelView {
     /** lazySpan: how far before / after `lazyNear` the terrain is drawn straight away (default 900 / 1800). */
     /** lo: the start screen's picture of another Part (its ground at TERRAIN_LO_RES, under `terrainlo-` keys a level never uses). */
     /** skipAbove: lazy views — ground pictures wholly above this height are never put up (a climb's start-screen glide never goes that high). */
-    opts?: { lazyNear?: number; keep?: boolean; free?: boolean; lazySpan?: [number, number]; ahead?: boolean; cull?: boolean; trim?: boolean; lo?: boolean; skipAbove?: number },
+    /** only: the start screen — trees and cloud platforms wholly outside this stretch (x0…x1) aren't put up (see `onlySpan`). */
+    opts?: { lazyNear?: number; keep?: boolean; free?: boolean; lazySpan?: [number, number]; ahead?: boolean; cull?: boolean; trim?: boolean; lo?: boolean; skipAbove?: number; only?: [number, number] },
   ) {
+    this.onlySpan = opts?.only ?? null;
     this.skipAbove = opts?.lazyNear !== undefined ? (opts?.skipAbove ?? -Infinity) : -Infinity;
     // (only when its resolution differs from a level's: otherwise the same pictures are shared)
     this.lo = !!opts?.lo && HOME_LO && TERRAIN_LO_RES !== TERRAIN_RES;
@@ -211,6 +213,27 @@ export class LevelView {
   private ropes: { rope: Phaser.GameObjects.Rope; speed: number; ph: number }[] = [];
   /** How many points up a strand of kelp (its bend's smoothness). */
   private static readonly KELP_PTS = 16;
+
+  /**
+   * The start screen: its fly-over only ever loops over the first stretch of a level, so the trees
+   * and cloud platforms (each a picture of its own, drawn and sent to the graphics chip) wholly
+   * outside it aren't put up at all — most of a level's, and the start-up drew them for every Part.
+   * Their pictures are drawn later, a quiet moment at a time (see `laterJobs`), or by the level
+   * itself when it starts (as it does any that are missing).
+   */
+  private readonly onlySpan: [number, number] | null;
+  /** The pictures of what `onlySpan` left out: drawing them is a job each (key, draw). */
+  private later: { key: string; draw: () => void }[] = [];
+  private outside(x0: number, x1: number) {
+    return !!this.onlySpan && (x1 < this.onlySpan[0] || x0 > this.onlySpan[1]);
+  }
+
+  /** The start screen: the pictures left out (see `onlySpan`) not drawn yet, a job each. */
+  laterJobs(): (() => void)[] {
+    return this.later.map((l) => () => {
+      if (!this.scene.textures.exists(l.key)) l.draw();
+    });
+  }
 
   /** Trees, flowers and grass that sway in the breeze. */
   private sway: { img: Phaser.GameObjects.Image; amp: number; speed: number; ph: number }[] = [];
@@ -630,7 +653,12 @@ export class LevelView {
           // (room over the deck for what stands on it: the old pier's rope coil, the modern one's railing and lamp)
           const modern = this.data.pierStyle === 'modern';
           const head = modern ? PIER_HEAD_MODERN : PIER_HEAD;
-          if (!this.scene.textures.exists(key)) addCanvas(this.scene, key, hires(w, down + 14 + head, PROP_RES, (ctx) => (modern ? drawModernPier : drawPier)(ctx, w, down + 8)), undefined, { release: true });
+          const draw = () => addCanvas(this.scene, key, hires(w, down + 14 + head, PROP_RES, (ctx) => (modern ? drawModernPier : drawPier)(ctx, w, down + 8)), undefined, { release: true });
+          if (this.outside(x * TILE, x * TILE + w)) {
+            this.later.push({ key, draw });
+            continue;
+          }
+          if (!this.scene.textures.exists(key)) draw();
           this.scene.add
             .image(x * TILE, y * TILE - 6 - head, key)
             .setOrigin(0, 0)
@@ -638,8 +666,12 @@ export class LevelView {
             .setDepth(DEPTH.tiles + 1);
           continue;
         }
-        if (!this.scene.textures.exists(key))
-          addCanvas(this.scene, key, hires(w + 24, 34, PROP_RES, (ctx) => drawCloudPlatform(ctx, 12, 8, w, DEFAULT_PALETTE, x * 7 + y)), undefined, { release: true });
+        const draw = () => addCanvas(this.scene, key, hires(w + 24, 34, PROP_RES, (ctx) => drawCloudPlatform(ctx, 12, 8, w, DEFAULT_PALETTE, x * 7 + y)), undefined, { release: true });
+        if (this.outside(x * TILE - 12, x * TILE + w + 12)) {
+          this.later.push({ key, draw });
+          continue;
+        }
+        if (!this.scene.textures.exists(key)) draw();
         this.scene.add
           .image(x * TILE - 12, y * TILE - 8, key)
           .setOrigin(0, 0)
@@ -712,7 +744,7 @@ export class LevelView {
         }
         // (like the cloud platforms and piers: only ever shown as a picture, so its canvas lets its
         // pixels go once they're on the graphics chip)
-        if (!this.scene.textures.exists(key))
+        const draw = () =>
           addCanvas(
             this.scene,
             key,
@@ -722,6 +754,12 @@ export class LevelView {
             undefined,
             { release: true },
           );
+        const tx = s.x * TILE + TILE / 2;
+        if (this.outside(tx - 48, tx + 48)) {
+          this.later.push({ key, draw });
+          return;
+        }
+        if (!this.scene.textures.exists(key)) draw();
         const img = this.scene.add
           .image(s.x * TILE + TILE / 2, (s.y + 1) * TILE + 4, key)
           .setOrigin(0.5, 1)
