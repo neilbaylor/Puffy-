@@ -365,3 +365,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.360: The iPhone home-screen app fills the whole screen sideways (the blue bar at the bottom).
 - v0.361: Faster basketball and wrestling arenas (the big screens cost a fraction of what they did), slightly quicker loading, fewer hitches.
 - v0.362: Less drawing of things off screen (smoother levels and start screen) and a quicker start-up.
+- v0.363: Lite mode skips edge smoothing: smoother on slow devices (ropes and nets look a little more jagged there).
