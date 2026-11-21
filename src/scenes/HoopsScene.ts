@@ -238,6 +238,9 @@ export class HoopsScene extends Phaser.Scene {
     this.jumboNext = 0;
     this.inIntro = false;
     this.skipping = false;
+    // (a rematch from the Bosses menu: the last game's ending left them running off, sulking or laughing)
+    this.kingAnim = { frames: ['idle0', 'idle1'], fps: 2.5 };
+    this.heroAnim = { frames: ['idle0', 'idle1'], fps: 2 };
   }
 
   // ───────────────────────────────────────────── setup ──
