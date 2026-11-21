@@ -1,4 +1,4 @@
-# Puffy: full bug and performance report (7 bug passes, 2 performance passes, 1 combined pass)
+# Puffy: full bug and performance report (7 bug passes, 2 performance passes, 3 combined passes)
 
 **Code:** `neilbaylor/Puffy-`, base `claude/game-base` at `ce8bcb2` (v0.351). That is about 51k lines of TS/JS:
 - the server and shared battle sim
@@ -28,7 +28,7 @@ Where I was unsure, I chose the lower one. No bug reached High: the account data
 | #1 | `perf-terrain-shapes` | perf | — | Terrain outlines ~5× faster (124.5 → 25.8 ms over all levels), identical output | `t_merge.ts` |
 | #2 | `fix-static-path-traversal` | security | Medium | `GET /..%2fdist-server/users.mjs` served server code; a malformed `%` escape gave 500 | curl on server.mjs |
 | #3 | `fix-login-rate-limit` | security | Medium | A spoofed `X-Forwarded-For` bypassed the 12-logins-a-minute limit | `t_rate.ts` |
-| #4 | `fix-account-beaten-level` | bug | Medium | A new device lost the last beaten level (King Bob gone from the Bosses menu) | `t_account.ts` |
+| #4 | `fix-account-beaten-level` | bug | Medium | A new device lost the last beaten level (King Bob gone from the Bosses menu) | `t_account.ts`; browser: `acct.mjs` (end to end) |
 | #5 | `fix-battle-rock-damage` | bug | Medium | One falling rock hit a bad guy every tick (any rock killed anything); rock kills stayed one tick | `t_rock.ts`, `t_dead.ts` |
 | #6 | `fix-boss-rotate-resume` | bug | Low | Turning the phone back un-paused Hoops/Fishing under the Paused menu | `t_rotate.ts` |
 | #7 | `fix-football-ball-leak` | bug | Low | Underwater football's ball pool ran dry | `t_football.ts` |
@@ -39,7 +39,7 @@ Where I was unsure, I chose the lower one. No bug reached High: the account data
 | #12 | `fix-projectile-shutdown-listeners` | bug (leak) | Low | Every projectile left a SHUTDOWN listener | `t_listeners.ts` |
 | #13 | `fix-start-fullscreen-listener` | bug (leak) | Low | Each start screen visit kept the old screen (3 × 320² canvases) alive | `t_fslisten.ts` |
 | #14 | `fix-slow-device-threshold` | bug | Low | 47.6–50 fps went straight to light mode, skipping the lower resolution | read + git history |
-| #15 | `fix-battle-rejoin-inputs` | bug | Medium | After a page reload mid-battle your buttons were ignored (frozen) | `t_rejoin.ts` |
+| #15 | `fix-battle-rejoin-inputs` | bug | Medium | After a page reload mid-battle your buttons were ignored (frozen) | `t_rejoin.ts`; browser: `battle2.mjs` |
 | #16 | `fix-account-progress-max` | bug | Medium | A device that hadn't caught up lowered the account (rootbeer, level, spent) | `t_progress.ts` |
 | #17 | `fix-register-race` | bug | Low | The same name registered twice at once → 500 (duplicate in the JSON store) | `t_register.ts` |
 | #18 | `fix-music-keep` | bug (memory) | Low | A song stayed decoded (13–21 MB) after it stopped being needed | `t_music.ts` |
@@ -175,6 +175,30 @@ Where I was unsure, I chose the lower one. No bug reached High: the account data
   - all five bosses from the Bosses menu, plus full basketball and fishing contests through to their results;
   - the Shop (buy, wear, take off: root beer 120 → 25 as expected), Battle lobby, Bosses and Account screens.
 - **Memory:** five round trips start screen → Part 1 → home stay flat (about 820 DOM nodes, 109 listeners, steady heap and textures). An early reading of steady growth was the test tool's own element handles: the heap retainer chain led to "DevTools console" handles.
+
+## Combined passes 2 and 3 (bugs and performance, with the browser)
+- **No new bugs or performance wins.** Nothing turned up in these areas, read again:
+  - the online battle client (prediction, shots, snapshots);
+  - the bad-guy fish and Kai;
+  - the per-frame world code (shadows, birds, sea);
+  - every place a player name or room code goes into the page (all escaped).
+- **More fixes shown in a real browser:**
+  - **#4:** device A (all 5 Parts beaten) makes an account and fresh device B signs in. On the base build B gets `beaten 4` and no King Bob in Bosses; on the fixed build `beaten 5` with King Bob (`acct.mjs`).
+  - **#15:** in a 3-player battle a player reloads mid-battle, rejoins and moves (102 px in 5 s) (`battle2.mjs`).
+- **Clean runs:**
+  - a whole 3-player battle with bots (correct draw card, no errors);
+  - 8 battles back to back: DOM nodes, listeners, heap and textures stay flat (`battles.mjs`);
+  - Part 6's chase for 60 s in full and light mode.
+- **Two false alarms**, both Playwright handles keeping elements alive, not game leaks: an apparent +72 DOM nodes per battle and +410 per level round trip. Heap snapshot retainer chains ended at "DevTools console" handles. With the test fixed, everything is flat.
+
+## If more turns up later (how to add to this)
+- **This PR (#26) stays the single place to start.** Add any new finding to this REPORT.md (table, details, evidence) and its description to PRs.md, then push to `claude/bug-hunt-report`. Don't open another report PR.
+- **New fixes go on new branches stacked on the top of the stack** (currently `claude/perf-music-mixdown`, #25): `claude/fix-<name>` based on the previous top. That gives one PR per fix, with the previous top as its base, and the patch should also apply on its own to `claude/game-base` (check with `git apply --check`).
+- **For each new fix PR:**
+  - a test that shows the bug on `claude/game-base` and the fix on top (node tests in `tests/`, browser scripts in `tests/browser/`, served build as described above);
+  - `tsc --noEmit` and `tsc --noEmit -p tsconfig.server.json` passing;
+  - a fresh-eyes review comment with a verdict.
+- **Performance changes** need measurements before and after, and identical output: pixels, samples, or a call log. No change without a measured win.
 
 ## Performance
 - **#1 `levelPieces`** (terrain outlines, worked out behind the loading screen for each level) uses number keys and flat arrays instead of `"x,y"` strings, plus a numeric `traceCellList`. The output is byte-identical for Parts 1–6 and the arena.
