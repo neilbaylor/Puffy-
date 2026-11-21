@@ -9,7 +9,7 @@ import { loseLife, lives } from '../core/lives';
 import { bank } from '../core/bank';
 import { ART_RES, CARRY_SWING, CHAR_H, CHAR_W, bodyLift, canvas, carryHand } from '../gfx/draw';
 import { wardrobe } from '../core/wardrobe';
-import { ARENA_H, ARENA_W, CROWD_H, FRONT_H, JUMBO, RIBBON, STAGE_OX, STAGE_OY, drawArena, drawArenaFront, drawCrowd, drawCameraFlash, drawRibbonScreen, drawSpotlight, paintCrawl, setArenaStyle, type JumboContent } from '../gfx/hoops';
+import { ARENA_H, ARENA_W, CROWD_H, FRONT_H, JUMBO, RIBBON, STAGE_OX, STAGE_OY, drawArena, drawArenaFront, drawCrowd, drawCameraFlash, drawSpotlight, paintCrawl, setArenaStyle, type JumboContent } from '../gfx/hoops';
 import { PLOP_FRAMES, PLOP_H, PLOP_W, QUEEN_KO_FRAMES, QUEEN_KO_GROUND, QUEEN_KO_H, QUEEN_KO_W, drawPlop, drawQueen, drawQueenKO, type PlopFrame } from '../gfx/plops';
 import { POOWAVE_H, POOWAVE_W, drawPooWave } from '../gfx/plopworld';
 import { drawPoo } from '../gfx/hazards';
@@ -17,7 +17,6 @@ import { drawPrize } from '../gfx/prizes';
 import { STYLES } from '../gfx/handdrawn';
 import { CHAIR_H, CHAIR_W, KING_SEAT, PLOP_DOME, PLOP_DOME_RING, POO_PALACE, POO_PALACE_RING, setRingLook, drawFoldingChair, POST_BOX, PUDDLE, RING, RING_BOX, ROPE_COL, TUNNEL, backX, drawArenaPoo, drawFrontPost, drawRing, drawRingFloor, drawRingside, drawTunnel, wrestleJumboBar, WR_CRAWL, wrestleCrawlAt, wrestleCrawlItems } from '../gfx/wrestle';
 import { HERO_SHEET_M, PCHUTE_DOWN, PCHUTE_RES, PCHUTE_UP, PLOP_PAD, PLOP_RES, PLOP_TOP, addCanvas, hires, makeCarrySheet, makeJetFx, makePlopChutes, makePlops, makeWeaponArt } from '../gfx/textures';
-import { liveCanvas } from '../gfx/liveCanvas';
 import { LedRibbon, LedStrip } from '../gfx/ledStrip';
 import { JumboScreen } from '../gfx/jumboScreen';
 import { BLASTER, SAW, W_RES } from '../gfx/weapons';
@@ -514,9 +513,6 @@ export class WrestleScene extends Phaser.Scene {
   private crowd!: Phaser.GameObjects.Image;
   private excitedUntil = 0;
   private jumboScreen!: JumboScreen;
-  private ribbonTex!: Phaser.Textures.CanvasTexture;
-  /** The ribbon's big-moment screen (shown over the gliding sponsor panels while one is on). */
-  private ribbonMsgImg!: Phaser.GameObjects.Image;
   /** The jumbotron's crawl and the ribbon's sponsor panels, slid along by the graphics chip. */
   private jumboCrawl!: LedStrip;
   private ribbon!: LedRibbon;
@@ -649,8 +645,6 @@ export class WrestleScene extends Phaser.Scene {
     const jk = JUMBO.s * K;
     this.jumboCrawl = new LedStrip(this, 'led-wcrawl', WX(JUMBO.x) + WR_CRAWL.x * jk, WY(JUMBO.y) + WR_CRAWL.y0 * jk, JUMBO.w - WR_CRAWL.x, JUMBO.h - WR_CRAWL.y0, jk, DEPTH_W.dark + 0.051);
     this.ribbon = new LedRibbon(this, WX(RIBBON.x), WY(RIBBON.y), K, DEPTH_W.dark + 0.052);
-    this.ribbonTex = liveCanvas(this.textures, 'wr-ribbon', RIBBON.w * 2, RIBBON.h * 2);
-    this.ribbonMsgImg = this.add.image(WX(RIBBON.x), WY(RIBBON.y), 'wr-ribbon').setOrigin(0).setScale(K / 2).setDepth(DEPTH_W.dark + 0.056).setVisible(false);
     this.add.image(WX(RING_BOX.x), WY(RING_BOX.y), this.tk('wr-ring')).setOrigin(0).setScale(K / RES).setDepth(DEPTH_W.ring);
     this.ringside = this.add.image(WX(-160), WY(500), 'wr-ringside').setOrigin(0).setScale(K / 1.5).setDepth(DEPTH_W.ringside);
     for (const x of [RING.x0, RING.x1])
@@ -1445,13 +1439,9 @@ export class WrestleScene extends Phaser.Scene {
     this.jumboCrawl.place(wrestleCrawlAt(t, this.jumboCrawl.loopWidth));
     const takeover = this.ribbonTakeover();
     this.ribbon.update(t, takeover);
-    this.ribbonMsgImg.setVisible(takeover);
     if (takeover && this.clock >= this.ribbonNext) {
       this.ribbonNext = this.clock + (LIGHT ? 70 : 33);
-      const rctx = this.ribbonTex.getContext();
-      rctx.setTransform(2, 0, 0, 2, 0, 0);
-      drawRibbonScreen(rctx, t, this.ribbonMsg);
-      this.ribbonTex.refresh();
+      this.ribbon.showMsg(t, this.ribbonMsg!);
     }
   }
 

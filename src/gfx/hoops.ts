@@ -1951,23 +1951,9 @@ export function drawRibbonScreen(ctx: Ctx, t: number, msg: { text: string; color
   const age = msg ? t - msg.t0 : Infinity;
   if (msg && age < 2.6) {
     // a full-width takeover: the message chases across, repeated, on a pulsing field
-    const bgc = ctx.createLinearGradient(0, 0, w, 0);
-    bgc.addColorStop(0, msg.bg);
-    bgc.addColorStop(0.5, Math.floor(t * 6) % 2 ? msg.bg : '#000000');
-    bgc.addColorStop(1, msg.bg);
-    ctx.fillStyle = bgc;
-    ctx.fillRect(0, 0, w, h);
-    ctx.font = `400 14px ${DISPLAY_FONT}`;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    const unit = `${msg.text}  ★  `;
-    const uw = ctx.measureText(unit).width;
-    const off = -((t * 260) % uw);
-    ctx.shadowColor = msg.color;
-    ctx.shadowBlur = 6;
-    ctx.fillStyle = msg.color;
-    for (let x = off; x < w; x += uw) ctx.fillText(unit, x, h / 2 + 1);
-    ctx.shadowBlur = 0;
+    paintRibbonMsgField(ctx, msg, ribbonMsgDark(t), h);
+    const uw = ribbonMsgLoop(msg);
+    for (let x = ribbonMsgAt(t, uw); x < w; x += uw) paintRibbonMsgUnit(ctx, msg, x);
   } else {
     // sponsor panels sliding by
     const segW = 230;
@@ -2003,6 +1989,43 @@ export function drawRibbonScreen(ctx: Ctx, t: number, msg: { text: string; color
   ctx.fillStyle = 'rgba(0,0,0,0.2)';
   for (let x = 0; x < w; x += 2.6) ctx.fillRect(x, 0, 0.7, h);
   for (let y = 0; y < h; y += 2.6) ctx.fillRect(0, y, w, 0.7);
+}
+
+/**
+ * A big moment's takeover of the ribbon, in parts (a LedRibbon shows them as layers): the field
+ * behind (all the message's colour, or — every other sixth of a second — dark in the middle), and
+ * the message chasing along, repeated (one loop of it: `ribbonMsgLoop` units).
+ */
+type RibbonMsg = { text: string; color: string; bg: string };
+export const ribbonMsgDark = (t: number) => Math.floor(t * 6) % 2 === 0;
+export function paintRibbonMsgField(ctx: Ctx, msg: RibbonMsg, dark: boolean, h: number) {
+  const bgc = ctx.createLinearGradient(0, 0, RIBBON.w, 0);
+  bgc.addColorStop(0, msg.bg);
+  bgc.addColorStop(0.5, dark ? '#000000' : msg.bg);
+  bgc.addColorStop(1, msg.bg);
+  ctx.fillStyle = bgc;
+  ctx.fillRect(0, 0, RIBBON.w, h);
+}
+const msgUnit = (msg: RibbonMsg) => `${msg.text}  ★  `;
+const MSG_FONT = `400 14px ${DISPLAY_FONT}`;
+export function ribbonMsgLoop(msg: RibbonMsg) {
+  const m = (measurer ??= canvas(4, 4).ctx);
+  m.font = MSG_FONT;
+  return m.measureText(msgUnit(msg)).width;
+}
+/** Where the message's loop starts at time t (units from the ribbon's left; it repeats every `loop`). */
+export const ribbonMsgAt = (t: number, loop: number) => -((t * 260) % loop);
+/** One copy of the message (glowing), starting at x. */
+export function paintRibbonMsgUnit(ctx: Ctx, msg: RibbonMsg, x: number) {
+  ctx.save();
+  ctx.font = MSG_FONT;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = msg.color;
+  ctx.shadowBlur = 6;
+  ctx.fillStyle = msg.color;
+  ctx.fillText(msgUnit(msg), x, RIBBON.h / 2 + 1);
+  ctx.restore();
 }
 
 /** The ribbon's sponsor panels: one loop of them, and its width. */

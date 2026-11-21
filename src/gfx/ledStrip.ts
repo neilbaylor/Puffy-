@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { addCanvas, hires, MAX_TEX } from './textures';
 import type { Ctx } from './draw';
-import { RIBBON, paintRibbonGrid, paintRibbonPanels, paintRibbonSweep, ribbonLoop, ribbonPanelsAt, ribbonSig, ribbonSweepAt } from './hoops';
+import { RIBBON, paintRibbonGrid, paintRibbonMsgField, paintRibbonMsgUnit, paintRibbonPanels, paintRibbonSweep, ribbonLoop, ribbonMsgAt, ribbonMsgDark, ribbonMsgLoop, ribbonPanelsAt, ribbonSig, ribbonSweepAt } from './hoops';
 
 /**
  * A loop of an LED screen's moving content (a ticker's crawl, the ribbon's sponsor panels), drawn
@@ -77,20 +77,22 @@ export function ledStill(scene: Phaser.Scene, key: string, w: number, h: number,
 
 /**
  * The LED ribbon between the decks, in layers: its dark backing, the sponsor panels gliding by (a
- * LedStrip), the light sweep running along it, and the pixel grid over all. Big moments ("KOBE!",
- * "CHAIR! CHAIR!") still take the whole ribbon as a drawn screen (the scene's own canvas, shown
- * over these while one is on).
+ * LedStrip), the light sweep running along it, and the pixel grid over all. A big moment ("CHAIR!
+ * CHAIR!") takes the ribbon over (see showMsg): its field and its message chasing along, layers too.
  */
 export class LedRibbon {
   private back: Phaser.GameObjects.Rectangle;
   private panels: LedStrip;
   private sweep: Phaser.GameObjects.Image;
-  private grid: Phaser.GameObjects.Image;
   private sweepRes: number;
+  // a big moment's takeover: its field (all one colour, or dark in the middle) and its message
+  private msgSolid: Phaser.GameObjects.Rectangle;
+  private msgDark: Phaser.GameObjects.Image;
+  private msgText: LedStrip;
 
   /** (x, y): the ribbon's top-left in the world; k world px per ribbon unit (its sponsors: the arena's look as set). */
   constructor(
-    scene: Phaser.Scene,
+    private scene: Phaser.Scene,
     private x: number,
     y: number,
     private k: number,
@@ -107,24 +109,55 @@ export class LedRibbon {
     this.sweepRes = sw.res;
     this.sweep = scene.add.image(x, y, sw.key).setOrigin(0, 0).setScale(k / sw.res).setDepth(depth + 0.002);
     const g = ledStill(scene, 'led-ribgrid', w, h, (ctx) => paintRibbonGrid(ctx));
-    this.grid = scene.add.image(x, y, g.key).setOrigin(0, 0).setScale(k / g.res).setDepth(depth + 0.003);
+    // (over the big moments' takeovers too: they have the same pixels)
+    scene.add.image(x, y, g.key).setOrigin(0, 0).setScale(k / g.res).setDepth(depth + 0.003);
+    this.msgSolid = scene.add.rectangle(x, y, w * k, h * k, 0).setOrigin(0, 0).setDepth(depth + 0.0005).setVisible(false);
+    this.msgDark = scene.add.image(x, y, '__WHITE').setOrigin(0, 0).setDepth(depth + 0.0006).setVisible(false);
+    this.msgText = new LedStrip(scene, 'led-msg', x, y, w, h, k, depth + 0.0015);
+    this.msgText.setVisible(false);
   }
 
   /** The layers moved to time t; hidden while a big moment has the ribbon (`takeover`). */
   update(t: number, takeover: boolean) {
     const on = !takeover;
     this.back.setVisible(on);
-    this.grid.setVisible(on);
     this.panels.setVisible(on);
     if (!on) {
       this.sweep.setVisible(false);
       return;
     }
+    this.msgSolid.setVisible(false);
+    this.msgDark.setVisible(false);
+    this.msgText.setVisible(false);
     this.panels.place(ribbonPanelsAt(t));
     const sx = ribbonSweepAt(t);
     const a = Math.max(0, -sx);
     const b = Math.min(120, RIBBON.w - sx);
     if (b <= a) this.sweep.setVisible(false);
     else this.sweep.setVisible(true).setPosition(this.x + sx * this.k, this.sweep.y).setCrop(a * this.sweepRes, 0, (b - a) * this.sweepRes, Math.ceil(RIBBON.h * this.sweepRes));
+  }
+
+  /**
+   * A big moment has the ribbon (while `update` is told so): it as it is at time t — the field, and
+   * the message chasing along (one loop of it drawn once, slid by the graphics chip). The scene
+   * calls this as often as it used to draw the whole ribbon and send it to the chip (30 times a second).
+   */
+  showMsg(t: number, msg: { text: string; color: string; bg: string }) {
+    const { w, h } = RIBBON;
+    const dark = ribbonMsgDark(t);
+    this.msgSolid.setFillStyle(Phaser.Display.Color.HexStringToColor(msg.bg).color).setVisible(!dark);
+    if (dark) {
+      // (the field only changes from side to side: one row of it, stretched)
+      const key = `led-msgfield-${msg.bg}`;
+      const field = ledStill(this.scene, key, w, 1, (ctx) => paintRibbonMsgField(ctx, msg, true, 1));
+      this.msgDark.setTexture(key).setScale(this.k / field.res, (h * this.k) / field.res).setVisible(true);
+    } else this.msgDark.setVisible(false);
+    // (each copy's glow reaches into the next: the loop is drawn with its neighbours' too)
+    this.msgText.paint(`${msg.text}|${msg.color}`, () => ribbonMsgLoop(msg), (ctx) => {
+      const uw = ribbonMsgLoop(msg);
+      for (const x of [-uw, 0, uw]) paintRibbonMsgUnit(ctx, msg, x);
+    });
+    this.msgText.setVisible(true);
+    this.msgText.place(ribbonMsgAt(t, this.msgText.loopWidth));
   }
 }
