@@ -354,3 +354,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.349: Slow devices are spotted properly now; the home screen's speed shows next to the version number, and tapping the version switches between full and light mode.
 - v0.350: Light mode kicks in more readily on slower devices.
 - v0.351: Hidden helper links for testing light mode on a device.
+- v0.352: Fixed the wrestling fights crashing when the fight starts.
