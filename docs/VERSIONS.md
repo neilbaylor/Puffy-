@@ -361,3 +361,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.356: A test copy of the game on the new Phaser 4 engine at /p4/; the waves at King Bob's fishing boat show again; small fixes to the hero's fainting and rope-climbing pictures.
 - v0.357: The scoreboards and ticker ribbons in the basketball and wrestling arenas are much cheaper to run, and their scrolling text now glides smoothly.
 - v0.358: The Boss Battles menu centres a lone boss (or the last odd one) on phones.
+- v0.359: The game now runs on the Phaser 4 engine: smoother on phones and tablets.
