@@ -164,22 +164,29 @@ export class JumboScreen {
 
 /** A small part of a screen that changes on its own: a little picture of its own, redrawn only when it changes. */
 class Bit {
-  private tex: Phaser.Textures.CanvasTexture;
-  private img: Phaser.GameObjects.Image;
+  // (made the first time it's shown: the wrestling ring's screen never shows a scoreboard)
+  private tex: Phaser.Textures.CanvasTexture | null = null;
+  private img: Phaser.GameObjects.Image | null = null;
   private sig: string | null = null;
 
-  constructor(scene: Phaser.Scene, key: string, private box: Box, at: { x: number; y: number; k: number }, depth: number) {
-    this.tex = liveCanvas(scene.textures, key, box.w * R, box.h * R);
-    this.img = scene.add.image(at.x + box.x * at.k, at.y + box.y * at.k, key).setOrigin(0, 0).setScale(at.k / R).setDepth(depth).setVisible(false);
-  }
+  constructor(
+    private scene: Phaser.Scene,
+    private key: string,
+    private box: Box,
+    private at: { x: number; y: number; k: number },
+    private depth: number,
+  ) {}
 
   /** Shown as `draw` draws it (in screen units: only its box shows), redrawn when `sig` changes; null hides it. */
   set(sig: string | null, draw: (ctx: Ctx) => void) {
     if (sig === null) {
-      this.img.setVisible(false);
+      this.img?.setVisible(false);
       this.sig = null;
       return;
     }
+    const { box, at } = this;
+    this.tex ??= liveCanvas(this.scene.textures, this.key, box.w * R, box.h * R);
+    this.img ??= this.scene.add.image(at.x + box.x * at.k, at.y + box.y * at.k, this.key).setOrigin(0, 0).setScale(at.k / R).setDepth(this.depth);
     this.img.setVisible(true);
     if (sig === this.sig) return;
     this.sig = sig;
@@ -187,10 +194,9 @@ class Bit {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, this.tex.width, this.tex.height);
     ctx.save();
-    ctx.setTransform(R, 0, 0, R, -this.box.x * R, -this.box.y * R);
+    ctx.setTransform(R, 0, 0, R, -box.x * R, -box.y * R);
     draw(ctx);
     ctx.restore();
     this.tex.refresh();
   }
 }
-
