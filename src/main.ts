@@ -60,13 +60,53 @@ function bootTrouble(msg: string) {
 }
 window.addEventListener('error', (e) => bootTrouble(e.message || String(e.error)));
 window.addEventListener('unhandledrejection', (e) => bootTrouble(String((e.reason as Error)?.message ?? e.reason)));
+/**
+ * The size of the page. Opened from the iOS home screen in landscape, the page is sometimes told it's
+ * a strip shorter than the screen (the portrait status bar's height) and no resize ever comes: the
+ * game was drawn that much short, with a band of the page's blue under it. A home-screen app fills
+ * the whole screen, so there: as wide as the screen but a little short → the screen's height, and
+ * the page's own boxes stretched to match (cleared again if iOS puts it right).
+ */
+const iosApp = (navigator as Navigator & { standalone?: boolean }).standalone === true;
+let tallFix = -1;
+function viewSize() {
+  const w = window.innerWidth;
+  let h = window.innerHeight;
+  if (iosApp) {
+    const long = Math.max(screen.width, screen.height);
+    const short = Math.min(screen.width, screen.height);
+    const sw = w > h ? long : short;
+    const sh = w > h ? short : long;
+    if (Math.abs(w - sw) <= 2 && h < sh && sh - h <= 64) h = sh;
+    const fix = h > window.innerHeight ? h : 0;
+    if (fix !== tallFix) {
+      tallFix = fix;
+      const px = fix ? `${fix}px` : '';
+      document.documentElement.style.height = px;
+      document.body.style.height = px;
+      for (const id of ['game', 'ui']) {
+        const el = document.getElementById(id);
+        if (el) {
+          el.style.height = px;
+          el.style.bottom = fix ? 'auto' : '';
+        }
+      }
+    }
+  }
+  return { w, h };
+}
 const dpr = () => {
-  const big = Math.min(window.innerWidth, window.innerHeight) >= 700;
+  const { w: vw, h: vh } = viewSize();
+  const big = Math.min(vw, vh) >= 700;
   let r = Math.min(window.devicePixelRatio || 1, big ? 1.75 : 2);
   if (resCap) r = Math.min(r, resCap);
   return home ? Math.min(r, HOME_RES) : r;
 };
-const size = () => ({ w: Math.max(1, Math.round(window.innerWidth * dpr())), h: Math.max(1, Math.round(window.innerHeight * dpr())) });
+const size = () => {
+  const { w, h } = viewSize();
+  const r = dpr();
+  return { w: Math.max(1, Math.round(w * r)), h: Math.max(1, Math.round(h * r)) };
+};
 
 /**
  * Frame rate: everything runs at 60 fps, the rate the game is tuned for and
@@ -141,11 +181,22 @@ function start(refreshMs: number) {
 
   const resize = () => {
     const s = size();
+    const z = 1 / dpr();
+    if (s.w === game.scale.width && s.h === game.scale.height && z === game.scale.zoom) return;
     game.scale.resize(s.w, s.h);
-    game.scale.setZoom(1 / dpr());
+    game.scale.setZoom(z);
   };
   window.addEventListener('resize', resize);
   window.addEventListener('orientationchange', () => setTimeout(resize, 200));
+  // (iOS can put the page's size right later without saying so: look again a few times after
+  // opening and on coming back — resizing to the same size does nothing)
+  if (iosApp) {
+    for (const ms of [300, 1000, 2500]) setTimeout(resize, ms);
+    window.addEventListener('pageshow', () => setTimeout(resize, 100));
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') setTimeout(resize, 100);
+    });
+  }
 
   // start screen on → its lower resolution; off (Play, a boss, Battle) → gameplay's. (Clicking
   // Play stops the start screen straight away, before the next scene is built, so the switch costs
