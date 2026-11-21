@@ -1457,6 +1457,8 @@ html.rotating body {
   .boss-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 6px 0 10px; }
   .boss-btn { padding: 7px 10px 6px; font-size: clamp(14px, 4.6vh, 18px); }
   .boss-btn small { font-size: 10px; }
+  /* (an odd one out at the end — or the only one — centred, not left alone in the left column) */
+  .boss-btn:last-child:nth-child(odd) { grid-column: 1 / -1; justify-self: center; width: calc(50% - 5px); }
 }
 .lvl small {
   font: 800 10px/1.2 var(--body);
