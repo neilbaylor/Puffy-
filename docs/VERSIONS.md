@@ -355,3 +355,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.350: Light mode kicks in more readily on slower devices.
 - v0.351: Hidden helper links for testing light mode on a device.
 - v0.352: Fixed the wrestling fights crashing when the fight starts.
+- v0.353: A batch of bug fixes: a server security hole, progress on new devices, battle rejoin after a reload, paused-game taps in Hoops/Fishing, Part 5 King Bob's silent intro, a stuck blaster, football running out of balls, faster loading and music.
