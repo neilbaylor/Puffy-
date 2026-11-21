@@ -62,22 +62,29 @@ window.addEventListener('error', (e) => bootTrouble(e.message || String(e.error)
 window.addEventListener('unhandledrejection', (e) => bootTrouble(String((e.reason as Error)?.message ?? e.reason)));
 /**
  * The size of the page. Opened from the iOS home screen in landscape, the page is sometimes told it's
- * a strip shorter than the screen (the portrait status bar's height) and no resize ever comes: the
- * game was drawn that much short, with a band of the page's blue under it. A home-screen app fills
- * the whole screen, so there: as wide as the screen but a little short → the screen's height, and
- * the page's own boxes stretched to match (cleared again if iOS puts it right).
+ * shorter than the screen — by the status bar's height, or more (up to a sixth of it on an iPhone with
+ * the Dynamic Island) — and no resize ever comes: the game was drawn that much short, with a band of
+ * the page's blue under it. A home-screen app on an iPhone always fills the whole screen, so there
+ * it's simply the screen's size (the right way round); on an iPad (which can share the screen) only
+ * when it's as wide as the screen and a little short. The page's own boxes are stretched to match
+ * (and let go again if iOS puts it right).
  */
 const iosApp = (navigator as Navigator & { standalone?: boolean }).standalone === true;
+const iPhone = /iPhone|iPod/.test(navigator.userAgent);
 let tallFix = -1;
 function viewSize() {
-  const w = window.innerWidth;
+  let w = window.innerWidth;
   let h = window.innerHeight;
+  const told = `${w}×${h} (screen ${screen.width}×${screen.height}${iosApp ? ', home-screen app' : ''})`;
   if (iosApp) {
     const long = Math.max(screen.width, screen.height);
     const short = Math.min(screen.width, screen.height);
     const sw = w > h ? long : short;
     const sh = w > h ? short : long;
-    if (Math.abs(w - sw) <= 2 && h < sh && sh - h <= 64) h = sh;
+    if (iPhone) {
+      w = sw;
+      h = sh;
+    } else if (Math.abs(w - sw) <= 2 && h < sh && sh - h <= 120) h = sh;
     const fix = h > window.innerHeight ? h : 0;
     if (fix !== tallFix) {
       tallFix = fix;
@@ -93,6 +100,7 @@ function viewSize() {
       }
     }
   }
+  diag.view = `told ${told} · using ${w}×${h}`;
   return { w, h };
 }
 const dpr = () => {

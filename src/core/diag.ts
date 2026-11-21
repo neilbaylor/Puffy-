@@ -5,7 +5,7 @@ import { VERSION } from '../version';
  * A hidden diagnostics box (only with `?diag` in the address): what the light-mode checks saw on
  * this device. For working out why a device is (or isn't) in light mode; players never see it.
  */
-export const diag = { home: 'not started', check: '', refresh: '' };
+export const diag = { home: 'not started', check: '', refresh: '', view: '' };
 
 export function showDiag() {
   let on = false;
@@ -40,6 +40,7 @@ export function showDiag() {
       `v${VERSION} · ${LIGHT ? 'LIGHT' : 'FULL'} mode · saved: ${key}`,
       `memory: ${nav.deviceMemory ?? '?'} GB · cores: ${nav.hardwareConcurrency ?? '?'} · max picture: ${maxTex || '?'}`,
       `screen: ${innerWidth}×${innerHeight} @${devicePixelRatio} · refresh: ${diag.refresh}`,
+      `page size: ${diag.view}`,
       `auto check: ${diag.check}`,
       `home screen: ${diag.home}`,
     ].join('\n');
