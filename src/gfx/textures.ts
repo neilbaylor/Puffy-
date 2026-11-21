@@ -112,6 +112,13 @@ export function addCanvas(
   return tex;
 }
 
+/**
+ * For pictures only ever shown as images (props, particles, the bad guys' weapons…): their canvas's own
+ * pixels let go once they're on the graphics chip, as the frame sheets' are — not kept for nothing.
+ * (Not for tile sprites, which need them, nor the pictures that are redrawn: see liveCanvas.)
+ */
+const REL = { release: true };
+
 /** Free textures whose keys start with `prefix` (e.g. the terrain of a level we left). */
 export function dropTextures(scene: Phaser.Scene, prefix: string) {
   for (const k of scene.textures.getTextureKeys()) if (k.startsWith(prefix)) scene.textures.remove(k);
@@ -351,10 +358,10 @@ export function makeFishFrames(scene: Phaser.Scene, key: string, kind: FishKind,
 /** The bad guys' weapons: blaster, chainsaw, ball and chain, and the blaster's pom-poms (only what's missing). */
 export function makeWeaponArt(scene: Phaser.Scene) {
   const st = STYLES[ART_STYLE];
-  if (!scene.textures.exists('w-blaster')) addCanvas(scene, 'w-blaster', hires(BLASTER.w, BLASTER.h, W_RES, (ctx) => drawBlaster(ctx, st)));
+  if (!scene.textures.exists('w-blaster')) addCanvas(scene, 'w-blaster', hires(BLASTER.w, BLASTER.h, W_RES, (ctx) => drawBlaster(ctx, st)), undefined, REL);
   if (!scene.textures.exists('w-saw')) sheet(scene, 'w-saw', SAW.w, SAW.h, ['s0', 's1'] as const, (ctx, f) => drawChainsaw(ctx, st, f === 's0' ? 0 : 1), W_RES);
   if (!scene.textures.exists('w-ball')) sheet(scene, 'w-ball', 30, 30, ['open', 'shut'] as const, (ctx, f) => drawFlailBall(ctx, st, f === 'open'), W_RES);
-  if (!scene.textures.exists('w-bullet')) addCanvas(scene, 'w-bullet', hires(18, 18, W_RES, (ctx) => drawBullet(ctx, st)));
+  if (!scene.textures.exists('w-bullet')) addCanvas(scene, 'w-bullet', hires(18, 18, W_RES, (ctx) => drawBullet(ctx, st)), undefined, REL);
 }
 
 /** The bad guys, as separate pieces (so they can be drawn a bit at a time). */
@@ -373,7 +380,7 @@ function baddiePieces(scene: Phaser.Scene): { name: string; run: () => void }[] 
           drawGoat(ctx, 0, 0, f, st);
           drawPooOnGoat(ctx, f);
         });
-        addCanvas(scene, 'spit', hires(36, 14, ART_RES, (ctx) => drawSpit(ctx, 24, 7, st)));
+        addCanvas(scene, 'spit', hires(36, 14, ART_RES, (ctx) => drawSpit(ctx, 24, 7, st)), undefined, REL);
       },
     },
     {
@@ -421,14 +428,14 @@ export function makeChaseArt(scene: Phaser.Scene) {
   const res = LIGHT ? 1.5 : 2.5;
   for (const k of PACK_KINDS) if (!T.exists(`fish6-${k}`)) sheet(scene, `fish6-${k}`, FISH_SIZE[k].w, FISH_SIZE[k].h, CHASE_FRAMES, (ctx, f) => drawFish(ctx, 0, 0, k, f, st), res);
   if (!T.exists('fish6-fat')) sheet(scene, 'fish6-fat', FISH_SIZE.fat.w, FISH_SIZE.fat.h, SWIM_FRAMES.filter((_, i) => i % 2 === 0), (ctx, f) => drawFish(ctx, 0, 0, 'fat', f, st), LIGHT ? 1.2 : 1.8);
-  if (!T.exists('chase-sign')) addCanvas(scene, 'chase-sign', hires(SIGN.w, SIGN.h, 3, (ctx) => drawFallSign(ctx)));
+  if (!T.exists('chase-sign')) addCanvas(scene, 'chase-sign', hires(SIGN.w, SIGN.h, 3, (ctx) => drawFallSign(ctx)), undefined, REL);
   if (!T.exists('chase-col')) addCanvas(scene, 'chase-col', hires(COLUMN.w, COLUMN.h, 1, (ctx) => drawDangerColumn(ctx)));
-  if (!T.exists('chase-target')) addCanvas(scene, 'chase-target', hires(TARGET.w, TARGET.h, 2, (ctx) => drawSurfaceTarget(ctx)));
-  if (!T.exists('chase-streaks')) addCanvas(scene, 'chase-streaks', hires(STREAKS.w, STREAKS.h, 1.5, (ctx) => drawFallStreaks(ctx)));
-  if (!T.exists('chase-wake')) addCanvas(scene, 'chase-wake', hires(WAKE.w, WAKE.h, 1.5, (ctx) => drawPackWake(ctx)));
-  if (!T.exists('chase-edge')) addCanvas(scene, 'chase-edge', hires(EDGE.w, EDGE.h, 1, (ctx) => drawEdgeGlow(ctx)));
-  if (!T.exists('chase-shadow')) addCanvas(scene, 'chase-shadow', hires(SHADOW.w, SHADOW.h, 1, (ctx) => drawBedShadow(ctx)));
-  if (!T.exists('chase-badge')) addCanvas(scene, 'chase-badge', hires(BADGE.w, BADGE.h, 2, (ctx) => drawBehindBadge(ctx)));
+  if (!T.exists('chase-target')) addCanvas(scene, 'chase-target', hires(TARGET.w, TARGET.h, 2, (ctx) => drawSurfaceTarget(ctx)), undefined, REL);
+  if (!T.exists('chase-streaks')) addCanvas(scene, 'chase-streaks', hires(STREAKS.w, STREAKS.h, 1.5, (ctx) => drawFallStreaks(ctx)), undefined, REL);
+  if (!T.exists('chase-wake')) addCanvas(scene, 'chase-wake', hires(WAKE.w, WAKE.h, 1.5, (ctx) => drawPackWake(ctx)), undefined, REL);
+  if (!T.exists('chase-edge')) addCanvas(scene, 'chase-edge', hires(EDGE.w, EDGE.h, 1, (ctx) => drawEdgeGlow(ctx)), undefined, REL);
+  if (!T.exists('chase-shadow')) addCanvas(scene, 'chase-shadow', hires(SHADOW.w, SHADOW.h, 1, (ctx) => drawBedShadow(ctx)), undefined, REL);
+  if (!T.exists('chase-badge')) addCanvas(scene, 'chase-badge', hires(BADGE.w, BADGE.h, 2, (ctx) => drawBehindBadge(ctx)), undefined, REL);
   // the pier's Ferris wheel: the wheel (it turns), its stand, the gondolas
   const fr = LIGHT ? 1.25 : 2;
   if (!T.exists('ferris-wheel')) addCanvas(scene, 'ferris-wheel', hires(FERRIS_SIZE, FERRIS_SIZE, fr, (ctx) => drawFerrisWheel(ctx)), undefined, { release: true });
@@ -479,12 +486,12 @@ export function makePlops(scene: Phaser.Scene, kind: PlopKind) {
   });
   addCanvas(scene, key, c, (t) => PLOP_FRAMES.forEach((f, i) => t.add(f, 0, g.x(i), g.y(i), fw, fh)), { release: true });
   if (!scene.textures.exists('poo')) {
-    addCanvas(scene, 'poo', hires(26, 24, ART_RES, (ctx2) => drawPoo(ctx2, 13, 22, 1)));
+    addCanvas(scene, 'poo', hires(26, 24, ART_RES, (ctx2) => drawPoo(ctx2, 13, 22, 1)), undefined, REL);
     sheet(scene, 'poowave', POOWAVE_W, POOWAVE_H, ['w0', 'w1', 'w2', 'w3'] as const, (ctx2, f) => drawPooWave(ctx2, +f[1]), 3);
-    addCanvas(scene, 'stink', hires(12, 26, 2, (ctx2) => drawStink(ctx2)));
+    addCanvas(scene, 'stink', hires(12, 26, 2, (ctx2) => drawStink(ctx2)), undefined, REL);
     // beach volleyball (Plop Invasion's mid-level match)
-    addCanvas(scene, 'volleyball', hires(26, 26, ART_RES, (ctx2) => drawVolleyball(ctx2, 13, 13, 11)));
-    addCanvas(scene, 'volleynet', hires(20, 112, 3, (ctx2) => drawVolleyNetSide(ctx2, 20, 108, 66)));
+    addCanvas(scene, 'volleyball', hires(26, 26, ART_RES, (ctx2) => drawVolleyball(ctx2, 13, 13, 11)), undefined, REL);
+    addCanvas(scene, 'volleynet', hires(20, 112, 3, (ctx2) => drawVolleyNetSide(ctx2, 20, 108, 66)), undefined, REL);
   }
 }
 
@@ -494,9 +501,9 @@ function itemParts(scene: Phaser.Scene, pal: WorldPalette): (() => void)[] {
   const st = STYLES[ART_STYLE];
   return [
     () => {
-    addCanvas(scene, 'aura', hires(48, 48, ART_RES, (ctx) => drawAura(ctx, 24, 25, 10.5)));
-    addCanvas(scene, 'soccerball', hires(28, 28, ART_RES, (ctx) => drawSoccerBall(ctx, 14, 14, 11)));
-    addCanvas(scene, 'soccerball-big', hires(44, 44, ART_RES, (ctx) => drawSoccerBall(ctx, 22, 22, 17)));
+    addCanvas(scene, 'aura', hires(48, 48, ART_RES, (ctx) => drawAura(ctx, 24, 25, 10.5)), undefined, REL);
+    addCanvas(scene, 'soccerball', hires(28, 28, ART_RES, (ctx) => drawSoccerBall(ctx, 14, 14, 11)), undefined, REL);
+    addCanvas(scene, 'soccerball-big', hires(44, 44, ART_RES, (ctx) => drawSoccerBall(ctx, 22, 22, 17)), undefined, REL);
     // giant's ground shockwave: a curling crest of dust (faces right)
     addCanvas(
       scene,
@@ -519,28 +526,30 @@ function itemParts(scene: Phaser.Scene, pal: WorldPalette): (() => void)[] {
         st.line(ctx, [[14, 26], [24, 16], [34, 14]], 2102, 0.7, '#fff6c8');
         st.line(ctx, [[26, 28], [36, 20], [44, 19]], 2103, 0.7, '#fff6c8');
       }),
+      undefined,
+      REL,
     );
     sheet(scene, 'flame', FLAME_W, FLAME_H, FLAME_FRAMES, (ctx, f) => (f[0] === 'd' ? drawDyingFlame(ctx, +f[1]) : drawFlame(ctx, +f[1])));
     },
     () => {
-    addCanvas(scene, 'scorch', hires(64, 16, PROP_RES, (ctx) => drawScorch(ctx)));
-    addCanvas(scene, 'chute', hires(64, 60, ART_RES, (ctx) => drawParachute(ctx)));
-    addCanvas(scene, 'hstick', hires(40, 40, ART_RES, (ctx) => drawStick(ctx)));
-    addCanvas(scene, 'puck', hires(18, 14, ART_RES, (ctx) => drawPuck(ctx, 9, 8, PUCK_R_ART)));
-    addCanvas(scene, 'hockeynet', hires(64, 44, PROP_RES, (ctx) => drawHockeyNet(ctx, 4, 40, 44, 30)));
-    addCanvas(scene, 'nuggie', hires(40, 34, ART_RES, (ctx) => drawNuggie(ctx, 20, 17, 11)));
-    addCanvas(scene, 'rootbeer', hires(30, 40, ART_RES, (ctx) => drawRootBeer(ctx, 15, 38, 34)));
-    addCanvas(scene, 'rocket', hires(30, 16, ART_RES, (ctx) => drawRocket(ctx, st, 15, 8)));
-    addCanvas(scene, 'flash', hires(40, 32, ART_RES, (ctx) => drawMuzzleFlash(ctx, st, 20, 16, 12)));
-    addCanvas(scene, 'boulder', hires(36, 36, PROP_RES, (ctx) => drawBoulder(ctx, 2, 2, pal, 7)));
-    addCanvas(scene, 'boulder2', hires(36, 36, PROP_RES, (ctx) => drawBoulder(ctx, 2, 2, pal, 19)));
-    addCanvas(scene, 'bramble', hires(36, 34, PROP_RES, (ctx) => drawBramble(ctx, 2, 32, pal, 3)));
-    addCanvas(scene, 'bramble2', hires(36, 34, PROP_RES, (ctx) => drawBramble(ctx, 2, 32, pal, 11)));
+    addCanvas(scene, 'scorch', hires(64, 16, PROP_RES, (ctx) => drawScorch(ctx)), undefined, REL);
+    addCanvas(scene, 'chute', hires(64, 60, ART_RES, (ctx) => drawParachute(ctx)), undefined, REL);
+    addCanvas(scene, 'hstick', hires(40, 40, ART_RES, (ctx) => drawStick(ctx)), undefined, REL);
+    addCanvas(scene, 'puck', hires(18, 14, ART_RES, (ctx) => drawPuck(ctx, 9, 8, PUCK_R_ART)), undefined, REL);
+    addCanvas(scene, 'hockeynet', hires(64, 44, PROP_RES, (ctx) => drawHockeyNet(ctx, 4, 40, 44, 30)), undefined, REL);
+    addCanvas(scene, 'nuggie', hires(40, 34, ART_RES, (ctx) => drawNuggie(ctx, 20, 17, 11)), undefined, REL);
+    addCanvas(scene, 'rootbeer', hires(30, 40, ART_RES, (ctx) => drawRootBeer(ctx, 15, 38, 34)), undefined, REL);
+    addCanvas(scene, 'rocket', hires(30, 16, ART_RES, (ctx) => drawRocket(ctx, st, 15, 8)), undefined, REL);
+    addCanvas(scene, 'flash', hires(40, 32, ART_RES, (ctx) => drawMuzzleFlash(ctx, st, 20, 16, 12)), undefined, REL);
+    addCanvas(scene, 'boulder', hires(36, 36, PROP_RES, (ctx) => drawBoulder(ctx, 2, 2, pal, 7)), undefined, REL);
+    addCanvas(scene, 'boulder2', hires(36, 36, PROP_RES, (ctx) => drawBoulder(ctx, 2, 2, pal, 19)), undefined, REL);
+    addCanvas(scene, 'bramble', hires(36, 34, PROP_RES, (ctx) => drawBramble(ctx, 2, 32, pal, 3)), undefined, REL);
+    addCanvas(scene, 'bramble2', hires(36, 34, PROP_RES, (ctx) => drawBramble(ctx, 2, 32, pal, 11)), undefined, REL);
     },
     () => {
     sheet(scene, 'bloom', 64, 104, ['off', 'on'] as const, (ctx, f) => drawBloom(ctx, 32, 102, f === 'on'), PROP_RES);
-    addCanvas(scene, 'gate', hires(130, 130, PROP_RES, (ctx) => drawGate(ctx, 65, 126, pal)));
-    addCanvas(scene, 'gate-swirl', hires(90, 90, PROP_RES, (ctx) => drawGateSwirl(ctx, 45, 45, 42)));
+    addCanvas(scene, 'gate', hires(130, 130, PROP_RES, (ctx) => drawGate(ctx, 65, 126, pal)), undefined, REL);
+    addCanvas(scene, 'gate-swirl', hires(90, 90, PROP_RES, (ctx) => drawGateSwirl(ctx, 45, 45, 42)), undefined, REL);
     sheet(scene, 'flower', 16, 24, ['f0', 'f1', 'f2', 'f3'] as const, (ctx, f) => drawFlower(ctx, 8, 23, pal.flowers[+f[1]], 30 + +f[1]), PROP_RES);
     sheet(scene, 'poopile', 24, 26, ['p0', 'p1', 'p2', 'p3'] as const, (ctx, f) => drawPooPile(ctx, 12, 25, +f[1]), PROP_RES);
     addCanvas(
@@ -556,6 +565,8 @@ function itemParts(scene: Phaser.Scene, pal: WorldPalette): (() => void)[] {
           ctx.fill();
         }
       }),
+      undefined,
+      REL,
     );
     },
     () => {
@@ -568,14 +579,14 @@ function itemParts(scene: Phaser.Scene, pal: WorldPalette): (() => void)[] {
       g.addColorStop(1, '#ffffff00');
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, size, size);
-      addCanvas(scene, key, c);
+      addCanvas(scene, key, c, undefined, REL);
     };
     soft('puff', 32);
     soft('glow', 64);
     {
       const { c, ctx } = canvas(64, 64);
       ellipse(ctx, 32, 32, 31, 31, '#ffffff');
-      addCanvas(scene, 'disc', c);
+      addCanvas(scene, 'disc', c, undefined, REL);
     }
     {
       const { c, ctx } = canvas(128, 128);
@@ -584,12 +595,12 @@ function itemParts(scene: Phaser.Scene, pal: WorldPalette): (() => void)[] {
       ctx.beginPath();
       ctx.arc(64, 64, 60, 0, Math.PI * 2);
       ctx.stroke();
-      addCanvas(scene, 'ring', c);
+      addCanvas(scene, 'ring', c, undefined, REL);
     }
     {
       const { c, ctx } = canvas(10, 10);
       ellipse(ctx, 5, 5, 4.5, 4.5, '#ffffff');
-      addCanvas(scene, 'spark', c);
+      addCanvas(scene, 'spark', c, undefined, REL);
     }
     {
       const { c, ctx } = canvas(24, 24);
@@ -605,7 +616,7 @@ function itemParts(scene: Phaser.Scene, pal: WorldPalette): (() => void)[] {
       };
       star(11, '#3a2418');
       star(8.5, '#ffe14d');
-      addCanvas(scene, 'star', c);
+      addCanvas(scene, 'star', c, undefined, REL);
     }
     {
       // rock chips for blasted boulders
@@ -626,7 +637,7 @@ function itemParts(scene: Phaser.Scene, pal: WorldPalette): (() => void)[] {
       ctx.lineTo(10, 10.8);
       ctx.lineTo(4.5, 11.5);
       ctx.fill();
-      addCanvas(scene, 'chip', c);
+      addCanvas(scene, 'chip', c, undefined, REL);
     }
     },
   ];
@@ -820,7 +831,7 @@ export function gameArtJobs(scene: Phaser.Scene, opts: { heroes: readonly string
       run: () => {
         for (const team of ['red', 'orange'] as const) if (!T.exists(`tcrab-${team}`)) sheet(scene, `tcrab-${team}`, TCRAB_W, TCRAB_H, TCRAB_FRAMES, (ctx, f) => drawTennisCrab(ctx, f, team), 2.5);
         if (!T.exists('clam')) sheet(scene, 'clam', CLAM_W, CLAM_H, CLAM_FRAMES, (ctx, f) => drawClam(ctx, f), 3);
-        if (!T.exists('tennisnet')) addCanvas(scene, 'tennisnet', hires(NET_W, NET_CELL_H, 3, (ctx) => drawTennisNet(ctx)));
+        if (!T.exists('tennisnet')) addCanvas(scene, 'tennisnet', hires(NET_W, NET_CELL_H, 3, (ctx) => drawTennisNet(ctx)), undefined, REL);
       },
     });
   if (want.includes('chase') && !BADDIE_KEYS.chase.every((k) => T.exists(k))) out.push({ name: 'the chase', run: () => makeChaseArt(scene) });
@@ -952,7 +963,7 @@ export function ensureSeaArt(scene: Phaser.Scene) {
   sheet(scene, 'sea-turtle', TURTLE_W, TURTLE_H, TURTLE_FRAMES, (ctx, f) => drawTurtle(ctx, f), 1.5);
   sheet(scene, 'sea-crab', CRAB_W, CRAB_H, CRAB_FRAMES, (ctx, f) => drawCrab(ctx, f), 2);
   sheet(scene, 'sea-octo', OCTO_W, OCTO_H, OCTO_FRAMES, (ctx, f) => drawOctopus(ctx, f), 1);
-  addCanvas(scene, 'sea-bubble', hires(16, 16, 2, (ctx) => drawSeaBubble(ctx)));
+  addCanvas(scene, 'sea-bubble', hires(16, 16, 2, (ctx) => drawSeaBubble(ctx)), undefined, REL);
   // the dark of the deep, with a soft pool of light round the hero (their diving lamp)
   addCanvas(
     scene,
@@ -966,6 +977,8 @@ export function ensureSeaArt(scene: Phaser.Scene) {
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, 256, 256);
     }),
+    undefined,
+    REL,
   );
   addCanvas(scene, 'sea-ray', hires(64, 256, 0.5, (ctx) => drawLightRay(ctx)), undefined, { release: true });
   addCanvas(scene, 'sea-sky', hires(1024, 160, BG_RES, (ctx) => drawSeaSky(ctx, 1024, 160)), undefined, { release: true });
@@ -980,8 +993,8 @@ export function makeBallpark(scene: Phaser.Scene) {
   const W = w + END * 2;
   if (!scene.textures.exists('bbpark-back')) addCanvas(scene, 'bbpark-back', hires(W, BACK_UP, Math.min(1.5, FIELD_RES), (ctx) => drawBallparkBack(ctx, w, [3, 2])), undefined, { release: true });
   if (!scene.textures.exists('bbpark-front')) addCanvas(scene, 'bbpark-front', hires(W, FRONT_UP + BAND_BOT, FIELD_RES, (ctx) => drawBallparkFront(ctx, w)), undefined, { release: true });
-  if (!scene.textures.exists('bb-ball')) addCanvas(scene, 'bb-ball', hires(14, 14, ART_RES, (ctx) => drawBaseball(ctx, 7, 7, 5.5)));
-  if (!scene.textures.exists('bb-drive')) addCanvas(scene, 'bb-drive', hires(64, 16, ART_RES, (ctx) => drawLineDrive(ctx, 55, 8, 5.5, 1)));
+  if (!scene.textures.exists('bb-ball')) addCanvas(scene, 'bb-ball', hires(14, 14, ART_RES, (ctx) => drawBaseball(ctx, 7, 7, 5.5)), undefined, REL);
+  if (!scene.textures.exists('bb-drive')) addCanvas(scene, 'bb-drive', hires(64, 16, ART_RES, (ctx) => drawLineDrive(ctx, 55, 8, 5.5, 1)), undefined, REL);
 }
 
 /**
