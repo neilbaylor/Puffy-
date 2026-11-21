@@ -19,6 +19,12 @@ const emitWarning = process.emitWarning;
 process.emitWarning = (w, ...rest) => (/SQLite/.test(String(w?.message ?? w)) ? undefined : emitWarning.call(process, w, ...rest));
 
 const ROOT = resolve('dist');
+/**
+ * The Phaser 4 trial: the game built on Phaser 4 (branch claude/phaser4-trial, `npm run build:p4`),
+ * committed in trials/p4 and served at /p4/ beside the real game. Its songs and fonts are the very
+ * same files as the real game's (same names), so any it hasn't got come from dist/assets.
+ */
+const TRIAL = resolve('trials/p4');
 const PORT = Number(process.env.PORT) || 8080;
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -98,9 +104,22 @@ const server = createServer(async (req, res) => {
     } catch {
       return void res.writeHead(400).end('Bad request');
     }
-    let path = normalize(join(ROOT, decoded));
+    if (decoded === '/p4') return void res.writeHead(301, { Location: '/p4/' }).end();
+    let base = ROOT;
+    let sub = decoded;
+    if (decoded.startsWith('/p4/')) {
+      sub = decoded.slice(3);
+      const t = normalize(join(TRIAL, sub));
+      // (its own files; any other address there is its page; a file it hasn't got, the real game's)
+      if (t.startsWith(TRIAL + sep) && (await stat(t).catch(() => null))?.isFile()) base = TRIAL;
+      else if (!extname(sub) && (await stat(join(TRIAL, 'index.html')).catch(() => null))) {
+        base = TRIAL;
+        sub = '/index.html';
+      }
+    }
+    let path = normalize(join(base, sub));
     // (inside dist itself: a plain prefix check let ..%2f reach dist-server/ and the like)
-    if (path !== ROOT && !path.startsWith(ROOT + sep)) return void res.writeHead(403).end();
+    if (path !== base && !path.startsWith(base + sep)) return void res.writeHead(403).end();
     const info = await stat(path).catch(() => null);
     // a missing file (it has a file extension: an old build's /assets/ file, say) is a 404, not the
     // page in its place (a page labelled as a script or a song would break whatever asked for it,

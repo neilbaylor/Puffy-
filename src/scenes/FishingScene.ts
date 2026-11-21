@@ -337,7 +337,9 @@ export class FishingScene extends Phaser.Scene {
     const add = (key: string, w: number, h: number, res: number, fn: (ctx: CanvasRenderingContext2D) => void) => {
       if (!T.exists(key))
         addCanvas(this, key, hires(w, h, res, fn), undefined, {
-          release: true,
+          // (the waves' tile keeps its pixels: a TileSprite of a picture that isn't a power of two in
+          // both directions is drawn from a copy Phaser makes of them — without them, no waves)
+          release: key !== 'fl-wave',
         });
     };
     add('fl-boat', BOAT.w, BOAT.h, 1.5, (ctx) => drawBoat(ctx));

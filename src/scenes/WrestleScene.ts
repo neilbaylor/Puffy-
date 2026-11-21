@@ -1404,7 +1404,11 @@ export class WrestleScene extends Phaser.Scene {
     p.sync(dt);
     this.cropInPoo();
     this.drawHeroHearts();
-    if (this.climb) p.view.setFrame(Math.floor(this.clock / 90) % 2 ? 'jump' : 'fall');
+    if (this.climb) {
+      // (off a face frame — a blink, a smile — first: those are on a sheet of their own)
+      if (p.view.texture.key.endsWith('-face')) p.view.setTexture(p.key);
+      p.view.setFrame(Math.floor(this.clock / 90) % 2 ? 'jump' : 'fall');
+    }
     if (this.fighting) this.emitHud();
     // the crowd on its feet for the big moments
     const excited = this.clock < this.excitedUntil && Math.floor(this.clock / 170) % 3 !== 2;
