@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.359)
+## Where things stand (v0.360)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -31,6 +31,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   Home screen (yellow).
 - Start screen: drone fly-over behind, logo hop, hero cards (pick = hop / backflip), Play, Part picker once a
   level is beaten, mute (top-left), full screen + **Battle** buttons (top-right, same height, side by side).
+- v0.360: iOS home-screen landscape bar still showed on v0.359 (gap bigger than v0.355's 64 px limit: Dynamic Island status bar). main.ts viewSize(): iPhone (UA) + navigator.standalone → always screen size oriented by innerWidth>innerHeight; iPad standalone → width matches and ≤120 px short. ?diag 'page size' line shows told vs used. Not verified on a real device yet.
 - v0.359: THE GAME IS ON PHASER 4 (4.2.1). claude/phaser4-trial merged into claude/battle (merge commit); trials/ and the /p4/ route removed (server.mjs 302s /p4/* to /), no build:p4 / p4 vite mode / version label any more. After pulling, run `npm ci` (phaser 4 in the lockfile). Phaser 4 notes: no setTintFill/tintFill (use setTint(c).setTintMode(Phaser.TintModes.FILL); clearTint resets the mode); DynamicTexture/RenderTexture drawing is queued until .render(); no direct gl calls (renderTargets.ts is now no-ops); canvas uploads flip Y (a bit dearer: keep per-frame canvas refreshes rare); TileSprite draws from the GL texture (released canvases fine); vite aliases phaser to node_modules/phaser/dist/phaser-arcade-physics.js by absolute path. Verified: tall.cjs full+lite all scenes, bt2 2-player battle smoke, off-test-ship offline. User reports P4 better on low/mid Android tablets and iPhone.
 - v0.358: Bosses menu (phones, 2 columns): `.boss-btn:last-child:nth-child(odd)` spans both columns, centred at half width. Applied on claude/phaser4-trial too; trials/p4 rebuilt (do this on every ship while the trial is up).
 - v0.357: LED screens (Hoops + Wrestle): src/gfx/ledStrip.ts — LedStrip (a loop drawn once via addCanvas, copies cropped to a window, place(offset) per frame; repaint only when its sig changes) and LedRibbon (backing rect, sponsor-panel LedStrip, sweep image, pixel-grid image). Jumbo panel drawn with drawJumboScreen(..., {crawl:false}); its crawl is a LedStrip (hoops: JUMBO_CRAWL_X..w + band glass 'led-jband'; wrestle: WR_CRAWL band, no glass). Wrestle jumbo redrawn every 50 ms (70 light; was every frame in full), ribbon canvas only during a ribbonMsg takeover (2.6 s; 33/70 ms). Hoops never has ribbon messages. Same commit cherry-picked to claude/phaser4-trial; trials/p4 rebuilt. Profiling note: gameplay (Part 1) has no single JS hot spot; the screens were the only big one. Prof builds: `npx vite build --minify false --outDir dist-prof` served by python http.server (8195 P3, 8196 P4); scratchpad tprof.cjs / tup.cjs (texImage2D counter).

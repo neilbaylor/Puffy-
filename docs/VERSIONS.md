@@ -362,3 +362,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.357: The scoreboards and ticker ribbons in the basketball and wrestling arenas are much cheaper to run, and their scrolling text now glides smoothly.
 - v0.358: The Boss Battles menu centres a lone boss (or the last odd one) on phones.
 - v0.359: The game now runs on the Phaser 4 engine: smoother on phones and tablets.
+- v0.360: The iPhone home-screen app fills the whole screen sideways (the blue bar at the bottom).
