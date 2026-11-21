@@ -182,7 +182,7 @@ export class LevelView {
       if (k.startsWith('terrain-') && !k.startsWith(`terrain-${data.name}-`) && !homeKeepKeys.has(k)) scene.textures.remove(k);
     this.map = scene.make.tilemap({ data: data.tiles.map((r) => [...r]), tileWidth: TILE, tileHeight: TILE });
     const tileset = this.map.addTilesetImage('tiles', 'tiles', TILE, TILE, 1, 2)!;
-    this.layer = this.map.createLayer(0, tileset, 0, 0)!.setVisible(false);
+    this.layer = (this.map.createLayer(0, tileset, 0, 0) as Phaser.Tilemaps.TilemapLayer).setVisible(false);
     this.layer.setCollision(SOLID_TILES);
     this.layer.forEachTile((t) => {
       if (ONE_WAY_TILES.includes(t.index)) t.setCollision(false, false, true, false, false);

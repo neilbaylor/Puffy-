@@ -19,12 +19,6 @@ const emitWarning = process.emitWarning;
 process.emitWarning = (w, ...rest) => (/SQLite/.test(String(w?.message ?? w)) ? undefined : emitWarning.call(process, w, ...rest));
 
 const ROOT = resolve('dist');
-/**
- * The Phaser 4 trial: the game built on Phaser 4 (branch claude/phaser4-trial, `npm run build:p4`),
- * committed in trials/p4 and served at /p4/ beside the real game. Its songs and fonts are the very
- * same files as the real game's (same names), so any it hasn't got come from dist/assets.
- */
-const TRIAL = resolve('trials/p4');
 const PORT = Number(process.env.PORT) || 8080;
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -104,19 +98,10 @@ const server = createServer(async (req, res) => {
     } catch {
       return void res.writeHead(400).end('Bad request');
     }
-    if (decoded === '/p4') return void res.writeHead(301, { Location: '/p4/' }).end();
-    let base = ROOT;
-    let sub = decoded;
-    if (decoded.startsWith('/p4/')) {
-      sub = decoded.slice(3);
-      const t = normalize(join(TRIAL, sub));
-      // (its own files; any other address there is its page; a file it hasn't got, the real game's)
-      if (t.startsWith(TRIAL + sep) && (await stat(t).catch(() => null))?.isFile()) base = TRIAL;
-      else if (!extname(sub) && (await stat(join(TRIAL, 'index.html')).catch(() => null))) {
-        base = TRIAL;
-        sub = '/index.html';
-      }
-    }
+    // (the Phaser 4 trial was served at /p4/ before the game moved to Phaser 4: old links land home)
+    if (decoded === '/p4' || decoded.startsWith('/p4/')) return void res.writeHead(302, { Location: '/' }).end();
+    const base = ROOT;
+    const sub = decoded;
     let path = normalize(join(base, sub));
     // (inside dist itself: a plain prefix check let ..%2f reach dist-server/ and the like)
     if (path !== base && !path.startsWith(base + sep)) return void res.writeHead(403).end();

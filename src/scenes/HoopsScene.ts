@@ -59,7 +59,7 @@ import type { GameData, GameOverState, ResultState } from './GameScene';
 import { loseLife } from '../core/lives';
 import { NetSim } from './hoopsNet';
 import { SimpleConfetti } from '../world/SimpleConfetti';
-import { dropDepthBuffer, shrinkCaptureTarget } from '../core/renderTargets';
+import { shrinkCaptureTarget } from '../core/renderTargets';
 import { LedRibbon, LedStrip, ledStill } from '../gfx/ledStrip';
 import { liveCanvas } from '../gfx/liveCanvas';
 import { PLOP_H, PLOP_KINDS, PLOP_SCALE, PLOP_W, drawPlop, type PlopFrame, type PlopKind } from '../gfx/plops';
@@ -375,8 +375,7 @@ export class HoopsScene extends Phaser.Scene {
 
     // darkness with spotlights cut out of it, plus the visible beams from the rafters
     this.darkRT = this.add.renderTexture(0, 0, ARENA_W, ARENA_H).setOrigin(0, 0).setDepth(11).setVisible(false);
-    dropDepthBuffer(this.game, (this.darkRT.texture as Phaser.Textures.DynamicTexture).renderTarget);
-    this.brush = this.make.image({ key: 'spotbrush', add: false }).setOrigin(0.5);
+    this.brush = new Phaser.GameObjects.Image(this, 0, 0, 'spotbrush').setOrigin(0.5);
     for (const src of [A(230, -90), A(1330, -90)]) {
       const beam = this.add.image(src.x, src.y, 'spot').setOrigin(0.5, 0).setBlendMode(Phaser.BlendModes.ADD).setDepth(11.4).setVisible(false);
       this.spots.push({ x: src.x, y: 500, sx: 1, sy: 1, on: false, src, beam });
@@ -825,6 +824,8 @@ export class HoopsScene extends Phaser.Scene {
         this.brush.setScale(sp.sx, sp.sy);
         this.darkRT.erase(this.brush, sp.x, sp.y);
       }
+      // (Phaser 4: the drawing above is only queued until this)
+      this.darkRT.render();
     }
     for (const sp of this.spots) {
       const show = on && sp.on;

@@ -1008,10 +1008,11 @@ export class WrestleScene extends Phaser.Scene {
     const t = this.clock / 1000;
     const gb = this.ropesBack.clear();
     const gf = this.ropesFront.clear();
-    const line = (g: Phaser.GameObjects.Graphics, pts: { x: number; y: number }[], col: string, w: number) => {
+    const line = (g: Phaser.GameObjects.Graphics, ptsIn: { x: number; y: number }[], col: string, w: number) => {
+      const pts = ptsIn as Phaser.Math.Vector2[];
       g.lineStyle(w + 1.6, 0x1a0e06, 1).strokePoints(pts, false);
       g.lineStyle(w, Phaser.Display.Color.HexStringToColor(col).color, 1).strokePoints(pts, false);
-      g.lineStyle(w * 0.3, 0xffffff, 0.35).strokePoints(pts.map((p) => ({ x: p.x, y: p.y - w * 0.2 })), false);
+      g.lineStyle(w * 0.3, 0xffffff, 0.35).strokePoints(pts.map((p) => ({ x: p.x, y: p.y - w * 0.2 })) as Phaser.Math.Vector2[], false);
     };
     const long = (g: Phaser.GameObjects.Graphics, k: number, x0: number, x1: number, y: number, col: string, w: number) => {
       const pts: { x: number; y: number }[] = [];

@@ -165,7 +165,6 @@ function start(refreshMs: number) {
     render: { antialias: true, pixelArt: false, roundPixels: false, powerPreference: 'high-performance' },
     // (no pre-effects — glow, shadow… on a sprite — anywhere: without them Phaser doesn't keep their
     // dozens of drawing surfaces on the graphics chip; see also trimRenderTargets)
-    disablePreFX: true,
     input: { activePointers: 4 },
     // (no tree of moving bodies: Phaser rebuilt it from every body on every physics step, a few
     // times a frame on a slow phone, to speed up checks among a few dozen bodies that mostly sit
