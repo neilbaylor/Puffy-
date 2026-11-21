@@ -270,3 +270,35 @@ Tests are in `tests/` (run with `bash tests/run.sh tests/t_x.ts`; it uses esbuil
   - Timings at 4× CPU, old → new: battle 231 → 86 ms; start screen 120 → 64 ms; hoops 157 → 76 ms; level-clear 167 → 114 ms; mountain 308 → 179 ms; plop 316 → 171 ms.
 - **Where it matters:** the start screen's song is decoded at every load. Level and boss songs are decoded ahead in slices during play, and those slices are now cheaper and half as many.
 - **Risk:** none. The output is bit-identical, and the slicing and the all-at-once mode under the loading screen are unchanged.
+
+---
+
+## Memory pass, stacked on #25
+
+### 27. Memory: pictures shown only as images let their canvas pixels go once uploaded
+`claude/mem-release-static-canvases` → #25 · `src/gfx/textures.ts`
+
+- **What:** 45 small static pictures kept a full copy of their pixels in the browser's memory after being uploaded to the graphics chip: props, particles, the weapons, the chase signs, the tennis net, the sea's bubble and dark, the baseballs. They now let it go with `addCanvas(..., { release: true })`, as the frame sheets and backgrounds (57 other places) already did. WebGL draws from the uploaded copy. Not changed:
+  - tile sprites (`chase-col`, the fishing wave), which need their pixels;
+  - live pictures that get redrawn (clouds, jumbotron, ribbon board);
+  - the chair sheets that are read back;
+  - the invisible collision `tiles`.
+- **Evidence** (`tests/browser/memcensus.mjs`, pixel ratio 2): held canvas pixels go 4.3 → 2.7 MB at the start screen, 4.5 → 2.8 in Part 2, 4.5 → 2.8 in Part 5, 5.4 → 3.9 in basketball. Texture memory is unchanged.
+- **Unchanged output:** `tests/browser/propshot.mjs` draws all 29 of these pictures that exist at the start screen through the game's WebGL renderer, and the screenshot hash is identical before and after. Sweeps of Parts 1–6 and four bosses show no errors.
+- **Risk:** low. Releasing only happens with WebGL (the canvas renderer keeps its pixels). A lost graphics context reloads the page (`main.ts`), as for the 57 existing releases.
+
+### 28. Memory (trade-off, needs a decision): a level keeps only the ground the start screen was showing
+`claude/mem-free-other-parts-ground` → #27 · `src/ui/ui.ts`
+
+- **What:** when a level starts, `homeKeepKeys` spares every ground picture any start-screen object uses, including the other Parts' fly-overs built ahead and kept hidden. So in a level, the other five Parts' ground (about 30 MB of textures at pixel ratio 2) stays held the whole time, unused. Now only what's on show is kept. The other Parts' fly-overs are freed with the level and drawn again in quiet moments after you return home, which is the start screen's existing path.
+- **Evidence** (`tests/browser/homecost.mjs`, pixel ratio 2, 4× CPU, two runs):
+
+  | | Before | After |
+  |---|---|---|
+  | Textures during Part 2 | 120 MB | **90 MB (−30 MB, −25%)** |
+  | Start screen back after "Home screen" | 0.58–0.62 s | 0.43–0.61 s |
+  | Loading card on the way home | none | none |
+  | Every other Part ready again | 7.8–8.4 s | 12.4–12.5 s |
+
+  At the start screen both end at 120 MB, as before.
+- **Trade-off:** no functionality goes, and the level and the way home look the same. The cost is that for about 4 s longer after coming home, the other Parts' fly-overs are still being redrawn in the background, so tapping a different Part in that window may take a moment to draw it. The gain is 25% less texture memory while playing, which is where the code's own comments say phones run out. **Merge only if that trade is wanted.** It's independent of #27.
