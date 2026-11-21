@@ -318,7 +318,10 @@ export async function createUserApi() {
       if (route === 'POST /api/register' || route === 'POST /api/login') {
         // (the last address in X-Forwarded-For is the one the proxy added; the ones before it are
         // whatever the caller sent, so keying on the first let anyone skip the limit)
-        const ip = String(req.headers['x-forwarded-for'] ?? req.socket.remoteAddress ?? '').split(',').pop()!.trim();
+        // (Railway's edge sets X-Real-IP to the player's own address — the header its docs promise;
+        // X-Forwarded-For's last entry if not, else the socket's: running locally)
+        const real = req.headers['x-real-ip'];
+        const ip = (typeof real === 'string' && real.trim()) || String(req.headers['x-forwarded-for'] ?? req.socket.remoteAddress ?? '').split(',').pop()!.trim();
         if (tooMany(ip)) return void send(res, 429, { error: 'Too many tries. Wait a minute.' }), true;
         const body = await readBody(req);
         const name = String(body.name ?? '').trim();

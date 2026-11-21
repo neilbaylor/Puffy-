@@ -329,7 +329,17 @@ function start(refreshMs: number) {
       setTimeout(() => location.reload(), 900);
       return;
     }
-    // (already in light mode: nothing more to try, and no message — whatever the browser does)
+    // already in light mode: start again quietly, so every picture is drawn afresh (left to Phaser,
+    // the ones whose pixels were let go after upload would come back blank). Not again within a
+    // minute: a device losing its graphics over and over isn't sent round a loop of restarts.
+    try {
+      const last = Number(sessionStorage.getItem('puffy.glReload') ?? 0);
+      if (Date.now() - last < 60000) return;
+      sessionStorage.setItem('puffy.glReload', String(Date.now()));
+    } catch {
+      return;
+    }
+    setTimeout(() => location.reload(), 300);
   });
 
   // handy for debugging from the console
