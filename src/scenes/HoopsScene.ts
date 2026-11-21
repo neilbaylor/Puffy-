@@ -39,7 +39,6 @@ import {
   type ArenaStyle,
   drawSpotBrush,
   drawSpotlight,
-  drawJumboScreen,
   drawJumboBandGlass,
   jumboCrawlItems,
   paintCrawl,
@@ -61,7 +60,7 @@ import { NetSim } from './hoopsNet';
 import { SimpleConfetti } from '../world/SimpleConfetti';
 import { shrinkCaptureTarget } from '../core/renderTargets';
 import { LedRibbon, LedStrip, ledStill } from '../gfx/ledStrip';
-import { liveCanvas } from '../gfx/liveCanvas';
+import { JumboScreen } from '../gfx/jumboScreen';
 import { PLOP_H, PLOP_KINDS, PLOP_SCALE, PLOP_W, drawPlop, type PlopFrame, type PlopKind } from '../gfx/plops';
 import { STYLES } from '../gfx/handdrawn';
 
@@ -196,7 +195,7 @@ export class HoopsScene extends Phaser.Scene {
   private dark = { level: 0 };
   private spots: { x: number; y: number; sx: number; sy: number; on: boolean; src: { x: number; y: number }; beam: Phaser.GameObjects.Image }[] = [];
   // the live jumbotron
-  private jumboTex!: Phaser.Textures.CanvasTexture;
+  private jumboScreen!: JumboScreen;
   private jumbo: JumboContent = { kind: 'title' };
   private jumboUntil = 0;
   private jumboNext = 0;
@@ -381,11 +380,10 @@ export class HoopsScene extends Phaser.Scene {
       this.spots.push({ x: src.x, y: 500, sx: 1, sy: 1, on: false, src, beam });
     }
 
-    // the live jumbotron screen (glows even when the lights are down)
-    const JR = 2;
-    this.jumboTex = liveCanvas(this.textures, 'jumbo', JUMBO.w * JR, JUMBO.h * JR);
+    // the live jumbotron screen (glows even when the lights are down): layers the graphics chip
+    // puts together, see JumboScreen
     const jp = A(JUMBO.x, JUMBO.y);
-    this.add.image(jp.x, jp.y, 'jumbo').setOrigin(0, 0).setScale(JUMBO.s / JR).setDepth(11.6);
+    this.jumboScreen = new JumboScreen(this, 'jumbo', jp.x, jp.y, JUMBO.s, 11.6, 'top');
     // (its ticker's crawl a strip of its own over it, then the LED glass over that)
     const bandY = jp.y + (JUMBO.h - JUMBO_TICK_H) * JUMBO.s;
     this.jumboCrawl = new LedStrip(this, 'led-hcrawl', jp.x + JUMBO_CRAWL_X * JUMBO.s, bandY, JUMBO.w - JUMBO_CRAWL_X, JUMBO_TICK_H, JUMBO.s, 11.601);
@@ -875,10 +873,7 @@ export class HoopsScene extends Phaser.Scene {
 
   /** The jumbotron's screen (its crawl and the ribbon move every frame in moveScreens). */
   private drawJumbo() {
-    const ctx = this.jumboTex.getContext();
-    ctx.setTransform(2, 0, 0, 2, 0, 0);
-    drawJumboScreen(ctx, this.jumbo, this.clock / 1000, { crawl: false });
-    this.jumboTex.refresh();
+    this.jumboScreen.show(this.jumbo, this.clock / 1000);
     const items = jumboCrawlItems(this.jumbo);
     this.jumboCrawl.paint(JSON.stringify(items), () => paintCrawl(null, items, 'after', JUMBO_TICK_H), (c) => paintCrawl(c, items, 'after', JUMBO_TICK_H));
   }

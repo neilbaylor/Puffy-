@@ -15,10 +15,11 @@ import { POOWAVE_H, POOWAVE_W, drawPooWave } from '../gfx/plopworld';
 import { drawPoo } from '../gfx/hazards';
 import { drawPrize } from '../gfx/prizes';
 import { STYLES } from '../gfx/handdrawn';
-import { CHAIR_H, CHAIR_W, KING_SEAT, PLOP_DOME, PLOP_DOME_RING, POO_PALACE, POO_PALACE_RING, setRingLook, drawFoldingChair, POST_BOX, PUDDLE, RING, RING_BOX, ROPE_COL, TUNNEL, backX, drawArenaPoo, drawFrontPost, drawRing, drawRingFloor, drawRingside, drawTunnel, drawWrestleJumbo, WR_CRAWL, wrestleCrawlAt, wrestleCrawlItems } from '../gfx/wrestle';
+import { CHAIR_H, CHAIR_W, KING_SEAT, PLOP_DOME, PLOP_DOME_RING, POO_PALACE, POO_PALACE_RING, setRingLook, drawFoldingChair, POST_BOX, PUDDLE, RING, RING_BOX, ROPE_COL, TUNNEL, backX, drawArenaPoo, drawFrontPost, drawRing, drawRingFloor, drawRingside, drawTunnel, wrestleJumboBar, WR_CRAWL, wrestleCrawlAt, wrestleCrawlItems } from '../gfx/wrestle';
 import { HERO_SHEET_M, PCHUTE_DOWN, PCHUTE_RES, PCHUTE_UP, PLOP_PAD, PLOP_RES, PLOP_TOP, addCanvas, hires, makeCarrySheet, makeJetFx, makePlopChutes, makePlops, makeWeaponArt } from '../gfx/textures';
 import { liveCanvas } from '../gfx/liveCanvas';
 import { LedRibbon, LedStrip } from '../gfx/ledStrip';
+import { JumboScreen } from '../gfx/jumboScreen';
 import { BLASTER, SAW, W_RES } from '../gfx/weapons';
 import { JET_NOZZLES, ROBE_H, ROBE_W, drawDuck, drawPlopKing, drawRobeHeap } from '../gfx/plopking';
 import { BOOM_FRAMES, BOOM_SIZE, drawBoomFrame } from '../gfx/boom';
@@ -512,7 +513,7 @@ export class WrestleScene extends Phaser.Scene {
   private fighting = false;
   private crowd!: Phaser.GameObjects.Image;
   private excitedUntil = 0;
-  private jumboTex!: Phaser.Textures.CanvasTexture;
+  private jumboScreen!: JumboScreen;
   private ribbonTex!: Phaser.Textures.CanvasTexture;
   /** The ribbon's big-moment screen (shown over the gliding sponsor panels while one is on). */
   private ribbonMsgImg!: Phaser.GameObjects.Image;
@@ -641,9 +642,9 @@ export class WrestleScene extends Phaser.Scene {
     this.add.image(0, 0, this.tk('wr-arena')).setOrigin(0).setScale(AS_).setDepth(DEPTH_W.arena);
     this.crowd = this.add.image(0, 0, this.tk('wr-crowd')).setOrigin(0).setScale(AS_).setDepth(DEPTH_W.crowd);
     this.add.image(0, 0, this.tk('wr-front')).setOrigin(0).setScale(AS_).setDepth(DEPTH_W.front);
-    this.jumboTex = liveCanvas(this.textures, 'wr-jumbo', JUMBO.w * 2, JUMBO.h * 2);
-    // (the screens glow: they're in front of the darkness when the lights go down, like the basketball jumbotron)
-    this.add.image(WX(JUMBO.x), WY(JUMBO.y), 'wr-jumbo').setOrigin(0).setScale((JUMBO.s * K) / 2).setDepth(DEPTH_W.dark + 0.05);
+    // (the screens glow: they're in front of the darkness when the lights go down, like the basketball
+    // jumbotron; layers the graphics chip puts together, see JumboScreen)
+    this.jumboScreen = new JumboScreen(this, 'wr-jumbo', WX(JUMBO.x), WY(JUMBO.y), JUMBO.s * K, DEPTH_W.dark + 0.05, 'full', wrestleJumboBar);
     // (the jumbotron's crawl a strip of its own over it)
     const jk = JUMBO.s * K;
     this.jumboCrawl = new LedStrip(this, 'led-wcrawl', WX(JUMBO.x) + WR_CRAWL.x * jk, WY(JUMBO.y) + WR_CRAWL.y0 * jk, JUMBO.w - WR_CRAWL.x, JUMBO.h - WR_CRAWL.y0, jk, DEPTH_W.dark + 0.051);
@@ -1866,10 +1867,7 @@ export class WrestleScene extends Phaser.Scene {
       ['TITLE MATCH', '#7fe7ff'],
       ['POOPA COLA', '#ffffff'],
     ];
-    const ctx = this.jumboTex.getContext();
-    ctx.setTransform(2, 0, 0, 2, 0, 0);
-    drawWrestleJumbo(ctx, this.jumbo, t, crawl, false);
-    this.jumboTex.refresh();
+    this.jumboScreen.show(this.jumbo, t);
     const items = wrestleCrawlItems(crawl);
     const h = JUMBO.h - WR_CRAWL.y0;
     this.jumboCrawl.paint(JSON.stringify(items), () => paintCrawl(null, items, 'between', h), (c) => paintCrawl(c, items, 'between', h));

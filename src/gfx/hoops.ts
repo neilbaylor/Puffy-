@@ -1371,6 +1371,14 @@ export function drawArenaFront(ctx: Ctx) {
  * same bottom edge as before and grows upward (it's the only scoreboard now).
  */
 export const JUMBO = { x: 158, y: 84 - 108 * 1.25, w: 424, h: 108, s: 1.25 };
+const JUMBO_W = JUMBO.w;
+const JUMBO_H = JUMBO.h;
+
+/** The jumbotron's news ticker band: its height, and the LIVE tag's width at its left. */
+export const JUMBO_TICK_H = 18;
+export const JUMBO_TAG_W = 50;
+/** Where the crawl strip starts (just past the LIVE tag's slanted edge). */
+export const JUMBO_CRAWL_X = JUMBO_TAG_W + 4;
 
 export type JumboContent =
   | { kind: 'title' }
@@ -1432,8 +1440,8 @@ function segDigit(ctx: Ctx, ch: string, x: number, y: number, w: number, h: numb
   }
 }
 
-/** The scrolling news ticker along the bottom of the jumbotron. */
-function jumboTicker(ctx: Ctx, items: { text: string; color: string }[], t: number, y0: number, h: number, w: number, crawl = true) {
+/** The scrolling news ticker along the bottom of the jumbotron. (`dot`: its LIVE tag's blinking dot too.) */
+function jumboTicker(ctx: Ctx, items: { text: string; color: string }[], t: number, y0: number, h: number, w: number, crawl = true, dot = true) {
   const bar = ctx.createLinearGradient(0, y0, 0, y0 + h);
   bar.addColorStop(0, '#1c1430');
   bar.addColorStop(1, '#0a0714');
@@ -1485,52 +1493,97 @@ function jumboTicker(ctx: Ctx, items: { text: string; color: string }[], t: numb
   ctx.fillStyle = '#d0021b';
   poly(ctx, [[0, y0], [tagW - 4, y0], [tagW + 4, y0 + h], [0, y0 + h]]);
   ctx.fill();
-  ctx.fillStyle = Math.floor(t * 2) % 2 ? '#ffffff' : '#ff9a9a';
-  ctx.beginPath();
-  ctx.arc(10, y0 + h / 2, 3, 0, Math.PI * 2);
-  ctx.fill();
+  if (dot) jumboLiveDot(ctx, t);
   ctx.font = `400 12px ${DISPLAY_FONT}`;
   ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'left';
   ctx.fillText('LIVE', 17, y0 + h / 2 + 0.5);
 }
 
-/** Live jumbotron content, drawn into a JUMBO.w × JUMBO.h canvas (scaled by the caller). */
-export function drawJumboScreen(ctx: Ctx, c: JumboContent, t = 0, opts: { crawl?: boolean; grid?: 'full' | 'top' } = {}) {
-  const { w, h } = JUMBO;
-  const TICK_H = JUMBO_TICK_H;
-  const crawl = opts.crawl ?? true;
-  const bg = ctx.createLinearGradient(0, 0, w, h);
-  bg.addColorStop(0, c.kind === 'big' ? c.bg : c.kind === 'score' ? '#0d0c14' : '#0e1240');
-  bg.addColorStop(1, c.kind === 'big' ? '#12061f' : c.kind === 'score' ? '#17141f' : '#240a40');
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, w, h);
-  ctx.textBaseline = 'middle';
-  if (c.kind === 'title') {
-    ctx.fillStyle = 'rgba(255,210,63,0.12)';
-    for (let i = 0; i < 12; i++) {
-      const a = (i / 12) * Math.PI * 2 + t * 0.4;
-      poly(ctx, [
-        [62, 44],
-        [62 + Math.cos(a) * 140, 44 + Math.sin(a) * 140],
-        [62 + Math.cos(a + 0.2) * 140, 44 + Math.sin(a + 0.2) * 140],
-      ]);
-      ctx.fill();
-    }
-    ctx.shadowColor = '#ffd23f';
-    ctx.shadowBlur = 12;
-    ctx.fillStyle = '#ffd23f';
-    poly(ctx, [[28, 64], [24, 26], [45, 42], [62, 18], [79, 42], [100, 26], [96, 64]]);
+/** The LIVE tag's dot (it blinks twice a second): a picture of its own on a JumboScreen. */
+export function jumboLiveDot(ctx: Ctx, t: number) {
+  const y0 = JUMBO.h - JUMBO_TICK_H;
+  ctx.fillStyle = Math.floor(t * 2) % 2 ? '#ffffff' : '#ff9a9a';
+  ctx.beginPath();
+  ctx.arc(10, y0 + JUMBO_TICK_H / 2, 3, 0, Math.PI * 2);
+  ctx.fill();
+}
+/** Where the LIVE dot is, with room round it (units): a JumboScreen's picture of it. */
+export const JUMBO_DOT_BOX = { x: 4, y: JUMBO_H - JUMBO_TICK_H + 1, w: 12, h: 16 };
+
+/**
+ * The turning rays behind the title and behind a big call: where they turn from, how many, how
+ * long, how wide (radians), how fast (radians a second), and their colour. (On a JumboScreen
+ * they're one picture of a ray, turned and repeated by the graphics chip.)
+ */
+export function jumboRays(c: JumboContent) {
+  if (c.kind === 'title') return { x: 62, y: 44, n: 12, r: 140, span: 0.2, speed: 0.4, color: '#ffd23f', alpha: 0.12 };
+  if (c.kind === 'big') return { x: JUMBO.w / 2, y: (JUMBO.h - JUMBO_TICK_H) / 2, n: 16, r: 300, span: 0.18, speed: 0.8, color: c.color, alpha: 0.14 };
+  return null;
+}
+function paintRays(ctx: Ctx, r: NonNullable<ReturnType<typeof jumboRays>>, t: number) {
+  ctx.save();
+  ctx.globalAlpha = r.alpha;
+  ctx.fillStyle = r.color;
+  for (let i = 0; i < r.n; i++) {
+    const a = (i / r.n) * Math.PI * 2 + t * r.speed;
+    poly(ctx, [
+      [r.x, r.y],
+      [r.x + Math.cos(a) * r.r, r.y + Math.sin(a) * r.r],
+      [r.x + Math.cos(a + r.span) * r.r, r.y + Math.sin(a + r.span) * r.r],
+    ]);
     ctx.fill();
-    ctx.font = `400 31px ${DISPLAY_FONT}`;
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#ffe58a';
-    ctx.fillText(AS.jumboTitle, 120, 32);
-    ctx.shadowBlur = 0;
-    ctx.font = `800 13px Nunito, "Arial Black", sans-serif`;
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(AS.jumboSub, 122, 60, JUMBO.w - 130);
-  } else if (c.kind === 'score') {
+  }
+  ctx.restore();
+}
+
+/** A big call's words pulse (their size, as a scale) … */
+export const jumboPulse = (t: number) => 1 + Math.sin(t * 9) * 0.03;
+/** … about this point (units). */
+export const jumboWordsAt = (c: Extract<JumboContent, { kind: 'big' }>) => ({ x: JUMBO.w / 2, y: c.sub ? 34 : (JUMBO.h - JUMBO_TICK_H) / 2 - 2 });
+/**
+ * The box (units, whole) a big call's words fit in at their own size, glow and all — no more than
+ * the screen above the ticker. (Generous: the words are only ever squeezed to fit, never wider.)
+ */
+export function jumboWordsBox(c: Extract<JumboContent, { kind: 'big' }>) {
+  const at = jumboWordsAt(c);
+  const fs = c.sub ? 42 : 52;
+  const m = (measurer ??= canvas(4, 4).ctx);
+  m.font = `400 ${fs}px ${DISPLAY_FONT}`;
+  const tw = Math.min(JUMBO.w - 24, m.measureText(c.text).width);
+  const padX = 22;
+  const padY = fs * 0.6 + 16;
+  return {
+    x0: Math.max(0, Math.floor(at.x - tw / 2 - padX)),
+    x1: Math.min(JUMBO.w, Math.ceil(at.x + tw / 2 + padX)),
+    y0: Math.max(0, Math.floor(at.y - padY)),
+    y1: Math.min(JUMBO.h - JUMBO_TICK_H, Math.ceil(at.y + padY)),
+  };
+}
+/** A big call's words, at their size × `pulse`, centred on (0, 0). */
+export function jumboWords(ctx: Ctx, c: Extract<JumboContent, { kind: 'big' }>, pulse = 1) {
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.scale(pulse, pulse);
+  ctx.font = `400 ${c.sub ? 42 : 52}px ${DISPLAY_FONT}`;
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+  ctx.strokeText(c.text, 0, 0, JUMBO.w - 24);
+  ctx.shadowColor = c.color;
+  ctx.shadowBlur = 16;
+  ctx.fillStyle = c.color;
+  ctx.fillText(c.text, 0, 0, JUMBO.w - 24);
+  ctx.restore();
+}
+
+/**
+ * The scoreboard ('score'): what stays put (`still`) and what moves (`moving`: the SUDDEN DEATH
+ * header blinking, the leader's digits glowing, the possession arrow) — both for a still of it.
+ */
+function scoreBoard(ctx: Ctx, c: Extract<JumboContent, { kind: 'score' }>, t: number, still: boolean, moving: boolean) {
+  const { w } = JUMBO;
     // An arena centre-hung board: dot-matrix team names, big recessed 7-segment
     // scores, a lit SHOT box with the possession arrow, and a row of bulbs per
     // team (green = made, red = missed).
@@ -1538,6 +1591,7 @@ export function drawJumboScreen(ctx: Ctx, c: JumboContent, t = 0, opts: { crawl?
     const ys = c.youShots ?? [];
     const ks = c.kingShots ?? [];
     const n = Math.max(reg, ys.length, ks.length);
+    if (still) {
     // brushed-metal frame band across the top
     const band = ctx.createLinearGradient(0, 0, 0, 13);
     band.addColorStop(0, c.sudden ? '#7a0012' : '#2b2840');
@@ -1546,7 +1600,9 @@ export function drawJumboScreen(ctx: Ctx, c: JumboContent, t = 0, opts: { crawl?
     ctx.fillRect(0, 0, w, 13);
     ctx.fillStyle = 'rgba(255,255,255,0.18)';
     ctx.fillRect(0, 0, w, 1);
+    }
     ctx.textAlign = 'center';
+    if (c.sudden ? moving : still) {
     ctx.font = `400 10.5px ${DISPLAY_FONT}`;
     ctx.fillStyle = c.sudden ? (Math.floor(t * 3) % 2 ? '#ffffff' : '#ffb340') : '#ffb340';
     ctx.save();
@@ -1554,6 +1610,7 @@ export function drawJumboScreen(ctx: Ctx, c: JumboContent, t = 0, opts: { crawl?
     ctx.shadowBlur = 4;
     ctx.fillText(c.sudden ? '★ SUDDEN DEATH ★' : 'FREE THROW SHOWDOWN', w / 2, 7);
     ctx.restore();
+    }
     const youNext = ys.length <= ks.length;
     const panels = [
       { x0: 7, name: c.name.toUpperCase(), n: c.you, shots: ys, col: '#ff4a3d', dim: 'rgba(255,74,61,0.09)', next: youNext, lead: c.you > c.king },
@@ -1561,6 +1618,11 @@ export function drawJumboScreen(ctx: Ctx, c: JumboContent, t = 0, opts: { crawl?
     ];
     const pw = 164;
     for (const p of panels) {
+      const bx = p.x0 + 14;
+      const by = 32;
+      const bw = 70;
+      const bh = 48;
+      if (still) {
       // team name on a black dot-matrix strip
       ctx.fillStyle = '#050407';
       ctx.beginPath();
@@ -1574,10 +1636,6 @@ export function drawJumboScreen(ctx: Ctx, c: JumboContent, t = 0, opts: { crawl?
       ctx.fillText(p.name, p.x0 + pw / 2, 23, pw - 14);
       ctx.restore();
       // the big score, sunk into a bezel
-      const bx = p.x0 + 14;
-      const by = 32;
-      const bw = 70;
-      const bh = 48;
       const bez = ctx.createLinearGradient(0, by, 0, by + bh);
       bez.addColorStop(0, '#3a3746');
       bez.addColorStop(1, '#121019');
@@ -1589,12 +1647,17 @@ export function drawJumboScreen(ctx: Ctx, c: JumboContent, t = 0, opts: { crawl?
       ctx.beginPath();
       ctx.roundRect(bx, by, bw, bh, 3);
       ctx.fill();
+      }
+      // (the leader's digits glow, gently pulsing: they move)
+      if (p.lead ? moving : still) {
       ctx.save();
       ctx.shadowColor = p.col;
       ctx.shadowBlur = p.lead ? 10 + Math.sin(t * 5) * 4 : 6;
       const str = String(Math.min(99, p.n)).padStart(2, ' ');
       for (let i = 0; i < 2; i++) segDigit(ctx, str[i], bx + 8 + i * 29, by + 6, 25, 36, p.col, p.dim);
       ctx.restore();
+      }
+      if (!still) continue;
       // shot bulbs: a little bank of lamps beside the score (two rows of five if it goes long)
       const per = Math.min(n, 10);
       const first = Math.max(0, Math.min(p.shots.length, n) - per);
@@ -1635,6 +1698,7 @@ export function drawJumboScreen(ctx: Ctx, c: JumboContent, t = 0, opts: { crawl?
     const done = Math.min(ys.length, ks.length);
     const shot = c.sudden ? done + 1 : Math.min(done + 1, reg);
     const cx0 = w / 2;
+    if (still) {
     ctx.font = `400 8.5px ${DISPLAY_FONT}`;
     ctx.fillStyle = 'rgba(255,255,255,0.55)';
     ctx.fillText(c.sudden ? 'SUDDEN DEATH' : 'SHOT', cx0, 22);
@@ -1654,6 +1718,8 @@ export function drawJumboScreen(ctx: Ctx, c: JumboContent, t = 0, opts: { crawl?
     ctx.font = `400 8px ${DISPLAY_FONT}`;
     ctx.fillStyle = 'rgba(255,255,255,0.45)';
     ctx.fillText(c.sudden ? 'EXTRA' : `OF ${reg}`, cx0, 69);
+    }
+    if (!moving) return;
     // possession arrow (blinks gently)
     ctx.save();
     ctx.globalAlpha = 0.65 + Math.sin(t * 6) * 0.35;
@@ -1673,50 +1739,102 @@ export function drawJumboScreen(ctx: Ctx, c: JumboContent, t = 0, opts: { crawl?
     ctx.closePath();
     ctx.fill();
     ctx.restore();
+}
+
+/**
+ * The scoreboard's moving parts, each a little picture of its own on a JumboScreen (redrawn as it
+ * changes): where each one is (units, with room round it for its glow), drawn by scoreMoving.
+ * The header only in sudden death; a team's digits only while it leads.
+ */
+export const SCORE_MOVING = {
+  header: { x: 0, y: 0, w: JUMBO_W, h: 16 },
+  you: { x: 7 + 14 - 4, y: 26, w: 78, h: 60 },
+  king: { x: JUMBO_W - 7 - 164 + 14 - 4, y: 26, w: 78, h: 60 },
+  arrow: { x: JUMBO_W / 2 - 22, y: 68, w: 44, h: 24 },
+};
+export function scoreMoving(ctx: Ctx, c: Extract<JumboContent, { kind: 'score' }>, t: number) {
+  ctx.textBaseline = 'middle';
+  scoreBoard(ctx, c, t, false, true);
+}
+
+/**
+ * What of the screen drawJumboScreen draws: all of it (a still), or — for a JumboScreen, whose
+ * moving parts are pictures of their own the graphics chip moves (see gfx/jumboScreen) — only
+ * what stays put under them ('back') or over them ('front'; the LED glass is a picture of its own).
+ */
+export type JumboPart = 'all' | 'back' | 'front';
+/** Where a screen's 'front' part starts (units from the top): nothing of it is above. */
+export function jumboFrontTop(c: JumboContent) {
+  if (c.kind === 'title') return 0;
+  if (c.kind === 'big' && c.sub) return 58;
+  return JUMBO_H - JUMBO_TICK_H;
+}
+
+/** Live jumbotron content, drawn into a JUMBO.w × JUMBO.h canvas (scaled by the caller). */
+export function drawJumboScreen(ctx: Ctx, c: JumboContent, t = 0, opts: { crawl?: boolean; grid?: 'full' | 'top'; part?: JumboPart } = {}) {
+  const { w, h } = JUMBO;
+  const TICK_H = JUMBO_TICK_H;
+  const crawl = opts.crawl ?? true;
+  const all = (opts.part ?? 'all') === 'all';
+  const back = all || opts.part === 'back';
+  const front = all || opts.part === 'front';
+  if (back) {
+  const bg = ctx.createLinearGradient(0, 0, w, h);
+  bg.addColorStop(0, c.kind === 'big' ? c.bg : c.kind === 'score' ? '#0d0c14' : '#0e1240');
+  bg.addColorStop(1, c.kind === 'big' ? '#12061f' : c.kind === 'score' ? '#17141f' : '#240a40');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, w, h);
+  }
+  ctx.textBaseline = 'middle';
+  if (c.kind === 'title') {
+    if (all) paintRays(ctx, jumboRays(c)!, t);
+    if (front) {
+    ctx.shadowColor = '#ffd23f';
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = '#ffd23f';
+    poly(ctx, [[28, 64], [24, 26], [45, 42], [62, 18], [79, 42], [100, 26], [96, 64]]);
+    ctx.fill();
+    ctx.font = `400 31px ${DISPLAY_FONT}`;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#ffe58a';
+    ctx.fillText(AS.jumboTitle, 120, 32);
+    ctx.shadowBlur = 0;
+    ctx.font = `800 13px Nunito, "Arial Black", sans-serif`;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(AS.jumboSub, 122, 60, JUMBO.w - 130);
+    }
+  } else if (c.kind === 'score') {
+    if (back) scoreBoard(ctx, c, t, true, all);
   } else {
     ctx.textAlign = 'center';
     // bursting rays behind the big call
+    if (all) {
+    paintRays(ctx, jumboRays(c)!, t);
+    const at = jumboWordsAt(c);
     ctx.save();
-    ctx.globalAlpha = 0.14;
-    ctx.fillStyle = c.color;
-    const cy = (h - TICK_H) / 2;
-    for (let i = 0; i < 16; i++) {
-      const a = (i / 16) * Math.PI * 2 + t * 0.8;
-      poly(ctx, [
-        [w / 2, cy],
-        [w / 2 + Math.cos(a) * 300, cy + Math.sin(a) * 300],
-        [w / 2 + Math.cos(a + 0.18) * 300, cy + Math.sin(a + 0.18) * 300],
-      ]);
-      ctx.fill();
+    ctx.translate(at.x, at.y);
+    jumboWords(ctx, c, jumboPulse(t));
+    ctx.restore();
     }
-    ctx.restore();
-    const pulse = 1 + Math.sin(t * 9) * 0.03;
-    ctx.save();
-    ctx.translate(w / 2, c.sub ? 34 : cy - 2);
-    ctx.scale(pulse, pulse);
-    ctx.font = `400 ${c.sub ? 42 : 52}px ${DISPLAY_FONT}`;
-    ctx.lineJoin = 'round';
-    ctx.lineWidth = 5;
-    ctx.strokeStyle = 'rgba(0,0,0,0.55)';
-    ctx.strokeText(c.text, 0, 0, w - 24);
-    ctx.shadowColor = c.color;
-    ctx.shadowBlur = 16;
-    ctx.fillStyle = c.color;
-    ctx.fillText(c.text, 0, 0, w - 24);
-    ctx.restore();
-    if (c.sub) {
+    if (front && c.sub) {
       ctx.font = `400 15px ${DISPLAY_FONT}`;
       ctx.fillStyle = '#ffffff';
       ctx.fillText(c.sub, w / 2, 70, w - 20);
     }
   }
   // ticker
-  jumboTicker(ctx, jumboCrawlItems(c), t, h - TICK_H, TICK_H, w, crawl);
+  if (front) jumboTicker(ctx, jumboCrawlItems(c), t, h - TICK_H, TICK_H, w, crawl, all);
   // LED pixels + glare (with the crawl its own strip: above the ticker only — the strip has its own)
+  if (all) jumboGlassLayer(ctx, crawl ? 'full' : opts.grid ?? 'top');
+}
+
+/** The LED pixels and glare over the screen ('top': above the ticker only, which has glass of its own). */
+export function jumboGlassLayer(ctx: Ctx, grid: 'full' | 'top') {
+  const { w, h } = JUMBO;
   ctx.save();
-  if (!crawl && opts.grid !== 'full') {
+  if (grid !== 'full') {
     ctx.beginPath();
-    ctx.rect(0, 0, w, h - TICK_H);
+    ctx.rect(0, 0, w, h - JUMBO_TICK_H);
     ctx.clip();
   }
   jumboGlass(ctx, w, h);
@@ -1734,12 +1852,6 @@ function jumboGlass(ctx: Ctx, w: number, h: number) {
   ctx.fillStyle = glare;
   ctx.fillRect(0, 0, w, h);
 }
-
-/** The jumbotron's news ticker band: its height, and the LIVE tag's width at its left. */
-export const JUMBO_TICK_H = 18;
-export const JUMBO_TAG_W = 50;
-/** Where the crawl strip starts (just past the LIVE tag's slanted edge). */
-export const JUMBO_CRAWL_X = JUMBO_TAG_W + 4;
 
 /** What the jumbotron's ticker says (it changes with the score). */
 export function jumboCrawlItems(c: JumboContent): { text: string; color: string }[] {

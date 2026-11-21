@@ -472,13 +472,9 @@ export const wrestleCrawlAt = (t: number, loop: number) => 6 - ((t * 46) % loop)
 /** With `withCrawl` false, the band without its text: the crawl is then its own strip (LedStrip). */
 export function drawWrestleJumbo(ctx: Ctx, c: JumboContent, t: number, crawl: [string, string][], withCrawl = true) {
   drawJumboScreen(ctx, c, t, withCrawl ? {} : { crawl: false, grid: 'full' });
-  const y0 = WR_CRAWL.y0;
-  const bar = ctx.createLinearGradient(0, y0, 0, JUMBO.h);
-  bar.addColorStop(0, '#1c1430');
-  bar.addColorStop(1, '#0a0714');
-  ctx.fillStyle = bar;
-  ctx.fillRect(50, y0, JUMBO.w - 50, JUMBO.h - y0);
+  wrestleJumboBar(ctx);
   if (!withCrawl) return;
+  const y0 = WR_CRAWL.y0;
   ctx.save();
   ctx.beginPath();
   ctx.rect(50, y0, JUMBO.w - 50, JUMBO.h - y0);
@@ -497,6 +493,16 @@ export function drawWrestleJumbo(ctx: Ctx, c: JumboContent, t: number, crawl: [s
     }
   }
   ctx.restore();
+}
+
+/** The band the ring's jumbotron crawl runs in (over the screen's glass: the crawl has none). */
+export function wrestleJumboBar(ctx: Ctx) {
+  const y0 = WR_CRAWL.y0;
+  const bar = ctx.createLinearGradient(0, y0, 0, JUMBO.h);
+  bar.addColorStop(0, '#1c1430');
+  bar.addColorStop(1, '#0a0714');
+  ctx.fillStyle = bar;
+  ctx.fillRect(50, y0, JUMBO.w - 50, JUMBO.h - y0);
 }
 
 /** The folded steel chair's box (art units): stood on end, the feet (where you grip it) at the bottom. */
