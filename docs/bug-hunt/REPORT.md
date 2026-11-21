@@ -6,8 +6,8 @@
 - entities, world, all scenes, UI
 - graphics (gfx) and the art page
 
-**Result:** 27 fix PRs (#1–#25, #27, #28), each on its own branch. #26 is this report. They are stacked: each PR's base is the one before it, and #1's base is `claude/game-base`. Every patch also applies **on its own** to `claude/game-base` (checked with `git apply --check`), so any subset can be merged in any order.
-- **2 are performance changes (#1, #25), 2 are memory changes (#27, and #28, a trade-off), and the other 23 fix 24 bugs.** #23 fixes two related bugs in two commits.
+**Result:** 26 fix PRs (#1–#25, #27), each on its own branch. #26 is this report. They are stacked: each PR's base is the one before it, and #1's base is `claude/game-base`. Every patch also applies **on its own** to `claude/game-base` (checked with `git apply --check`), so any subset can be merged in any order.
+- **2 are performance changes (#1, #25), 1 is a memory change (#27), and the other 23 fix 24 bugs.** #23 fixes two related bugs in two commits.
 - Each PR has a fresh-eyes review comment on GitHub (verdict plus inline notes) for whoever decides what to merge.
 - **Checks:**
   - on every branch: `tsc --noEmit` and `tsc --noEmit -p tsconfig.server.json` pass;
@@ -51,7 +51,6 @@ Where I was unsure, I chose the lower one. No bug reached High: the account data
 | #24 | `fix-drop-plop-weapon` | bug | Low | A passed-by drop Plop's blaster was left hanging in mid-air | browser: `drop.mjs` |
 | #25 | `perf-music-mixdown` | perf | — | Songs mixed to mono in one pass: 1.5–2.7× faster at 4× CPU, bit-identical | browser: `mix.mjs` (real songs) |
 | #27 | `mem-release-static-canvases` | memory | — | 45 static pictures let their canvas pixels go once uploaded: −1.6 MB held everywhere, pixel-identical | browser: `memcensus.mjs`, `propshot.mjs` |
-| #28 | `mem-free-other-parts-ground` | memory (trade-off) | — | A level frees the other Parts' hidden start-screen ground: −30 MB (−25%) of textures while playing; other Parts ready ~4 s later after coming home | browser: `homecost.mjs` |
 
 ## For whoever merges: decisions and caveats (from the reviews)
 - **#3** assumes **exactly one proxy that appends** to X-Forwarded-For (the Railway setup).
@@ -60,7 +59,6 @@ Where I was unsure, I chose the lower one. No bug reached High: the account data
 - **#5 is a balance change:** rocks now do their stated 1/2/3 damage, so big bad guys survive most rocks. It needs a design OK. Its extra filter in `stepHazards` is made redundant by #19 (keep #19's).
 - **#14 is a behaviour change:** devices at 47.6–50 fps get a lower resolution before light mode, which is saved for good. It needs a design OK.
 - **#16** stops the progress endpoint from ever lowering values. Any future "reset progress" feature needs its own route.
-- **#28 is a trade-off:** it frees 30 MB of textures during a level, at the cost of the other Parts' fly-overs taking about 4 s longer to be ready again after coming home. Merge only if that trade is wanted. It's independent of #27.
 - **#8 is the easiest to skip:** by my estimate it is only reachable with very precise play.
 - **#20:** guarding `go()` in `askCode()` would also avoid the brief connect-leave-connect. It isn't needed for correctness.
 - **#6:** the `paused` CSS class is used as state; a `pauseEl` reference would be more explicit. A neighbouring comment is stale.
@@ -197,18 +195,17 @@ Where I was unsure, I chose the lower one. No bug reached High: the account data
 ## Memory pass
 - **Census** (`tests/browser/memcensus.mjs`, pixel ratio 2): textures on the graphics chip at the start screen 79 MB, in Parts 2 and 5 about 120 MB, in basketball 118 MB. Canvases still holding their pixels: 4.3–5.4 MB. JS heap: 14–32 MB.
 - **#27 (clear win):** 45 static pictures kept their canvas pixels after upload for nothing. Released: −1.6 MB held in every state, and the screenshot of all of them drawn by the game is identical.
-- **#28 (trade-off):** about 30 MB of other Parts' ground stays held through every level, because `homeKeepKeys` also spares the start screen's *hidden* fly-overs. Freeing them: −25% textures in Part 2 (120 → 90 MB), with the start screen back just as quickly and no loading card, but the other Parts ready about 4 s later after coming home.
 - **Looked at and left alone:**
   - **The start screen keeping every Part's fly-over:** deliberate ("light enough to keep", for instant switching).
   - **Ground resolution:** already lowered and shared between the start screen and levels.
   - **The live cloud canvases** (re-painted in levels) and the **jumbotron/ribbon** (redrawn): they need their pixels.
-  - **The sea art held in dry levels** (about 3 MB), the other Parts' trees (part of 6.9 MB), and the terrain held during a boss: the same kind of trade-off as #28 (kept for an instant way back), smaller, and not changed.
+  - **The other Parts' ground and trees, and the sea art (about 3 MB), held through a level, and the terrain held during a boss:** kept deliberately so that going back is instant. Freeing them would trade that instant return for memory, so they're not changed.
   - **Decoded songs:** at most the last two plus the one playing (#18).
 - **Functional checks on the new builds:** Parts 1–6 and four bosses ran with no errors.
 
 ## If more turns up later (how to add to this)
 - **This PR (#26) stays the single place to start.** Add any new finding to this REPORT.md (table, details, evidence) and its description to PRs.md, then push to `claude/bug-hunt-report`. Don't open another report PR.
-- **New fixes go on new branches stacked on the top of the stack** (currently `claude/mem-free-other-parts-ground`, #28, or `claude/mem-release-static-canvases`, #27, if #28 is not wanted): `claude/fix-<name>` based on the previous top. That gives one PR per fix, with the previous top as its base, and the patch should also apply on its own to `claude/game-base` (check with `git apply --check`).
+- **New fixes go on new branches stacked on the top of the stack** (currently `claude/mem-release-static-canvases`, #27): `claude/fix-<name>` based on the previous top. That gives one PR per fix, with the previous top as its base, and the patch should also apply on its own to `claude/game-base` (check with `git apply --check`).
 - **For each new fix PR:**
   - a test that shows the bug on `claude/game-base` and the fix on top (node tests in `tests/`, browser scripts in `tests/browser/`, served build as described above);
   - `tsc --noEmit` and `tsc --noEmit -p tsconfig.server.json` passing;
