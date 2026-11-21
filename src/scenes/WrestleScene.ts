@@ -996,10 +996,11 @@ export class WrestleScene extends Phaser.Scene {
     const t = this.clock / 1000;
     const gb = this.ropesBack.clear();
     const gf = this.ropesFront.clear();
-    const line = (g: Phaser.GameObjects.Graphics, pts: { x: number; y: number }[], col: string, w: number) => {
+    const line = (g: Phaser.GameObjects.Graphics, ptsIn: { x: number; y: number }[], col: string, w: number) => {
+      const pts = ptsIn as Phaser.Math.Vector2[];
       g.lineStyle(w + 1.6, 0x1a0e06, 1).strokePoints(pts, false);
       g.lineStyle(w, Phaser.Display.Color.HexStringToColor(col).color, 1).strokePoints(pts, false);
-      g.lineStyle(w * 0.3, 0xffffff, 0.35).strokePoints(pts.map((p) => ({ x: p.x, y: p.y - w * 0.2 })), false);
+      g.lineStyle(w * 0.3, 0xffffff, 0.35).strokePoints(pts.map((p) => ({ x: p.x, y: p.y - w * 0.2 })) as Phaser.Math.Vector2[], false);
     };
     const long = (g: Phaser.GameObjects.Graphics, k: number, x0: number, x1: number, y: number, col: string, w: number) => {
       const pts: { x: number; y: number }[] = [];
@@ -1404,7 +1405,11 @@ export class WrestleScene extends Phaser.Scene {
     p.sync(dt);
     this.cropInPoo();
     this.drawHeroHearts();
-    if (this.climb) p.view.setFrame(Math.floor(this.clock / 90) % 2 ? 'jump' : 'fall');
+    if (this.climb) {
+      // (off a face frame — a blink, a smile — first: those are on a sheet of their own)
+      if (p.view.texture.key.endsWith('-face')) p.view.setTexture(p.key);
+      p.view.setFrame(Math.floor(this.clock / 90) % 2 ? 'jump' : 'fall');
+    }
     if (this.fighting) this.emitHud();
     // the crowd on its feet for the big moments
     const excited = this.clock < this.excitedUntil && Math.floor(this.clock / 170) % 3 !== 2;

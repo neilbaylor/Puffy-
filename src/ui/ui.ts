@@ -584,7 +584,7 @@ export class UI {
         <button class="icon-btn battle-btn" data-act="battle" aria-label="Online battle with friends">Battle</button>
         <button class="icon-btn fs-btn" data-act="fs" aria-label="Full screen" hidden>⛶</button>
       </div>
-      <p class="version">v${VERSION} · ${this.game.renderer.type === Phaser.WEBGL ? 'WebGL' : 'Canvas'}${this.lowRes()}</p>
+      <p class="version">v${VERSION} · Phaser 4 · ${this.game.renderer.type === Phaser.WEBGL ? 'WebGL' : 'Canvas'}${this.lowRes()}</p>
       <div class="start-foot">
         <button class="btn btn-big btn-go" data-act="play">Play</button>
         ${usingTouch() ? '' : controlsHtml(true)}

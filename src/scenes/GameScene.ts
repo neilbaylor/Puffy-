@@ -1746,7 +1746,7 @@ export class GameScene extends Phaser.Scene {
         const lx = pd.x0 + (((i * 0.43 + pd.t * 0.03) % 1) * (w - 30)) + 6;
         im.setPosition(lx, y + 6 + (i % 2) * 3).setDisplaySize(18 + (i % 3) * 6, 2.5).setVisible(true);
       });
-      g.lineStyle(2, 0x3a2418, 1).strokePoints(pts);
+      g.lineStyle(2, 0x3a2418, 1).strokePoints(pts as Phaser.Math.Vector2[]);
       g.lineStyle(1.5, hexOf(POO.light), 0.9);
       g.beginPath();
       pts.forEach((q, i) => (i ? g.lineTo(q.x, q.y + 3) : g.moveTo(q.x, q.y + 3)));

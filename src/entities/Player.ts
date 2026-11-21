@@ -154,7 +154,8 @@ export class Player {
     this.hitbox.setData('player', this);
 
     this.key = `char-${char.id}`;
-    this.view = scene.add.sprite(x, y, `char-${char.id}`, 'idle0').setOrigin(0.5, 1).setScale(this.S).setDepth(DEPTH.players);
+    // (under the sea the level swaps in the dive-gear sheet straight away: this one isn't made there)
+    this.view = scene.add.sprite(x, y, this.key, scene.textures.exists(this.key) ? 'idle0' : undefined).setOrigin(0.5, 1).setScale(this.S).setDepth(DEPTH.players);
     this.meter = new StaminaMeter(scene);
   }
 
@@ -630,7 +631,8 @@ export class Player {
     this.body.setVelocity(0, 0);
     this.body.enable = false;
     sfx.die();
-    this.view.setFrame('hurt').setAlpha(1);
+    // (the plain sheet's: a face frame — a blink, a smile — is on another sheet without one)
+    this.view.setTexture(this.key, 'hurt').setAlpha(1);
     this.meter.hide();
     if (fell) {
       this.view.setVisible(false);

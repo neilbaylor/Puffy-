@@ -116,7 +116,7 @@ export abstract class Enemy extends Phaser.Physics.Arcade.Sprite {
       this.gs.onEnemyDefeated(this, by);
       this.kill(how);
     } else {
-      this.setTintFill(0xffffff);
+      this.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
       this.flashUntil = this.gs.time.now + 90;
       this.hurtAt = this.gs.time.now;
       sfx.bump();

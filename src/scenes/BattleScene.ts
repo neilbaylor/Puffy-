@@ -1479,7 +1479,7 @@ export class BattleScene extends Phaser.Scene {
           v.sparkT = 0.06;
           this.fx.sparkle(x + (Math.random() - 0.5) * 30 * v.size, y - Math.random() * 40 * v.size, 1);
         }
-      } else if (p.frozen <= 0 && v.sprite.isTinted && v.sprite.tintFill === false) v.sprite.clearTint();
+      } else if (p.frozen <= 0 && v.sprite.isTinted && v.sprite.tintMode !== Phaser.TintModes.FILL) v.sprite.clearTint();
       if (p.power === POWER.rapid && v.sparkT <= 0) {
         v.sparkT = 0.09;
         this.fx.flameTrail(x + p.facing * 22 * c.scale, y - (c.muzzleY ?? 18), p.facing, 0.5);
@@ -1766,7 +1766,7 @@ export class BattleScene extends Phaser.Scene {
       }
       // (the Plops' art faces left, like the Puff Balls')
       v.spr.setFrame(frame).setPosition(x + ox, y + 2 + oy).setFlipX(dir > 0);
-      if (flags & 8) v.spr.setTintFill(0xffffff);
+      if (flags & 8) v.spr.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
       else v.spr.clearTint();
       v.chute.setVisible(chute).setPosition(x, y - h + 4).setRotation(Math.sin(this.time.now / 400 + id) * 0.12);
       // the front hand: a Plop's is the tip of its arm; a Puff Ball's as in the levels
@@ -1984,7 +1984,7 @@ export class BattleScene extends Phaser.Scene {
         case 'hit': {
           const v = this.views.get(e.id);
           if (v) {
-            v.sprite.setTintFill(0xffffff);
+            v.sprite.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
             this.time.delayedCall(90, () => v.sprite.active && v.sprite.clearTint());
             this.fx.stars(v.sprite.x, v.sprite.y - 30, 5);
           }

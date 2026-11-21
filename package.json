@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host",
     "build": "tsc --noEmit && tsc --noEmit -p tsconfig.server.json && vite build && npm run build:server",
+    "build:p4": "tsc --noEmit && vite build --mode p4",
     "build:single": "tsc --noEmit && vite build --mode single",
     "preview": "vite preview --host",
     "typecheck": "tsc --noEmit",
@@ -13,7 +14,7 @@
     "build:server": "esbuild server/battle.ts server/users.ts --bundle --platform=node --format=esm --packages=external --outdir=dist-server --out-extension:.js=.mjs"
   },
   "dependencies": {
-    "phaser": "^3.90.0",
+    "phaser": "^4.2.1",
     "ws": "^8.18.3"
   },
   "devDependencies": {

@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig, type Plugin } from 'vite';
 import { viteSingleFile } from 'vite-plugin-singlefile';
 import { offline } from './scripts/offline-plugin';
@@ -25,13 +26,14 @@ const preloadGame: Plugin = {
 // `npm run build` -> normal multi-file build in dist/
 // `npm run build:single` -> one self-contained HTML file (easy to share / host anywhere)
 export default defineConfig(({ mode }) => ({
-  base: './',
-  plugins: mode === 'single' ? [viteSingleFile()] : [preloadGame, offline()],
+  // (`--mode p4`: the Phaser 4 trial, served from /p4/ beside the real game, without its offline helper)
+  base: mode === 'p4' ? '/p4/' : './',
+  plugins: mode === 'single' ? [viteSingleFile()] : mode === 'p4' ? [preloadGame] : [preloadGame, offline()],
   // Phaser without the Matter physics engine (the game only uses Arcade physics): ~110 kB less
   // code for phones to download and parse at start-up
-  resolve: { alias: [{ find: /^phaser$/, replacement: 'phaser/dist/phaser-arcade-physics.js' }] },
+  resolve: { alias: [{ find: /^phaser$/, replacement: fileURLToPath(new URL('./node_modules/phaser/dist/phaser-arcade-physics.js', import.meta.url)) }] },
   build: {
-    outDir: mode === 'single' ? 'dist-single' : 'dist',
+    outDir: mode === 'single' ? 'dist-single' : mode === 'p4' ? 'dist-p4' : 'dist',
     chunkSizeWarningLimit: 2000,
   },
 }));

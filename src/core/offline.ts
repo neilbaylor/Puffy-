@@ -10,7 +10,8 @@
  * Only in the real (built) game: not on the dev server, nor in the single-file build (which can't
  * have one), nor a saved copy of the page. Anything going wrong here just means no offline copy.
  */
-const ON = import.meta.env.PROD && import.meta.env.MODE !== 'single';
+// (and not the Phaser 4 trial at /p4/: the real game's helper looks after the site)
+const ON = import.meta.env.PROD && import.meta.env.MODE !== 'single' && import.meta.env.MODE !== 'p4';
 /** How long after the start screen appears. */
 const AFTER_MS = 3000;
 
