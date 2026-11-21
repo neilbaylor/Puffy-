@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.353)
+## Where things stand (v0.354)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -31,6 +31,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   Home screen (yellow).
 - Start screen: drone fly-over behind, logo hop, hero cards (pick = hop / backflip), Play, Part picker once a
   level is beaten, mute (top-left), full screen + **Battle** buttons (top-right, same height, side by side).
+- v0.354: WrestleScene.outOfPoo(): when the poo puddle (or anything else) takes your last heart while sinking, the hero is moved onto the mat at the puddle edge, view included (a fainted Player's sync() no longer moves the view, so it used to stay under the mat uncropped and show through the ring). All bug-hunt PRs now closed on GitHub.
 - v0.353: Bug-hunt PRs cherry-picked (-x) onto claude/battle: #1 #2 #3 #4 #6 #7 #9 #13 #15 #16 #18 #19 #22 #23 #24 #25. Not taken: #5 (balance), #8, #10 (look), #11, #12, #14 (slow-check behaviour), #17, #20, #21 (optional), #26 (report, some claims wrong), #27 (risk: freed canvases blank after GL restore). #3 adjusted: rate-limit key = X-Real-IP (Railway), else last XFF hop. main.ts: light mode reloads once (per minute, sessionStorage puffy.glReload) after a GL context loss. PRs on GitHub still open (not closed/merged there).
 - v0.352: Wrestling crash at fight start fixed: since useTree:false (E1, v0.314) Phaser's collideSpriteVsGroup walked the group's live children with a cached length; a hit destroying a member → children[i] undefined → "reading 'body'" TypeError (Safari: page dies). core/physicsFix.ts patches it to walk a copy (main.ts calls fixArcadeGroupWalk before the game). Repro: twr5.cjs (Queen, 30 shots).
 - v0.351: Hidden ?lite / ?full (light.ts hiddenSwitch: sets puffy.light 1/0 + lightRetried, strips the param) and ?diag (core/diag.ts box: mode, saved key, memory, cores, max texture, screen, refresh, auto check, home measurement). For the user's low tablet that never switched.
