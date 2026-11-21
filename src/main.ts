@@ -16,6 +16,10 @@ import { savedResCap, saveResCap } from './core/res';
 import { trackBossArt } from './gfx/textures';
 import { refreshMs } from './core/refresh';
 import { trimRenderTargets } from './core/renderTargets';
+import { fixArcadeGroupWalk } from './core/physicsFix';
+
+// (before any scene: see physicsFix)
+fixArcadeGroupWalk();
 
 installInput();
 
