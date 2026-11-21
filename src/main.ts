@@ -149,7 +149,10 @@ function makeGl(): { canvas: HTMLCanvasElement; context: WebGLRenderingContext }
       desynchronized: false,
       depth: false,
       stencil: false,
-      antialias: true,
+      // (light mode: no smoothing of the screen's edges. The art's own pictures have soft edges of
+      // their own and look the same; only lines drawn as lines — ropes, nets, cords — show steps.
+      // Smoothing keeps four samples of every pixel of the screen, and works them all each frame)
+      antialias: !LIGHT,
       premultipliedAlpha: true,
       failIfMajorPerformanceCaveat: false,
       powerPreference: 'high-performance',
@@ -222,6 +225,8 @@ function start(refreshMs: number) {
     resize();
   };
   game.events.once(Phaser.Core.Events.READY, () => {
+    const g = (game.renderer as unknown as { gl?: WebGLRenderingContext }).gl;
+    diag.smooth = g ? `${g.getContextAttributes()?.antialias ? 'on' : 'off'} (${g.getParameter(g.SAMPLES)} samples)` : 'canvas';
     warmBatchShaders(game);
     trimRenderTargets(game);
     trackBossArt(game);
