@@ -358,3 +358,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.353: A batch of bug fixes: a server security hole, progress on new devices, battle rejoin after a reload, paused-game taps in Hoops/Fishing, Part 5 King Bob's silent intro, a stuck blaster, football running out of balls, faster loading and music.
 - v0.354: Wrestling: losing your last heart in the poo puddle no longer shows the hero through the ring.
 - v0.355: The iPhone home-screen app opened sideways fills the whole screen (no blue strip at the bottom).
+- v0.356: A test copy of the game on the new Phaser 4 engine at /p4/; the waves at King Bob's fishing boat show again; small fixes to the hero's fainting and rope-climbing pictures.
