@@ -29,6 +29,9 @@ function warm(game: Phaser.Game) {
   const factory = r.shaderProgramFactory;
   const handler = r.renderNodes?.getNode('BatchHandlerQuad');
   if (!r.gl || !factory || !handler?.finalizeTextureCount) return;
+  // (only where the chip can get shaders ready in the background: elsewhere each would be made on
+  // the spot, all 16 at once — a longer start, mostly for counts the game never draws with)
+  if (!r.gl.getExtension('KHR_parallel_shader_compile')) return;
   const P = (Phaser.Renderer.WebGL.Wrappers.WebGLProgramWrapper.prototype as unknown) as Program & { __warmPatched?: boolean };
   if (!P.__warmPatched) {
     P.__warmPatched = true;
