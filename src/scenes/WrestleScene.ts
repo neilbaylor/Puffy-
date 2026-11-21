@@ -9,15 +9,16 @@ import { loseLife, lives } from '../core/lives';
 import { bank } from '../core/bank';
 import { ART_RES, CARRY_SWING, CHAR_H, CHAR_W, bodyLift, canvas, carryHand } from '../gfx/draw';
 import { wardrobe } from '../core/wardrobe';
-import { ARENA_H, ARENA_W, CROWD_H, FRONT_H, JUMBO, RIBBON, STAGE_OX, STAGE_OY, drawArena, drawArenaFront, drawCrowd, drawCameraFlash, drawRibbonScreen, drawSpotlight, setArenaStyle, type JumboContent } from '../gfx/hoops';
+import { ARENA_H, ARENA_W, CROWD_H, FRONT_H, JUMBO, RIBBON, STAGE_OX, STAGE_OY, drawArena, drawArenaFront, drawCrowd, drawCameraFlash, drawRibbonScreen, drawSpotlight, paintCrawl, setArenaStyle, type JumboContent } from '../gfx/hoops';
 import { PLOP_FRAMES, PLOP_H, PLOP_W, QUEEN_KO_FRAMES, QUEEN_KO_GROUND, QUEEN_KO_H, QUEEN_KO_W, drawPlop, drawQueen, drawQueenKO, type PlopFrame } from '../gfx/plops';
 import { POOWAVE_H, POOWAVE_W, drawPooWave } from '../gfx/plopworld';
 import { drawPoo } from '../gfx/hazards';
 import { drawPrize } from '../gfx/prizes';
 import { STYLES } from '../gfx/handdrawn';
-import { CHAIR_H, CHAIR_W, KING_SEAT, PLOP_DOME, PLOP_DOME_RING, POO_PALACE, POO_PALACE_RING, setRingLook, drawFoldingChair, POST_BOX, PUDDLE, RING, RING_BOX, ROPE_COL, TUNNEL, backX, drawArenaPoo, drawFrontPost, drawRing, drawRingFloor, drawRingside, drawTunnel, drawWrestleJumbo } from '../gfx/wrestle';
+import { CHAIR_H, CHAIR_W, KING_SEAT, PLOP_DOME, PLOP_DOME_RING, POO_PALACE, POO_PALACE_RING, setRingLook, drawFoldingChair, POST_BOX, PUDDLE, RING, RING_BOX, ROPE_COL, TUNNEL, backX, drawArenaPoo, drawFrontPost, drawRing, drawRingFloor, drawRingside, drawTunnel, drawWrestleJumbo, WR_CRAWL, wrestleCrawlAt, wrestleCrawlItems } from '../gfx/wrestle';
 import { HERO_SHEET_M, PCHUTE_DOWN, PCHUTE_RES, PCHUTE_UP, PLOP_PAD, PLOP_RES, PLOP_TOP, addCanvas, hires, makeCarrySheet, makeJetFx, makePlopChutes, makePlops, makeWeaponArt } from '../gfx/textures';
 import { liveCanvas } from '../gfx/liveCanvas';
+import { LedRibbon, LedStrip } from '../gfx/ledStrip';
 import { BLASTER, SAW, W_RES } from '../gfx/weapons';
 import { JET_NOZZLES, ROBE_H, ROBE_W, drawDuck, drawPlopKing, drawRobeHeap } from '../gfx/plopking';
 import { BOOM_FRAMES, BOOM_SIZE, drawBoomFrame } from '../gfx/boom';
@@ -513,9 +514,15 @@ export class WrestleScene extends Phaser.Scene {
   private excitedUntil = 0;
   private jumboTex!: Phaser.Textures.CanvasTexture;
   private ribbonTex!: Phaser.Textures.CanvasTexture;
+  /** The ribbon's big-moment screen (shown over the gliding sponsor panels while one is on). */
+  private ribbonMsgImg!: Phaser.GameObjects.Image;
+  /** The jumbotron's crawl and the ribbon's sponsor panels, slid along by the graphics chip. */
+  private jumboCrawl!: LedStrip;
+  private ribbon!: LedRibbon;
   private jumbo: JumboContent = { kind: 'title' };
   private jumboUntil = 0;
   private screensNext = 0;
+  private ribbonNext = 0;
   private ribbonMsg: { text: string; color: string; bg: string; t0: number } | null = null;
   private ropesBack!: Phaser.GameObjects.Graphics;
   private ropesFront!: Phaser.GameObjects.Graphics;
@@ -618,6 +625,7 @@ export class WrestleScene extends Phaser.Scene {
     this.lastHud = '';
     this.clock = 0;
     this.screensNext = 0;
+    this.ribbonNext = 0;
   }
 
   create() {
@@ -636,8 +644,12 @@ export class WrestleScene extends Phaser.Scene {
     this.jumboTex = liveCanvas(this.textures, 'wr-jumbo', JUMBO.w * 2, JUMBO.h * 2);
     // (the screens glow: they're in front of the darkness when the lights go down, like the basketball jumbotron)
     this.add.image(WX(JUMBO.x), WY(JUMBO.y), 'wr-jumbo').setOrigin(0).setScale((JUMBO.s * K) / 2).setDepth(DEPTH_W.dark + 0.05);
+    // (the jumbotron's crawl a strip of its own over it)
+    const jk = JUMBO.s * K;
+    this.jumboCrawl = new LedStrip(this, 'led-wcrawl', WX(JUMBO.x) + WR_CRAWL.x * jk, WY(JUMBO.y) + WR_CRAWL.y0 * jk, JUMBO.w - WR_CRAWL.x, JUMBO.h - WR_CRAWL.y0, jk, DEPTH_W.dark + 0.051);
+    this.ribbon = new LedRibbon(this, WX(RIBBON.x), WY(RIBBON.y), K, DEPTH_W.dark + 0.052);
     this.ribbonTex = liveCanvas(this.textures, 'wr-ribbon', RIBBON.w * 2, RIBBON.h * 2);
-    this.add.image(WX(RIBBON.x), WY(RIBBON.y), 'wr-ribbon').setOrigin(0).setScale(K / 2).setDepth(DEPTH_W.dark + 0.05);
+    this.ribbonMsgImg = this.add.image(WX(RIBBON.x), WY(RIBBON.y), 'wr-ribbon').setOrigin(0).setScale(K / 2).setDepth(DEPTH_W.dark + 0.056).setVisible(false);
     this.add.image(WX(RING_BOX.x), WY(RING_BOX.y), this.tk('wr-ring')).setOrigin(0).setScale(K / RES).setDepth(DEPTH_W.ring);
     this.ringside = this.add.image(WX(-160), WY(500), 'wr-ringside').setOrigin(0).setScale(K / 1.5).setDepth(DEPTH_W.ringside);
     for (const x of [RING.x0, RING.x1])
@@ -1419,11 +1431,25 @@ export class WrestleScene extends Phaser.Scene {
       // (before the fight, back to her title: the hits to go only go up once it's on)
       this.jumbo = this.fighting || this.ended ? this.countJumbo() : { kind: 'title' };
     }
-    // (light mode: the screens are redrawn every 70 ms, like the basketball ones, not every frame:
-    // redrawing and re-uploading both was a third of a slow phone's frame)
-    if (!LIGHT || this.clock >= this.screensNext) {
-      this.screensNext = this.clock + 70;
+    // the jumbotron's screen is redrawn 20 times a second (14 in light mode), and the ribbon's
+    // only while a big moment has it (30 / 14): redrawing and re-uploading both every frame was a
+    // third of a slow phone's frame. What glides along (the jumbotron's crawl, the ribbon's
+    // sponsor panels) is slid by the graphics chip every frame instead, nothing redrawn.
+    if (this.clock >= this.screensNext) {
+      this.screensNext = this.clock + (LIGHT ? 70 : 50);
       this.drawScreens();
+    }
+    const t = this.clock / 1000;
+    this.jumboCrawl.place(wrestleCrawlAt(t, this.jumboCrawl.loopWidth));
+    const takeover = this.ribbonTakeover();
+    this.ribbon.update(t, takeover);
+    this.ribbonMsgImg.setVisible(takeover);
+    if (takeover && this.clock >= this.ribbonNext) {
+      this.ribbonNext = this.clock + (LIGHT ? 70 : 33);
+      const rctx = this.ribbonTex.getContext();
+      rctx.setTransform(2, 0, 0, 2, 0, 0);
+      drawRibbonScreen(rctx, t, this.ribbonMsg);
+      this.ribbonTex.refresh();
     }
   }
 
@@ -1825,21 +1851,27 @@ export class WrestleScene extends Phaser.Scene {
     this.jumboUntil = this.clock + ms;
   }
 
+  /** A big moment ("CHAIR! CHAIR!") has the ribbon (as drawRibbonScreen shows them: 2.6 s). */
+  private ribbonTakeover() {
+    return !!this.ribbonMsg && this.clock / 1000 - this.ribbonMsg.t0 < 2.6;
+  }
+
+  /** The jumbotron's screen (its crawl glides on its own: see update). */
   private drawScreens() {
     const t = this.clock / 1000;
-    const ctx = this.jumboTex.getContext();
-    ctx.setTransform(2, 0, 0, 2, 0, 0);
-    drawWrestleJumbo(ctx, this.jumbo, t, [
+    const crawl: [string, string][] = [
       [this.kingFight ? 'PLOP DOME' : 'POO PALACE', '#ffd23f'],
       [`${this.bossName} vs ${characterById(this.wd.charId).name.toUpperCase()}`, '#ffffff'],
       ['TITLE MATCH', '#7fe7ff'],
       ['POOPA COLA', '#ffffff'],
-    ]);
+    ];
+    const ctx = this.jumboTex.getContext();
+    ctx.setTransform(2, 0, 0, 2, 0, 0);
+    drawWrestleJumbo(ctx, this.jumbo, t, crawl, false);
     this.jumboTex.refresh();
-    const rctx = this.ribbonTex.getContext();
-    rctx.setTransform(2, 0, 0, 2, 0, 0);
-    drawRibbonScreen(rctx, t, this.ribbonMsg);
-    this.ribbonTex.refresh();
+    const items = wrestleCrawlItems(crawl);
+    const h = JUMBO.h - WR_CRAWL.y0;
+    this.jumboCrawl.paint(JSON.stringify(items), () => paintCrawl(null, items, 'between', h), (c) => paintCrawl(c, items, 'between', h));
   }
 
   private emitHud(force = false) {

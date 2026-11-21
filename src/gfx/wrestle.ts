@@ -462,14 +462,23 @@ export function drawRingside(ctx: Ctx) {
 }
 
 /** The jumbotron: one of the scoreboard's screens, with this show's own crawl along the bottom. */
-export function drawWrestleJumbo(ctx: Ctx, c: JumboContent, t: number, crawl: [string, string][]) {
-  drawJumboScreen(ctx, c, t);
-  const y0 = JUMBO.h - 18 + 1.5;
+/** The wrestling jumbotron's own crawl band (it covers the basketball ticker's crawl): from x 50, y0 to the bottom. */
+export const WR_CRAWL = { x: 50, y0: JUMBO.h - 18 + 1.5 };
+/** Its crawl items, with gold stars between them. */
+export const wrestleCrawlItems = (crawl: [string, string][]) => crawl.map(([text, color]) => ({ text, color }));
+/** The crawl's offset at time t (from the band's left; it loops every `loop`). */
+export const wrestleCrawlAt = (t: number, loop: number) => 6 - ((t * 46) % loop) - loop;
+
+/** With `withCrawl` false, the band without its text: the crawl is then its own strip (LedStrip). */
+export function drawWrestleJumbo(ctx: Ctx, c: JumboContent, t: number, crawl: [string, string][], withCrawl = true) {
+  drawJumboScreen(ctx, c, t, withCrawl ? {} : { crawl: false, grid: 'full' });
+  const y0 = WR_CRAWL.y0;
   const bar = ctx.createLinearGradient(0, y0, 0, JUMBO.h);
   bar.addColorStop(0, '#1c1430');
   bar.addColorStop(1, '#0a0714');
   ctx.fillStyle = bar;
   ctx.fillRect(50, y0, JUMBO.w - 50, JUMBO.h - y0);
+  if (!withCrawl) return;
   ctx.save();
   ctx.beginPath();
   ctx.rect(50, y0, JUMBO.w - 50, JUMBO.h - y0);

@@ -14,7 +14,6 @@ import {
   HOOP,
   JUMBO,
   RIBBON,
-  drawRibbonScreen,
   KING_FRAMES,
   KING_H,
   KING_W,
@@ -41,6 +40,12 @@ import {
   drawSpotBrush,
   drawSpotlight,
   drawJumboScreen,
+  drawJumboBandGlass,
+  jumboCrawlItems,
+  paintCrawl,
+  JUMBO_TICK_H,
+  JUMBO_CRAWL_X,
+  JUMBO_TAG_W,
   type JumboContent,
 } from '../gfx/hoops';
 import { stingerReveal, stingerTitle } from '../ui/stinger';
@@ -55,6 +60,7 @@ import { loseLife } from '../core/lives';
 import { NetSim } from './hoopsNet';
 import { SimpleConfetti } from '../world/SimpleConfetti';
 import { dropDepthBuffer, shrinkCaptureTarget } from '../core/renderTargets';
+import { LedRibbon, LedStrip, ledStill } from '../gfx/ledStrip';
 import { liveCanvas } from '../gfx/liveCanvas';
 import { PLOP_H, PLOP_KINDS, PLOP_SCALE, PLOP_W, drawPlop, type PlopFrame, type PlopKind } from '../gfx/plops';
 import { STYLES } from '../gfx/handdrawn';
@@ -195,8 +201,9 @@ export class HoopsScene extends Phaser.Scene {
   private jumboUntil = 0;
   private jumboNext = 0;
   // the LED ribbon marquee between the decks
-  private ribbonTex!: Phaser.Textures.CanvasTexture;
-  private ribbonMsg: { text: string; color: string; bg: string; t0: number } | null = null;
+  /** The jumbotron ticker's crawl and the ribbon's sponsor panels, slid along by the graphics chip. */
+  private jumboCrawl!: LedStrip;
+  private ribbon!: LedRibbon;
   // ball motion trail
   private ghosts: Phaser.GameObjects.Image[] = [];
   private trail: { x: number; y: number; s: number }[] = [];
@@ -380,10 +387,13 @@ export class HoopsScene extends Phaser.Scene {
     this.jumboTex = liveCanvas(this.textures, 'jumbo', JUMBO.w * JR, JUMBO.h * JR);
     const jp = A(JUMBO.x, JUMBO.y);
     this.add.image(jp.x, jp.y, 'jumbo').setOrigin(0, 0).setScale(JUMBO.s / JR).setDepth(11.6);
-    this.ribbonTex = liveCanvas(this.textures, 'ribbon', RIBBON.w * JR, RIBBON.h * JR);
+    // (its ticker's crawl a strip of its own over it, then the LED glass over that)
+    const bandY = jp.y + (JUMBO.h - JUMBO_TICK_H) * JUMBO.s;
+    this.jumboCrawl = new LedStrip(this, 'led-hcrawl', jp.x + JUMBO_CRAWL_X * JUMBO.s, bandY, JUMBO.w - JUMBO_CRAWL_X, JUMBO_TICK_H, JUMBO.s, 11.601);
+    const band = ledStill(this, 'led-jband', JUMBO.w, JUMBO_TICK_H, (ctx) => drawJumboBandGlass(ctx));
+    this.add.image(jp.x, bandY, band.key).setOrigin(0, 0).setScale(JUMBO.s / band.res).setDepth(11.602);
     const rp = A(RIBBON.x, RIBBON.y);
-    this.add.image(rp.x, rp.y, 'ribbon').setOrigin(0, 0).setScale(1 / JR).setDepth(2.05);
-    this.ribbonMsg = null;
+    this.ribbon = new LedRibbon(this, rp.x, rp.y, 1, 2.05);
     this.drawJumbo();
 
     this.dom = document.createElement('div');
@@ -589,6 +599,7 @@ export class HoopsScene extends Phaser.Scene {
       if (this.jumbo.kind === 'big' && this.clock > this.jumboUntil) this.jumbo = this.scoreJumbo();
       this.drawJumbo();
     }
+    this.moveScreens();
     if (this.inIntro) {
       // touches during the intro don't skip it (fingers are often still on the controls when you
       // reach the gate): only the Skip button, or Enter / Esc on a keyboard, once the title is done
@@ -861,15 +872,21 @@ export class HoopsScene extends Phaser.Scene {
     this.drawJumbo();
   }
 
+  /** The jumbotron's screen (its crawl and the ribbon move every frame in moveScreens). */
   private drawJumbo() {
     const ctx = this.jumboTex.getContext();
     ctx.setTransform(2, 0, 0, 2, 0, 0);
-    drawJumboScreen(ctx, this.jumbo, this.clock / 1000);
+    drawJumboScreen(ctx, this.jumbo, this.clock / 1000, { crawl: false });
     this.jumboTex.refresh();
-    const rctx = this.ribbonTex.getContext();
-    rctx.setTransform(2, 0, 0, 2, 0, 0);
-    drawRibbonScreen(rctx, this.clock / 1000, this.ribbonMsg);
-    this.ribbonTex.refresh();
+    const items = jumboCrawlItems(this.jumbo);
+    this.jumboCrawl.paint(JSON.stringify(items), () => paintCrawl(null, items, 'after', JUMBO_TICK_H), (c) => paintCrawl(c, items, 'after', JUMBO_TICK_H));
+  }
+
+  /** The crawl and the ribbon glide on (every frame: nothing redrawn, just moved). */
+  private moveScreens() {
+    const t = this.clock / 1000;
+    this.jumboCrawl.place(JUMBO_TAG_W - JUMBO_CRAWL_X - ((t * 46) % this.jumboCrawl.loopWidth));
+    this.ribbon.update(t, false);
   }
 
   private letterbox(on: boolean) {

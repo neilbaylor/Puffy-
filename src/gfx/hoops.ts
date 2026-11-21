@@ -1433,7 +1433,7 @@ function segDigit(ctx: Ctx, ch: string, x: number, y: number, w: number, h: numb
 }
 
 /** The scrolling news ticker along the bottom of the jumbotron. */
-function jumboTicker(ctx: Ctx, items: { text: string; color: string }[], t: number, y0: number, h: number, w: number) {
+function jumboTicker(ctx: Ctx, items: { text: string; color: string }[], t: number, y0: number, h: number, w: number, crawl = true) {
   const bar = ctx.createLinearGradient(0, y0, 0, y0 + h);
   bar.addColorStop(0, '#1c1430');
   bar.addColorStop(1, '#0a0714');
@@ -1441,8 +1441,9 @@ function jumboTicker(ctx: Ctx, items: { text: string; color: string }[], t: numb
   ctx.fillRect(0, y0, w, h);
   ctx.fillStyle = AS.ads[0].bg;
   ctx.fillRect(0, y0, w, 1.5);
-  // the crawl
-  const tagW = 50;
+  // the crawl (or not: then it's a strip of its own, slid along by the graphics chip — see LedCrawl)
+  const tagW = JUMBO_TAG_W;
+  if (crawl) {
   ctx.save();
   ctx.beginPath();
   ctx.rect(tagW, y0, w - tagW, h);
@@ -1479,6 +1480,7 @@ function jumboTicker(ctx: Ctx, items: { text: string; color: string }[], t: numb
     ctx.fillRect(Math.min(x0, x1), y0, 26, h);
   }
   ctx.restore();
+  }
   // LIVE tag with a blinking dot
   ctx.fillStyle = '#d0021b';
   poly(ctx, [[0, y0], [tagW - 4, y0], [tagW + 4, y0 + h], [0, y0 + h]]);
@@ -1494,9 +1496,10 @@ function jumboTicker(ctx: Ctx, items: { text: string; color: string }[], t: numb
 }
 
 /** Live jumbotron content, drawn into a JUMBO.w × JUMBO.h canvas (scaled by the caller). */
-export function drawJumboScreen(ctx: Ctx, c: JumboContent, t = 0) {
+export function drawJumboScreen(ctx: Ctx, c: JumboContent, t = 0, opts: { crawl?: boolean; grid?: 'full' | 'top' } = {}) {
   const { w, h } = JUMBO;
-  const TICK_H = 18;
+  const TICK_H = JUMBO_TICK_H;
+  const crawl = opts.crawl ?? true;
   const bg = ctx.createLinearGradient(0, 0, w, h);
   bg.addColorStop(0, c.kind === 'big' ? c.bg : c.kind === 'score' ? '#0d0c14' : '#0e1240');
   bg.addColorStop(1, c.kind === 'big' ? '#12061f' : c.kind === 'score' ? '#17141f' : '#240a40');
@@ -1708,8 +1711,39 @@ export function drawJumboScreen(ctx: Ctx, c: JumboContent, t = 0) {
     }
   }
   // ticker
-  const items =
-    c.kind === 'score'
+  jumboTicker(ctx, jumboCrawlItems(c), t, h - TICK_H, TICK_H, w, crawl);
+  // LED pixels + glare (with the crawl its own strip: above the ticker only — the strip has its own)
+  ctx.save();
+  if (!crawl && opts.grid !== 'full') {
+    ctx.beginPath();
+    ctx.rect(0, 0, w, h - TICK_H);
+    ctx.clip();
+  }
+  jumboGlass(ctx, w, h);
+  ctx.restore();
+}
+
+/** The jumbotron's LED pixels and glare, over the whole w × h screen. */
+function jumboGlass(ctx: Ctx, w: number, h: number) {
+  ctx.fillStyle = 'rgba(0,0,0,0.16)';
+  for (let x = 0; x < w; x += 2.6) ctx.fillRect(x, 0, 0.7, h);
+  for (let y = 0; y < h; y += 2.6) ctx.fillRect(0, y, w, 0.7);
+  const glare = ctx.createLinearGradient(0, 0, 160, h);
+  glare.addColorStop(0, 'rgba(255,255,255,0.12)');
+  glare.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = glare;
+  ctx.fillRect(0, 0, w, h);
+}
+
+/** The jumbotron's news ticker band: its height, and the LIVE tag's width at its left. */
+export const JUMBO_TICK_H = 18;
+export const JUMBO_TAG_W = 50;
+/** Where the crawl strip starts (just past the LIVE tag's slanted edge). */
+export const JUMBO_CRAWL_X = JUMBO_TAG_W + 4;
+
+/** What the jumbotron's ticker says (it changes with the score). */
+export function jumboCrawlItems(c: JumboContent): { text: string; color: string }[] {
+  return c.kind === 'score'
       ? [
           { text: `${c.name.toUpperCase()} ${c.you}  ·  KING ${c.king}`, color: '#ffffff' },
           { text: AS.jumboTitle + ' ' + AS.words[1], color: '#ffd23f' },
@@ -1722,16 +1756,73 @@ export function drawJumboScreen(ctx: Ctx, c: JumboContent, t = 0) {
           { text: '5 SHOTS EACH', color: '#7fe7ff' },
           ...AS.ads.slice(0, 3).map((a) => ({ text: a.text, color: '#ffffff' })),
         ];
-  jumboTicker(ctx, items, t, h - TICK_H, TICK_H, w);
-  // LED pixels + glare
-  ctx.fillStyle = 'rgba(0,0,0,0.16)';
-  for (let x = 0; x < w; x += 2.6) ctx.fillRect(x, 0, 0.7, h);
-  for (let y = 0; y < h; y += 2.6) ctx.fillRect(0, y, w, 0.7);
-  const glare = ctx.createLinearGradient(0, 0, 160, h);
-  glare.addColorStop(0, 'rgba(255,255,255,0.12)');
-  glare.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = glare;
-  ctx.fillRect(0, 0, w, h);
+}
+
+/**
+ * One full loop of a ticker's crawl, for a strip the graphics chip slides along (LedCrawl): the items
+ * in their colours, a gold star after each (`sep: 'after'`, the basketball ticker) or between them
+ * (`'between'`, the wrestling one: the gap after the last is left empty). Returns the loop's width;
+ * with `ctx` null it only measures.
+ */
+let measurer: Ctx | null = null;
+export function paintCrawl(ctx: Ctx | null, items: { text: string; color: string }[], sep: 'after' | 'between', h: number): number {
+  const m = ctx ?? (measurer ??= canvas(4, 4).ctx);
+  m.font = `400 12px ${DISPLAY_FONT}`;
+  const star = '   ★   ';
+  const starW = m.measureText(star).width;
+  let x = 0;
+  items.forEach((it, i) => {
+    if (sep === 'between' && i > 0) {
+      if (ctx) {
+        ctx.fillStyle = '#ffd23f';
+        ctx.fillText(star, x, h / 2 + 0.5);
+      }
+      x += starW;
+    }
+    if (ctx) {
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = it.color;
+      ctx.fillText(it.text, x, h / 2 + 0.5);
+    }
+    x += m.measureText(it.text).width;
+    if (sep === 'after') {
+      if (ctx) {
+        ctx.fillStyle = '#ffd23f';
+        ctx.fillText(star, x, h / 2 + 0.5);
+      }
+      x += starW;
+    }
+  });
+  return sep === 'between' ? x + starW : x;
+}
+
+/**
+ * What goes over the basketball ticker's crawl strip (band-local: w × JUMBO_TICK_H): the soft fades
+ * at its ends and the screen's LED pixels and glare, as they fall on the band.
+ */
+export function drawJumboBandGlass(ctx: Ctx) {
+  const { w, h } = JUMBO;
+  const y0 = h - JUMBO_TICK_H;
+  ctx.save();
+  ctx.translate(0, -y0);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(JUMBO_CRAWL_X, y0, w - JUMBO_CRAWL_X, JUMBO_TICK_H);
+  ctx.clip();
+  for (const [x0, x1] of [[JUMBO_CRAWL_X, JUMBO_CRAWL_X + 26], [w, w - 26]] as const) {
+    const f = ctx.createLinearGradient(x0, 0, x1, 0);
+    f.addColorStop(0, '#120c22');
+    f.addColorStop(1, 'rgba(18,12,34,0)');
+    ctx.fillStyle = f;
+    ctx.fillRect(Math.min(x0, x1), y0, 26, JUMBO_TICK_H);
+  }
+  ctx.restore();
+  ctx.beginPath();
+  ctx.rect(0, y0, w, JUMBO_TICK_H);
+  ctx.clip();
+  jumboGlass(ctx, w, h);
+  ctx.restore();
 }
 
 /** The LED ribbon between the decks, in stage coordinates (the scene animates it). */
@@ -1797,6 +1888,55 @@ export function drawRibbonScreen(ctx: Ctx, t: number, msg: { text: string; color
     ctx.fillRect(sx - 60, 0, 120, h);
   }
   // LED pixel grid
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  for (let x = 0; x < w; x += 2.6) ctx.fillRect(x, 0, 0.7, h);
+  for (let y = 0; y < h; y += 2.6) ctx.fillRect(0, y, w, 0.7);
+}
+
+/** The ribbon's sponsor panels: one loop of them, and its width. */
+export const RIBBON_SEG = 230;
+/** Which sponsors the ribbon shows (it differs by arena): names its picture. */
+export const ribbonSig = () => AS.ads.map((a) => a.text).join('|');
+export const ribbonLoop = () => RIBBON_SEG * AS.ads.length;
+export function paintRibbonPanels(ctx: Ctx) {
+  const { h } = RIBBON;
+  const segW = RIBBON_SEG;
+  AS.ads.forEach((ad, i) => {
+    const x = i * segW;
+    ctx.fillStyle = ad.bg;
+    ctx.fillRect(x + 1.5, 0, segW - 3, h);
+    const sheen = ctx.createLinearGradient(0, 0, 0, h);
+    sheen.addColorStop(0, 'rgba(255,255,255,0.22)');
+    sheen.addColorStop(0.5, 'rgba(255,255,255,0)');
+    sheen.addColorStop(1, 'rgba(0,0,0,0.18)');
+    ctx.fillStyle = sheen;
+    ctx.fillRect(x + 1.5, 0, segW - 3, h);
+    ctx.font = `400 12px ${DISPLAY_FONT}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = ad.fg;
+    ctx.fillText(ad.text, x + segW / 2, h / 2 + 1, segW - 18);
+  });
+}
+/** The panels' offset at time t (they glide left), as drawRibbonScreen has them. */
+export const ribbonPanelsAt = (t: number) => -((t * 28) % ribbonLoop());
+/** The light sweep running along the ribbon: its left edge at time t, and the picture of it (120 wide). */
+export const ribbonSweepAt = (t: number) => ((t * 400) % (RIBBON.w * 2.5)) - RIBBON.w * 0.25 - 60;
+export function paintRibbonSweep(ctx: Ctx) {
+  const sw = ctx.createLinearGradient(0, 0, 120, 0);
+  sw.addColorStop(0, 'rgba(255,255,255,0)');
+  sw.addColorStop(0.5, 'rgba(255,255,255,0.28)');
+  sw.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = sw;
+  ctx.fillRect(0, 0, 120, RIBBON.h);
+}
+/** The ribbon's dark backing and its LED pixel grid (the panels go between the two). */
+export function paintRibbonBack(ctx: Ctx) {
+  ctx.fillStyle = '#060509';
+  ctx.fillRect(0, 0, RIBBON.w, RIBBON.h);
+}
+export function paintRibbonGrid(ctx: Ctx) {
+  const { w, h } = RIBBON;
   ctx.fillStyle = 'rgba(0,0,0,0.2)';
   for (let x = 0; x < w; x += 2.6) ctx.fillRect(x, 0, 0.7, h);
   for (let y = 0; y < h; y += 2.6) ctx.fillRect(0, y, w, 0.7);
