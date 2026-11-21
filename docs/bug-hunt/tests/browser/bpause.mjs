@@ -1,0 +1,31 @@
+// usage: node bpause.mjs <port> -> two players battle (8 s); A opens Pause during it; the battle ends under it;
+// A presses Escape on the results card: is the card still up?
+import { chromium } from 'playwright';
+const [port] = process.argv.slice(2);
+const b = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--disable-accelerated-2d-canvas'] });
+const room = 'p' + Math.floor(Math.random() * 1e6);
+const mk = async (name) => {
+  const ctx = await b.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 1 });
+  await ctx.addInitScript((n) => { localStorage.setItem('puffy.name', n); localStorage.setItem('puffy.light', '1'); }, name);
+  const p = await ctx.newPage();
+  await p.goto(`http://localhost:${port}/`);
+  await p.waitForFunction(() => window.game?.registry?.get('ready'), null, { timeout: 300000 });
+  await p.evaluate(() => document.querySelector('[data-act=battle]').click());
+  await p.waitForFunction(() => !!document.querySelector('.bc-box input'));
+  await p.fill('.bc-box input', room);
+  await p.evaluate(() => document.querySelector('.battle-code [data-act=go]').click());
+  return p;
+};
+const a = await mk('Amy');
+const c = await mk('Cal');
+await a.waitForFunction(() => window.game.scene.isActive('Battle') && document.querySelector('.bhud-leave'), null, { timeout: 120000 });
+await a.waitForTimeout(1500);
+await a.evaluate(() => document.querySelector('.bhud-leave').click());
+const paused = await a.evaluate(() => document.querySelector('#ui .screen h2')?.textContent);
+await a.waitForFunction(() => document.querySelector('.battle-results'), null, { timeout: 60000 });
+await a.waitForTimeout(400);
+await a.keyboard.press('Escape');
+await a.waitForTimeout(400);
+const card = await a.evaluate(() => !!document.querySelector('.battle-results'));
+console.log(JSON.stringify({ pausedMenu: paused, resultsCardAfterEscape: card }));
+await b.close();

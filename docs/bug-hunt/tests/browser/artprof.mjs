@@ -1,0 +1,15 @@
+import { chromium } from 'playwright';
+const [file, thr = '4'] = process.argv.slice(2);
+const b = await chromium.launch({ args: ['--disable-accelerated-2d-canvas'] });
+const p = await b.newPage();
+await p.goto('about:blank');
+await p.addScriptTag({ path: file });
+const cdp = await p.context().newCDPSession(p);
+await cdp.send('Emulation.setCPUThrottlingRate', { rate: Number(thr) });
+await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 200 }); await cdp.send('Profiler.start');
+await p.evaluate(() => window.__bench());
+const { profile } = await cdp.send('Profiler.stop');
+const self = new Map(); const byId = new Map(profile.nodes.map((n) => [n.id, n])); let total = 0;
+profile.samples.forEach((s, i) => { const cf = byId.get(s).callFrame; const key = `${cf.functionName || '(anon)'}:${cf.lineNumber}`; self.set(key, (self.get(key) || 0) + profile.timeDeltas[i]); total += profile.timeDeltas[i]; });
+console.log([...self.entries()].sort((x, y) => y[1] - x[1]).slice(0, 26).map(([k, v]) => `${((100 * v) / total).toFixed(1).padStart(5)}%  ${k}`).join('\n'));
+await b.close();

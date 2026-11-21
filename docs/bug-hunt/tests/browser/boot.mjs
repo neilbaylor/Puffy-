@@ -1,0 +1,31 @@
+// usage: node boot.mjs <port> [throttle]  -> time to ready, the game's own boot breakdown, top self-time functions over the whole load
+import { chromium } from 'playwright';
+const [port, thr = '1'] = process.argv.slice(2);
+const b = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', ...(process.env.CPU2D ? ['--disable-accelerated-2d-canvas'] : [])] });
+const ctx = await b.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 1 });
+await ctx.addInitScript(() => { localStorage.setItem('puffy.beaten', '6'); localStorage.setItem('puffy.light', '0'); localStorage.setItem('puffy.lightRetried', '1'); });
+const p = await ctx.newPage();
+const cdp = await ctx.newCDPSession(p);
+await cdp.send('Emulation.setCPUThrottlingRate', { rate: Number(thr) });
+await cdp.send('Profiler.enable');
+await cdp.send('Profiler.setSamplingInterval', { interval: 500 });
+await cdp.send('Profiler.start');
+const t0 = Date.now();
+await p.goto(`http://localhost:${port}/`);
+await p.waitForFunction(() => window.game?.registry?.get('ready'), null, { timeout: 900000, polling: 200 });
+const ms = Date.now() - t0;
+const { profile } = await cdp.send('Profiler.stop');
+const boot = await p.evaluate(() => ({ boot: window.__boot, nav: performance.getEntriesByType('navigation')[0]?.domContentLoadedEventEnd, bootStart: performance.getEntriesByType('mark').map((m) => [m.name, Math.round(m.startTime)]) }));
+const self = new Map();
+const byId = new Map(profile.nodes.map((n) => [n.id, n]));
+let total = 0;
+profile.samples.forEach((s, i) => {
+  const cf = byId.get(s).callFrame;
+  const key = `${cf.functionName || '(anon)'} ${(cf.url.split('/').pop() || '').slice(0, 24)}:${cf.lineNumber}:${cf.columnNumber}`;
+  self.set(key, (self.get(key) || 0) + profile.timeDeltas[i]);
+  total += profile.timeDeltas[i];
+});
+console.log(JSON.stringify({ throttle: thr, readyMs: ms, profiledMs: Math.round(total / 1000), domContentLoaded: Math.round(boot.nav) }));
+console.log(JSON.stringify(boot.boot));
+console.log([...self.entries()].sort((x, y) => y[1] - x[1]).slice(0, Number(process.env.TOP || 25)).map(([k, v]) => `${((100 * v) / total).toFixed(1).padStart(5)}%  ${(v / 1000).toFixed(0).padStart(6)} ms  ${k}`).join('\n'));
+await b.close();

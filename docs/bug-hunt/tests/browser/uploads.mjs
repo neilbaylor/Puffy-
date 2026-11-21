@@ -1,0 +1,31 @@
+// usage: node uploads.mjs <port> <part> [secs]  -> texture uploads per second while running through a Part, and what made them
+import { chromium } from 'playwright';
+const [port, part = '2', secs = '10'] = process.argv.slice(2);
+const b = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--disable-accelerated-2d-canvas'] });
+const ctx = await b.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 1 });
+await ctx.addInitScript(() => { localStorage.setItem('puffy.beaten', '6'); localStorage.setItem('puffy.dev', '1'); localStorage.setItem('puffy.light', '0'); localStorage.setItem('puffy.lightRetried', '1'); });
+const p = await ctx.newPage();
+await p.goto(`http://localhost:${port}/`);
+await p.waitForFunction(() => window.game?.registry?.get('ready'), null, { timeout: 600000 });
+await p.evaluate((n) => { const el = document.querySelector(`.lvl[data-lvl="${n}"]`); el?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); el?.click(); }, part);
+await p.waitForTimeout(1500);
+await p.click('[data-act=play]');
+await p.waitForFunction(() => window.game.scene.isActive('Game') && window.game.scene.getScene('Game').players?.[0]?.body, null, { timeout: 300000 });
+await p.evaluate(() => window.game.events.emit('skip-intro'));
+await p.waitForFunction(() => !window.game.scene.getScene('Game').intro, null, { timeout: 120000 });
+await p.waitForTimeout(2500);
+const r = await p.evaluate((secs) => new Promise((done) => {
+  const g = window.game.scene.getScene('Game');
+  const pl = g.players[0];
+  pl.invulnUntil = 1e15;
+  let f = 0;
+  pl.input = { ...pl.input, id: 'bot', poll: () => ({ left: false, right: true, jump: f++ % 50 < 12, fire: false, run: true, bomb: false }) };
+  const gl = window.game.renderer.gl;
+  let ups = 0, px = 0; const who = new Map();
+  const wrap = (name) => { const fn = gl[name].bind(gl); gl[name] = (...a) => { ups++; const src = a[a.length - 1]; px += (src?.width ?? a[3] ?? 0) * (src?.height ?? a[4] ?? 0); const k = new Error().stack.split('\n').slice(3, 9).map((l) => l.trim().replace(/^at /, '').replace(/\(.*\/(.*?):(\d+):\d+\)/, '$1:$2')).join(' < '); who.set(k, (who.get(k) || 0) + 1); return fn(...a); }; };
+  wrap('texImage2D'); wrap('texSubImage2D');
+  const f0 = window.game.loop.frame, x0 = pl.x;
+  setTimeout(() => done({ secs, frames: window.game.loop.frame - f0, moved: Math.round(pl.x - x0), uploads: ups, mpix: +(px / 1e6).toFixed(1), from: [...who.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6) }), secs * 1000);
+}), Number(secs));
+console.log(JSON.stringify(r, null, 1));
+await b.close();

@@ -1,0 +1,2 @@
+const P: any = { Math: { Clamp: (v: number, a: number, b: number) => Math.max(a, Math.min(b, v)), Between: (a: number, b: number) => a, RadToDeg: (r: number) => (r * 180) / Math.PI }, Physics: { Arcade: { Sprite: class {}, Image: class {} } }, GameObjects: { Image: class {}, Sprite: class {} }, Scenes: { Events: { UPDATE: 'update', SHUTDOWN: 'shutdown' } }, Scene: class {}, BlendModes: {} };
+export default P;

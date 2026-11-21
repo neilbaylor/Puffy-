@@ -1,0 +1,21 @@
+// minimal browser globals so scene modules can be imported under node (nothing is drawn)
+const any = new Proxy(function () {}, { get: (_t, k) => (k === Symbol.toPrimitive ? () => 0 : k === 'then' ? undefined : any), apply: () => any, construct: () => any, set: () => true });
+const store = new Map();
+globalThis.window = globalThis;
+globalThis.document = any;
+Object.defineProperty(globalThis, 'navigator', { value: { userAgent: 'node', maxTouchPoints: 0, hardwareConcurrency: 8, onLine: true }, configurable: true, writable: true });
+globalThis.location = { search: '', hash: '', href: 'http://localhost/', pathname: '/', protocol: 'http:', host: 'localhost', hostname: 'localhost' };
+Object.defineProperty(globalThis, 'localStorage', { configurable: true, writable: true, value: { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) } });
+globalThis.addEventListener = () => {};
+globalThis.removeEventListener = () => {};
+globalThis.matchMedia = () => ({ matches: false, addEventListener() {} });
+globalThis.requestAnimationFrame = () => 0;
+globalThis.cancelAnimationFrame = () => {};
+globalThis.getComputedStyle = () => any;
+globalThis.innerWidth = 1280;
+globalThis.innerHeight = 720;
+globalThis.devicePixelRatio = 1;
+globalThis.Image = class {};
+globalThis.Audio = class {};
+globalThis.HTMLCanvasElement = class {};
+globalThis.OffscreenCanvas = class {};
