@@ -19,6 +19,7 @@ import { trimRenderTargets } from './core/renderTargets';
 import { fixArcadeGroupWalk } from './core/physicsFix';
 import { installUprightUploads } from './core/uprightUploads';
 import { roundTextureIds } from './core/texIdFix';
+import { warmBatchShaders } from './core/shaderWarm';
 
 // (before any scene: see physicsFix)
 fixArcadeGroupWalk();
@@ -221,6 +222,7 @@ function start(refreshMs: number) {
     resize();
   };
   game.events.once(Phaser.Core.Events.READY, () => {
+    warmBatchShaders(game);
     trimRenderTargets(game);
     trackBossArt(game);
     const ev = game.scene.getScene('Menu').events;
