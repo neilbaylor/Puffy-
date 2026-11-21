@@ -63,16 +63,17 @@ export class VolleyMatch {
     const sw = Math.round(half * 2);
     const skey = `volleysand-${sw}`;
     if (!gs.textures.exists(skey)) addCanvas(gs, skey, hires(sw + SAND.END * 2, SAND.UP + SAND.DOWN, SAND_RES, (ctx) => drawVolleySand(ctx, sw)), undefined, { release: true });
-    gs.add.image(this.left - SAND.END, ground, skey).setOrigin(0, SAND.UP / (SAND.UP + SAND.DOWN)).setScale(1 / SAND_RES).setDepth(DEPTH.tiles + 0.5);
+    // (still pictures: skipped while off the camera, see GameScene.still)
+    gs.still(gs.add.image(this.left - SAND.END, ground, skey).setOrigin(0, SAND.UP / (SAND.UP + SAND.DOWN)).setScale(1 / SAND_RES).setDepth(DEPTH.tiles + 0.5));
     const bw = Math.round(half - 46);
     const bkey = `volleyboard-${bw}`;
     if (!gs.textures.exists(bkey)) addCanvas(gs, bkey, hires(bw, 22, 3, (ctx) => drawCourtBoard(ctx, bw, 16, 'PLOP BEACH TOUR')), undefined, { release: true });
-    for (const x0 of [this.left + 10, cx + 36]) gs.add.image(x0, ground - 2, bkey).setOrigin(0, 1).setScale(1 / 3).setDepth(DEPTH.decor - 1);
+    for (const x0 of [this.left + 10, cx + 36]) gs.still(gs.add.image(x0, ground - 2, bkey).setOrigin(0, 1).setScale(1 / 3).setDepth(DEPTH.decor - 1));
     if (!gs.textures.exists('refchair')) addCanvas(gs, 'refchair', hires(24, 52, 3, (ctx) => drawRefChair(ctx, 12, 50)));
     const chairX = cx + 20;
     const chairY = ground;
-    gs.add.image(chairX, chairY, 'refchair').setOrigin(0.5, 50 / 52).setScale(1 / 3).setDepth(DEPTH.decor - 1);
-    gs.add.image(cx, ground + 2, 'volleynet').setOrigin(0.5, 108 / 112).setScale(1 / 3).setDepth(DEPTH.enemies + 2);
+    gs.still(gs.add.image(chairX, chairY, 'refchair').setOrigin(0.5, 50 / 52).setScale(1 / 3).setDepth(DEPTH.decor - 1));
+    gs.still(gs.add.image(cx, ground + 2, 'volleynet').setOrigin(0.5, 108 / 112).setScale(1 / 3).setDepth(DEPTH.enemies + 2));
     // the ball's shadow on the sand (so you can see where it's coming down)
     this.shadow = gs.add.ellipse(cx, ground - 2, 18, 5, 0x5a3a1c, 0.3).setDepth(DEPTH.tiles + 0.55);
 
@@ -95,6 +96,12 @@ export class VolleyMatch {
 
   private get body() {
     return this.ball.body as Phaser.Physics.Arcade.Body;
+  }
+
+  /** The ball and its shadow aren't drawn while they're off the camera (see GameScene.cullOffCamera). */
+  cullWith(cull: (o: Phaser.GameObjects.Image | Phaser.GameObjects.Shape) => void) {
+    if (this.ball.active) cull(this.ball);
+    cull(this.shadow);
   }
 
   private get alive() {

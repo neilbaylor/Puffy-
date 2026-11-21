@@ -55,10 +55,11 @@ export class HockeyMatch implements Coach {
     const ice = `rink-ice-${rinkW}`;
     if (!gs.textures.exists(back)) addCanvas(gs, back, hires(W, RINK.ABOVE + RINK.BELOW, FIELD_RES, (ctx) => drawRinkBack(ctx, rinkW)), undefined, { release: true });
     if (!gs.textures.exists(ice)) addCanvas(gs, ice, hires(W, RINK.ICE_UP + RINK.ICE_DOWN, FIELD_RES, (ctx) => drawRinkIce(ctx, rinkW)), undefined, { release: true });
-    gs.add.image(this.left - RINK.END, ground, back).setOrigin(0, RINK.ABOVE / (RINK.ABOVE + RINK.BELOW)).setScale(1 / FIELD_RES).setDepth(DEPTH.decor - 1);
-    gs.add.image(this.left - RINK.END, ground, ice).setOrigin(0, RINK.ICE_UP / (RINK.ICE_UP + RINK.ICE_DOWN)).setScale(1 / FIELD_RES).setDepth(DEPTH.tiles + 0.5);
-    gs.add.image(this.left - 4, ground + 1, 'hockeynet').setOrigin(4 / 64, 40 / 44).setScale(1 / 2).setDepth(DEPTH.decor);
-    gs.add.image(this.right + 4, ground + 1, 'hockeynet').setOrigin(4 / 64, 40 / 44).setScale(-1 / 2, 1 / 2).setDepth(DEPTH.decor);
+    // (still pictures: skipped while off the camera, see GameScene.still)
+    gs.still(gs.add.image(this.left - RINK.END, ground, back).setOrigin(0, RINK.ABOVE / (RINK.ABOVE + RINK.BELOW)).setScale(1 / FIELD_RES).setDepth(DEPTH.decor - 1));
+    gs.still(gs.add.image(this.left - RINK.END, ground, ice).setOrigin(0, RINK.ICE_UP / (RINK.ICE_UP + RINK.ICE_DOWN)).setScale(1 / FIELD_RES).setDepth(DEPTH.tiles + 0.5));
+    gs.still(gs.add.image(this.left - 4, ground + 1, 'hockeynet').setOrigin(4 / 64, 40 / 44).setScale(1 / 2).setDepth(DEPTH.decor));
+    gs.still(gs.add.image(this.right + 4, ground + 1, 'hockeynet').setOrigin(4 / 64, 40 / 44).setScale(-1 / 2, 1 / 2).setDepth(DEPTH.decor));
 
     const n = team.length;
     [...team].forEach((kind, i) => {
@@ -74,6 +75,12 @@ export class HockeyMatch implements Coach {
 
   get centerX() {
     return (this.left + this.right) / 2;
+  }
+
+  /** The sticks and pucks aren't drawn while they're off the camera (see GameScene.cullOffCamera). */
+  cullWith(cull: (o: Phaser.GameObjects.Image | Phaser.GameObjects.Shape) => void) {
+    for (const s of this.sticks.values()) if (s.active) cull(s);
+    for (const p of this.pucks) if (p.img.active) cull(p.img);
   }
 
   /** Puck pops if a rocket hits it. */

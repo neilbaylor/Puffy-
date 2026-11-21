@@ -230,6 +230,19 @@ export class GameScene extends Phaser.Scene {
   private dripT = 0;
   /** Puddles of poo (quicksand): their extent, surface, and the picture. */
   private puddles: { x0: number; x1: number; y: number; g: Phaser.GameObjects.Graphics; t: number; bubbles?: Phaser.GameObjects.Image[]; streaks?: Phaser.GameObjects.Image[] }[] = [];
+  /**
+   * Pictures that never move once put up (a puddle's still body, the minigames' fields, nets and
+   * stands), each with its box: skipped while entirely off the camera, like the level's own scenery
+   * (see cullOffCamera). Phaser draws everything in the scene otherwise — a level's puddles, all of
+   * them, every frame, wherever you are.
+   */
+  private stills: { o: Phaser.GameObjects.GameObject & { cameraFilter: number }; x0: number; x1: number; y0: number; y1: number }[] = [];
+  /** Put up `o` as one of the `stills` (boxed now: it doesn't move). */
+  still<T extends Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle>(o: T): T {
+    const b = o.getBounds();
+    this.stills.push({ o, x0: b.x, x1: b.right, y0: b.y, y1: b.bottom });
+    return o;
+  }
   /** Boulder chases: where they start and end, how fast; and the rock while it's rolling. */
   private chases: { x0: number; x1: number; speed: number; started: boolean }[] = [];
   private rock: null | {
@@ -324,6 +337,7 @@ export class GameScene extends Phaser.Scene {
     this.checkpoints = [];
     this.goal = undefined;
     this.puddles = [];
+    this.stills = [];
     this.dripFrom = [];
     this.drops = [];
     this.chases = [];
@@ -681,11 +695,15 @@ export class GameScene extends Phaser.Scene {
     const hw = Math.max(w / 2, r) + 64;
     const hh = Math.max(h / 2, r) + 64;
     const id = cam.id;
-    const cull = (o: Phaser.GameObjects.Image | Phaser.GameObjects.Sprite) => {
+    const cull = (o: Phaser.GameObjects.Image | Phaser.GameObjects.Sprite | Phaser.GameObjects.Shape) => {
       const m = Math.max(o.displayWidth, o.displayHeight);
       if (Math.abs(o.x - cx) > hw + m || Math.abs(o.y - cy) > hh + m) o.cameraFilter |= id;
       else o.cameraFilter &= ~id;
     };
+    for (const s of this.stills) {
+      if (s.x1 < cx - hw || s.x0 > cx + hw || s.y1 < cy - hh || s.y0 > cy + hh) s.o.cameraFilter |= id;
+      else s.o.cameraFilter &= ~id;
+    }
     for (const a of this.auras) {
       if (!a.active) continue;
       cull(a);
@@ -708,6 +726,12 @@ export class GameScene extends Phaser.Scene {
       cull(this.goal.swirl);
     }
     for (const f of this.football) f.cullWith(cull);
+    // (the minigames' balls, pucks, sticks and shadows)
+    for (const m of this.matches) m.cullWith(cull);
+    for (const m of this.hockey) m.cullWith(cull);
+    for (const m of this.volleys) m.cullWith(cull);
+    for (const m of this.ballgames) m.cullWith(cull);
+    for (const m of this.tennis) m.cullWith(cull);
   }
 
   /** Bad guys that can move now join the ground checks (see gEnemiesOnTiles); once in, they stay. */
@@ -1637,8 +1661,8 @@ export class GameScene extends Phaser.Scene {
       }
       this.textures.addCanvas(key, upright(c));
     }
-    this.add.image(x0 - 2, y + 3, key).setOrigin(0, 0).setScale(1 / R).setDepth(DEPTH.players + 0.59);
-    this.add.rectangle(x0 - 2, y + 102, w, this.level.heightPx + 40 - (y + 100), hexOf(POO_DARK.base)).setOrigin(0, 0).setDepth(DEPTH.players + 0.59);
+    this.still(this.add.image(x0 - 2, y + 3, key).setOrigin(0, 0).setScale(1 / R).setDepth(DEPTH.players + 0.59));
+    this.still(this.add.rectangle(x0 - 2, y + 102, w, this.level.heightPx + 40 - (y + 100), hexOf(POO_DARK.base)).setOrigin(0, 0).setDepth(DEPTH.players + 0.59));
   }
 
   private updatePuddles(dt: number) {
@@ -1697,7 +1721,11 @@ export class GameScene extends Phaser.Scene {
       pd.t += dt;
       const g = pd.g;
       g.clear();
-      if (pd.x1 < left || pd.x0 > right) {
+      // (off the view its surface has nothing in it — and isn't even looked at: an empty shape still
+      // cost a turn of the renderer, and a break in its batching, every frame)
+      const off = pd.x1 < left || pd.x0 > right;
+      g.setVisible(!off);
+      if (off) {
         for (const im of pd.bubbles ?? []) im.setVisible(false);
         for (const im of pd.streaks ?? []) im.setVisible(false);
         continue;

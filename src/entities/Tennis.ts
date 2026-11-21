@@ -64,9 +64,10 @@ export class TennisMatch {
     const bkey = `court-back-${w}`;
     if (!gs.textures.exists(fkey)) addCanvas(gs, fkey, hires(w + END * 2, UP + DOWN, FIELD_RES, (ctx) => drawCourtFront(ctx, w)), undefined, { release: true });
     if (!gs.textures.exists(bkey)) addCanvas(gs, bkey, hires(w + END * 2, BACK_UP, Math.min(1.5, FIELD_RES), (ctx) => drawCourtBack(ctx, w)), undefined, { release: true });
-    gs.add.image(this.left - END, ground, fkey).setOrigin(0, UP / (UP + DOWN)).setScale(1 / FIELD_RES).setDepth(DEPTH.tiles + 0.5);
-    gs.add.image(this.left - END, ground, bkey).setOrigin(0, 1).setScale(1 / Math.min(1.5, FIELD_RES)).setDepth(DEPTH.decor - 1);
-    gs.add.image(cx, ground, 'tennisnet').setOrigin(0.5, NET_GROUND / NET_CELL_H).setScale(1 / 3).setDepth(DEPTH.enemies + 2);
+    // (still pictures: skipped while off the camera, see GameScene.still)
+    gs.still(gs.add.image(this.left - END, ground, fkey).setOrigin(0, UP / (UP + DOWN)).setScale(1 / FIELD_RES).setDepth(DEPTH.tiles + 0.5));
+    gs.still(gs.add.image(this.left - END, ground, bkey).setOrigin(0, 1).setScale(1 / Math.min(1.5, FIELD_RES)).setDepth(DEPTH.decor - 1));
+    gs.still(gs.add.image(cx, ground, 'tennisnet').setOrigin(0.5, NET_GROUND / NET_CELL_H).setScale(1 / 3).setDepth(DEPTH.enemies + 2));
     // (the umpire's high chair stands empty behind the net: it's in the back picture)
     this.shadow = gs.add.ellipse(cx, ground - 2, 16, 4, 0x1a3050, 0.25).setDepth(DEPTH.tiles + 0.55);
 
@@ -89,6 +90,12 @@ export class TennisMatch {
 
   private get body() {
     return this.ball.body as Phaser.Physics.Arcade.Body;
+  }
+
+  /** The clam and its shadow aren't drawn while they're off the camera (see GameScene.cullOffCamera). */
+  cullWith(cull: (o: Phaser.GameObjects.Image | Phaser.GameObjects.Shape) => void) {
+    if (this.ball.active) cull(this.ball);
+    cull(this.shadow);
   }
 
   private get alive() {

@@ -373,6 +373,12 @@ export class GiantPlop extends Giant {
     });
   }
 
+  /** (his flies are skipped with him while he's off the camera) */
+  cullParts(cull: (o: Phaser.GameObjects.Image) => void) {
+    super.cullParts(cull);
+    for (const f of this.flies) cull(f);
+  }
+
   kill(how: DeathKind) {
     if (!this.dead && how !== 'fall') this.gs.fx.pooSplat(this.x, this.y, 30);
     this.flies.forEach((f) => f.destroy());

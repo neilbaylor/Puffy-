@@ -389,11 +389,14 @@ export class Background {
       const n = Math.ceil((view.width + 4 + l.w) / l.w) + 1;
       const a = this.row(l.a, l.keyA, n, l.depth);
       const b = this.row(l.b, l.keyB, n, l.depth);
+      // (and none of the row while it's wholly above or below the view: up a climb, or high over the
+      // ground, the far layers are a long way down, and were drawn there every frame all the same)
+      const rowOn = l.y < view.top + view.height + 8 && l.y + l.h > view.top - 8;
       for (let i = 0; i < a.length; i++) {
         const x = x0 + i * l.w - 0.3 * i;
         // (only the ones in view: the row's last picture or two are past the right edge, and Phaser
         // draws a picture wherever it is)
-        const on = i < n && x < view.left + view.width;
+        const on = rowOn && i < n && x < view.left + view.width;
         // (a hair of overlap so no seam shows between neighbours)
         a[i].setVisible(on).setPosition(x, l.y);
         b[i].setVisible(on && this.showB).setAlpha(this.wB).setPosition(x, l.y);
@@ -402,7 +405,13 @@ export class Background {
     // solid fill under the nearest layer so the bottom of the screen is always covered
     const near = this.layers[this.layers.length - 1];
     const fillTop = near.y + near.h - 2;
-    this.fill.setPosition(view.left - 2, fillTop);
-    this.fill.setSize(view.width + 4, Math.max(0, view.top + view.height - fillTop + 4));
+    // (not drawn at all while it's below the view: its few pixels' strip off the bottom of the screen
+    // still cost a break in the drawing's batching, every frame)
+    const fillOn = fillTop < view.top + view.height + 8;
+    this.fill.setVisible(fillOn);
+    if (fillOn) {
+      this.fill.setPosition(view.left - 2, fillTop);
+      this.fill.setSize(view.width + 4, Math.max(0, view.top + view.height - fillTop + 4));
+    }
   }
 }

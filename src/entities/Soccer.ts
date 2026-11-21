@@ -74,8 +74,9 @@ export class SoccerMatch implements Coach {
       const back = `pitch-back-${pitchW}`;
       if (!gs.textures.exists(front)) addCanvas(gs, front, hires(W, PITCH.FRONT_UP + PITCH.FRONT_DOWN, FIELD_RES, (ctx) => drawPitchFront(ctx, pitchW)), undefined, { release: true });
       if (!gs.textures.exists(back)) addCanvas(gs, back, hires(W, PITCH.BACK_UP + 2, FIELD_RES, (ctx) => drawPitchBack(ctx, pitchW)), undefined, { release: true });
-      gs.add.image(x0, ground, back).setOrigin(0, PITCH.BACK_UP / (PITCH.BACK_UP + 2)).setScale(1 / FIELD_RES).setDepth(DEPTH.decor - 1);
-      gs.add.image(x0, ground, front).setOrigin(0, PITCH.FRONT_UP / (PITCH.FRONT_UP + PITCH.FRONT_DOWN)).setScale(1 / FIELD_RES).setDepth(DEPTH.tiles + 0.5);
+      // (still pictures: skipped while off the camera, see GameScene.still)
+      gs.still(gs.add.image(x0, ground, back).setOrigin(0, PITCH.BACK_UP / (PITCH.BACK_UP + 2)).setScale(1 / FIELD_RES).setDepth(DEPTH.decor - 1));
+      gs.still(gs.add.image(x0, ground, front).setOrigin(0, PITCH.FRONT_UP / (PITCH.FRONT_UP + PITCH.FRONT_DOWN)).setScale(1 / FIELD_RES).setDepth(DEPTH.tiles + 0.5));
     }
 
     // spread the team over the pitch (a two-player team stands in between the others)
@@ -101,6 +102,11 @@ export class SoccerMatch implements Coach {
 
   private get body() {
     return this.ball.body as Phaser.Physics.Arcade.Body;
+  }
+
+  /** The ball isn't drawn while it's off the camera (see GameScene.cullOffCamera). */
+  cullWith(cull: (o: Phaser.GameObjects.Image | Phaser.GameObjects.Shape) => void) {
+    if (this.ball.active) cull(this.ball);
   }
 
   private get alive() {

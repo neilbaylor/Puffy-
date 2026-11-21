@@ -3,6 +3,31 @@ import type { InputSource, InputState } from './types';
 const DEAD = 0.3;
 const RUN_TILT = 0.85;
 
+/**
+ * Asking the browser for its gamepads (navigator.getGamepads) isn't free — a fresh list each time —
+ * and the game asked five times a frame, every frame, on every phone and tablet, for pads almost no
+ * one has. A browser only ever shows a page a pad after it's been used (and says so with a
+ * 'gamepadconnected' event), so until then it's only asked about once a second (in case that event
+ * was somehow missed); once a pad has shown up, once a frame, shared by all four pad slots.
+ */
+let padSeen = false;
+let nextLook = 0;
+let pads: readonly (Gamepad | null)[] = [];
+let padsAt = -1;
+if (typeof window !== 'undefined') window.addEventListener('gamepadconnected', () => (padSeen = true));
+
+function currentPads(): readonly (Gamepad | null)[] {
+  const now = performance.now();
+  if (!padSeen) {
+    if (now < nextLook) return pads;
+    nextLook = now + 1000;
+  } else if (now - padsAt < 4) return pads; // (the same frame: the list just read)
+  padsAt = now;
+  pads = navigator.getGamepads?.() ?? [];
+  if (!padSeen && pads.some((p) => p?.connected)) padSeen = true;
+  return pads;
+}
+
 class GamepadSource implements InputSource {
   readonly kind = 'gamepad' as const;
   readonly id: string;
@@ -13,8 +38,7 @@ class GamepadSource implements InputSource {
     this.label = `Gamepad ${index + 1}`;
   }
   private pad(): Gamepad | null {
-    const pads = navigator.getGamepads?.() ?? [];
-    return pads[this.index] ?? null;
+    return currentPads()[this.index] ?? null;
   }
   connected() {
     return !!this.pad()?.connected;

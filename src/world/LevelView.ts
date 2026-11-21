@@ -215,6 +215,15 @@ export class LevelView {
   /** Trees, flowers and grass that sway in the breeze. */
   private sway: { img: Phaser.GameObjects.Image; amp: number; speed: number; ph: number }[] = [];
 
+  /**
+   * The little plants and props scattered along the ground (flowers, tufts, poo piles; sea grass,
+   * coral and shells): frames of a few shared pictures. Without `cull` (the start screen) they're
+   * still skipped while out of the view to either side, as the kelp is: they share pictures that are
+   * on the graphics chip anyway, so nothing needs readying first. (Part 6's sea bed alone has over a
+   * hundred, most of them off the screen, all drawn every frame.)
+   */
+  private bits: Phaser.GameObjects.Image[] = [];
+
   /** The plain deep rock under every terrain chunk (one shape for the whole level). */
   private deepG: Phaser.GameObjects.Graphics | null = null;
 
@@ -295,6 +304,12 @@ export class LevelView {
       for (const q of pts) q.x = bend * Math.pow(Phaser.Math.Clamp(-q.y / (KELP_H * PROP_RES), 0, 1), 1.8);
       rope.setDirty();
     }
+    // (the same reach either side as the swaying: what's past it doesn't move, so mustn't show)
+    if (camId)
+      for (const im of this.bits) {
+        const off = im.x < left - 80 || im.x > right + 80;
+        im.cameraFilter = off ? im.cameraFilter | camId : im.cameraFilter & ~camId;
+      }
     for (const s of this.sway) {
       if (s.img.x < left - 80 || s.img.x > right + 80) continue;
       // a wave of wind rolls across the level (phase follows x)
@@ -738,24 +753,27 @@ export class LevelView {
           const kind = Math.floor(r() * GRASS_FILLS.length);
           const img = this.scene.add.image(wx, wy + 5, 'sea-grass', `g${kind}_0`).setOrigin(0.5, 54 / 56).setScale((0.75 + r() * 0.45) / PROP_RES).setFlipX(r() < 0.5).setDepth(DEPTH.decor);
           this.waving.push({ img, pre: `g${kind}_`, speed: 0.5 + r() * 0.12, ph: -wx * 0.0011 });
+          this.bits.push(img);
         } else if (roll < 0.29) {
           const f = SEA_PROPS[Math.floor(r() * SEA_PROPS.length)];
-          this.scene.add.image(wx, wy + 4, 'sea-props', f).setOrigin(0.5, 46 / 48).setScale((0.75 + r() * 0.35) / PROP_RES).setDepth(DEPTH.decor);
+          this.bits.push(this.scene.add.image(wx, wy + 4, 'sea-props', f).setOrigin(0.5, 46 / 48).setScale((0.75 + r() * 0.35) / PROP_RES).setDepth(DEPTH.decor));
         }
         continue;
       }
       if (this.paletteAt(wx).poo) {
         // Plop Invasion: little poo piles where the flowers were
-        if (roll < 0.34) this.scene.add.image(wx, wy + 1, 'poopile', `p${Math.floor(r() * 4)}`).setOrigin(0.5, 1).setScale(1 / PROP_RES).setDepth(DEPTH.decor);
+        if (roll < 0.34) this.bits.push(this.scene.add.image(wx, wy + 1, 'poopile', `p${Math.floor(r() * 4)}`).setOrigin(0.5, 1).setScale(1 / PROP_RES).setDepth(DEPTH.decor));
         continue;
       }
       if (this.paletteAt(wx).flowers.length < 2) continue; // no flowers in the snow or on the ice
       if (roll < 0.28) {
         const img = this.scene.add.image(wx, wy, 'flower', `f${Math.floor(r() * 4)}`).setOrigin(0.5, 1).setScale(1 / PROP_RES).setDepth(DEPTH.decor);
         this.sway.push({ img, amp: 7, speed: 1.6 + r() * 0.6, ph: wx * 0.013 });
+        this.bits.push(img);
       } else if (roll < 0.55) {
         const img = this.scene.add.image(wx, wy + 1, 'tuft').setOrigin(0.5, 1).setScale(1 / PROP_RES).setDepth(DEPTH.decor);
         this.sway.push({ img, amp: 6, speed: 2 + r() * 0.6, ph: wx * 0.013 });
+        this.bits.push(img);
       }
     }
   }

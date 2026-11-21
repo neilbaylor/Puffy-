@@ -238,8 +238,9 @@ export class BaseballGame {
     // the ballpark: the wall, scoreboard, backstop and lights behind; the turf, infield and bases over the ground
     // (drawn while the level loads; here only if it somehow wasn't)
     makeBallpark(gs);
-    gs.add.image(x0 - END, ground, 'bbpark-back').setOrigin(0, 1).setScale(1 / Math.min(1.5, FIELD_RES)).setDepth(DEPTH.decor - 1);
-    gs.add.image(x0 - END, ground - FRONT_UP, 'bbpark-front').setOrigin(0, 0).setScale(1 / FIELD_RES).setDepth(DEPTH.tiles + 0.5);
+    // (still pictures: skipped while off the camera, see GameScene.still)
+    gs.still(gs.add.image(x0 - END, ground, 'bbpark-back').setOrigin(0, 1).setScale(1 / Math.min(1.5, FIELD_RES)).setDepth(DEPTH.decor - 1));
+    gs.still(gs.add.image(x0 - END, ground - FRONT_UP, 'bbpark-front').setOrigin(0, 0).setScale(1 / FIELD_RES).setDepth(DEPTH.tiles + 0.5));
 
     // the players, in their spots (the field's spots are measured from the picture's left edge)
     const sp = parkSpots(w);
@@ -265,6 +266,11 @@ export class BaseballGame {
     add(this.home + 100, R('bbp-ondeck'), false);
     // the ball in play
     this.ball = gs.add.image(0, 0, 'bb-ball').setScale(1 / ART_RES).setDepth(DEPTH.enemies + 1).setVisible(false);
+  }
+
+  /** The ball in play isn't drawn while it's off the camera (see GameScene.cullOffCamera). */
+  cullWith(cull: (o: Phaser.GameObjects.Image | Phaser.GameObjects.Shape) => void) {
+    if (this.ball.active) cull(this.ball);
   }
 
   /** In the game (not beaten, not off chasing you). */
