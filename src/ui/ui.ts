@@ -1490,6 +1490,9 @@ export class UI {
     if (HOME_LO) {
       const menu = this.game.scene.getScene('Menu');
       for (const o of menu?.children.list ?? []) {
+        // (only what's on show: the other Parts' fly-overs, built ahead and kept hidden, are let go with
+        // the level — tens of MB on a phone — and drawn again behind the start screen's loading bar)
+        if ((o as unknown as { visible?: boolean }).visible === false) continue;
         const k = (o as unknown as { texture?: Phaser.Textures.Texture }).texture?.key;
         if (k && (k.startsWith('terrain-') || /^bg-[a-z]+:/.test(k))) homeKeepKeys.add(k);
       }
