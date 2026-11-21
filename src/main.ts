@@ -174,7 +174,10 @@ function start(refreshMs: number) {
     width: w,
     height: h,
     scale: { mode: Phaser.Scale.NONE, zoom: 1 / dpr() },
-    render: { antialias: true, pixelArt: false, roundPixels: false, powerPreference: 'high-performance' },
+    // (stencil off: Phaser 4 otherwise gives every drawing surface it makes — the basketball arena's
+    // darkness, 1600 × 900, the jumbotrons' rays — a stencil buffer the size of it, used only by its
+    // Stencil objects, which nothing here has; the screen itself has none, see makeGl)
+    render: { antialias: true, pixelArt: false, roundPixels: false, powerPreference: 'high-performance', stencil: false },
     // (no pre-effects — glow, shadow… on a sprite — anywhere: without them Phaser doesn't keep their
     // dozens of drawing surfaces on the graphics chip; see also trimRenderTargets)
     input: { activePointers: 4 },
