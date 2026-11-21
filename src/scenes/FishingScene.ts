@@ -296,6 +296,13 @@ export class FishingScene extends Phaser.Scene {
     this.camK = 3;
     this.arm = -0.85;
     this.heroPose = null;
+    // (left mid-cast or mid-landing by the Paused menu's Home screen: the rod tip's streak — timed on the
+    // last contest's clock — the line down to a fish on the hook, and the hero's lean all go with it)
+    this.heroLean = 0;
+    this.tipTrail = [];
+    this.lureTrail = [];
+    this.swing = null;
+    this.dangle = { hero: null, king: null };
     this.rod.hero = {
       a: -1.35,
       bend: 0,
