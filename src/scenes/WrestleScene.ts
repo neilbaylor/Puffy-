@@ -951,6 +951,7 @@ export class WrestleScene extends Phaser.Scene {
       this.hearts--;
       if (this.hearts <= 0) {
         this.hearts = 0;
+        if (p.goo > 0) this.outOfPoo();
         this.dropChair();
         this.emitHud(true);
         p.faint(false);
@@ -1124,12 +1125,25 @@ export class WrestleScene extends Phaser.Scene {
       this.fx.pooSplat(p.x, MAT_Y, 14);
       this.fx.popText(p.x, MAT_Y - 30, 'BLUB!', '#c99064', 20);
       sfx.dribble(1);
-      const x = b.center.x - PUD_X0 < PUD_X1 - b.center.x ? PUD_X0 - 16 : PUD_X1 + 16;
-      p.goo = 0;
-      b.reset(x, MAT_Y - b.halfHeight - 2);
+      this.outOfPoo();
       b.setVelocity(0, -380);
       this.hurtPlayer(PUDDLE.x);
     }
+  }
+
+  /**
+   * Out of the poo onto the mat at the nearer edge — the picture too (a fainted hero's picture
+   * stays put, so without this one knocked out in the puddle lay there under the mat, showing
+   * through the ring).
+   */
+  private outOfPoo() {
+    const p = this.player;
+    const b = p.body;
+    const x = b.center.x - PUD_X0 < PUD_X1 - b.center.x ? PUD_X0 - 16 : PUD_X1 + 16;
+    p.goo = 0;
+    b.reset(x, MAT_Y - b.halfHeight - 2);
+    p.view.setPosition(b.center.x, b.bottom + 2);
+    if (p.view.isCropped) p.view.setCrop();
   }
 
   /** Only what's above the poo shows (applied after the hero's picture is placed each frame). */
