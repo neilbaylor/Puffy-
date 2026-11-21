@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { Ctx } from './draw';
+import { canvas, type Ctx } from './draw';
 import { addCanvas, hires } from './textures';
 import { liveCanvas } from './liveCanvas';
 import { ledStill } from './ledStrip';
@@ -22,6 +22,9 @@ import {
 
 /** The screen's pictures are drawn at this many px per unit (as the whole screen was). */
 const R = 2;
+/** The size of the small picture of a back that's only a fade (see paint). */
+const FADE_W = 128;
+const FADE_H = 32;
 type Box = { x: number; y: number; w: number; h: number };
 
 /**
@@ -118,9 +121,21 @@ export class JumboScreen {
   /** What stays put, for this content: the back, the front, a big call's words. */
   private paint(c: JumboContent, t: number) {
     const { w, h } = JUMBO;
-    const bk = `${this.key}-back`;
-    addCanvas(this.scene, bk, hires(w, h, R, (ctx) => drawJumboScreen(ctx, c, t, { crawl: false, part: 'back' })), undefined, { release: true });
-    this.back.setTexture(bk).setVisible(true);
+    if (c.kind === 'score') {
+      const bk = `${this.key}-back`;
+      addCanvas(this.scene, bk, hires(w, h, R, (ctx) => drawJumboScreen(ctx, c, t, { crawl: false, part: 'back' })), undefined, { release: true });
+      this.back.setTexture(bk).setScale(this.k / R);
+    } else {
+      // (the title's and a big call's back is only its colour fading corner to corner: a small
+      // picture of that, stretched by the chip, is the same fade — a straight fade stays straight)
+      const gk = `${this.key}-fade`;
+      const { c: cv, ctx } = canvas(FADE_W, FADE_H);
+      ctx.scale(FADE_W / w, FADE_H / h);
+      drawJumboScreen(ctx, c, t, { crawl: false, part: 'back' });
+      addCanvas(this.scene, gk, cv, undefined, { release: true });
+      this.back.setTexture(gk).setScale((w * this.k) / FADE_W, (h * this.k) / FADE_H);
+    }
+    this.back.setVisible(true);
     const top = jumboFrontTop(c);
     const fk = `${this.key}-front`;
     addCanvas(this.scene, fk, hires(w, h - top, R, (ctx) => {

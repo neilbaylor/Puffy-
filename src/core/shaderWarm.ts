@@ -13,6 +13,15 @@ import Phaser from 'phaser';
  * (images, sprites — nearly everything) is done; the others are seldom needed with many textures.
  */
 export function warmBatchShaders(game: Phaser.Game) {
+  // (it leans on Phaser's insides: should they change, the game just starts without it)
+  try {
+    warm(game);
+  } catch {
+    /* nothing warmed */
+  }
+}
+
+function warm(game: Phaser.Game) {
   type Program = { compiling: boolean; __warm?: boolean; _completeProgram(): void; checkParallelCompile(): void };
   type Handler = { maxTexturesPerBatch: number; finalizeTextureCount(n: number): void; programManager: { currentConfig: { base: unknown; additions: unknown; features: unknown } } };
   type Renderer = { gl?: WebGLRenderingContext; renderNodes?: { getNode(name: string): Handler | undefined }; shaderProgramFactory?: { getShaderProgram(base: unknown, additions: unknown, features: unknown): Program } };
