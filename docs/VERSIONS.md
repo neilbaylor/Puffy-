@@ -364,3 +364,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.359: The game now runs on the Phaser 4 engine: smoother on phones and tablets.
 - v0.360: The iPhone home-screen app fills the whole screen sideways (the blue bar at the bottom).
 - v0.361: Faster basketball and wrestling arenas (the big screens cost a fraction of what they did), slightly quicker loading, fewer hitches.
+- v0.362: Less drawing of things off screen (smoother levels and start screen) and a quicker start-up.
