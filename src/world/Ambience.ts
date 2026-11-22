@@ -239,12 +239,70 @@ function makeTextures(scene: Phaser.Scene) {
   // sun glow, light shaft and vignette
   mk('amb-glow', 128, 128, (ctx) => {
     const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
-    g.addColorStop(0, 'rgba(255,250,225,1)');
-    g.addColorStop(0.3, 'rgba(255,240,200,0.45)');
-    g.addColorStop(1, 'rgba(255,240,200,0)');
+    for (const [t, r, gr, b, a] of GLOW_STOPS) g.addColorStop(t, `rgba(${r},${gr},${b},${a})`);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, 128, 128);
   });
+}
+
+/** The sun's glow from its middle out (0 … 1 of its radius): red, green, blue, see-through-ness. */
+const GLOW_STOPS: readonly (readonly [number, number, number, number, number])[] = [
+  [0, 255, 250, 225, 1],
+  [0.3, 255, 240, 200, 0.45],
+  [1, 255, 240, 200, 0],
+];
+/** Rings the glow's shading is worked out at (the stops, and a few between, so it fades as smoothly as the picture's). */
+const GLOW_RINGS = [0, 0.15, 0.3, 0.5, 0.75, 1];
+/** Slices round it. */
+const GLOW_SLICES = 32;
+
+/**
+ * The sun's glow as a disc of triangles shaded from colour to colour (the same as the picture
+ * 'amb-glow', 128 across), not that picture: it covers half the screen, added onto the sky, and
+ * reading a picture for every one of those pixels was a fifth of a level's drawing time on the
+ * test browser's software graphics chip. Shaded from its corners, it's a fraction of that, and
+ * the picture's see-through corners aren't drawn at all. Drawn once: it's moved and sized as the
+ * picture was.
+ */
+function glowDisc(scene: Phaser.Scene) {
+  const at = (t: number) => {
+    let i = 0;
+    while (i < GLOW_STOPS.length - 2 && t > GLOW_STOPS[i + 1][0]) i++;
+    const a = GLOW_STOPS[i];
+    const b = GLOW_STOPS[i + 1];
+    const u = (t - a[0]) / (b[0] - a[0]);
+    const c = [1, 2, 3, 4].map((k) => a[k] + (b[k] - a[k]) * u);
+    return { col: (Math.round(c[0]) << 16) | (Math.round(c[1]) << 8) | Math.round(c[2]), alpha: c[3] };
+  };
+  const g = scene.add.graphics();
+  const R = 64;
+  const ring = GLOW_RINGS.map(at);
+  for (let k = 0; k < GLOW_SLICES; k++) {
+    const a0 = (k / GLOW_SLICES) * Math.PI * 2;
+    const a1 = ((k + 1) / GLOW_SLICES) * Math.PI * 2;
+    const c0 = Math.cos(a0) * R;
+    const s0 = Math.sin(a0) * R;
+    const c1 = Math.cos(a1) * R;
+    const s1 = Math.sin(a1) * R;
+    for (let i = 1; i < GLOW_RINGS.length; i++) {
+      const r0 = GLOW_RINGS[i - 1];
+      const r1 = GLOW_RINGS[i];
+      const p = ring[i - 1];
+      const q = ring[i];
+      if (i === 1) {
+        // (the middle: one triangle a slice)
+        g.fillGradientStyle(p.col, q.col, q.col, q.col, p.alpha, q.alpha, q.alpha, q.alpha);
+        g.fillTriangle(0, 0, c0 * r1, s0 * r1, c1 * r1, s1 * r1);
+        continue;
+      }
+      // (a ring: two triangles a slice; fillTriangle shades its corners as top-left, top-right, bottom-left)
+      g.fillGradientStyle(p.col, p.col, q.col, q.col, p.alpha, p.alpha, q.alpha, q.alpha);
+      g.fillTriangle(c0 * r0, s0 * r0, c1 * r0, s1 * r0, c0 * r1, s0 * r1);
+      g.fillGradientStyle(q.col, q.col, p.col, p.col, q.alpha, q.alpha, p.alpha, p.alpha);
+      g.fillTriangle(c0 * r1, s0 * r1, c1 * r1, s1 * r1, c1 * r0, s1 * r0);
+    }
+  }
+  return g;
 }
 
 export class Ambience {
@@ -252,7 +310,7 @@ export class Ambience {
   private flies: Fly[] = [];
   private nextFlock = 2;
   private shadows = new Map<Phaser.GameObjects.GameObject, Phaser.GameObjects.Image>();
-  private glow: Phaser.GameObjects.Image;
+  private glow: Phaser.GameObjects.Image | Phaser.GameObjects.Graphics;
   private t = 0;
   private readonly arctic: boolean;
   /** Plop Invasion: flies buzzing about instead of butterflies, drab birds. */
@@ -271,7 +329,11 @@ export class Ambience {
     makeTextures(scene);
     this.arctic = levelId === 2;
     this.stinky = levelId === 3 || levelId === 4;
-    this.glow = scene.add.image(0, 0, 'amb-glow').setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.clouds - 1).setAlpha(0.55);
+    // (with WebGL a shaded disc, see glowDisc; the canvas renderer can't shade like that)
+    this.glow = (scene.game.renderer instanceof Phaser.Renderer.WebGL.WebGLRenderer ? glowDisc(scene) : scene.add.image(0, 0, 'amb-glow'))
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setDepth(DEPTH.clouds - 1)
+      .setAlpha(0.55);
     this.sea = water ? new SeaLife(scene, water.surface, water.width, groundBelow, water.dark) : null;
     if (this.sea) this.glow.setVisible(false);
     // (no light shafts or vignette any more: each was a whole extra screenful to draw every frame,
