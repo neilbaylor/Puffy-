@@ -44,6 +44,73 @@ interface Crab {
 /** Room round a far-off critter's middle for its picture (the biggest, the turtle, is under 50 px across). */
 const CRITTER_R = 64;
 
+/**
+ * A light beam (as the picture 'sea-ray', drawLightRay: 32 × 128 pixels, hung from its top middle)
+ * drawn as a few triangles shaded from corner to corner instead of that picture: the beams cover
+ * half the screen under the sea (the start screen too, when Part 5 or 6 is shown) and reading a
+ * picture for every one of those pixels was a fifth of the frame's drawing time on the test
+ * browser's software graphics chip. The same shape, the same fade down it (white, 0.55 → 0.18 at
+ * 60% → 0), and soft sides: the picture's edge pixels are part-covered and then stretched over
+ * three or more screen pixels, so each side fades out over a pixel either side of the edge here
+ * too (in the picture's pixels: it's scaled with it). Its top pixel row is half as bright (the
+ * picture's top row blends with its see-through bottom one when stretched).
+ */
+const RAY = { w: 32, h: 128, top: 5 };
+function rayShape(scene: Phaser.Scene) {
+  const g = scene.add.graphics();
+  const alphaAt = (y: number) => {
+    const t = y / RAY.h;
+    return t < 0.6 ? 0.55 + ((0.18 - 0.55) * t) / 0.6 : 0.18 * (1 - (t - 0.6) / 0.4);
+  };
+  // (its sides: from ±5 at the top out to ±16 at the bottom)
+  const side = (y: number) => RAY.top + ((RAY.w / 2 - RAY.top) * y) / RAY.h;
+  const rows = [0, 0.5, 0.6 * RAY.h, RAY.h];
+  const alphas = [alphaAt(0.5) / 2, alphaAt(0.5), 0.18, 0];
+  /** A four-cornered piece: corners top-left, top-right, bottom-right, bottom-left, with their see-through-ness. */
+  const quad = (x: number[], y: number[], a: number[]) => {
+    g.fillGradientStyle(0xffffff, 0xffffff, 0xffffff, 0xffffff, a[0], a[1], a[3], a[2]);
+    g.fillTriangle(x[0], y[0], x[1], y[1], x[3], y[3]);
+    g.fillGradientStyle(0xffffff, 0xffffff, 0xffffff, 0xffffff, a[1], a[2], a[3], a[3]);
+    g.fillTriangle(x[1], y[1], x[2], y[2], x[3], y[3]);
+  };
+  for (let i = 1; i < rows.length; i++) {
+    const y0 = rows[i - 1];
+    const y1 = rows[i];
+    const a0 = alphas[i - 1];
+    const a1 = alphas[i];
+    const s0 = side(y0);
+    const s1 = side(y1);
+    const ys = [y0, y0, y1, y1];
+    // the middle, then each side fading out over a pixel either side of the edge
+    quad([-s0 + 1, s0 - 1, s1 - 1, -s1 + 1], ys, [a0, a0, a1, a1]);
+    quad([-s0 - 1, -s0 + 1, -s1 + 1, -s1 - 1], ys, [0, a0, a1, 0]);
+    quad([s0 - 1, s0 + 1, s1 + 1, s1 - 1], ys, [a0, 0, 0, a1]);
+  }
+  return g;
+}
+
+/** Where a beam is on screen (its box, turned and scaled with it). */
+function rayBounds(o: Phaser.GameObjects.Image | Phaser.GameObjects.Graphics, out: Phaser.Geom.Rectangle) {
+  if (o instanceof Phaser.GameObjects.Image) return o.getBounds(out);
+  const c = Math.cos(o.rotation);
+  const sn = Math.sin(o.rotation);
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (const [lx, ly] of [[-RAY.w / 2, 0], [RAY.w / 2, 0], [RAY.w / 2, RAY.h], [-RAY.w / 2, RAY.h]]) {
+    const x = lx * o.scaleX;
+    const y = ly * o.scaleY;
+    const px = o.x + x * c - y * sn;
+    const py = o.y + x * sn + y * c;
+    x0 = Math.min(x0, px);
+    x1 = Math.max(x1, px);
+    y0 = Math.min(y0, py);
+    y1 = Math.max(y1, py);
+  }
+  return out.setTo(x0, y0, x1 - x0, y1 - y0);
+}
+
 export class SeaLife {
   private t = 0;
   /** (a light beam's bounds, worked out into this each frame) */
@@ -51,7 +118,7 @@ export class SeaLife {
   private sky: Phaser.GameObjects.Image[] = [];
   private skyTop: Phaser.GameObjects.Rectangle;
   private surface: Phaser.GameObjects.Image[] = [];
-  private rays: { img: Phaser.GameObjects.Image; x: number; ph: number; a: number }[] = [];
+  private rays: { img: Phaser.GameObjects.Image | Phaser.GameObjects.Graphics; x: number; ph: number; a: number }[] = [];
   private drifters: Drifter[] = [];
   private crabs: Crab[] = [];
   private nextSchool = 3;
@@ -81,7 +148,11 @@ export class SeaLife {
     // light beams (light mode: three, not five; each is a tall see-through picture over the whole view)
     const rays = LIGHT ? 3 : 5;
     for (let i = 0; i < rays; i++) {
-      const img = scene.add.image(0, surfaceY, 'sea-ray').setOrigin(0.5, 0).setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH.near + 3);
+      // (with WebGL a shaded shape, see rayShape; the canvas renderer can't shade like that)
+      const img = (scene.game.renderer instanceof Phaser.Renderer.WebGL.WebGLRenderer ? rayShape(scene) : scene.add.image(0, surfaceY, 'sea-ray').setOrigin(0.5, 0))
+        .setPosition(0, surfaceY)
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setDepth(DEPTH.near + 3);
       this.rays.push({ img, x: i / rays + Math.random() * 0.1, ph: Math.random() * 6, a: 0.16 + Math.random() * 0.12 });
     }
     // a few jellyfish far off (light mode: two)
@@ -197,7 +268,7 @@ export class SeaLife {
         .setRotation(0.22 + Math.sin(t * 0.2 + r.ph) * 0.04)
         .setAlpha(r.a * (0.6 + 0.4 * Math.sin(t * 0.7 + r.ph)) * (1 - this.darkK));
       // (not drawn while it's out of view: a glowing picture breaks the batch around it into draw calls of its own)
-      const b = r.img.getBounds(this.box);
+      const b = rayBounds(r.img, this.box);
       r.img.visible = b.right > view.left && b.x < right && b.bottom > view.top && b.y < view.top + view.height;
     }
     // ── jellyfish, schools of fish, the odd turtle ──
