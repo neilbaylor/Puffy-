@@ -209,7 +209,8 @@ export class Background {
    * Null without WebGL (the canvas renderer can't shade like this): the pictures are drawn then.
    */
   private skyBands: Phaser.GameObjects.Graphics | null = null;
-  private skyStops = { t: [] as number[], a: [] as number[][], b: [] as number[][] };
+  /** (the steps of the sky being drawn, kept from frame to frame) */
+  private skyTs: number[] = [];
 
   private drawSkyBands(g: Phaser.GameObjects.Graphics, view: View, tint: number) {
     const ca = skyColours(this.themeA);
@@ -230,7 +231,7 @@ export class Background {
       return [p[0] + (q[0] - p[0]) * u, p[1] + (q[1] - p[1]) * u, p[2] + (q[2] - p[2]) * u];
     };
     // (the steps of both skies, so each band is a straight line in both)
-    const ts = this.skyStops.t;
+    const ts = this.skyTs;
     ts.length = 0;
     for (let i = 0; i < ca.length; i++) ts.push(i / (ca.length - 1));
     if (cb) for (let i = 1; i < cb.length - 1; i++) ts.push(i / (cb.length - 1));

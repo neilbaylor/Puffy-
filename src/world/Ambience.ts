@@ -251,10 +251,15 @@ const GLOW_STOPS: readonly (readonly [number, number, number, number, number])[]
   [0.3, 255, 240, 200, 0.45],
   [1, 255, 240, 200, 0],
 ];
-/** Rings the glow's shading is worked out at (the stops, and a few between, so it fades as smoothly as the picture's). */
-const GLOW_RINGS = [0, 0.15, 0.3, 0.5, 0.75, 1];
-/** Slices round it. */
-const GLOW_SLICES = 32;
+/**
+ * Rings the glow's shading is worked out at: its stops, and one between the first two (its colour
+ * changes there as well as its see-through-ness, and shading from corner to corner mixes the two a
+ * touch differently from the picture's gradient). Past 0.3 only the see-through-ness changes,
+ * evenly out to the rim: no ring needed between.
+ */
+const GLOW_RINGS = [0, 0.15, 0.3, 1];
+/** Slices round it (each a few triangles to work through every frame: as few as keep it round). */
+const GLOW_SLICES = 24;
 
 /**
  * The sun's glow as a disc of triangles shaded from colour to colour (the same as the picture
