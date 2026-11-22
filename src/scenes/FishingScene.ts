@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { clearWith } from '../core/screenClear';
 import { characterById } from '../data/characters';
 import type { Session } from '../core/session';
 import { fadeOutMusic, playHoops } from '../core/music';
@@ -382,7 +383,7 @@ export class FishingScene extends Phaser.Scene {
     this.makeTextures();
     const ch = characterById(this.fd.charId);
     this.heroKey = makeCastSheet(this, ch);
-    this.cameras.main.setBackgroundColor('#8fd0f6');
+    clearWith(this, '#8fd0f6');
 
     // ── the sky, the far-off sea and an island on the horizon ──
     const HORIZON = WATER - 74;

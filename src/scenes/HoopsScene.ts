@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { clearWith } from '../core/screenClear';
 import { LIGHT } from '../core/light';
 import { characterById } from '../data/characters';
 import type { Session } from '../core/session';
@@ -320,7 +321,7 @@ export class HoopsScene extends Phaser.Scene {
   create() {
     this.makeTextures();
     const ch = characterById(this.hd.charId);
-    this.cameras.main.setBackgroundColor('#140a26');
+    clearWith(this, '#140a26');
 
     this.add.image(0, 0, this.k('arena')).setOrigin(0, 0).setScale(1 / ARENA_RES).setDepth(0);
     this.crowd = this.add.image(0, 0, this.k('crowd')).setOrigin(0, 0).setScale(1 / ARENA_RES).setDepth(1);

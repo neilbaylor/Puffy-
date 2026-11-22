@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { clearWith } from '../core/screenClear';
 import { LIGHT } from '../core/light';
 import { DEPTH, GRAVITY, MIN_VIEW_W, VIEW_H } from '../config';
 import { characterById } from '../data/characters';
@@ -636,7 +637,7 @@ export class WrestleScene extends Phaser.Scene {
     this.makeTextures();
     this.physics.world.gravity.y = GRAVITY;
     this.physics.world.setBounds(0, -200, WORLD_W, WORLD_H + 200, true, true, false, false);
-    this.cameras.main.setBackgroundColor('#0b0705');
+    clearWith(this, '#0b0705');
 
     // ── the arena (the basketball one, in poo browns), the ring, the floor and steps around it ──
     const AS_ = K / ARENA_RES;
