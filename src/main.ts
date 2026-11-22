@@ -152,8 +152,9 @@ function makeGl(): { canvas: HTMLCanvasElement; context: WebGLRenderingContext }
       // (no smoothing of the screen's edges, in either mode: it keeps four samples of every pixel of
       // the screen, and works them all each frame. The art's own pictures have soft edges of their
       // own; the shapes drawn as the game goes — ropes, nets, fishing lines, rings, shadows — are
-      // drawn with soft edges of their own too, see gfx/softShapes. Only plain rectangles are
-      // still shapes with hard edges, and they're square to the screen)
+      // drawn with soft edges of their own too, see gfx/softShapes (not in light mode, where
+      // plain hard-edged shapes measured faster). Only plain rectangles are still shapes with hard
+      // edges, and they're square to the screen)
       antialias: false,
       premultipliedAlpha: true,
       failIfMajorPerformanceCaveat: false,

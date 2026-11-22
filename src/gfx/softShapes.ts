@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { addCanvas } from './textures';
+import { LIGHT } from '../core/light';
 
 /**
  * Shapes drawn while the game runs (ropes, nets, fishing lines, rings, bubbles, shadows…) with soft
@@ -534,8 +535,37 @@ function miters(n: number, closed: boolean, side: number) {
   }
 }
 
-/** A SoftShapes in the scene (in place of scene.add.graphics()). */
-export function softShapes(scene: Phaser.Scene, x = 0, y = 0) {
+/**
+ * Light mode's stand-in: a plain Graphics (hard edges). Light mode drew without the screen-edge
+ * smoothing before these shapes came, and measured there (slow tablet speed) the soft edges cost a
+ * little more of the graphics chip's time in the ring and on the court (3–5%) than the plain shapes
+ * — light mode is for speed, so it keeps them. The same calls, and fillUnder as the strips of
+ * triangles the puddles had.
+ */
+class PlainShapes extends Phaser.GameObjects.Graphics {
+  width = 0;
+  height = 0;
+
+  fillUnder(pts: Pt[], baseY: number) {
+    for (let k = 0; k + 1 < pts.length; k++) {
+      const p = pts[k];
+      const q = pts[k + 1];
+      this.fillTriangle(p.x, p.y, q.x, q.y, q.x, baseY);
+      this.fillTriangle(p.x, p.y, q.x, baseY, p.x, baseY);
+    }
+    return this;
+  }
+
+  setSize(w: number, h: number) {
+    this.width = w;
+    this.height = h;
+    return this;
+  }
+}
+
+/** A SoftShapes in the scene (in place of scene.add.graphics()): in light mode, a plain one. */
+export function softShapes(scene: Phaser.Scene, x = 0, y = 0): SoftShapes {
+  if (LIGHT) return scene.add.existing(new PlainShapes(scene, { x, y })) as unknown as SoftShapes;
   return scene.add.existing(new SoftShapes(scene, x, y));
 }
 
