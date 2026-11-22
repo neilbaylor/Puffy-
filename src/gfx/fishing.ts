@@ -814,30 +814,18 @@ export function drawBobber(ctx: Ctx, gold = false) {
 }
 
 /** The sky (a tall strip, stretched across): deep blue at the top to a warm haze at the horizon. */
-export function drawSkyStrip(ctx: Ctx, h: number) {
-  const g = ctx.createLinearGradient(0, 0, 0, h);
-  g.addColorStop(0, '#3e8fe0');
-  g.addColorStop(0.55, '#8fd0f6');
-  g.addColorStop(1, '#fff1cf');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 4, h);
-}
+/** A gradient's colours down a strip: [where (0 top … 1 bottom), colour]. */
+export type Stops = readonly (readonly [number, string])[];
+export const SKY_STOPS: Stops = [[0, '#3e8fe0'], [0.55, '#8fd0f6'], [1, '#fff1cf']];
+/** The water under the surface: bright under the top, deep blue down below. */
+export const DEEP_STOPS: Stops = [[0, '#2bb3d6'], [0.35, '#1683b5'], [1, '#0a3e6e']];
+/** The far-off sea, seen over the top of the cut-away: hazy at the horizon, bluer nearer. */
+export const FAR_SEA_STOPS: Stops = [[0, '#9fd9ee'], [1, '#3fa6d0']];
 
-/** The water under the surface (a strip, stretched): bright under the top, deep blue down below. */
-export function drawDeepStrip(ctx: Ctx, h: number) {
+/** A strip of a gradient (stretched over its part of the scene). */
+export function drawStrip(ctx: Ctx, h: number, stops: Stops) {
   const g = ctx.createLinearGradient(0, 0, 0, h);
-  g.addColorStop(0, '#2bb3d6');
-  g.addColorStop(0.35, '#1683b5');
-  g.addColorStop(1, '#0a3e6e');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 4, h);
-}
-
-/** The far-off sea, seen over the top of the cut-away (a strip): hazy at the horizon, bluer nearer. */
-export function drawFarSeaStrip(ctx: Ctx, h: number) {
-  const g = ctx.createLinearGradient(0, 0, 0, h);
-  g.addColorStop(0, '#9fd9ee');
-  g.addColorStop(1, '#3fa6d0');
+  for (const [t, c] of stops) g.addColorStop(t, c);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 4, h);
 }

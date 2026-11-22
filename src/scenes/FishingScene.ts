@@ -7,6 +7,11 @@ import { sfx } from '../core/sfx';
 import { ART_RES, CHAR_H, CHAR_W, carryHand, drawCharacter } from '../gfx/draw';
 import { CAST_ANGLES, HERO_SHEET_M, addCanvas, fishingWear, hires, makeCastSheet, makeFishFrames } from '../gfx/textures';
 import {
+  DEEP_STOPS,
+  FAR_SEA_STOPS,
+  SKY_STOPS,
+  drawStrip,
+  type Stops,
   BOAT,
   BOBBER,
   BOWL,
@@ -18,9 +23,7 @@ import {
   drawBowlFront,
   drawCloud,
   drawCooler,
-  drawDeepStrip,
   drawDrop,
-  drawFarSeaStrip,
   drawFishShadow,
   drawHullShadow,
   drawDock,
@@ -31,7 +34,6 @@ import {
   drawIsland,
   drawRay,
   drawRipple,
-  drawSkyStrip,
   drawStarburst,
   drawWaveTile,
 } from '../gfx/fishing';
@@ -360,9 +362,9 @@ export class FishingScene extends Phaser.Scene {
     add('fl-bowl-front', BOWL.w, BOWL.h, 2, (ctx) => drawBowlFront(ctx));
     add('fl-bobber', BOBBER.w, BOBBER.h, 3, (ctx) => drawBobber(ctx));
     add('fl-bobber-gold', BOBBER.w, BOBBER.h, 3, (ctx) => drawBobber(ctx, true));
-    add('fl-sky', 4, 512, 1, (ctx) => drawSkyStrip(ctx, 512));
-    add('fl-deep', 4, 256, 1, (ctx) => drawDeepStrip(ctx, 256));
-    add('fl-farsea', 4, 64, 1, (ctx) => drawFarSeaStrip(ctx, 64));
+    add('fl-sky', 4, 512, 1, (ctx) => drawStrip(ctx, 512, SKY_STOPS));
+    add('fl-deep', 4, 256, 1, (ctx) => drawStrip(ctx, 256, DEEP_STOPS));
+    add('fl-farsea', 4, 64, 1, (ctx) => drawStrip(ctx, 64, FAR_SEA_STOPS));
     add('fl-wave', WAVE.w, WAVE.h, 2, (ctx) => drawWaveTile(ctx));
     add('fl-island', 520, 120, 1.5, (ctx) => drawIsland(ctx, 520, 120));
     for (let i = 0; i < 3; i++) add(`fl-cloud${i}`, 240, 90, 1.5, (ctx) => drawCloud(ctx, 240, 90, 31 + i * 17));
@@ -371,12 +373,30 @@ export class FishingScene extends Phaser.Scene {
     add('fl-burst', 256, 256, 1, (ctx) => drawStarburst(ctx, 256));
     add('fl-ripple', 64, 18, 2, (ctx) => drawRipple(ctx, 64, 18));
     add('fl-drop', 8, 8, 2, (ctx) => drawDrop(ctx, 4));
-    add('fl-px', 2, 2, 1, (ctx) => {
-      ctx.fillStyle = '#fff';
-      ctx.fillRect(0, 0, 2, 2);
-    });
     makeFishFrames(this, 'fl-kingbob', 'kingbob', ['sw0', 'sw1', 'sw2', 'sw3', 'sw4', 'sw5', 'bl1', 'bl4'], 2);
     for (const c of CATCHES) makeFishFrames(this, `fl-fish-${c.kind}`, c.kind, ['sw0', 'sw2', 'sw4'], fishRes(c));
+  }
+
+  /**
+   * A gradient strip stretched over a box of the scene (the sky, the far sea, the deep water). With
+   * WebGL it's drawn as rectangles shaded from colour to colour, one per step, not as the strip's
+   * picture: the same gradient (to 1/255), and much less work for the graphics chip than reading
+   * a picture for every pixel — together they cover the whole screen.
+   */
+  private strip(x: number, y: number, w: number, h: number, key: string, stops: Stops, depth: number) {
+    if (!(this.game.renderer instanceof Phaser.Renderer.WebGL.WebGLRenderer)) {
+      this.add.image(x, y, key).setOrigin(0, 0).setDisplaySize(w, h).setDepth(depth);
+      return;
+    }
+    const g = this.add.graphics().setDepth(depth);
+    for (let i = 1; i < stops.length; i++) {
+      const [t0, c0] = stops[i - 1];
+      const [t1, c1] = stops[i];
+      const a = Phaser.Display.Color.HexStringToColor(c0).color;
+      const b = Phaser.Display.Color.HexStringToColor(c1).color;
+      g.fillGradientStyle(a, a, b, b, 1);
+      g.fillRect(x, y + t0 * h, w, (t1 - t0) * h);
+    }
   }
 
   create() {
@@ -387,16 +407,8 @@ export class FishingScene extends Phaser.Scene {
 
     // ── the sky, the far-off sea and an island on the horizon ──
     const HORIZON = WATER - 74;
-    this.add
-      .image(WORLD_L, WORLD_TOP, 'fl-sky')
-      .setOrigin(0, 0)
-      .setDisplaySize(WORLD_W - WORLD_L + 400, HORIZON - WORLD_TOP)
-      .setDepth(0);
-    this.add
-      .image(WORLD_L, HORIZON, 'fl-farsea')
-      .setOrigin(0, 0)
-      .setDisplaySize(WORLD_W - WORLD_L + 400, WATER - HORIZON + 10)
-      .setDepth(0.2);
+    this.strip(WORLD_L, WORLD_TOP, WORLD_W - WORLD_L + 400, HORIZON - WORLD_TOP, 'fl-sky', SKY_STOPS, 0);
+    this.strip(WORLD_L, HORIZON, WORLD_W - WORLD_L + 400, WATER - HORIZON + 10, 'fl-farsea', FAR_SEA_STOPS, 0.2);
     // the sun, a soft glow (it barely moves: far away)
     this.add.image(1180, 150, 'fl-burst').setScale(1.1).setAlpha(0.55).setDepth(0.1).setScrollFactor(0.15, 0.6);
     softCircle(this, 1180, 150, 40, 0xfff6c8).setDepth(0.12).setScrollFactor(0.15, 0.6);
@@ -433,11 +445,7 @@ export class FishingScene extends Phaser.Scene {
       });
 
     // ── the water: deep under the surface, light coming down in rays, little fish going by ──
-    this.add
-      .image(WORLD_L, WATER, 'fl-deep')
-      .setOrigin(0, 0)
-      .setDisplaySize(WORLD_W - WORLD_L + 400, WORLD_BOTTOM - WATER + 40)
-      .setDepth(1);
+    this.strip(WORLD_L, WATER, WORLD_W - WORLD_L + 400, WORLD_BOTTOM - WATER + 40, 'fl-deep', DEEP_STOPS, 1);
     for (let i = 0; i < 7; i++) {
       const r = this.add
         .image(200 + i * 520 + Math.random() * 160, WATER + 4, 'fl-ray')
@@ -519,11 +527,11 @@ export class FishingScene extends Phaser.Scene {
       w.setData('sp', sp);
       this.waves.push(w);
     }
+    // (a plain colour: a rectangle, not a white picture tinted — the same, without a picture read
+    // for each of its pixels, a good part of the screen)
     this.add
-      .image(WORLD_L, WATER + 22, 'fl-px')
+      .rectangle(WORLD_L, WATER + 22, WORLD_W - WORLD_L + 400, WORLD_BOTTOM - WATER, 0x0d5f92)
       .setOrigin(0, 0)
-      .setDisplaySize(WORLD_W - WORLD_L + 400, WORLD_BOTTOM - WATER)
-      .setTint(0x0d5f92)
       .setAlpha(0.3)
       .setDepth(6.4);
 
