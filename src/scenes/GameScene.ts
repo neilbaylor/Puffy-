@@ -34,7 +34,7 @@ import { Background, type View } from '../world/Background';
 import { Ambience } from '../world/Ambience';
 import type { HoopsData } from './HoopsScene';
 import { Fx } from '../world/Fx';
-import { stingerCover } from '../ui/stinger';
+import { stingerCover, stingerReveal } from '../ui/stinger';
 import { mixTint, themeClock, themeMix, themesFor } from '../world/theme';
 import { LevelView } from '../world/LevelView';
 import { FishChase } from '../world/FishChase';
@@ -2346,9 +2346,15 @@ export class GameScene extends Phaser.Scene {
         // broadcast stinger: bars sweep across, the palace is revealed underneath
         this.cameras.main.flash(200, 255, 240, 200);
         sfx.whoosh();
-        void stingerCover().then(() =>
-          this.scene.start(boss, { session: this.session, charId: p.char.id, checkpoint: this.lastCheckpoint, level: this.levelId, result: res } satisfies HoopsData),
-        );
+        void stingerCover().then(() => {
+          // (left for the start screen in the 0.62 s the bars take — Pause, then Home screen — the
+          // boss mustn't start over it: the bars go away again instead)
+          if (!this.sys.isActive() && !this.sys.isPaused()) {
+            void stingerReveal();
+            return;
+          }
+          this.scene.start(boss, { session: this.session, charId: p.char.id, checkpoint: this.lastCheckpoint, level: this.levelId, result: res } satisfies HoopsData);
+        });
       },
     });
   }

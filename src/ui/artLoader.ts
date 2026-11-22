@@ -19,6 +19,19 @@ let busy: Promise<void> | null = null;
  * Draw a game's art (only what isn't drawn yet) behind a small loading card: a few steps per
  * frame, the bar moving between them. Nothing to draw: no card at all.
  */
+/**
+ * One drawing step, and on with the rest if it fails: a step that threw used to stop the loading
+ * card where it was, for good — and with it every Play after, waiting on it. (A picture that
+ * couldn't be drawn shows as Phaser's "missing" one; the game goes on.)
+ */
+function runSafely(step: () => void) {
+  try {
+    step();
+  } catch (e) {
+    console.error('A drawing step failed:', e);
+  }
+}
+
 export function loadArt(steps: Step[], label = 'Loading…'): Promise<void> {
   if (!steps.length) return busy ?? Promise.resolve();
   const run = async () => {
@@ -31,20 +44,23 @@ export function loadArt(steps: Step[], label = 'Loading…'): Promise<void> {
     // (shown first, before any drawing starts)
     await nextFrame();
     await nextFrame();
-    let slice = performance.now();
-    for (let i = 0; i < steps.length; i++) {
-      steps[i].run();
-      bar.style.setProperty('--p', String((i + 1) / steps.length));
-      if (performance.now() - slice > 40) {
-        await nextFrame();
-        slice = performance.now();
+    try {
+      let slice = performance.now();
+      for (let i = 0; i < steps.length; i++) {
+        runSafely(steps[i].run);
+        bar.style.setProperty('--p', String((i + 1) / steps.length));
+        if (performance.now() - slice > 40) {
+          await nextFrame();
+          slice = performance.now();
+        }
       }
+      // (a couple of frames with everything drawn on show behind the card: the new pictures are on
+      // the graphics chip before the level starts)
+      await nextFrame();
+      await nextFrame();
+    } finally {
+      el.remove();
     }
-    // (a couple of frames with everything drawn on show behind the card: the new pictures are on
-    // the graphics chip before the level starts)
-    await nextFrame();
-    await nextFrame();
-    el.remove();
   };
   const p = run().finally(() => {
     if (busy === p) busy = null;
@@ -70,7 +86,7 @@ export function loadArtQueue(take: () => (() => void) | null, left: () => number
     let done = 0;
     let slice = performance.now();
     for (let job = take(); job; job = take()) {
-      job();
+      runSafely(job);
       done++;
       // (never backwards: a job that adds more only slows the bar down)
       const p = done / (done + left());
