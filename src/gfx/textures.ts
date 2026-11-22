@@ -680,8 +680,96 @@ function makeBgLayer(scene: Phaser.Scene, id: string, layer: BgLayer, home = fal
   sliced?.play();
   const c = sliced?.canvas ?? drawBgLayer(id, layer, home, hiresPadV);
   if (!c) return;
+  // (its see-through top measured while its pixels are still here: see bgPieces)
+  if (layer !== 'sky') measurePieces(key, c);
   // (the sky is a 4-pixel strip: its pixels are kept)
   addCanvas(scene, key, c, undefined, layer === 'sky' ? undefined : { release: true });
+}
+
+/** A piece of a background layer's picture (canvas pixels): `w` wide from `x`, from row `top` down. */
+export type LayerPiece = { x: number; w: number; top: number };
+/** Each background layer's pieces, by key (see bgPieces). */
+const layerPieces = new Map<string, LayerPiece[]>();
+/** How many pieces a layer's picture is cut into, at most (see measurePieces). */
+export const LAYER_PIECES = 8;
+
+/**
+ * A background layer (hills, far islands, near ground) is a wide strip, mostly see-through above
+ * its outline, and was drawn as one picture: the graphics chip worked through every pixel of its
+ * box, see-through or not — at the foot of Part 4's climb the three of them were over 1.3 screens'
+ * worth, the biggest part of each frame, and the stutters there. So each picture is shown as a few
+ * side-by-side pieces, each cut down to just below its own top (the outline rises and falls across
+ * the strip): the same picture, the same places, less of nothing.
+ *
+ * The pieces, for the Background to show: null if the layer wasn't measured (then it's shown whole).
+ */
+export function bgPieces(key: string): readonly LayerPiece[] | undefined {
+  return layerPieces.get(key);
+}
+
+/**
+ * Find where each 32-pixel column of a layer's picture starts having anything in it, from its pixels
+ * (read back once, just before the picture is sent to the graphics chip: the browser has just
+ * painted them for that anyway, so reading them is quick — ~3 ms at 4× slow CPU), and join
+ * neighbouring columns into at most LAYER_PIECES pieces, keeping the most see-through rows out.
+ * Each piece starts 2 rows above its first non-see-through row: the graphics chip blends a pixel
+ * from the rows either side of it, so a row that's see-through but next to one that isn't still
+ * shows a little — it's kept, and the picture on screen is the same to the pixel.
+ */
+function measurePieces(key: string, c: HTMLCanvasElement) {
+  layerPieces.delete(key);
+  try {
+    const W = c.width;
+    const H = c.height;
+    const COL = 32;
+    const cols = Math.ceil(W / COL);
+    const px = new Uint32Array(c.getContext('2d')!.getImageData(0, 0, W, H).data.buffer);
+    // (alpha is the top byte of each pixel read as one number on little-endian devices — all phones —
+    // and the bottom one otherwise)
+    const A = new Uint8Array(new Uint32Array([0x01000000]).buffer)[3] === 1 ? 0xff000000 : 0x000000ff;
+    // each pixel column's first row with anything in it
+    const first = new Int32Array(W).fill(H);
+    let left = W;
+    for (let y = 0; y < H && left > 0; y++) {
+      const row = y * W;
+      for (let x = 0; x < W; x++)
+        if (first[x] === H && px[row + x] & A) {
+          first[x] = y;
+          left--;
+        }
+    }
+    // each 32-pixel column's top: its own pixel columns and the one either side of it (the graphics
+    // chip blends a pixel from its neighbours, across as well as up and down), 2 rows of margin; a
+    // column with nothing in it at all keeps its last row, as an empty piece
+    const top: number[] = [];
+    for (let k = 0; k < cols; k++) {
+      let t = H;
+      for (let x = Math.max(0, k * COL - 1); x < Math.min(W, (k + 1) * COL + 1); x++) t = Math.min(t, first[x]);
+      top.push(Math.max(0, Math.min(H - 1, t) - 2));
+    }
+    // join columns: the two neighbouring pieces whose join wastes least, until few enough
+    let pieces: LayerPiece[] = top.map((t, k) => ({ x: k * COL, w: Math.min(COL, W - k * COL), top: t }));
+    while (pieces.length > LAYER_PIECES) {
+      let best = 0;
+      let cost = Infinity;
+      for (let i = 0; i + 1 < pieces.length; i++) {
+        const a = pieces[i];
+        const b = pieces[i + 1];
+        const t = Math.min(a.top, b.top);
+        const extra = (a.top - t) * a.w + (b.top - t) * b.w;
+        if (extra < cost) {
+          cost = extra;
+          best = i;
+        }
+      }
+      const a = pieces[best];
+      const b = pieces[best + 1];
+      pieces = [...pieces.slice(0, best), { x: a.x, w: a.w + b.w, top: Math.min(a.top, b.top) }, ...pieces.slice(best + 2)];
+    }
+    layerPieces.set(key, pieces);
+  } catch {
+    /* not measured: shown whole */
+  }
 }
 
 /**

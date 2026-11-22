@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { DEPTH } from '../config';
-import { BG_LAYERS, bgKey, bgRes, ensureLook, skyColours } from '../gfx/textures';
+import { BG_LAYERS, LAYER_PIECES, bgKey, bgPieces, bgRes, ensureLook, skyColours } from '../gfx/textures';
 import { rng } from '../gfx/draw';
 import { liveCanvas } from '../gfx/liveCanvas';
 import { LIGHT } from '../core/light';
@@ -103,6 +103,16 @@ interface Seed {
   img: Phaser.GameObjects.Image;
 }
 
+/**
+ * One picture of a layer's row, shown as the pieces it's cut into (see bgPieces): LAYER_PIECES images
+ * made together, each cropped to its piece; the ones a picture doesn't need are hidden.
+ */
+interface Tile {
+  imgs: Phaser.GameObjects.Image[];
+  /** How many of `imgs` are in use. */
+  n: number;
+}
+
 interface Layer {
   id: LayerId;
   /**
@@ -112,8 +122,8 @@ interface Layer {
    * whenever their width changes (every frame of a zooming fly-over), which is
    * what was running iPhones out of memory.
    */
-  a: Phaser.GameObjects.Image[];
-  b: Phaser.GameObjects.Image[];
+  a: Tile[];
+  b: Tile[];
   keyA: string;
   keyB: string;
   depth: number;
@@ -273,9 +283,38 @@ export class Background {
   }
 
   /** Make sure a row has `n` pictures (they're only ever added: a handful at most). */
-  private row(imgs: Phaser.GameObjects.Image[], key: string, n: number, depth: number) {
-    while (imgs.length < n) imgs.push(this.scene.add.image(0, 0, key).setOrigin(0, 0).setScale(1 / this.res).setDepth(depth));
-    return imgs;
+  private row(tiles: Tile[], key: string, n: number, depth: number) {
+    while (tiles.length < n) {
+      // (all of a picture's pieces made at once, in the order the whole pictures were: what's drawn
+      // over what stays the same)
+      const imgs: Phaser.GameObjects.Image[] = [];
+      for (let k = 0; k < LAYER_PIECES; k++) imgs.push(this.scene.add.image(0, 0, key).setOrigin(0, 0).setScale(1 / this.res).setDepth(depth));
+      const tile: Tile = { imgs, n: 0 };
+      this.cut(tile, key);
+      tiles.push(tile);
+    }
+    return tiles;
+  }
+
+  /** Show `key` in a row's picture: its pieces cropped to their boxes (or the whole picture in one). */
+  private cut(tile: Tile, key: string) {
+    const pieces = this.pieces ? bgPieces(key) : undefined;
+    if (!pieces) {
+      tile.imgs[0].setTexture(key).setCrop();
+      tile.n = 1;
+    } else {
+      tile.n = pieces.length;
+      pieces.forEach((p, i) => {
+        const img = tile.imgs[i].setTexture(key);
+        img.setCrop(p.x, p.top, p.w, img.frame.height - p.top);
+      });
+    }
+    for (let i = tile.n; i < tile.imgs.length; i++) tile.imgs[i].setVisible(false);
+  }
+
+  /** Pieces (see Tile): with WebGL only (the canvas renderer draws only what's in a picture anyway). */
+  private get pieces() {
+    return this.scene.game.renderer.type === Phaser.WEBGL;
   }
 
   /** Show look `a`, with look `b` faded in on top by `w`. */
@@ -287,7 +326,7 @@ export class Background {
       this.skyA.setTexture(bgKey('sky', m.a, this.home));
       for (const l of this.layers) {
         l.keyA = bgKey(l.id, m.a, this.home);
-        for (const img of l.a) img.setTexture(l.keyA);
+        for (const t of l.a) this.cut(t, l.keyA);
       }
     }
     const showB = m.w > 0.001 && m.b !== m.a;
@@ -296,13 +335,13 @@ export class Background {
       this.skyB.setTexture(bgKey('sky', m.b, this.home));
       for (const l of this.layers) {
         l.keyB = bgKey(l.id, m.b, this.home);
-        for (const img of l.b) img.setTexture(l.keyB);
+        for (const t of l.b) this.cut(t, l.keyB);
       }
     }
     this.skyB.setVisible(showB && !this.skyBands).setAlpha(m.w);
     this.showB = showB;
     this.wB = m.w;
-    for (const l of this.layers) for (const img of l.b) img.setVisible(showB).setAlpha(m.w);
+    for (const l of this.layers) for (const t of l.b) for (let i = 0; i < t.n; i++) t.imgs[i].setVisible(showB).setAlpha(m.w);
     this.fill.setFillStyle(mixSea(m));
     const pa = PALETTES[m.a];
     const pb = PALETTES[m.b];
@@ -513,14 +552,20 @@ export class Background {
       // (and none of the row while it's wholly above or below the view: up a climb, or high over the
       // ground, the far layers are a long way down, and were drawn there every frame all the same)
       const rowOn = l.y < view.top + view.height + 8 && l.y + l.h > view.top - 8;
+      const right = view.left + view.width;
       for (let i = 0; i < a.length; i++) {
+        // (a hair of overlap so no seam shows between neighbours)
         const x = x0 + i * l.w - 0.3 * i;
         // (only the ones in view: the row's last picture or two are past the right edge, and Phaser
-        // draws a picture wherever it is)
-        const on = rowOn && i < n && x < view.left + view.width;
-        // (a hair of overlap so no seam shows between neighbours)
-        a[i].setVisible(on).setPosition(x, l.y);
-        b[i].setVisible(on && this.showB).setAlpha(this.wB).setPosition(x, l.y);
+        // draws a picture wherever it is. All of a picture's pieces go with it: the start screen's
+        // view turns a little, so the corners of the screen can show what's just outside the box)
+        const on = rowOn && i < n && x < right;
+        for (const [t, show] of [[a[i], on], [b[i], on && this.showB]] as const)
+          for (let j = 0; j < t.n; j++) {
+            const img = t.imgs[j];
+            img.setVisible(show).setPosition(x, l.y);
+            if (t === b[i]) img.setAlpha(this.wB);
+          }
       }
     }
     // solid fill under the nearest layer so the bottom of the screen is always covered
