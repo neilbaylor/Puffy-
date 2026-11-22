@@ -725,6 +725,12 @@ export class WrestleScene extends Phaser.Scene {
     this.heartsImg = this.add.image(0, 0, '__DEFAULT').setDepth(DEPTH.text).setVisible(false);
     this.confetti = new SimpleConfetti(this, DEPTH.fx);
     this.dark = this.add.rectangle(WORLD_W / 2, WORLD_H / 2, WORLD_W * 3, WORLD_H * 3, 0x070302, 0).setDepth(DEPTH_W.dark);
+    // (only drawn while it darkens anything: it covers the whole screen, and see-through — nearly
+    // all the fight — it was still a screenful of nothing blended into every pixel, every frame.
+    // Under 1/255 the graphics chip gets 0 anyway.)
+    const darkOn = () => this.dark.setVisible(this.dark.fillAlpha * 255 >= 1);
+    this.events.on(Phaser.Scenes.Events.PRE_RENDER, darkOn);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.events.off(Phaser.Scenes.Events.PRE_RENDER, darkOn));
     this.spot = this.add.image(0, 0, 'spot').setOrigin(0.5, 1).setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH_W.spot).setAlpha(0);
 
     // ── the overlay: her health in 8 pieces, call-outs, speech, a Skip button ──
