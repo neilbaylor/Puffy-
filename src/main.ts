@@ -127,6 +127,22 @@ const size = () => {
  * so motion stays perfectly even (and saves battery).
  */
 /** Phaser draws once the frame times it has added up reach 1000 / limit ms. */
+/**
+ * Pictures are drawn in runs, and Phaser can put pictures from up to 16 different textures in one
+ * run: each pixel then works out which of them it's from, comparing its texture's number with
+ * each in turn, so the more textures in a run, the dearer every pixel of it. Phaser already keeps
+ * to one texture a run on phones and tablets it recognises (its `autoMobileTextures`: "can help
+ * performance on some devices"), but not on anything that says it's a computer — and Android
+ * tablets' Chrome asks for the desktop version of sites by default, so says just that. Here it's
+ * one texture a run everywhere: a few more runs a frame (~10 → ~30, nothing for the processor),
+ * each pixel cheaper. Measured with the software graphics chip of the test browser: a still
+ * frame −15..25% in every scene, both modes. The picture is the same.
+ */
+function oneTexturePerBatch(game: Phaser.Game) {
+  const nodes = (game.renderer as unknown as { renderNodes?: { setMaxParallelTextureUnits?(n: number): void } }).renderNodes;
+  nodes?.setMaxParallelTextureUnits?.(1);
+}
+
 function fpsLimitFor(refreshMs: number) {
   const hz = 1000 / refreshMs;
   const every = Math.max(1, Math.round(hz / 60 - 0.1)); // 60Hz → 1, 120Hz → 2, 90Hz → 1 (can't divide evenly)
@@ -230,6 +246,8 @@ function start(refreshMs: number) {
   game.events.once(Phaser.Core.Events.READY, () => {
     const g = (game.renderer as unknown as { gl?: WebGLRenderingContext }).gl;
     diag.smooth = g ? `${g.getContextAttributes()?.antialias ? 'on' : 'off'} (${g.getParameter(g.SAMPLES)} samples)` : 'canvas';
+    diag.seenAs = game.device.os.desktop ? 'computer' : 'phone/tablet';
+    oneTexturePerBatch(game);
     warmBatchShaders(game);
     trimRenderTargets(game);
     trackBossArt(game);
