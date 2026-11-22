@@ -49,7 +49,7 @@ import {
   type JumboContent,
 } from '../gfx/hoops';
 import { stingerReveal, stingerTitle } from '../ui/stinger';
-import { addCanvas, frameGrid, hires } from '../gfx/textures';
+import { addCanvas, frameGrid, hires, type Step } from '../gfx/textures';
 import { BOOM_FRAMES, BOOM_SIZE, drawBoomFrame } from '../gfx/boom';
 import { drawEmber, drawFireball, drawFluffChunk, drawSmoke } from '../gfx/blast';
 import { gamepadSources } from '../input/gamepad';
@@ -260,8 +260,35 @@ export class HoopsScene extends Phaser.Scene {
 
   private makeTextures() {
     setArenaStyle(this.style);
-    if (!this.textures.exists(this.k('arena'))) addCanvas(this, this.k('arena'), hires(ARENA_W, ARENA_H, ARENA_RES, (ctx) => drawArena(ctx)), undefined, { release: true });
-    if (!this.textures.exists('king')) {
+    for (const step of this.artSteps(this.hd.level ?? 1)) step.run();
+  }
+
+  /**
+   * The arena's pictures not drawn yet, one step each. As the fight starts they're all drawn at once
+   * (makeTextures); from the Bosses menu they're drawn first, a few at a time behind the loading
+   * card (see UI.gameArt) — drawn in the scene's first frame, they held that frame up for a second
+   * or more on a slow phone, with nothing on screen moving. (`level` 1: the Palace, 2: the Summit Dome.)
+   */
+  artSteps(level: number): Step[] {
+    const style = level === 2 ? SUMMIT : PALACE;
+    const hard = level === 2;
+    const k = (key: string) => `${key}:${style.id}`;
+    const T = this.textures;
+    const steps: Step[] = [];
+    // (each checked again as it runs, and drawn in its arena's colours)
+    const add = (key: string, draw: () => void) => {
+      if (!T.exists(key))
+        steps.push({
+          name: key,
+          run: () => {
+            if (T.exists(key)) return;
+            setArenaStyle(style);
+            draw();
+          },
+        });
+    };
+    add(k('arena'), () => addCanvas(this, k('arena'), hires(ARENA_W, ARENA_H, ARENA_RES, (ctx) => drawArena(ctx)), undefined, { release: true }));
+    add('king', () => {
       const fw = Math.ceil(KING_W * KING_RES);
       const fh = Math.ceil(KING_H * KING_RES);
       const g = frameGrid(KING_FRAMES.length, fw, fh);
@@ -277,12 +304,12 @@ export class HoopsScene extends Phaser.Scene {
         ctx.restore();
       });
       addCanvas(this, 'king', c, (t) => KING_FRAMES.forEach((f, i) => t.add(f, 0, g.x(i), g.y(i), fw, fh)), { release: true });
-    }
+    });
     // (the Plop family's parade: Part 2's ending only, so only there; and only the poses it strikes)
-    if (this.hard)
+    if (hard)
     for (const kind of PLOP_KINDS) {
       const key = `plop-${kind}`;
-      if (!this.textures.exists(key)) {
+      add(key, () => {
         const R = PARADE_RES;
         const fw = Math.round(PLOP_W * R);
         const fh = Math.round(PLOP_H * R);
@@ -296,26 +323,27 @@ export class HoopsScene extends Phaser.Scene {
           ctx.restore();
         });
         addCanvas(this, key, c, (t) => PARADE_FRAMES.forEach((f, i) => t.add(f, 0, g.x(i), g.y(i), fw, fh)), { release: true });
-      }
+      });
     }
-    if (!this.textures.exists('kingcrown')) addCanvas(this, 'kingcrown', hires(64, 44, KING_RES, (ctx) => drawKingCrown(ctx, 32, 40)), undefined, { release: true });
-    if (!this.textures.exists(this.k('crowd'))) addCanvas(this, this.k('crowd'), hires(ARENA_W, CROWD_H, ARENA_RES, (ctx) => drawCrowd(ctx, false)), undefined, { release: true });
-    if (!this.textures.exists(this.k('crowd2'))) addCanvas(this, this.k('crowd2'), hires(ARENA_W, CROWD_H, ARENA_RES, (ctx) => drawCrowd(ctx, true)), undefined, { release: true });
-    if (!this.textures.exists(this.k('arenafront'))) addCanvas(this, this.k('arenafront'), hires(ARENA_W, FRONT_H, ARENA_RES, (ctx) => drawArenaFront(ctx)), undefined, { release: true });
-    if (!this.textures.exists('camflash')) addCanvas(this, 'camflash', hires(48, 48, 1, (ctx) => drawCameraFlash(ctx, 24)), undefined, { release: true });
-    if (!this.textures.exists('hball')) addCanvas(this, 'hball', hires(52, 52, 3, (ctx) => drawBall(ctx, 26, 26, 24)), undefined, { release: true });
-    if (!this.textures.exists(this.k('backboard'))) {
-      // drawn in stage coordinates around the hoop, then cropped
-      addCanvas(this, this.k('backboard'), hires(320, 420, 3, (ctx) => {
+    add('kingcrown', () => addCanvas(this, 'kingcrown', hires(64, 44, KING_RES, (ctx) => drawKingCrown(ctx, 32, 40)), undefined, { release: true }));
+    add(k('crowd'), () => addCanvas(this, k('crowd'), hires(ARENA_W, CROWD_H, ARENA_RES, (ctx) => drawCrowd(ctx, false)), undefined, { release: true }));
+    add(k('crowd2'), () => addCanvas(this, k('crowd2'), hires(ARENA_W, CROWD_H, ARENA_RES, (ctx) => drawCrowd(ctx, true)), undefined, { release: true }));
+    add(k('arenafront'), () => addCanvas(this, k('arenafront'), hires(ARENA_W, FRONT_H, ARENA_RES, (ctx) => drawArenaFront(ctx)), undefined, { release: true }));
+    add('camflash', () => addCanvas(this, 'camflash', hires(48, 48, 1, (ctx) => drawCameraFlash(ctx, 24)), undefined, { release: true }));
+    add('hball', () => addCanvas(this, 'hball', hires(52, 52, 3, (ctx) => drawBall(ctx, 26, 26, 24)), undefined, { release: true }));
+    // drawn in stage coordinates around the hoop, then cropped
+    add(k('backboard'), () =>
+      addCanvas(this, k('backboard'), hires(320, 420, 3, (ctx) => {
         ctx.translate(160 - HOOP.rimX, 220 - HOOP.rimY);
         drawBackboard(ctx);
         drawRimBack(ctx, false);
-      }), undefined, { release: true });
-    }
-    if (!this.textures.exists('rimf')) addCanvas(this, 'rimf', hires(140, 40, 3, (ctx) => drawRimFrontTube(ctx, 70, 16)), undefined, { release: true });
-    if (!this.textures.exists('spot')) addCanvas(this, 'spot', hires(300, 700, 1, (ctx) => drawSpotlight(ctx, 300, 700)), undefined, { release: true });
-    if (!this.textures.exists('softshadow')) addCanvas(this, 'softshadow', hires(128, 40, 1, (ctx) => drawSoftShadow(ctx, 128, 40)), undefined, { release: true });
-    if (!this.textures.exists('spotbrush')) addCanvas(this, 'spotbrush', hires(256, 256, 1, (ctx) => drawSpotBrush(ctx, 256)), undefined, { release: true });
+      }), undefined, { release: true }),
+    );
+    add('rimf', () => addCanvas(this, 'rimf', hires(140, 40, 3, (ctx) => drawRimFrontTube(ctx, 70, 16)), undefined, { release: true }));
+    add('spot', () => addCanvas(this, 'spot', hires(300, 700, 1, (ctx) => drawSpotlight(ctx, 300, 700)), undefined, { release: true }));
+    add('softshadow', () => addCanvas(this, 'softshadow', hires(128, 40, 1, (ctx) => drawSoftShadow(ctx, 128, 40)), undefined, { release: true }));
+    add('spotbrush', () => addCanvas(this, 'spotbrush', hires(256, 256, 1, (ctx) => drawSpotBrush(ctx, 256)), undefined, { release: true }));
+    return steps;
   }
 
   create() {

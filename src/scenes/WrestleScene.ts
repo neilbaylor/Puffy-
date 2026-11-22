@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { clearWith } from '../core/screenClear';
 import { LIGHT } from '../core/light';
 import { DEPTH, GRAVITY, MIN_VIEW_W, VIEW_H } from '../config';
-import { characterById } from '../data/characters';
+import { characterById, type CharacterDef } from '../data/characters';
 import type { Session } from '../core/session';
 import { fadeOutMusic, playHoops } from '../core/music';
 import { sfx } from '../core/sfx';
@@ -17,7 +17,7 @@ import { drawPoo } from '../gfx/hazards';
 import { drawPrize } from '../gfx/prizes';
 import { STYLES } from '../gfx/handdrawn';
 import { CHAIR_H, CHAIR_W, KING_SEAT, PLOP_DOME, PLOP_DOME_RING, POO_PALACE, POO_PALACE_RING, setRingLook, drawFoldingChair, POST_BOX, PUDDLE, RING, RING_BOX, ROPE_COL, TUNNEL, backX, drawArenaPoo, drawFrontPost, drawRing, drawRingFloor, drawRingside, RINGSIDE_PARTS, drawTunnel, wrestleJumboBar, WR_CRAWL, wrestleCrawlAt, wrestleCrawlItems } from '../gfx/wrestle';
-import { HERO_SHEET_M, PCHUTE_DOWN, PCHUTE_RES, PCHUTE_UP, PLOP_PAD, PLOP_RES, PLOP_TOP, addCanvas, hires, makeCarrySheet, makeJetFx, makePlopChutes, makePlops, makeWeaponArt } from '../gfx/textures';
+import { HERO_SHEET_M, PCHUTE_DOWN, PCHUTE_RES, PCHUTE_UP, PLOP_PAD, PLOP_RES, PLOP_TOP, addCanvas, hires, makeCarrySheet, makeJetFx, makePlopChutes, makePlops, makeWeaponArt, type Step } from '../gfx/textures';
 import { LedRibbon, LedStrip } from '../gfx/ledStrip';
 import { JumboScreen } from '../gfx/jumboScreen';
 import { BLASTER, SAW, W_RES } from '../gfx/weapons';
@@ -768,40 +768,76 @@ export class WrestleScene extends Phaser.Scene {
   // ───────────────────────────────────────────── art ──
 
   private makeTextures() {
+    for (const step of this.artSteps(this.wd.level ?? 3)) step.run();
+  }
+
+  /**
+   * The ring's pictures not drawn yet, one step each (and the hero's chair-carrying frames, given the
+   * hero). As the fight starts they're all drawn at once (makeTextures); from the Bosses menu
+   * they're drawn first, a few at a time behind the loading card (see UI.gameArt) — drawn in the
+   * scene's first frame, they held that frame up for two seconds or more on a slow phone, with
+   * nothing on screen moving. (`level` 3: Queen Plop's Poo Palace, 4: the Plop King's dome.)
+   */
+  artSteps(level: number, ch?: CharacterDef): Step[] {
     const T = this.textures;
+    const kingFight = level === 4;
+    const tk = (key: string) => (kingFight ? `${key}-k` : key);
+    const steps: Step[] = [];
+    // (each checked again as it runs, and drawn in its ring's colours)
+    const look = () => {
+      setArenaStyle(kingFight ? PLOP_DOME : POO_PALACE);
+      setRingLook(kingFight ? PLOP_DOME_RING : POO_PALACE_RING);
+    };
+    const step = (keys: string[], draw: () => void) => {
+      if (keys.some((k) => !T.exists(k)))
+        steps.push({
+          name: keys[0],
+          run: () => {
+            look();
+            draw();
+          },
+        });
+    };
+    const once = (key: string, draw: () => void) => step([key], () => !T.exists(key) && draw());
     // (only one ring's pictures at a time: the other one's go — they're big)
-    for (const k of ['wr-arena', 'wr-crowd', 'wr-crowd2', 'wr-front', 'wr-ring', 'wr-post']) {
-      const other = this.kingFight ? k : `${k}-k`;
-      if (T.exists(other)) T.remove(other);
-    }
-    for (const k of this.kingFight ? ['wr-queen', 'wr-king', 'wr-queen-ko'] : ['wr-pking', 'wr-pking-robe']) if (T.exists(k)) T.remove(k);
-    if (!T.exists(this.tk('wr-arena')))
-      addCanvas(this, this.tk('wr-arena'), hires(ARENA_W, ARENA_H, ARENA_RES, (ctx) => {
+    const others = [...['wr-arena', 'wr-crowd', 'wr-crowd2', 'wr-front', 'wr-ring', 'wr-post'].map((k) => (kingFight ? k : `${k}-k`)), ...(kingFight ? ['wr-queen', 'wr-king', 'wr-queen-ko'] : ['wr-pking', 'wr-pking-robe'])];
+    if (others.some((k) => T.exists(k)))
+      steps.push({
+        name: 'the other ring',
+        run: () => {
+          for (const k of others) if (T.exists(k)) T.remove(k);
+        },
+      });
+    once(tk('wr-arena'), () =>
+      addCanvas(this, tk('wr-arena'), hires(ARENA_W, ARENA_H, ARENA_RES, (ctx) => {
         drawArena(ctx);
         drawRingFloor(ctx);
-      }), undefined, { release: true });
-    if (!T.exists(this.tk('wr-crowd'))) addCanvas(this, this.tk('wr-crowd'), hires(ARENA_W, CROWD_H, ARENA_RES, (ctx) => (drawCrowd(ctx, false), drawTunnel(ctx))), undefined, { release: true });
-    if (!T.exists(this.tk('wr-crowd2'))) addCanvas(this, this.tk('wr-crowd2'), hires(ARENA_W, CROWD_H, ARENA_RES, (ctx) => (drawCrowd(ctx, true), drawTunnel(ctx))), undefined, { release: true });
-    if (!T.exists(this.tk('wr-front')))
-      addCanvas(this, this.tk('wr-front'), hires(ARENA_W, FRONT_H, ARENA_RES, (ctx) => {
+      }), undefined, { release: true }),
+    );
+    once(tk('wr-crowd'), () => addCanvas(this, tk('wr-crowd'), hires(ARENA_W, CROWD_H, ARENA_RES, (ctx) => (drawCrowd(ctx, false), drawTunnel(ctx))), undefined, { release: true }));
+    once(tk('wr-crowd2'), () => addCanvas(this, tk('wr-crowd2'), hires(ARENA_W, CROWD_H, ARENA_RES, (ctx) => (drawCrowd(ctx, true), drawTunnel(ctx))), undefined, { release: true }));
+    once(tk('wr-front'), () =>
+      addCanvas(this, tk('wr-front'), hires(ARENA_W, FRONT_H, ARENA_RES, (ctx) => {
         drawArenaFront(ctx);
         drawArenaPoo(ctx);
-      }), undefined, { release: true });
-    if (!T.exists(this.tk('wr-ring')))
-      addCanvas(this, this.tk('wr-ring'), hires(RING_BOX.w, RING_BOX.h, RES, (ctx) => {
+      }), undefined, { release: true }),
+    );
+    once(tk('wr-ring'), () =>
+      addCanvas(this, tk('wr-ring'), hires(RING_BOX.w, RING_BOX.h, RES, (ctx) => {
         ctx.translate(-RING_BOX.x, -RING_BOX.y);
         drawRing(ctx);
-      }), undefined, { release: true });
-    if (!T.exists(this.tk('wr-post'))) addCanvas(this, this.tk('wr-post'), hires(POST_BOX.w, POST_BOX.h, RES, (ctx) => drawFrontPost(ctx)), undefined, { release: true });
-    if (!T.exists('wr-ringside'))
+      }), undefined, { release: true }),
+    );
+    once(tk('wr-post'), () => addCanvas(this, tk('wr-post'), hires(POST_BOX.w, POST_BOX.h, RES, (ctx) => drawFrontPost(ctx)), undefined, { release: true }));
+    once('wr-ringside', () =>
       addCanvas(this, 'wr-ringside', hires(1600, 230, 1.5, (ctx) => {
         ctx.translate(160, -500);
         drawRingside(ctx);
-      }), undefined, { release: true });
+      }), undefined, { release: true }),
+    );
     // Queen Plop and the King, all their frames (a grid: one long strip is too wide for some phones)
     // (`frames`: only those, for one that only strikes a few poses)
-    const sheetOf = (key: string, draw: (ctx: CanvasRenderingContext2D, f: PlopFrame) => void, frames: readonly PlopFrame[] = PLOP_FRAMES) => {
-      if (T.exists(key)) return;
+    const sheetOf = (key: string, draw: (ctx: CanvasRenderingContext2D, f: PlopFrame) => void, frames: readonly PlopFrame[] = PLOP_FRAMES) => once(key, () => {
       const fw = Math.round((PLOP_W + Q_PAD * 2) * Q_RES);
       const fh = Math.round((PLOP_H + Q_TOP) * Q_RES);
       // (five across, or as few rows as fit and the frames shared out evenly between them)
@@ -815,19 +851,20 @@ export class WrestleScene extends Phaser.Scene {
         ctx.restore();
       });
       addCanvas(this, key, c, (t) => frames.forEach((f, i) => t.add(f, 0, (i % COLS) * fw, Math.floor(i / COLS) * fh, fw, fh)), { release: true });
-    };
-    if (this.kingFight) {
+    });
+    if (kingFight) {
       // the Plop King: in his robe (walking in), and stripped for the fight with his jetpack on his back
       // (his own art has the Plop drawn 25, 34 into its box: moved to where the Queen's sheet has it)
       sheetOf('wr-pking', (ctx, f) => (ctx.translate(Q_PAD - 25, Q_TOP - 34), drawPlopKing(ctx, f, { jet: true })));
       sheetOf('wr-pking-robe', (ctx, f) => (ctx.translate(Q_PAD - 25, Q_TOP - 34), drawPlopKing(ctx, f, { robe: true })));
-      if (!T.exists('wr-robe')) addCanvas(this, 'wr-robe', hires(ROBE_W, ROBE_H, 2, (ctx) => drawRobeHeap(ctx)), undefined, { release: true });
-      makeJetFx(this);
-      makePlopChutes(this);
-      for (const k of ['small', 'medium', 'large'] as const) makePlops(this, k);
-      makeWeaponArt(this);
-      if (!T.exists('wr-duck')) addCanvas(this, 'wr-duck', hires(28, 24, 3, (ctx) => drawDuck(ctx)), undefined, { release: true });
-      if (!T.exists('wr-boom')) {
+      once('wr-robe', () => addCanvas(this, 'wr-robe', hires(ROBE_W, ROBE_H, 2, (ctx) => drawRobeHeap(ctx)), undefined, { release: true }));
+      // (each of these makers does nothing for what's there)
+      step(['jetflame', 'jetsmoke'], () => makeJetFx(this));
+      step(['pchute'], () => makePlopChutes(this));
+      for (const k of ['small', 'medium', 'large'] as const) step([`gplop-${k}`], () => makePlops(this, k));
+      step(['w-blaster', 'w-saw', 'w-ball', 'w-bullet'], () => makeWeaponArt(this));
+      once('wr-duck', () => addCanvas(this, 'wr-duck', hires(28, 24, 3, (ctx) => drawDuck(ctx)), undefined, { release: true }));
+      once('wr-boom', () => {
         const R = 1.2;
         const fw = Math.round(BOOM_SIZE * R);
         const COLS = 4;
@@ -840,14 +877,15 @@ export class WrestleScene extends Phaser.Scene {
           ctx.restore();
         });
         addCanvas(this, 'wr-boom', c, (t) => BOOM_FRAMES.forEach((f, i) => t.add(f, 0, (i % COLS) * fw, Math.floor(i / COLS) * fw, fw, fw)), { release: true });
-      }
+      });
     } else {
       sheetOf('wr-queen', (ctx, f) => drawQueen(ctx, Q_PAD, Q_TOP, f));
       // (the King's cameo in the front row at the end: just the poses it strikes, see win)
       sheetOf('wr-king', (ctx, f) => drawPlop(ctx, Q_PAD, Q_TOP, f, STYLES.polished, 'king'), ['idle', 'look', 'grin', 'yell1', 'run0', 'run1']);
     }
     // Queen Plop knocked out (four frames: breathing, eyes spinning)
-    if (!this.kingFight && !T.exists('wr-queen-ko')) {
+    if (!kingFight)
+    once('wr-queen-ko', () => {
       const R = Q_RES;
       const fw = Math.round(QUEEN_KO_W * R);
       const fh = Math.round(QUEEN_KO_H * R);
@@ -860,10 +898,10 @@ export class WrestleScene extends Phaser.Scene {
         ctx.restore();
       });
       addCanvas(this, 'wr-queen-ko', c, (t) => QUEEN_KO_FRAMES.forEach((f, i) => t.add(f, 0, (i % 2) * fw, Math.floor(i / 2) * fh, fw, fh)), { release: true });
-    }
-    if (!T.exists('camflash')) addCanvas(this, 'camflash', hires(48, 48, 1, (ctx) => drawCameraFlash(ctx, 24)), undefined, { release: true });
-    if (!T.exists('spot')) addCanvas(this, 'spot', hires(300, 700, 1, (ctx) => drawSpotlight(ctx, 300, 700)), undefined, { release: true });
-    if (!T.exists('softshadow'))
+    });
+    once('camflash', () => addCanvas(this, 'camflash', hires(48, 48, 1, (ctx) => drawCameraFlash(ctx, 24)), undefined, { release: true }));
+    once('spot', () => addCanvas(this, 'spot', hires(300, 700, 1, (ctx) => drawSpotlight(ctx, 300, 700)), undefined, { release: true }));
+    once('softshadow', () =>
       addCanvas(this, 'softshadow', hires(128, 40, 1, (ctx) => {
         const g = ctx.createRadialGradient(64, 20, 2, 64, 20, 64);
         g.addColorStop(0, 'rgba(20,10,4,0.8)');
@@ -871,8 +909,9 @@ export class WrestleScene extends Phaser.Scene {
         ctx.fillStyle = g;
         ctx.scale(1, 0.3125);
         ctx.fillRect(0, 0, 128, 128);
-      }), undefined, { release: true });
-    if (!T.exists('wr-poowave')) {
+      }), undefined, { release: true }),
+    );
+    once('wr-poowave', () => {
       const { c, ctx } = canvas(POOWAVE_W * 3 * 4, POOWAVE_H * 3);
       for (let i = 0; i < 4; i++) {
         ctx.save();
@@ -882,11 +921,14 @@ export class WrestleScene extends Phaser.Scene {
         ctx.restore();
       }
       addCanvas(this, 'wr-poowave', c, (t) => [0, 1, 2, 3].forEach((i) => t.add(`w${i}`, 0, i * POOWAVE_W * 3, 0, POOWAVE_W * 3, POOWAVE_H * 3)), { release: true });
-    }
-    if (!T.exists('wr-poo')) addCanvas(this, 'wr-poo', hires(26, 24, ART_RES, (ctx) => drawPoo(ctx, 13, 22, 1)), undefined, { release: true });
-    if (!T.exists('prize-heart')) addCanvas(this, 'prize-heart', hires(30, 30, ART_RES, (ctx) => drawPrize(ctx, 'heart')), undefined, { release: true });
-    if (!T.exists('wr-chair')) addCanvas(this, 'wr-chair', hires(CHAIR_W + 8, CHAIR_H + 4, ART_RES, (ctx) => (ctx.translate(4, 2), drawFoldingChair(ctx))), undefined, { release: true });
-    if (!T.exists('wr-chair-bent')) addCanvas(this, 'wr-chair-bent', hires(CHAIR_W + 8, CHAIR_H + 4, ART_RES, (ctx) => (ctx.translate(4, 2), drawFoldingChair(ctx, true))), undefined, { release: true });
+    });
+    once('wr-poo', () => addCanvas(this, 'wr-poo', hires(26, 24, ART_RES, (ctx) => drawPoo(ctx, 13, 22, 1)), undefined, { release: true }));
+    once('prize-heart', () => addCanvas(this, 'prize-heart', hires(30, 30, ART_RES, (ctx) => drawPrize(ctx, 'heart')), undefined, { release: true }));
+    once('wr-chair', () => addCanvas(this, 'wr-chair', hires(CHAIR_W + 8, CHAIR_H + 4, ART_RES, (ctx) => (ctx.translate(4, 2), drawFoldingChair(ctx))), undefined, { release: true }));
+    once('wr-chair-bent', () => addCanvas(this, 'wr-chair-bent', hires(CHAIR_W + 8, CHAIR_H + 4, ART_RES, (ctx) => (ctx.translate(4, 2), drawFoldingChair(ctx, true))), undefined, { release: true }));
+    // (the hero's chair-carrying frames, for when a chair comes in)
+    if (ch) step([`char-${ch.id}-carry`], () => makeCarrySheet(this, ch));
+    return steps;
   }
 
   // ───────────────────────────────────────────── the hero's side ──

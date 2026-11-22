@@ -1,11 +1,11 @@
 import Phaser from 'phaser';
 import { clearWith } from '../core/screenClear';
-import { characterById } from '../data/characters';
+import { characterById, type CharacterDef } from '../data/characters';
 import type { Session } from '../core/session';
 import { fadeOutMusic, playHoops } from '../core/music';
 import { sfx } from '../core/sfx';
 import { ART_RES, CHAR_H, CHAR_W, carryHand, drawCharacter } from '../gfx/draw';
-import { CAST_ANGLES, HERO_SHEET_M, addCanvas, fishingWear, hires, makeCastSheet, makeFishFrames } from '../gfx/textures';
+import { CAST_ANGLES, HERO_SHEET_M, addCanvas, fishingWear, hires, makeCastSheet, makeFishFrames, type Step } from '../gfx/textures';
 import {
   DEEP_STOPS,
   FAR_SEA_STOPS,
@@ -344,14 +344,36 @@ export class FishingScene extends Phaser.Scene {
   // ───────────────────────────────────────────── setup ──
 
   private makeTextures() {
+    for (const step of this.artSteps(this.fd.level ?? 5)) step.run();
+  }
+
+  /**
+   * The contest's pictures not drawn yet, one step each (and the hero's casting frames, given the
+   * hero). As the contest starts they're all drawn at once (makeTextures); from the Bosses menu
+   * they're drawn first, a few at a time behind the loading card (see UI.gameArt) — drawn in the
+   * scene's first frame, they held that frame up for a second or so on a slow phone. (The level
+   * makes no difference: there's the one contest.)
+   */
+  artSteps(_level: number, ch?: CharacterDef): Step[] {
     const T = this.textures;
+    const steps: Step[] = [];
     const add = (key: string, w: number, h: number, res: number, fn: (ctx: CanvasRenderingContext2D) => void) => {
       if (!T.exists(key))
-        addCanvas(this, key, hires(w, h, res, fn), undefined, {
-          // (the waves' tile keeps its pixels: a TileSprite of a picture that isn't a power of two in
-          // both directions is drawn from a copy Phaser makes of them — without them, no waves)
-          release: key !== 'fl-wave',
+        steps.push({
+          name: key,
+          run: () => {
+            if (T.exists(key)) return;
+            addCanvas(this, key, hires(w, h, res, fn), undefined, {
+              // (the waves' tile keeps its pixels: a TileSprite of a picture that isn't a power of two in
+              // both directions is drawn from a copy Phaser makes of them — without them, no waves)
+              release: key !== 'fl-wave',
+            });
+          },
         });
+    };
+    // (a sheet of frames: made by its own maker, which does nothing if it's there)
+    const sheet = (key: string, make: () => void) => {
+      if (!T.exists(key)) steps.push({ name: key, run: make });
     };
     add('fl-boat', BOAT.w, BOAT.h, 1.5, (ctx) => drawBoat(ctx));
     add('fl-hullshadow', 256, 64, 1, (ctx) => drawHullShadow(ctx, 256, 64));
@@ -373,8 +395,10 @@ export class FishingScene extends Phaser.Scene {
     add('fl-burst', 256, 256, 1, (ctx) => drawStarburst(ctx, 256));
     add('fl-ripple', 64, 18, 2, (ctx) => drawRipple(ctx, 64, 18));
     add('fl-drop', 8, 8, 2, (ctx) => drawDrop(ctx, 4));
-    makeFishFrames(this, 'fl-kingbob', 'kingbob', ['sw0', 'sw1', 'sw2', 'sw3', 'sw4', 'sw5', 'bl1', 'bl4'], 2);
-    for (const c of CATCHES) makeFishFrames(this, `fl-fish-${c.kind}`, c.kind, ['sw0', 'sw2', 'sw4'], fishRes(c));
+    sheet('fl-kingbob', () => makeFishFrames(this, 'fl-kingbob', 'kingbob', ['sw0', 'sw1', 'sw2', 'sw3', 'sw4', 'sw5', 'bl1', 'bl4'], 2));
+    for (const c of CATCHES) sheet(`fl-fish-${c.kind}`, () => makeFishFrames(this, `fl-fish-${c.kind}`, c.kind, ['sw0', 'sw2', 'sw4'], fishRes(c)));
+    if (ch) sheet(`char-${ch.id}-cast`, () => makeCastSheet(this, ch));
+    return steps;
   }
 
   /**

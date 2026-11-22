@@ -9,7 +9,7 @@ import { BattleUI } from './battleUi';
 import { loadArt } from './artLoader';
 import { LIGHT } from '../core/light';
 import { savedResCap } from '../core/res';
-import { HOME_LO, dropHeroSheets, freeBossArtExcept, gameArtJobs, homeKeepKeys, missingLookSteps, seaWear, swimLevel } from '../gfx/textures';
+import { HOME_LO, asBossArt, dropHeroSheets, freeBossArtExcept, gameArtJobs, homeKeepKeys, missingLookSteps, seaWear, swimLevel, type Step } from '../gfx/textures';
 import { themesFor } from '../world/theme';
 import { SHOP, wardrobe } from '../core/wardrobe';
 import { groundPaintJobs } from '../world/LevelView';
@@ -1457,7 +1457,23 @@ export class UI {
         if ((k.startsWith('terrain-') && !k.startsWith(`terrain-${data.name}-`)) || (k.startsWith('tree-') && !k.startsWith(`tree-${data.name}-`))) this.game.textures.remove(k);
       ground = groundPaintJobs(host, data).map((job, i) => ({ name: `ground ${i}`, run: () => void job() }));
     }
-    return loadArt([...gameArtJobs(scene, { heroes, level }), ...ground]);
+    return loadArt([...gameArtJobs(scene, { heroes, level }), ...ground, ...this.bossArtSteps(heroes[0], level, boss)]);
+  }
+
+  /**
+   * Straight into a boss fight (the Bosses menu): its arena's pictures, drawn behind the same card
+   * before it starts. Left to the boss's scene, they were all drawn in its first frame — one frame
+   * of a second or more on a slow phone (up to ~2 s for the Plop King's ring), the start screen
+   * frozen meanwhile. (Not a boss at the end of a level: that one's drawn behind its stinger.)
+   */
+  private bossArtSteps(heroId: string | undefined, level: number | null, boss?: string) {
+    if (level !== null || !boss) return [];
+    const [key, n] = boss.split(':');
+    const lv = Number(n);
+    const ch = heroId ? characterById(heroId) : undefined;
+    const sc = this.game.scene.getScene(key) as unknown as { artSteps?: (level: number, ch?: CharacterDef) => Step[] } | null;
+    if (!sc?.artSteps) return [];
+    return asBossArt(this.game, boss, sc.artSteps(lv, ch));
   }
 
   private starting = false;

@@ -916,6 +916,27 @@ export function trackBossArt(game: Phaser.Game) {
 }
 
 /**
+ * A boss's own pictures drawn before its scene starts (behind the loading card, from the Bosses
+ * menu: see UI.gameArt): each step's new pictures are noted as that boss's (`id`, e.g. 'Wrestle:4'),
+ * as if its scene had made them — so they're let go with the rest of its art (freeBossArtExcept).
+ */
+export function asBossArt(game: Phaser.Game, id: string, steps: Step[]): Step[] {
+  return steps.map((s) => ({
+    name: s.name,
+    run: () => {
+      const before = new Set(game.textures.getTextureKeys());
+      try {
+        s.run();
+      } finally {
+        const own = bossArt.get(id) ?? new Set<string>();
+        for (const k of game.textures.getTextureKeys()) if (!before.has(k)) own.add(k);
+        bossArt.set(id, own);
+      }
+    },
+  }));
+}
+
+/**
  * Free the bosses' own pictures (all but `keep`'s, e.g. 'Hoops:1'), before a game's art is drawn. Never
  * a boss that's still up (its results card), anything a running scene is showing, the looks or the
  * heroes' own sheets (those are looked after elsewhere).
