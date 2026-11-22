@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { DEPTH } from '../config';
-import { BG_LAYERS, bgKey, bgRes, ensureLook } from '../gfx/textures';
+import { BG_LAYERS, bgKey, bgRes, ensureLook, skyColours } from '../gfx/textures';
 import { rng } from '../gfx/draw';
 import { liveCanvas } from '../gfx/liveCanvas';
 import { LIGHT } from '../core/light';
@@ -172,6 +172,11 @@ export class Background {
     this.res = bgRes(home);
     this.skyA = scene.add.image(0, 0, bgKey('sky', 'puff', home)).setOrigin(0, 0).setDepth(DEPTH.sky);
     this.skyB = scene.add.image(0, 0, bgKey('sky', 'puff', home)).setOrigin(0, 0).setDepth(DEPTH.sky).setVisible(false);
+    // (with WebGL, the sky's drawn as shaded bands instead: see drawSkyBands)
+    if (scene.game.renderer instanceof Phaser.Renderer.WebGL.WebGLRenderer) {
+      this.skyBands = scene.add.graphics().setDepth(DEPTH.sky);
+      this.skyA.setVisible(false);
+    }
     this.add('far', BG_LAYERS.far.h, 0.08, 0.04, 0.3, 0, DEPTH.far);
     // two bands of living clouds: small far ones up high, big slow ones lower down
     if (!sea) {
@@ -192,6 +197,70 @@ export class Background {
     this.add('near', BG_LAYERS.near.h, 0.58, 0.32, 0.68, 0, DEPTH.near);
     this.fill = scene.add.rectangle(0, 0, 10, 10, 0xffffff).setOrigin(0, 0).setDepth(DEPTH.near);
     this.setTheme({ a: 'puff', b: 'puff', w: 0 });
+  }
+
+  /**
+   * The sky as a few rectangles shaded from colour to colour (one per step of its gradient), not
+   * its picture stretched over the screen. The picture is that same gradient, so it looks the same
+   * (to a shade of 1/255 here and there), but filling the screen from colours at the corners is
+   * much less work for the graphics chip than reading a picture for every pixel: the sky alone was
+   * a fifth of a level's drawing time on the test browser's software graphics chip. And a change
+   * of look (one sky fading into the next) is worked out here as one sky, not drawn as two.
+   * Null without WebGL (the canvas renderer can't shade like this): the pictures are drawn then.
+   */
+  private skyBands: Phaser.GameObjects.Graphics | null = null;
+  private skyStops = { t: [] as number[], a: [] as number[][], b: [] as number[][] };
+
+  private drawSkyBands(g: Phaser.GameObjects.Graphics, view: View, tint: number) {
+    const ca = skyColours(this.themeA);
+    const cb = this.showB ? skyColours(this.themeB) : undefined;
+    g.clear();
+    if (!ca) return;
+    const rgb = (c: string) => {
+      const n = hex(c);
+      return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    };
+    // the colour of a gradient at t (0 top … 1 bottom): straight lines between its colours, as drawSky's
+    const at = (cols: readonly string[], t: number) => {
+      const f = t * (cols.length - 1);
+      const i = Math.min(cols.length - 2, Math.floor(f));
+      const u = f - i;
+      const p = rgb(cols[i]);
+      const q = rgb(cols[i + 1]);
+      return [p[0] + (q[0] - p[0]) * u, p[1] + (q[1] - p[1]) * u, p[2] + (q[2] - p[2]) * u];
+    };
+    // (the steps of both skies, so each band is a straight line in both)
+    const ts = this.skyStops.t;
+    ts.length = 0;
+    for (let i = 0; i < ca.length; i++) ts.push(i / (ca.length - 1));
+    if (cb) for (let i = 1; i < cb.length - 1; i++) ts.push(i / (cb.length - 1));
+    ts.sort((x, y) => x - y);
+    const tr = (tint >> 16) & 255;
+    const tg = (tint >> 8) & 255;
+    const tb = tint & 255;
+    const w = cb ? this.wB : 0;
+    // (the first sky as tinted — as the picture was — and the next one faded in over it by w)
+    const colour = (t: number) => {
+      const a = at(ca, t);
+      const b = cb ? at(cb, t) : a;
+      const mix = (x: number, k: number, y: number) => Math.round(Math.round((x * k) / 255) * (1 - w) + y * w);
+      return (mix(a[0], tr, b[0]) << 16) | (mix(a[1], tg, b[1]) << 8) | mix(a[2], tb, b[2]);
+    };
+    // (the same box the picture covered: the view and 2 px round it)
+    const x = view.left - 2;
+    const y = view.top - 2;
+    const W = view.width + 4;
+    const H = view.height + 4;
+    let c0 = colour(0);
+    for (let i = 1; i < ts.length; i++) {
+      if (ts[i] <= ts[i - 1]) continue;
+      const c1 = colour(ts[i]);
+      const y0 = y + ts[i - 1] * H;
+      const y1 = y + ts[i] * H;
+      g.fillGradientStyle(c0, c0, c1, c1, 1);
+      g.fillRect(x, y0, W, y1 - y0);
+      c0 = c1;
+    }
   }
 
   /** The resolution its layers' pictures are drawn at. */
@@ -229,7 +298,7 @@ export class Background {
         for (const img of l.b) img.setTexture(l.keyB);
       }
     }
-    this.skyB.setVisible(showB).setAlpha(m.w);
+    this.skyB.setVisible(showB && !this.skyBands).setAlpha(m.w);
     this.showB = showB;
     this.wB = m.w;
     for (const l of this.layers) for (const img of l.b) img.setVisible(showB).setAlpha(m.w);
@@ -417,10 +486,17 @@ export class Background {
   update(view: View, dt: number) {
     for (const sky of [this.skyA, this.skyB]) sky.setPosition(view.left - 2, view.top - 2).setDisplaySize(view.width + 4, view.height + 4);
     const camUp = this.lowestViewTop - view.top; // how far the camera is above its lowest point
+    let tint = 0xffffff;
     if (this.vertical) {
       // (the higher you climb, the smoggier the sky)
       const k = Math.max(0, Math.min(1, camUp / Math.max(1, this.lowestViewTop)));
-      this.skyA.setTint(lerpRgb(0xffffff, 0xc89a66, k * 0.55));
+      tint = lerpRgb(0xffffff, 0xc89a66, k * 0.55);
+      this.skyA.setTint(tint);
+    }
+    if (this.skyBands) {
+      this.skyA.setVisible(false);
+      this.skyB.setVisible(false);
+      this.drawSkyBands(this.skyBands, view, tint);
     }
     this.drawClouds(view, camUp, dt);
     this.drawSeeds(view, dt);

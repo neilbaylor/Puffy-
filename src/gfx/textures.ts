@@ -667,6 +667,9 @@ export const bgRes = (home = false) => (home && HOME_SKY_SEP ? HOME_BG_RES : BG_
 
 type BgLayer = 'sky' | 'far' | 'hills' | 'near';
 
+/** A look's sky colours, top to bottom, evenly spaced (what drawSky draws its picture from). */
+export const skyColours = (id: string): readonly string[] | undefined => (MOUNTAIN_LOOKS.find((l) => l.pal.id === id)?.pal ?? PALETTES[id])?.sky;
+
 /** One background layer of one look (Part 1/3 looks and Part 2's mountain looks alike). */
 function makeBgLayer(scene: Phaser.Scene, id: string, layer: BgLayer, home = false) {
   const key = bgKey(layer, id, home);
