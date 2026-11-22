@@ -41,6 +41,7 @@ import { FishChase } from '../world/FishChase';
 import { FerrisWheel } from '../world/FerrisWheel';
 import { roundRectPath, smallTex } from '../gfx/smallTex';
 import { upright } from '../core/uprightUploads';
+import { softShapes, type SoftShapes } from '../gfx/softShapes';
 
 /** A puddle bubble's picture: radius (world px) and resolution. */
 const BUB_R = 6;
@@ -229,7 +230,7 @@ export class GameScene extends Phaser.Scene {
   private drops: { img: Phaser.GameObjects.Image; vy: number; grow: number }[] = [];
   private dripT = 0;
   /** Puddles of poo (quicksand): their extent, surface, and the picture. */
-  private puddles: { x0: number; x1: number; y: number; g: Phaser.GameObjects.Graphics; t: number; bubbles?: Phaser.GameObjects.Image[]; streaks?: Phaser.GameObjects.Image[] }[] = [];
+  private puddles: { x0: number; x1: number; y: number; g: SoftShapes; t: number; bubbles?: Phaser.GameObjects.Image[]; streaks?: Phaser.GameObjects.Image[] }[] = [];
   /**
    * Pictures that never move once put up (a puddle's still body, the minigames' fields, nets and
    * stands), each with its box: skipped while entirely off the camera, like the level's own scenery
@@ -506,7 +507,7 @@ export class GameScene extends Phaser.Scene {
         case 'puddle': {
           const x0 = s.x * TILE;
           const x1 = (s.x + Number(s.opts?.w ?? 4)) * TILE;
-          const g = this.add.graphics().setDepth(DEPTH.players + 0.6);
+          const g = softShapes(this).setDepth(DEPTH.players + 0.6);
           const y = s.y * TILE + 10;
           this.puddles.push({ x0, x1, y, g, t: Math.random() * 10 });
           this.puddleBody(x0, x1, y);
@@ -1738,20 +1739,11 @@ export class GameScene extends Phaser.Scene {
       const w = pd.x1 - pd.x0 + 4;
       // (deeper = darker, in soft bands: that part is drawn once, in puddleBody; here just the
       // wavy surface down to where it starts)
-      // (as a strip of triangles: a filled path is cut into triangles all over again every frame,
-      // which was most of the puddles' cost)
-      g.fillStyle(hexOf(POO.base), 1);
+      // (as a strip down from each stretch of the surface: a filled path is cut into triangles all
+      // over again every frame, which was most of the puddles' cost)
       const yb = y + 5;
-      let px = pd.x0 - 2;
-      let py = yb;
-      for (const q of [...pts, { x: pd.x1 + 2, y: yb }]) {
-        if (q.x > px) {
-          g.fillTriangle(px, py, q.x, q.y, q.x, yb);
-          g.fillTriangle(px, py, q.x, yb, px, yb);
-        }
-        px = q.x;
-        py = q.y;
-      }
+      const top = pts[pts.length - 1].x < pd.x1 + 2 ? [...pts, { x: pd.x1 + 2, y: yb }] : pts;
+      g.fillStyle(hexOf(POO.base), 1).fillUnder(top, yb);
       // slow swirls stirring in it
       for (let i = 0; i < Math.max(2, Math.round(w / 60)); i++) {
         const sx = pd.x0 + ((i + 0.5) / Math.max(2, Math.round(w / 60))) * w + Math.sin(pd.t * 0.5 + i * 2) * 8;
@@ -1794,7 +1786,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** A puddle's bubbles and gloss streaks as pictures (made the first time it's on screen). */
-  private puddleBits(pd: { x0: number; x1: number; g: Phaser.GameObjects.Graphics; bubbles?: Phaser.GameObjects.Image[]; streaks?: Phaser.GameObjects.Image[] }) {
+  private puddleBits(pd: { x0: number; x1: number; g: SoftShapes; bubbles?: Phaser.GameObjects.Image[]; streaks?: Phaser.GameObjects.Image[] }) {
     if (pd.bubbles) return;
     const bub = smallTex(this, 'pd-bubble', BUB_R * 2 + 2, BUB_R * 2 + 2, BUB_RES, (ctx) => {
       ctx.beginPath();
@@ -2033,7 +2025,7 @@ export class GameScene extends Phaser.Scene {
       .setResolution(3);
     const w = t.width + 22;
     const h = t.height + 14;
-    const g = this.add.graphics();
+    const g = softShapes(this);
     g.fillStyle(0x3a2418, 1).fillRoundedRect(-w / 2 - 2, -h / 2 - 2, w + 4, h + 4, 12);
     g.fillTriangle(-9, h / 2 - 2, 7, h / 2 - 2, -8, h / 2 + 13);
     g.fillStyle(0xffffff, 1).fillRoundedRect(-w / 2, -h / 2, w, h, 10);
@@ -2065,7 +2057,7 @@ export class GameScene extends Phaser.Scene {
 
   /** A glowing ring that swells out from the hero when the aura goes up. */
   private auraRing(p: Player) {
-    const ring = this.add.graphics().setDepth(p.view.depth - 1).setBlendMode(Phaser.BlendModes.ADD);
+    const ring = softShapes(this).setDepth(p.view.depth - 1).setBlendMode(Phaser.BlendModes.ADD);
     const st = { r: 8, a: 0.9 };
     this.tweens.add({
       targets: st,

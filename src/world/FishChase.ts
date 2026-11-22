@@ -9,6 +9,7 @@ import type { Enemy } from '../entities/enemies/Enemy';
 import type { Rocket } from '../entities/Rocket';
 import type { Fx } from './Fx';
 import type { SeaLife } from './Sea';
+import { softShapes, type SoftShapes } from '../gfx/softShapes';
 
 /** What the chase needs from the game scene. */
 export interface ChaseHost extends Phaser.Scene {
@@ -132,7 +133,7 @@ interface Fall {
   sign: Phaser.GameObjects.Image;
   target: Phaser.GameObjects.Image;
   /** (warning b) the countdown ring round the sign. */
-  ring?: Phaser.GameObjects.Graphics;
+  ring?: SoftShapes;
   /** (warning c) the arrow under the sign, and the shadow growing on the sea bed. */
   down?: Phaser.GameObjects.Text;
   shadow?: Phaser.GameObjects.Image;
@@ -221,7 +222,7 @@ export class FishChase {
       this.face = gs.add.sprite(0, 0, 'fish6-stone', 'an0');
       this.arrow = gs.add.container(0, 0, [this.face]).setDepth(DEPTH.text + 1).setVisible(false);
     } else {
-      const g = gs.add.graphics();
+      const g = softShapes(gs);
       g.fillStyle(0x3a2418, 1).fillCircle(0, 0, 15).fillTriangle(-24, 0, -10, -11, -10, 11);
       g.fillStyle(0xe8463f, 1).fillCircle(0, 0, 12.5).fillTriangle(-20, 0, -9, -8.5, -9, 8.5);
       const ex = gs.add.text(0, 0, '!', { fontFamily: '"Lilita One", "Arial Black", sans-serif', fontSize: '20px', color: '#ffffff' }).setOrigin(0.5, 0.52);
@@ -837,7 +838,7 @@ export class FishChase {
       gs.fx.popText(Math.min(x, p.x + 260), water + 40, 'LOOK OUT ABOVE!', '#ffd23f', 22);
     } else gs.fx.popText(Math.min(x, p.x + 260), water + 40, 'FAT FISH!', '#ffd23f', 20);
     this.fall = { x, phase: 'warn', t: 0, sign, target, col, y: 0, vy: 0, bed, hitDone: false, count: 0 };
-    if (STYLE.warn === 'b') this.fall.ring = gs.add.graphics().setDepth(DEPTH.text - 0.1);
+    if (STYLE.warn === 'b') this.fall.ring = softShapes(gs).setDepth(DEPTH.text - 0.1);
     if (STYLE.warn === 'c') {
       this.fall.down = gs.add.text(x, 0, '▼', { fontFamily: '"Lilita One", "Arial Black", sans-serif', fontSize: '26px', color: '#ff5a4a', stroke: '#3a2418', strokeThickness: 5 }).setOrigin(0.5).setDepth(DEPTH.text);
       this.fall.shadow = gs.add.image(x, bed - 2, 'chase-shadow').setDepth(DEPTH.enemies - 0.4).setAlpha(0).setScale(0.3);

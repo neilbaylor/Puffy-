@@ -41,6 +41,7 @@ import { isKeyDown } from '../input/keyboard';
 import type { GameData, GameOverState, ResultState } from './GameScene';
 import { loseLife } from '../core/lives';
 import { SimpleConfetti } from '../world/SimpleConfetti';
+import { softCircle, softShapes, type SoftShapes } from '../gfx/softShapes';
 
 export interface FishingData {
   session: Session;
@@ -213,7 +214,7 @@ export class FishingScene extends Phaser.Scene {
   /** the hero's arm angle (the frame nearest it is shown; the rod follows it, a bit more upright) */
   private arm = -0.85;
   private heroPose: string | null = null;
-  private rods!: Phaser.GameObjects.Graphics;
+  private rods!: SoftShapes;
   private rod: Record<Who, Rod> = {
     hero: {
       a: -1.35,
@@ -246,7 +247,7 @@ export class FishingScene extends Phaser.Scene {
     y0: number;
     ph: number;
   }[] = [];
-  private gulls!: Phaser.GameObjects.Graphics;
+  private gulls!: SoftShapes;
   private gullList: { x: number; y: number; v: number; ph: number }[] = [];
   private confettiFx!: SimpleConfetti;
   /** the boat rocking (radians) and bobbing (px) */
@@ -397,7 +398,7 @@ export class FishingScene extends Phaser.Scene {
       .setDepth(0.2);
     // the sun, a soft glow (it barely moves: far away)
     this.add.image(1180, 150, 'fl-burst').setScale(1.1).setAlpha(0.55).setDepth(0.1).setScrollFactor(0.15, 0.6);
-    this.add.circle(1180, 150, 40, 0xfff6c8).setDepth(0.12).setScrollFactor(0.15, 0.6);
+    softCircle(this, 1180, 150, 40, 0xfff6c8).setDepth(0.12).setScrollFactor(0.15, 0.6);
     this.add
       .image(1500, HORIZON + 2, 'fl-island')
       .setOrigin(0.5, 1)
@@ -421,7 +422,7 @@ export class FishingScene extends Phaser.Scene {
         .setAlpha(0.95);
       this.clouds.push(c);
     }
-    this.gulls = this.add.graphics().setDepth(0.3);
+    this.gulls = softShapes(this).setDepth(0.3);
     for (let i = 0; i < 4; i++)
       this.gullList.push({
         x: Math.random() * 2400,
@@ -526,7 +527,7 @@ export class FishingScene extends Phaser.Scene {
       .setDepth(6.4);
 
     // the rods and the lines (drawn every frame), the bobbers
-    this.rods = this.add.graphics().setDepth(7);
+    this.rods = softShapes(this).setDepth(7);
     for (const who of ['hero', 'king'] as const) {
       const img = this.add
         .image(0, 0, who === 'king' ? 'fl-bobber-gold' : 'fl-bobber')
@@ -1446,7 +1447,7 @@ export class FishingScene extends Phaser.Scene {
     const bx = at.x + w / 2 + 18;
     const by = at.y - h / 2 - 34;
     t.setPosition(bx, by);
-    const g = this.add.graphics().setDepth(10.9);
+    const g = softShapes(this).setDepth(10.9);
     g.fillStyle(0xffffff, 1).lineStyle(3, 0x3a2418, 1);
     g.fillRoundedRect(bx - w / 2, by - h / 2, w, h, 12).strokeRoundedRect(bx - w / 2, by - h / 2, w, h, 12);
     const tx = bx - w / 2 + 16;
@@ -1687,7 +1688,7 @@ export class FishingScene extends Phaser.Scene {
 
   private bubbles(x: number, y: number, n: number) {
     for (let i = 0; i < n; i++) {
-      const b = this.add.circle(x + (Math.random() - 0.5) * 30, y + Math.random() * 20, 2 + Math.random() * 3, 0xffffff, 0.55).setDepth(5.6);
+      const b = softCircle(this, x + (Math.random() - 0.5) * 30, y + Math.random() * 20, 2 + Math.random() * 3, 0xffffff, 0.55).setDepth(5.6);
       this.tweens.add({
         targets: b,
         y: WATER + 4,

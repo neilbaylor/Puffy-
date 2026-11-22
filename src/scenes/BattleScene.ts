@@ -25,6 +25,7 @@ import { Fx } from '../world/Fx';
 import { LevelView } from '../world/LevelView';
 import { FaceClock } from '../gfx/face';
 import { THEMES, mixTint, themeClock, themeMix } from '../world/theme';
+import { softEllipse, softShapes, type SoftShapes } from '../gfx/softShapes';
 
 /**
  * How far behind the server's clock the other players are shown (ticks): a tick (to have the next
@@ -54,7 +55,7 @@ type PrizeView = {
   img: Phaser.GameObjects.Image;
   chute: Phaser.GameObjects.Image;
   glow: Phaser.GameObjects.Image;
-  shadow: Phaser.GameObjects.Ellipse;
+  shadow: SoftShapes;
   landY: number;
   lastY: number;
   /** 1 while it floats down, easing to 0 once it's landed. */
@@ -182,7 +183,7 @@ interface EnemyView {
   gun: Phaser.GameObjects.Image | null;
   saw: Phaser.GameObjects.Sprite | null;
   ball: Phaser.GameObjects.Image | null;
-  chain: Phaser.GameObjects.Graphics | null;
+  chain: SoftShapes | null;
   chute: Phaser.GameObjects.Image;
   anim: number;
   lastX: number;
@@ -350,7 +351,7 @@ export class BattleScene extends Phaser.Scene {
   private wears = new Map<string, string>();
   private hudT = 0;
   private enemyViews = new Map<number, EnemyView>();
-  private hazardViews = new Map<number, { img: Phaser.GameObjects.Image; shadow: Phaser.GameObjects.Ellipse; landY: number }>();
+  private hazardViews = new Map<number, { img: Phaser.GameObjects.Image; shadow: SoftShapes; landY: number }>();
   /** Just watching (joined mid-battle): no hero of your own, shown in a little window. */
   private spectate = false;
   private preview: { x: number; y: number; w: number; h: number } | null = null;
@@ -1577,7 +1578,7 @@ export class BattleScene extends Phaser.Scene {
           .setDepth(DEPTH.pickups - 1)
           .setScale(1.5);
         const landY = landingY(this.map, px);
-        const shadow = this.add.ellipse(px, landY, 30, 7, 0x2b1a12, 0.3).setDepth(DEPTH.pickups - 0.2);
+        const shadow = softEllipse(this, px, landY, 30, 7, 0x2b1a12, 0.3).setDepth(DEPTH.pickups - 0.2);
         const chute = this.add.image(px, py, `prize-chute-${kind}`).setScale(PRIZE_SCALE / ART_RES).setOrigin(0.5, 1).setDepth(DEPTH.pickups);
         const img = this.add.image(px, py, `prize-${kind}`).setScale(PRIZE_SCALE / ART_RES).setOrigin(0.5, 1).setDepth(DEPTH.pickups + 0.1);
         pv = { img, chute, glow, shadow, landY, lastY: py, falling: age < 0 ? 1 : 0, land: 0 };
@@ -1619,7 +1620,7 @@ export class BattleScene extends Phaser.Scene {
       // (its outline worked out again only when its size changes: a landed one's stays put)
       const sw = 16 + near * 20 - (falling ? 0 : 4);
       const sh = 5 + near * 3;
-      if (pv.shadow.width !== sw || pv.shadow.height !== sh) pv.shadow.setSize(sw, sh);
+      if (pv.shadow.width !== sw || pv.shadow.height !== sh) pv.shadow.clear().fillEllipse(0, 0, sw, sh).setSize(sw, sh);
       pv.shadow.setPosition(ix, pv.landY + 1).setAlpha(0.12 + near * 0.22);
       const blink = age > PRIZE_LIFE - 2 && Math.floor(this.time.now / (age > PRIZE_LIFE - 0.8 ? 70 : 130)) % 2 === 0;
       pv.img.setVisible(!blink);
@@ -1693,7 +1694,7 @@ export class BattleScene extends Phaser.Scene {
         if (weapon === 1) v.gun = this.add.image(x, y, 'w-blaster').setScale(k / W_RES).setDepth(DEPTH.enemies + 0.1);
         if (weapon === 2) v.saw = this.add.sprite(x, y, 'w-saw', 's0').setScale(k / W_RES).setDepth(DEPTH.enemies + 0.1);
         if (weapon === 3) {
-          v.chain = this.add.graphics().setDepth(DEPTH.enemies + 0.05);
+          v.chain = softShapes(this).setDepth(DEPTH.enemies + 0.05);
           v.ball = this.add.image(x, y, 'w-ball', 'open').setScale(0.85 / W_RES).setDepth(DEPTH.enemies + 0.15);
         }
         v.weapon = weapon;
@@ -1835,7 +1836,7 @@ export class BattleScene extends Phaser.Scene {
       if (!v) {
         // where it lands: the ramp, or the first ground or cloud below the sky
         const landY = landingY(this.map, x);
-        const shadow = this.add.ellipse(x, landY, 40 * (big ? HAZARD_BIG : 1), 10, 0x2b1a12, 0.35).setDepth(DEPTH.pickups - 0.2);
+        const shadow = softEllipse(this, x, landY, 40 * (big ? HAZARD_BIG : 1), 10, 0x2b1a12, 0.35).setDepth(DEPTH.pickups - 0.2);
         const img = this.add.image(x, y, kind === 'anvil' ? 'banvil' : 'brock').setOrigin(0.5, kind === 'rock' ? 0.5 : 1).setScale((HAZARD_SCALE * (big ? HAZARD_BIG : 1)) / ART_RES).setDepth(DEPTH.projectiles + 0.5);
         v = { img, shadow, landY };
         this.hazardViews.set(id, v);

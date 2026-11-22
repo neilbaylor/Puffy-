@@ -6,6 +6,7 @@ import { FIELD_RES, addCanvas, hires } from '../gfx/textures';
 import type { GameScene } from '../scenes/GameScene';
 import { Enemy, type DeathKind } from './enemies/Enemy';
 import type { Player } from './Player';
+import { softEllipse, type SoftShapes } from '../gfx/softShapes';
 
 /** They spot you once you're this close to one of them. */
 const SPOT = 340;
@@ -40,7 +41,7 @@ export class TennisMatch {
   private prevX = 0;
   private prevY = 0;
   private readonly netX: number;
-  private shadow: Phaser.GameObjects.Ellipse;
+  private shadow: SoftShapes;
   private readonly left: number;
   private readonly right: number;
   private dangerousMode = false;
@@ -69,7 +70,7 @@ export class TennisMatch {
     gs.still(gs.add.image(this.left - END, ground, bkey).setOrigin(0, 1).setScale(1 / Math.min(1.5, FIELD_RES)).setDepth(DEPTH.decor - 1));
     gs.still(gs.add.image(cx, ground, 'tennisnet').setOrigin(0.5, NET_GROUND / NET_CELL_H).setScale(1 / 3).setDepth(DEPTH.enemies + 2));
     // (the umpire's high chair stands empty behind the net: it's in the back picture)
-    this.shadow = gs.add.ellipse(cx, ground - 2, 16, 4, 0x1a3050, 0.25).setDepth(DEPTH.tiles + 0.55);
+    this.shadow = softEllipse(gs, cx, ground - 2, 16, 4, 0x1a3050, 0.25).setDepth(DEPTH.tiles + 0.55);
 
     // doubles: two a side, red on the left, orange on the right
     for (const [side, f] of [[-1, 0.7], [-1, 0.3], [1, 0.3], [1, 0.7]] as const) {

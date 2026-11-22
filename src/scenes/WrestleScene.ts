@@ -27,6 +27,7 @@ import { Rocket } from '../entities/Rocket';
 import { Fx } from '../world/Fx';
 import { stingerReveal } from '../ui/stinger';
 import { SimpleConfetti } from '../world/SimpleConfetti';
+import { softShapes, type SoftShapes } from '../gfx/softShapes';
 import { soloSource, sourceById } from '../input/devices';
 import type { GameOverState, HudState, ResultState } from './GameScene';
 
@@ -86,6 +87,10 @@ const KING_HITS = 16;
 const Q_TOUGH = 1;
 /** Your hearts in the ring: you start with all 6, and pick-ups top you back up. */
 const HEARTS_START = 6;
+/** Your hearts' picture: its resolution, height (world px) and where the hearts' line is down it. */
+const HEART_RES = 3;
+const HEART_H = 12;
+const HEART_Y = 5.5 / 12;
 const HEARTS_MAX = 6;
 /** Folding chairs in a match, and (for each one after the first) how few hits she has left when it comes, at the latest. */
 const CHAIRS = 3;
@@ -482,7 +487,7 @@ export class WrestleScene extends Phaser.Scene {
   /** A heart to pick up in the ring (instead of nuggies), and when the next one comes. */
   private heartPick: { img: Phaser.GameObjects.Image; t: number; y: number } | null = null;
   private heartIn = 3;
-  private heartsG!: Phaser.GameObjects.Graphics;
+  private heartsImg!: Phaser.GameObjects.Image;
   /** The folding chair: falls into the ring now and then; pick it up and hit her with it (two hits). */
   private chair: {
     img: Phaser.GameObjects.Image;
@@ -521,8 +526,8 @@ export class WrestleScene extends Phaser.Scene {
   private screensNext = 0;
   private ribbonNext = 0;
   private ribbonMsg: { text: string; color: string; bg: string; t0: number } | null = null;
-  private ropesBack!: Phaser.GameObjects.Graphics;
-  private ropesFront!: Phaser.GameObjects.Graphics;
+  private ropesBack!: SoftShapes;
+  private ropesFront!: SoftShapes;
   /** Side ropes (left, right): how far each of the 3 bows out, and how fast. */
   private bow = { [-1]: [0, 0, 0], [1]: [0, 0, 0] } as Record<Side, number[]>;
   private bowV = { [-1]: [0, 0, 0], [1]: [0, 0, 0] } as Record<Side, number[]>;
@@ -649,8 +654,8 @@ export class WrestleScene extends Phaser.Scene {
     this.ringside = this.add.image(WX(-160), WY(500), 'wr-ringside').setOrigin(0).setScale(K / 1.5).setDepth(DEPTH_W.ringside);
     for (const x of [RING.x0, RING.x1])
       this.add.image(WX(x), WY(RING.frontY), this.tk('wr-post')).setOrigin(0.5, (POST_BOX.h - 2) / POST_BOX.h).setScale(K / RES).setDepth(DEPTH_W.posts);
-    this.ropesBack = this.add.graphics().setDepth(DEPTH_W.backRopes);
-    this.ropesFront = this.add.graphics().setDepth(DEPTH_W.frontRopes).setAlpha(0.6);
+    this.ropesBack = softShapes(this).setDepth(DEPTH_W.backRopes);
+    this.ropesFront = softShapes(this).setDepth(DEPTH_W.frontRopes).setAlpha(0.6);
 
     // the King, watching from the front row (unseen until the end)
     this.king = this.add.sprite(WX(KING_SEAT.x), WY(KING_SEAT.feet), this.kingFight ? 'wr-pking' : 'wr-king', 'idle').setOrigin(0.5, (100 + Q_TOP) / (PLOP_H + Q_TOP)).setScale((0.62 * K) / Q_RES * 1.6).setDepth(DEPTH_W.king).setVisible(false);
@@ -717,7 +722,7 @@ export class WrestleScene extends Phaser.Scene {
       if (r.active && this.queen.dangerous) r.explode();
     });
 
-    this.heartsG = this.add.graphics().setDepth(DEPTH.text);
+    this.heartsImg = this.add.image(0, 0, '__DEFAULT').setDepth(DEPTH.text).setVisible(false);
     this.confetti = new SimpleConfetti(this, DEPTH.fx);
     this.dark = this.add.rectangle(WORLD_W / 2, WORLD_H / 2, WORLD_W * 3, WORLD_H * 3, 0x070302, 0).setDepth(DEPTH_W.dark);
     this.spot = this.add.image(0, 0, 'spot').setOrigin(0.5, 1).setBlendMode(Phaser.BlendModes.ADD).setDepth(DEPTH_W.spot).setAlpha(0);
@@ -1003,13 +1008,13 @@ export class WrestleScene extends Phaser.Scene {
     const t = this.clock / 1000;
     const gb = this.ropesBack.clear();
     const gf = this.ropesFront.clear();
-    const line = (g: Phaser.GameObjects.Graphics, ptsIn: { x: number; y: number }[], col: string, w: number) => {
+    const line = (g: SoftShapes, ptsIn: { x: number; y: number }[], col: string, w: number) => {
       const pts = ptsIn as Phaser.Math.Vector2[];
       g.lineStyle(w + 1.6, 0x1a0e06, 1).strokePoints(pts, false);
       g.lineStyle(w, Phaser.Display.Color.HexStringToColor(col).color, 1).strokePoints(pts, false);
       g.lineStyle(w * 0.3, 0xffffff, 0.35).strokePoints(pts.map((p) => ({ x: p.x, y: p.y - w * 0.2 })) as Phaser.Math.Vector2[], false);
     };
-    const long = (g: Phaser.GameObjects.Graphics, k: number, x0: number, x1: number, y: number, col: string, w: number) => {
+    const long = (g: SoftShapes, k: number, x0: number, x1: number, y: number, col: string, w: number) => {
       const pts: { x: number; y: number }[] = [];
       const N = 22;
       for (let n = 0; n <= N; n++) {
@@ -1526,20 +1531,62 @@ export class WrestleScene extends Phaser.Scene {
 
   /** Your hearts, over your head (like Battle). */
   private drawHeroHearts() {
-    const g = this.heartsG.clear();
     const p = this.player;
-    if (!this.fighting || !p.alive) return;
+    const img = this.heartsImg;
+    if (!this.fighting || !p.alive) {
+      img.setVisible(false);
+      return;
+    }
     // (5 slots, and a 6th when you've got one)
     const n = Math.max(HEARTS_START, this.hearts);
+    img.setTexture(this.heartsTex(n, this.hearts)).setOrigin(0.5, HEART_Y).setScale(1 / HEART_RES).setPosition(p.x, p.body.top - 12).setVisible(true);
+  }
+
+  /**
+   * The picture of your hearts (n slots, `full` of them full), drawn once per count: the same shapes
+   * they always had, one after another as they were drawn every frame (so the outline's lobes
+   * overlap the same way), but drawn by the canvas, with its smooth edges. Its point (0.5, HEART_Y)
+   * is where the hearts' line runs.
+   */
+  private heartsTex(n: number, full: number) {
+    const key = `wr-hearts-${n}-${Math.min(n, full)}`;
+    if (this.textures.exists(key)) return key;
     const w = 8.5;
-    const x0 = p.x - ((n - 1) * w) / 2;
-    const y = p.body.top - 12;
+    const W = n * w + 4;
+    const R = HEART_RES;
+    const cv = document.createElement('canvas');
+    cv.width = Math.ceil(W * R);
+    cv.height = Math.ceil(HEART_H * R);
+    const ctx = cv.getContext('2d')!;
+    ctx.scale(R, R);
+    const y = HEART_Y * HEART_H;
+    const x0 = W / 2 - ((n - 1) * w) / 2;
+    const circle = (x: number, yy: number, r: number) => {
+      ctx.beginPath();
+      ctx.arc(x, yy, r, 0, Math.PI * 2);
+      ctx.fill();
+    };
+    const tri = (ax: number, ay: number, bx: number, by: number, cx: number, cy: number) => {
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(bx, by);
+      ctx.lineTo(cx, cy);
+      ctx.closePath();
+      ctx.fill();
+    };
     for (let i = 0; i < n; i++) {
       const cx = x0 + i * w;
-      const full = i < this.hearts;
-      g.fillStyle(0x2b1a12, 0.85).fillCircle(cx - 1.8, y - 1, 3.4).fillCircle(cx + 1.8, y - 1, 3.4).fillTriangle(cx - 5, y, cx + 5, y, cx, y + 5.4);
-      g.fillStyle(full ? 0xff5d7a : 0x6b5a5a, 1).fillCircle(cx - 1.7, y - 1, 2.3).fillCircle(cx + 1.7, y - 1, 2.3).fillTriangle(cx - 3.8, y - 0.4, cx + 3.8, y - 0.4, cx, y + 3.8);
+      ctx.fillStyle = 'rgba(43,26,18,0.85)';
+      circle(cx - 1.8, y - 1, 3.4);
+      circle(cx + 1.8, y - 1, 3.4);
+      tri(cx - 5, y, cx + 5, y, cx, y + 5.4);
+      ctx.fillStyle = i < full ? '#ff5d7a' : '#6b5a5a';
+      circle(cx - 1.7, y - 1, 2.3);
+      circle(cx + 1.7, y - 1, 2.3);
+      tri(cx - 3.8, y - 0.4, cx + 3.8, y - 0.4, cx, y + 3.8);
     }
+    addCanvas(this, key, cv);
+    return key;
   }
 
   // ── the folding chair ──
@@ -2940,7 +2987,7 @@ export class WrestleScene extends Phaser.Scene {
    * waves, a foamy crest, glints on the surface, bubbles, and his robe and a few bits bobbing about on it.
    */
   private flood: {
-    g: Phaser.GameObjects.Graphics;
+    g: SoftShapes;
     y: number;
     t: number;
     bubbles: { x: number; y: number; r: number; v: number }[];
@@ -2951,7 +2998,7 @@ export class WrestleScene extends Phaser.Scene {
   } | null = null;
 
   private startFlood() {
-    const g = this.add.graphics().setDepth(DEPTH_W.ringside + 0.5);
+    const g = softShapes(this).setDepth(DEPTH_W.ringside + 0.5);
     const floaters: { img: Phaser.GameObjects.Image; x: number; ph: number; dy: number }[] = [];
     const robe = this.children.list.find((o) => o instanceof Phaser.GameObjects.Image && o.texture.key === 'wr-robe') as Phaser.GameObjects.Image | undefined;
     if (robe) floaters.push({ img: robe.setDepth(DEPTH_W.ringside + 0.55), x: robe.x, ph: 0, dy: 6 });
@@ -2977,20 +3024,13 @@ export class WrestleScene extends Phaser.Scene {
     const back = (x: number) => f.y - 5 + wave(x + 40, 52, 23, 1.7);
     const front = (x: number) => f.y + wave(x, 38, 17, 2.4);
     // the back layer of waves (lighter, further off), then the deep water
-    g.fillStyle(0x6cc3e0, 0.7);
-    g.beginPath();
-    g.moveTo(x0, bottom);
-    for (let x = x0; x <= x1; x += 12) g.lineTo(x, back(x));
-    g.lineTo(x1, bottom);
-    g.closePath();
-    g.fillPath();
-    g.fillStyle(0x2f86b8, 0.8);
-    g.beginPath();
-    g.moveTo(x0, bottom);
-    for (let x = x0; x <= x1; x += 12) g.lineTo(x, front(x));
-    g.lineTo(x1, bottom);
-    g.closePath();
-    g.fillPath();
+    const surface = (h: (x: number) => number) => {
+      const pts: { x: number; y: number }[] = [];
+      for (let x = x0; x <= x1; x += 12) pts.push({ x, y: h(x) });
+      return pts;
+    };
+    g.fillStyle(0x6cc3e0, 0.7).fillUnder(surface(back), bottom);
+    g.fillStyle(0x2f86b8, 0.8).fillUnder(surface(front), bottom);
     // (darker further down)
     const depth = bottom - f.y;
     for (let k = 1; k <= 3; k++) g.fillStyle(0x0d4a78, 0.13).fillRect(x0, f.y + (depth * k) / 4, x1 - x0, bottom);
@@ -3079,7 +3119,7 @@ export class WrestleScene extends Phaser.Scene {
     this.tweens.add({ targets: boom, scale: 0.9, duration: 8 * FT + 160, ease: 'Sine.easeOut' });
     this.tweens.add({ targets: boom, alpha: 0, delay: 8 * FT - 40, duration: 260, onComplete: () => boom.destroy() });
     for (const [delay, col, w] of [[0, 0xffffff, 10], [90, 0xffd23f, 6], [180, 0x7b3fb8, 4]] as const) {
-      const ring = this.add.graphics().setDepth(DEPTH_W.spot + 0.9).setBlendMode(Phaser.BlendModes.ADD);
+      const ring = softShapes(this).setDepth(DEPTH_W.spot + 0.9).setBlendMode(Phaser.BlendModes.ADD);
       const st = { r: 14, a: 1 };
       this.tweens.add({
         targets: st,

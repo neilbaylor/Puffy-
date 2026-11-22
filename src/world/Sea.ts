@@ -3,6 +3,7 @@ import { DEPTH } from '../config';
 import { LIGHT } from '../core/light';
 import { SURFACE_LINE } from '../gfx/sea';
 import { drawOnlyWhenBusy } from './Fx';
+import { softShapes } from '../gfx/softShapes';
 
 interface View {
   left: number;
@@ -137,7 +138,7 @@ export class SeaLife {
     this.columnE.explode(14, x, this.surfaceY);
     this.bubbles(x, this.surfaceY + 24, 10);
     // a ring of ripples spreading on the surface
-    const g = this.scene.add.graphics().setDepth(DEPTH.players + 1);
+    const g = softShapes(this.scene).setDepth(DEPTH.players + 1);
     const st = { r: 6, a: 0.9 };
     this.scene.tweens.add({
       targets: st,

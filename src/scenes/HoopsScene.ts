@@ -63,6 +63,7 @@ import { LedRibbon, LedStrip, ledStill } from '../gfx/ledStrip';
 import { JumboScreen } from '../gfx/jumboScreen';
 import { PLOP_H, PLOP_KINDS, PLOP_SCALE, PLOP_W, drawPlop, type PlopFrame, type PlopKind } from '../gfx/plops';
 import { STYLES } from '../gfx/handdrawn';
+import { softCircle, softShapes, type SoftShapes } from '../gfx/softShapes';
 
 export interface HoopsData {
   session: Session;
@@ -144,8 +145,8 @@ export class HoopsScene extends Phaser.Scene {
   private ballShadow!: Phaser.GameObjects.Image;
   // the hoop: a simulated net between the back and front of the rim
   private netSim!: NetSim;
-  private netBack!: Phaser.GameObjects.Graphics;
-  private netFront!: Phaser.GameObjects.Graphics;
+  private netBack!: SoftShapes;
+  private netFront!: SoftShapes;
   private rimFront!: Phaser.GameObjects.Image;
   private board!: Phaser.GameObjects.Image;
   private prevBallY = 0;
@@ -370,8 +371,8 @@ export class HoopsScene extends Phaser.Scene {
     for (let i = 0; i < 4; i++) this.ghosts.push(this.add.image(0, 0, 'hball').setDepth(8.9).setVisible(false).setAlpha(0.3 - i * 0.07));
     this.ball = this.add.image(0, 0, 'hball').setScale(1 / 3).setDepth(9).setVisible(false);
     this.netSim = new NetSim(HOOP.rimRX, HOOP.rimRY, 46, this.style.net);
-    this.netBack = this.add.graphics().setDepth(8.7);
-    this.netFront = this.add.graphics().setDepth(10);
+    this.netBack = softShapes(this).setDepth(8.7);
+    this.netFront = softShapes(this).setDepth(10);
     this.rimFront = this.add.image(bb.x, bb.y, 'rimf').setOrigin(0.5, 16 / 40).setScale(1 / 3).setDepth(10.5);
     this.loose = null;
 
@@ -968,7 +969,7 @@ export class HoopsScene extends Phaser.Scene {
     this.blastFx(cx, cy, k.y);
     // shockwave rings
     for (const [delay, col, w] of [[0, 0xffffff, 14], [90, 0xffd23f, 8], [180, 0xff8fb3, 5]] as const) {
-      const ring = this.add.graphics().setDepth(12.3).setBlendMode(Phaser.BlendModes.ADD);
+      const ring = softShapes(this).setDepth(12.3).setBlendMode(Phaser.BlendModes.ADD);
       const st = { r: 20, a: 1 };
       this.tweens.add({
         targets: st,
@@ -1489,7 +1490,7 @@ export class HoopsScene extends Phaser.Scene {
     for (let i = 0; i < 8; i++) {
       const a = Math.PI + (Math.random() - 0.5) * 1.3 - 0.3;
       const v = 160 + Math.random() * 180;
-      const dot = this.add.circle(x, y, (1.6 + Math.random() * 2.2) * k, 0xbfe8ff).setStrokeStyle(1, 0x4fa8e0).setDepth(11);
+      const dot = softCircle(this, x, y, (1.6 + Math.random() * 2.2) * k, 0xbfe8ff, 1, { width: 1, color: 0x4fa8e0 }).setDepth(11);
       this.tweens.add({ targets: dot, x: x + Math.cos(a) * v * 0.35 * k, y: y + Math.sin(a) * v * 0.35 * k + 30 * k, alpha: 0, duration: 380 + Math.random() * 160, ease: 'Quad.easeOut', onComplete: () => dot.destroy() });
     }
   }

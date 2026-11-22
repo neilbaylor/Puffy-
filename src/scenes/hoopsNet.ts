@@ -1,4 +1,4 @@
-import type Phaser from 'phaser';
+import type { SoftShapes } from '../gfx/softShapes';
 
 interface NetPoint {
   x: number;
@@ -148,7 +148,7 @@ export class NetSim {
   }
 
   /** Draw the back strands into `back` and the front strands into `front`, at rim centre (ox, oy). */
-  draw(back: Phaser.GameObjects.Graphics, front: Phaser.GameObjects.Graphics, ox: number, oy: number) {
+  draw(back: SoftShapes, front: SoftShapes, ox: number, oy: number) {
     const sx = (p: NetPoint) => ox + p.x;
     const sy = (p: NetPoint) => oy + p.y + p.z * (this.ry / this.R);
     back.clear();

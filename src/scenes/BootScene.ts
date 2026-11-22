@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { preloadMenuMusic, primeMusic } from '../core/music';
 import { textureSteps } from '../gfx/textures';
+import { edgeTexture } from '../gfx/softShapes';
 import { latestLevel, levelInfo } from '../level/levels';
 import { buildLevel1 } from '../level/level1';
 import { levelPieces } from '../world/LevelView';
@@ -43,6 +44,8 @@ export class BootScene extends Phaser.Scene {
   }
 
   async create() {
+    // (the soft-edged shapes' texture: see gfx/softShapes)
+    edgeTexture(this);
     // (how long each part of the loading takes: window.__boot in the console)
     const times: [string, number][] = [];
     (window as unknown as { __boot: typeof times }).__boot = times;

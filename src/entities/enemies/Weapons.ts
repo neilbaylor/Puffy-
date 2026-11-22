@@ -4,6 +4,7 @@ import { ART_RES } from '../../gfx/draw';
 import { BLASTER, SAW, W_RES } from '../../gfx/weapons';
 import type { GameScene } from '../../scenes/GameScene';
 import type { Enemy } from './Enemy';
+import { softShapes, type SoftShapes } from '../../gfx/softShapes';
 
 /**
  * Weapons some bad guys carry (from the sketches):
@@ -23,7 +24,7 @@ const HAND = { small: { x: -17, y: 5 }, big: { x: -31, y: 3 } };
 export class Weapon {
   private img: Phaser.GameObjects.Image;
   private ball: Phaser.GameObjects.Image | null = null;
-  private chain: Phaser.GameObjects.Graphics | null = null;
+  private chain: SoftShapes | null = null;
   private cd: number;
   private warn = 0;
   private t = Math.random() * 10;
@@ -49,7 +50,7 @@ export class Weapon {
     this.k = (kind === 'gun' ? (size === 'small' ? 0.52 : 0.8) : kind === 'saw' ? 0.82 : 0.9) * owner.weaponK;
     const key = kind === 'gun' ? 'w-blaster' : kind === 'saw' ? 'w-saw' : 'w-ball';
     if (kind === 'flail') {
-      this.chain = gs.add.graphics().setDepth(owner.depth + 0.15);
+      this.chain = softShapes(gs).setDepth(owner.depth + 0.15);
       this.ball = gs.add.image(owner.x, owner.y, 'w-ball', 'open').setScale(this.k / W_RES).setDepth(owner.depth + 0.2);
       this.img = gs.add.image(owner.x, owner.y, 'w-ball', 'open').setVisible(false);
     } else {

@@ -8,6 +8,7 @@ import { FIELD_RES, addCanvas, hires } from '../gfx/textures';
 import type { GameScene } from '../scenes/GameScene';
 import { Plop } from './enemies/Plops';
 import type { Player } from './Player';
+import { softEllipse, type SoftShapes } from '../gfx/softShapes';
 
 /** The court's sand band's resolution (light mode: the fields' lower one). */
 const SAND_RES = LIGHT ? FIELD_RES : 3;
@@ -43,7 +44,7 @@ export class VolleyMatch {
   private prevX = 0;
   private prevY = 0;
   private readonly netX: number;
-  private shadow: Phaser.GameObjects.Ellipse;
+  private shadow: SoftShapes;
   private readonly left: number;
   private readonly right: number;
 
@@ -75,7 +76,7 @@ export class VolleyMatch {
     gs.still(gs.add.image(chairX, chairY, 'refchair').setOrigin(0.5, 50 / 52).setScale(1 / 3).setDepth(DEPTH.decor - 1));
     gs.still(gs.add.image(cx, ground + 2, 'volleynet').setOrigin(0.5, 108 / 112).setScale(1 / 3).setDepth(DEPTH.enemies + 2));
     // the ball's shadow on the sand (so you can see where it's coming down)
-    this.shadow = gs.add.ellipse(cx, ground - 2, 18, 5, 0x5a3a1c, 0.3).setDepth(DEPTH.tiles + 0.55);
+    this.shadow = softEllipse(gs, cx, ground - 2, 18, 5, 0x5a3a1c, 0.3).setDepth(DEPTH.tiles + 0.55);
 
     // two a side
     for (const [side, f] of [[-1, 0.72], [-1, 0.32], [1, 0.32], [1, 0.72]] as const) {
