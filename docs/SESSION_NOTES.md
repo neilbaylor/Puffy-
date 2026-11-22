@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.365)
+## Where things stand (v0.366)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -31,6 +31,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   Home screen (yellow).
 - Start screen: drone fly-over behind, logo hop, hero cards (pick = hop / backflip), Play, Part picker once a
   level is beaten, mute (top-left), full screen + **Battle** buttons (top-right, same height, side by side).
+- v0.366: gfx/softShapes.ts SoftShapes (Image subclass; Graphics-like API + fillUnder; own batch via BatchHandlerQuad, 3x2 'soft-edge' texture for 1px edge fade) replaces runtime Graphics/Shape sites (wrestle ropes/flood/rings, hoops net/rings/dots, fishing rods/lines/gulls/sun/bubbles/bubble, puddles, speech bubble, aura, flail chains, battle shadows, volley/tennis shadows, sea ripple, Fat Fish ring); Wrestle hearts are a canvas texture per count. makeGl antialias:false everywhere. LIGHT: softShapes() returns PlainShapes (Graphics + fillUnder/setSize) because soft edges measured +3-5% gap in lite Hoops/Wrestle (swiftshader); with PlainShapes lite measured even (-2..+1%). Full mode -22..-30% frame gap at 4x (scratchpad/mine/perf-v365.txt, perf-lite2.txt). Sweeps full+lite, battle smoke full+lite, offline full+lite all pass. Idea not tried: render.maxTextures lower in lite (per-pixel texId cost).
 - v0.365: artLoader.ts runSafely() per step + card removed in finally (a throwing step used to leave the card up and `starting` stuck: reproduced with scratchpad/tartfail.cjs); GameScene reachGoal stinger: boss not started if the Game scene was left (unreachable now: pause closed after the goal). Gamepad Y: battle already masks fire while bomb held (BattleScene buttons()). PR #31 closed (docs not merged). In progress: agent on claude/soft-shapes (soft-edged runtime shapes, then MSAA off everywhere).
 - v0.364: bug-hunt round 8-9 (PR #31 report on v0.361): cherry-picked #29 (HoopsScene.init resets kingAnim/heroAnim) and #30 (FishingScene.init resets heroLean, tipTrail, lureTrail, swing, dangle). #31 itself (docs/bug-hunt, 2.6k lines + screenshots) not merged into the game branch. Its unchecked suspicions: failing art step leaves the loading card stuck; 0.62 s quit-to-home race at the end of a boss level; gamepad Y does fire and bomb.
 - v0.363: light mode: WebGL context antialias (MSAA) off (main.ts makeGl `antialias: !LIGHT`); Phaser's render.antialias (texture filtering) unchanged. Owner approved after a side-by-side (only drawn lines — ropes, nets, cords — show steps). 4x swiftshader lite: frame gaps −21..28% (home 74→58 ms, Part 1 95→72, wrestle 95→68). ?diag line 'edge smoothing'. Owner to judge on the slow tablet.
