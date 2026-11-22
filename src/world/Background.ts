@@ -47,6 +47,43 @@ const SIL = new Float32Array(SIL_N * 2);
 const SIL_COS = Float32Array.from({ length: SIL_N }, (_, k) => Math.cos((k / SIL_N) * Math.PI * 2));
 const SIL_SIN = Float32Array.from({ length: SIL_N }, (_, k) => Math.sin((k / SIL_N) * Math.PI * 2));
 
+/**
+ * Only the part of a cloud's picture it's drawn in is shown: the picture is a box big enough for
+ * any shape the cloud takes, and the cloud fills a third of it or so; the rest is see-through,
+ * yet every pixel of it was blended onto the sky (clouds made up half a screen of pixels or more
+ * in a level, the most of any one kind). The box is kept with the picture, as clouds' pictures
+ * are shared by the scenes that show the same sky: whichever drew it last says what's in it.
+ */
+type CloudTex = Phaser.Textures.CanvasTexture & { box?: { x: number; y: number; w: number; h: number } };
+type CroppedCopy = Phaser.GameObjects.Image & { box?: CloudTex['box'] };
+
+/** Note round what was just drawn in a cloud's picture: its outline (as drawn, and lifted for the lit top), plus the ink line and a pixel or two. */
+function setCloudCrop(c: Cloud, pts: Float32Array) {
+  const k = CLOUD_RES;
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (let i = 0; i < SIL_N; i++) {
+    const x = pts[i * 2];
+    const y = pts[i * 2 + 1];
+    // (the outline, and the lit top: 0.93 × 0.9 of it, lifted 3 — it can poke out above a flat-topped cloud)
+    const yl = y * 0.9 - 3 * c.s;
+    x0 = Math.min(x0, x);
+    x1 = Math.max(x1, x);
+    y0 = Math.min(y0, y, yl);
+    y1 = Math.max(y1, y, yl);
+  }
+  // (the soft highlights sit inside the puffs, and so inside the outline)
+  const pad = 3;
+  const tex = c.tex as CloudTex;
+  const bx = Math.max(0, Math.floor((x0 - CB.x0 * c.s) * k) - pad);
+  const by = Math.max(0, Math.floor((y0 - CB.y0 * c.s) * k) - pad);
+  const bw = Math.min(tex.width, Math.ceil((x1 - CB.x0 * c.s) * k) + pad) - bx;
+  const bh = Math.min(tex.height, Math.ceil((y1 - CB.y0 * c.s) * k) + pad) - by;
+  tex.box = { x: bx, y: by, w: Math.max(1, bw), h: Math.max(1, bh) };
+}
+
 /** A band of living clouds at one parallax depth. */
 interface CloudBand {
   clouds: Cloud[];
@@ -295,6 +332,7 @@ export class Background {
     ctx.strokeStyle = col(ink);
     ctx.stroke();
     c.tex.refresh();
+    setCloudCrop(c, pts);
   }
 
   private drawClouds(view: View, camUp: number, dt: number) {
@@ -335,7 +373,13 @@ export class Background {
               .setScale(1 / CLOUD_RES)
               .setDepth(band.depth)
               .setAlpha(band.alpha);
-          c.imgs[n].setVisible(true).setPosition(ox + x, oy + y);
+          const img = c.imgs[n] as CroppedCopy;
+          const box = (c.tex as CloudTex).box;
+          if (box && img.box !== box) {
+            img.box = box;
+            img.setCrop(box.x, box.y, box.w, box.h);
+          }
+          img.setVisible(true).setPosition(ox + x, oy + y);
         }
         for (; n < c.imgs.length; n++) c.imgs[n].setVisible(false);
       }
