@@ -21,10 +21,12 @@ import { installUprightUploads } from './core/uprightUploads';
 import { skipClearCameraFills } from './core/fadeFix';
 import { roundTextureIds } from './core/texIdFix';
 import { warmBatchShaders } from './core/shaderWarm';
+import { freeSwappedRenderTextures } from './core/dynamicTextureFix';
 
 // (before any scene: see physicsFix)
 fixArcadeGroupWalk();
 installUprightUploads();
+freeSwappedRenderTextures();
 skipClearCameraFills();
 
 installInput();
