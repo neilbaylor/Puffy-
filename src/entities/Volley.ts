@@ -32,6 +32,19 @@ const R = 11;
  * They fetch it and keep spiking until you're past them, the ball's popped
  * (shoot it) or the Plops are. Land on the ball and you bounce off it.
  */
+/**
+ * A beach-volleyball court's sand for a match `widthTiles` wide, as a job that draws it if it isn't
+ * there — null if it is (see Soccer's pitchArt).
+ */
+export function sandArt(scene: Phaser.Scene, widthTiles: number): (() => void) | null {
+  const sw = Math.round(widthTiles * TILE);
+  const skey = `volleysand-${sw}`;
+  if (scene.textures.exists(skey)) return null;
+  return () => {
+    if (!scene.textures.exists(skey)) addCanvas(scene, skey, hires(sw + SAND.END * 2, SAND.UP + SAND.DOWN, SAND_RES, (ctx) => drawVolleySand(ctx, sw)), undefined, { release: true });
+  };
+}
+
 export class VolleyMatch {
   readonly ball: Phaser.Physics.Arcade.Image;
   private team: VolleyPlop[] = [];
@@ -63,7 +76,7 @@ export class VolleyMatch {
     // (side on: a padded post, the net band and its antenna) in front of everyone
     const sw = Math.round(half * 2);
     const skey = `volleysand-${sw}`;
-    if (!gs.textures.exists(skey)) addCanvas(gs, skey, hires(sw + SAND.END * 2, SAND.UP + SAND.DOWN, SAND_RES, (ctx) => drawVolleySand(ctx, sw)), undefined, { release: true });
+    sandArt(gs, widthTiles)?.();
     // (still pictures: skipped while off the camera, see GameScene.still)
     gs.still(gs.add.image(this.left - SAND.END, ground, skey).setOrigin(0, SAND.UP / (SAND.UP + SAND.DOWN)).setScale(1 / SAND_RES).setDepth(DEPTH.tiles + 0.5));
     const bw = Math.round(half - 46);

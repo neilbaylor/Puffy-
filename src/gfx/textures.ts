@@ -716,6 +716,9 @@ function slicedPadV(w: number, h: number, res: number, fn: (ctx: Ctx) => void): 
 
 /** Background layers being drawn a slice at a time by the quiet jobs, by key (see lookJobs). */
 const slicing = new Map<string, SlicedDraw>();
+/** The jobs that draw a slice of a layer (see lookJobs): quick, so the next can follow on the next frame. */
+const sliceJobs = new WeakSet<() => void>();
+export const isSliceJob = (job: () => void) => sliceJobs.has(job);
 /** Set while the start screen runs one of its quiet jobs itself, between frames of its fly-over (see lookJobs). */
 let slicingOn = false;
 /**
@@ -744,15 +747,17 @@ export function ensureLook(scene: Phaser.Scene, id: string, home = false) {
 
 /**
  * A look's missing layers as separate little jobs (the start screen draws them between taps:
- * a layer at a time keeps each pause short, so a tap is never kept waiting long).
+ * a layer at a time keeps each pause short, so a tap is never kept waiting long). `sliced`: for the
+ * start screen's quiet jobs, each hill or ground layer as several jobs, drawn a slice at a time
+ * (see below).
  */
-export function lookJobs(scene: Phaser.Scene, id: string, home = false): (() => void)[] {
+export function lookJobs(scene: Phaser.Scene, id: string, home = false, sliced = false): (() => void)[] {
   return BG_LAYER_IDS.flatMap((l) => {
     const key = bgKey(l, id, home);
     const make = () => {
       if (!scene.textures.exists(key)) makeBgLayer(scene, id, l, home);
     };
-    if (l === 'sky') return [make];
+    if (l === 'sky' || !sliced) return [make];
     // (a hill or a ground layer: its drawing noted down in one job, drawn a slice per job over the
     // next few, then sent to the graphics chip — see SlicedDraw. Drawn in one go, each was one long
     // frame on the start screen, 150–550 ms at 4× slow CPU. One that's half drawn is finished, not
@@ -761,6 +766,7 @@ export function lookJobs(scene: Phaser.Scene, id: string, home = false): (() => 
       const s = slicing.get(key);
       if (s) s.play(Math.ceil(s.size / LAYER_SLICES));
     };
+    sliceJobs.add(slice);
     return [
       () => {
         if (scene.textures.exists(key) || slicing.has(key)) return;

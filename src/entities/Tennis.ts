@@ -30,6 +30,24 @@ const CLAM_K = 0.95;
  * the clam next SMASHES it at you. They fetch it and keep smashing until you're past, the clam's
  * popped open (shoot it) or the crabs are; then they scuttle after you.
  */
+/**
+ * A tennis court's pictures for a match `widthTiles` wide (the court; behind it the boards, towers,
+ * scoreboard and umpire's chair), as a job that draws whichever aren't there — null if both are
+ * (see Soccer's pitchArt).
+ */
+export function courtArt(scene: Phaser.Scene, widthTiles: number): (() => void) | null {
+  const w = Math.round(widthTiles * TILE);
+  const { END, UP, DOWN, BACK_UP } = COURT;
+  const fkey = `court-front-${w}`;
+  const bkey = `court-back-${w}`;
+  const T = scene.textures;
+  if (T.exists(fkey) && T.exists(bkey)) return null;
+  return () => {
+    if (!T.exists(fkey)) addCanvas(scene, fkey, hires(w + END * 2, UP + DOWN, FIELD_RES, (ctx) => drawCourtFront(ctx, w)), undefined, { release: true });
+    if (!T.exists(bkey)) addCanvas(scene, bkey, hires(w + END * 2, BACK_UP, Math.min(1.5, FIELD_RES), (ctx) => drawCourtBack(ctx, w)), undefined, { release: true });
+  };
+}
+
 export class TennisMatch {
   readonly ball: Phaser.Physics.Arcade.Image;
   private team: TennisCrab[] = [];
@@ -58,13 +76,12 @@ export class TennisMatch {
     this.left = cx - half;
     this.right = cx + half;
     const w = Math.round(half * 2);
-    const { END, UP, DOWN, BACK_UP } = COURT;
+    const { END, UP, DOWN } = COURT;
     // the court (just over the ground's top edge, behind the players), and behind it the boards,
     // towers, scoreboard and the umpire's chair
     const fkey = `court-front-${w}`;
     const bkey = `court-back-${w}`;
-    if (!gs.textures.exists(fkey)) addCanvas(gs, fkey, hires(w + END * 2, UP + DOWN, FIELD_RES, (ctx) => drawCourtFront(ctx, w)), undefined, { release: true });
-    if (!gs.textures.exists(bkey)) addCanvas(gs, bkey, hires(w + END * 2, BACK_UP, Math.min(1.5, FIELD_RES), (ctx) => drawCourtBack(ctx, w)), undefined, { release: true });
+    courtArt(gs, widthTiles)?.();
     // (still pictures: skipped while off the camera, see GameScene.still)
     gs.still(gs.add.image(this.left - END, ground, fkey).setOrigin(0, UP / (UP + DOWN)).setScale(1 / FIELD_RES).setDepth(DEPTH.tiles + 0.5));
     gs.still(gs.add.image(this.left - END, ground, bkey).setOrigin(0, 1).setScale(1 / Math.min(1.5, FIELD_RES)).setDepth(DEPTH.decor - 1));

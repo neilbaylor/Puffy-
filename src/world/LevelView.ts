@@ -235,6 +235,20 @@ export class LevelView {
     });
   }
 
+  /**
+   * The same, those not drawn yet, as loading-card steps: Play before the start screen got to them
+   * (a slow phone, a quick tap) left them to the level, which drew them as it was built — in the
+   * frame it first showed, a few hundred ms at 4× slow CPU as its fly-over began.
+   */
+  laterSteps(): { name: string; run: () => void }[] {
+    return this.later.filter((l) => !this.scene.textures.exists(l.key)).map((l) => ({
+      name: l.key,
+      run: () => {
+        if (!this.scene.textures.exists(l.key)) l.draw();
+      },
+    }));
+  }
+
   /** Trees, flowers and grass that sway in the breeze. */
   private sway: { img: Phaser.GameObjects.Image; amp: number; speed: number; ph: number }[] = [];
 

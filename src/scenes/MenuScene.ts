@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { MIN_VIEW_W, TILE, VIEW_H } from '../config';
-import { BG_LAYER_IDS, HOME_SKY_SEP, asQuietJob, bgKey, ensureLook, freeLooksExcept, lookJobs } from '../gfx/textures';
+import { BG_LAYER_IDS, HOME_SKY_SEP, asQuietJob, bgKey, ensureLook, freeLooksExcept, isSliceJob, lookJobs } from '../gfx/textures';
 import { buildLevel1 } from '../level/level1';
 import { levelInfo, levelName, pickableLevels, progress } from '../level/levels';
 import { Background } from '../world/Background';
@@ -308,6 +308,11 @@ export class MenuScene extends Phaser.Scene {
   /** The Parts' fly-overs kept hidden (see World). */
   private worlds = new Map<number, World>();
 
+  /** This Part's trees and cloud platforms the start screen hasn't drawn yet (see LevelView.laterSteps). */
+  laterSteps(id: number): { name: string; run: () => void }[] {
+    return this.levelId === id && this.level ? this.level.laterSteps() : [];
+  }
+
   /**
    * A level's ground not drawn yet, as steps (for the little loading card before it starts: the
    * level's opening fly-over sweeps all of it in a few seconds, and drawing pieces during it made
@@ -489,14 +494,14 @@ export class MenuScene extends Phaser.Scene {
         .flatMap((n) => {
           const a = themesFor(n)[0];
           const lo = !keptFull.has(n);
-          return [...lookJobs(this, a, lo), () => this.warmLook(a, lo), ...this.prewarmJobs(n, lo)];
+          return [...lookJobs(this, a, lo, true), () => this.warmLook(a, lo), ...this.prewarmJobs(n, lo)];
         }),
     ];
     jobs.push(
       // (the rest of this Part's ground isn't drawn here any more: the loading card before the
       // level draws whatever's missing — doing it here was a string of hitches after every switch)
       // (this Part's other looks last: the game only drifts into them 20 seconds in)
-      ...looks.slice(1).flatMap((l) => [...lookJobs(this, l), () => this.warmLook(l)]),
+      ...looks.slice(1).flatMap((l) => [...lookJobs(this, l, false, true), () => this.warmLook(l)]),
       // (and last, this Part's trees and cloud platforms past its fly-over's loop: the level needs
       // them, and drawing them now saves its loading card the time)
       ...this.level.laterJobs(),
@@ -550,12 +555,14 @@ export class MenuScene extends Phaser.Scene {
     // (1.5 s after the last tap: someone tapping their way around the start screen is rarely kept
     // waiting behind one, and the other Parts still get ready while they look at each one)
     if (this.quiet.length && now - this.lastInput > 1500 && now >= this.nextQuiet) {
-      asQuietJob(this.quiet.shift()!);
+      const job = this.quiet.shift()!;
+      asQuietJob(job);
       const took = performance.now() - now;
       // (a quick one: the next one straight after, on the next frame; a bigger one leaves the
       // frames after it free, the bigger the longer — about half the steps are quick, so the other
-      // Parts are ready sooner)
-      this.nextQuiet = performance.now() + (took < 12 ? 0 : Math.min(250, took * 6));
+      // Parts are ready sooner. A slice of a background layer is always followed straight on: its
+      // painting comes after, at the end of the frame — see lookJobs)
+      this.nextQuiet = performance.now() + (took < 12 || isSliceJob(job) ? 0 : Math.min(250, took * 6));
     }
     if (this.still && this.held) return;
     this.held = this.still;

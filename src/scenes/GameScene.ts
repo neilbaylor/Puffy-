@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { DEPTH, GRAVITY, MAX_FALL_SPEED, MIN_VIEW_W, TILE, VIEW_H } from '../config';
-import { PROP_RES, addCanvas, dropBaddiesExcept, dropOtherHeroSheets, dropTextures, ensureLook, freeLooksExcept, gameArtJobs, hires, lookJobs } from '../gfx/textures';
+import { PROP_RES, addCanvas, dropBaddiesExcept, dropOtherHeroSheets, dropTextures, ensureLook, freeLooksExcept, gameArtJobs, hires, isSliceJob, lookJobs, asQuietJob, type Step } from '../gfx/textures';
 import { PALETTES } from '../gfx/world';
 import { drawRock } from '../gfx/hazards';
 import { POO, POO_DARK } from '../gfx/plopworld';
@@ -18,14 +18,14 @@ import type { WeaponKind } from '../entities/enemies/Weapons';
 import { Aura, Checkpoint, Goal, RootBeer } from '../entities/Pickups';
 import { Player, WATER_G } from '../entities/Player';
 import { Rocket } from '../entities/Rocket';
-import { SoccerMatch } from '../entities/Soccer';
-import { HockeyMatch } from '../entities/Hockey';
-import { VolleyMatch } from '../entities/Volley';
+import { SoccerMatch, pitchArt } from '../entities/Soccer';
+import { HockeyMatch, rinkArt } from '../entities/Hockey';
+import { VolleyMatch, sandArt } from '../entities/Volley';
 import { BaseballGame } from '../entities/Baseball';
-import { TennisMatch } from '../entities/Tennis';
+import { TennisMatch, courtArt } from '../entities/Tennis';
 import { FootballGame } from '../entities/Football';
 import { soloSource, sourceById } from '../input/devices';
-import type { EnemyKind } from '../level/builder';
+import type { EnemyKind, LevelData } from '../level/builder';
 import { levelInfo } from '../level/levels';
 import { preloadHoopsMusic } from '../core/music';
 import { buildLevel1 } from '../level/level1';
@@ -143,6 +143,30 @@ function introGlide(u: number) {
 const UPHILL_TILT = -0.06;
 /** The Plop King's size in a level (world px per art unit: half again a medium Plop). */
 const KING_K = 1.1;
+
+/** The mini-games' widths (tiles), where the level doesn't give one. */
+const FIELD_W = { soccer: 10, hockey: 16, volley: 14, tennis: 18 };
+
+/**
+ * A level's mini-game pitches, rinks and courts not drawn yet, a step each — for its loading card
+ * (see UI.gameArt). Left to the level, they were drawn as it was built, in the frame it first
+ * showed: Part 1's two soccer pitches made that frame ~200 ms longer at 4× slow CPU, as the
+ * fly-over began. (Drawn the same; a level drops other levels' ones as it starts, as before.)
+ */
+export function fieldArtSteps(scene: Phaser.Scene, data: LevelData): Step[] {
+  const out: Step[] = [];
+  for (const s of data.spawns) {
+    const w = (n: number) => Number(s.opts?.w ?? n);
+    const job =
+      s.type === 'soccer' ? (s.opts?.goals !== false ? pitchArt(scene, w(FIELD_W.soccer)) : null)
+      : s.type === 'hockey' ? rinkArt(scene, w(FIELD_W.hockey))
+      : s.type === 'tennis' ? courtArt(scene, w(FIELD_W.tennis))
+      : s.type === 'volley' ? sandArt(scene, w(FIELD_W.volley))
+      : null;
+    if (job) out.push({ name: `${s.type} field`, run: job });
+  }
+  return out;
+}
 
 export class GameScene extends Phaser.Scene {
   session!: Session;
@@ -385,7 +409,7 @@ export class GameScene extends Phaser.Scene {
     const mix0 = themeMix(themeClock.t, themesFor(this.levelId));
     ensureLook(this, mix0.a);
     if (mix0.w > 0) ensureLook(this, mix0.b);
-    this.lookQueue = themesFor(this.levelId).flatMap((l) => lookJobs(this, l));
+    this.lookQueue = themesFor(this.levelId).flatMap((l) => lookJobs(this, l, false, true));
     // this level's bad guys (drawn behind the loading card before the level started; here if not
     // yet, e.g. a restart); the other levels' are freed
     for (const job of gameArtJobs(this, { heroes: this.session.players.map((p) => p.characterId), level: this.levelId })) job.run();
@@ -491,7 +515,7 @@ export class GameScene extends Phaser.Scene {
         case 'tree':
           break;
         case 'hockey':
-          this.hockey.push(new HockeyMatch(this, cx, surface(s.y), Number(s.opts?.w ?? 16), String(s.opts?.team ?? 'pppb')));
+          this.hockey.push(new HockeyMatch(this, cx, surface(s.y), Number(s.opts?.w ?? FIELD_W.hockey), String(s.opts?.team ?? 'pppb')));
           break;
         case 'para':
           this.paraWaiting.push({ kind: (s.opts?.kind as EnemyKind) ?? 'puffball', x: cx, y: s.y * TILE });
@@ -514,10 +538,10 @@ export class GameScene extends Phaser.Scene {
           break;
         }
         case 'volley':
-          this.volleys.push(new VolleyMatch(this, cx, surface(s.y), Number(s.opts?.w ?? 14)));
+          this.volleys.push(new VolleyMatch(this, cx, surface(s.y), Number(s.opts?.w ?? FIELD_W.volley)));
           break;
         case 'tennis':
-          this.tennis.push(new TennisMatch(this, cx, surface(s.y), Number(s.opts?.w ?? 18)));
+          this.tennis.push(new TennisMatch(this, cx, surface(s.y), Number(s.opts?.w ?? FIELD_W.tennis)));
           break;
         case 'football':
           this.football.push(new FootballGame(this, s.x * TILE, surface(s.y)));
@@ -540,7 +564,7 @@ export class GameScene extends Phaser.Scene {
           break;
         case 'soccer':
           this.matches.push(
-            new SoccerMatch(this, cx, surface(s.y), Number(s.opts?.w ?? 10), {
+            new SoccerMatch(this, cx, surface(s.y), Number(s.opts?.w ?? FIELD_W.soccer), {
               team: String(s.opts?.team ?? 'ppp'),
               big: !!s.opts?.big,
               goals: s.opts?.goals !== false,
@@ -962,11 +986,14 @@ export class GameScene extends Phaser.Scene {
     this.updateDrops(dt);
 
     themeClock.t += dt;
-    // the level's other looks, a layer every so often (each is a quick job; nothing if already drawn)
+    // the level's other looks, a layer every so often (nothing if already drawn). Each hill or
+    // ground layer is drawn a slice a frame (see lookJobs): drawn in one go, one could be a frame of
+    // 150-550 ms at 4× slow CPU mid-level, when the start screen hadn't got to it before Play.
     this.lookNext -= dt;
     if (this.lookQueue.length && this.lookNext <= 0) {
-      this.lookQueue.shift()!();
-      this.lookNext = 0.35;
+      const job = this.lookQueue.shift()!;
+      asQuietJob(job);
+      this.lookNext = isSliceJob(job) ? 0 : 0.35;
     }
     this.applyTheme();
     this.level.animate(this.time.now / 1000, this.view.left, this.view.left + this.view.width);

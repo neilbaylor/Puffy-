@@ -22,6 +22,23 @@ interface Puck {
  * until they spot you — whistle, "!" — then they take turns slapping pucks at
  * you, low and fast across the ice: jump them (or shoot them). Then they charge.
  */
+/**
+ * A mini ice rink's pictures for a match `widthTiles` wide (behind: stand, glass, boards; in front:
+ * the ice), as a job that draws whichever aren't there — null if both are (see pitchArt).
+ */
+export function rinkArt(scene: Phaser.Scene, widthTiles: number): (() => void) | null {
+  const rinkW = widthTiles * TILE;
+  const W = rinkW + RINK.END * 2;
+  const back = `rink-back-${rinkW}`;
+  const ice = `rink-ice-${rinkW}`;
+  const T = scene.textures;
+  if (T.exists(back) && T.exists(ice)) return null;
+  return () => {
+    if (!T.exists(back)) addCanvas(scene, back, hires(W, RINK.ABOVE + RINK.BELOW, FIELD_RES, (ctx) => drawRinkBack(ctx, rinkW)), undefined, { release: true });
+    if (!T.exists(ice)) addCanvas(scene, ice, hires(W, RINK.ICE_UP + RINK.ICE_DOWN, FIELD_RES, (ctx) => drawRinkIce(ctx, rinkW)), undefined, { release: true });
+  };
+}
+
 export class HockeyMatch implements Coach {
   private players: SoccerMember[] = [];
   private sticks = new Map<SoccerMember, Phaser.GameObjects.Image>();
@@ -50,11 +67,9 @@ export class HockeyMatch implements Coach {
     this.ground = ground;
     // the mini arena: grandstand, glass, boards and lights behind; the marked ice sheet in front
     const rinkW = half * 2;
-    const W = rinkW + RINK.END * 2;
     const back = `rink-back-${rinkW}`;
     const ice = `rink-ice-${rinkW}`;
-    if (!gs.textures.exists(back)) addCanvas(gs, back, hires(W, RINK.ABOVE + RINK.BELOW, FIELD_RES, (ctx) => drawRinkBack(ctx, rinkW)), undefined, { release: true });
-    if (!gs.textures.exists(ice)) addCanvas(gs, ice, hires(W, RINK.ICE_UP + RINK.ICE_DOWN, FIELD_RES, (ctx) => drawRinkIce(ctx, rinkW)), undefined, { release: true });
+    rinkArt(gs, widthTiles)?.();
     // (still pictures: skipped while off the camera, see GameScene.still)
     gs.still(gs.add.image(this.left - RINK.END, ground, back).setOrigin(0, RINK.ABOVE / (RINK.ABOVE + RINK.BELOW)).setScale(1 / FIELD_RES).setDepth(DEPTH.decor - 1));
     gs.still(gs.add.image(this.left - RINK.END, ground, ice).setOrigin(0, RINK.ICE_UP / (RINK.ICE_UP + RINK.ICE_DOWN)).setScale(1 / FIELD_RES).setDepth(DEPTH.tiles + 0.5));

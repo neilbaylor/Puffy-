@@ -27,6 +27,24 @@ const SPOT_DIST = 210;
  * behind the ball and boots it at you. Jump it (or shoot it to pop it; land
  * on it and you bounce off). After the kick the whole team charges.
  */
+/**
+ * A soccer pitch's pictures for a match `widthTiles` wide (front: turf, lines, goals; back: boards and
+ * floodlights), as a job that draws whichever aren't there — null if both are. The level's loading
+ * card draws them before it starts (see fieldArtSteps); the match only if they're still missing.
+ */
+export function pitchArt(scene: Phaser.Scene, widthTiles: number): (() => void) | null {
+  const pitchW = widthTiles * TILE + 56;
+  const W = pitchW + PITCH.END * 2;
+  const front = `pitch-front-${pitchW}`;
+  const back = `pitch-back-${pitchW}`;
+  const T = scene.textures;
+  if (T.exists(front) && T.exists(back)) return null;
+  return () => {
+    if (!T.exists(front)) addCanvas(scene, front, hires(W, PITCH.FRONT_UP + PITCH.FRONT_DOWN, FIELD_RES, (ctx) => drawPitchFront(ctx, pitchW)), undefined, { release: true });
+    if (!T.exists(back)) addCanvas(scene, back, hires(W, PITCH.BACK_UP + 2, FIELD_RES, (ctx) => drawPitchBack(ctx, pitchW)), undefined, { release: true });
+  };
+}
+
 export class SoccerMatch implements Coach {
   readonly ball: Phaser.Physics.Arcade.Image;
   private puffs: SoccerMember[] = [];
@@ -68,12 +86,10 @@ export class SoccerMatch implements Coach {
     // a proper pitch: striped turf, lines, goals + corner flags in front; ad boards + floodlights behind
     if (opts.goals !== false) {
       const pitchW = half * 2 + 56;
-      const W = pitchW + PITCH.END * 2;
       const x0 = this.left - 28 - PITCH.END;
       const front = `pitch-front-${pitchW}`;
       const back = `pitch-back-${pitchW}`;
-      if (!gs.textures.exists(front)) addCanvas(gs, front, hires(W, PITCH.FRONT_UP + PITCH.FRONT_DOWN, FIELD_RES, (ctx) => drawPitchFront(ctx, pitchW)), undefined, { release: true });
-      if (!gs.textures.exists(back)) addCanvas(gs, back, hires(W, PITCH.BACK_UP + 2, FIELD_RES, (ctx) => drawPitchBack(ctx, pitchW)), undefined, { release: true });
+      pitchArt(gs, widthTiles)?.();
       // (still pictures: skipped while off the camera, see GameScene.still)
       gs.still(gs.add.image(x0, ground, back).setOrigin(0, PITCH.BACK_UP / (PITCH.BACK_UP + 2)).setScale(1 / FIELD_RES).setDepth(DEPTH.decor - 1));
       gs.still(gs.add.image(x0, ground, front).setOrigin(0, PITCH.FRONT_UP / (PITCH.FRONT_UP + PITCH.FRONT_DOWN)).setScale(1 / FIELD_RES).setDepth(DEPTH.tiles + 0.5));

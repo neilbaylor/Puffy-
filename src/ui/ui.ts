@@ -17,6 +17,7 @@ import { gamepadSources } from '../input/gamepad';
 import { isKeyDown } from '../input/keyboard';
 import { isTouchDevice, onInputModeChange, usingTouch } from '../input/touch';
 import type { GameData, GameOverState, GameScene, HudState, ResultState } from '../scenes/GameScene';
+import { fieldArtSteps } from '../scenes/GameScene';
 import { TouchControls } from './touchControls';
 import { drawNuggie, drawRootBeer } from '../gfx/collectibles';
 import { VERSION } from '../version';
@@ -1438,7 +1439,7 @@ export class UI {
     // (the bosses' arenas let go first: all but this one's in a rematch, or the one at the end of this level)
     const next = level !== null ? BOSSES.find((b) => b.level === level) : undefined;
     freeBossArtExcept(this.game, boss ?? (next && `${next.scene}:${level}`));
-    const scene = this.game.scene.getScene('Menu') as unknown as Phaser.Scene & { groundJobs?: (id: number) => { name: string; run: () => void }[] };
+    const scene = this.game.scene.getScene('Menu') as unknown as Phaser.Scene & { groundJobs?: (id: number) => { name: string; run: () => void }[]; laterSteps?: (id: number) => { name: string; run: () => void }[] };
     // (and the level's ground, for its opening fly-over, if the start screen hasn't drawn it yet)
     let ground: { name: string; run: () => void }[] = [];
     const build = level !== null ? levelInfo(level).build : undefined;
@@ -1447,6 +1448,8 @@ export class UI {
     const host = ['Hoops', 'Wrestle', 'Fishing'].map((k) => this.game.scene.getScene(k)).find((sc) => sc?.sys.isActive());
     if (level !== null && this.game.scene.isActive('Menu')) {
       ground = scene.groundJobs?.(level) ?? [];
+      // (and its trees and cloud platforms the start screen hadn't got to yet)
+      ground.push(...(scene.laterSteps?.(level) ?? []));
       // (and its first look, if the start screen only had its own lower-resolution copy of it: a
       // Part picked on the start screen, see HOME_LO — the level's is drawn here, not as it starts)
       if (!boss) ground.push(...missingLookSteps(scene, themesFor(level)[0]));
@@ -1457,7 +1460,9 @@ export class UI {
         if ((k.startsWith('terrain-') && !k.startsWith(`terrain-${data.name}-`)) || (k.startsWith('tree-') && !k.startsWith(`tree-${data.name}-`))) this.game.textures.remove(k);
       ground = groundPaintJobs(host, data).map((job, i) => ({ name: `ground ${i}`, run: () => void job() }));
     }
-    return loadArt([...gameArtJobs(scene, { heroes, level }), ...ground, ...this.bossArtSteps(heroes[0], level, boss)]);
+    // (and the level's soccer pitches, rinks and courts: see fieldArtSteps)
+    const fields = build ? fieldArtSteps(scene, build()) : [];
+    return loadArt([...gameArtJobs(scene, { heroes, level }), ...ground, ...fields, ...this.bossArtSteps(heroes[0], level, boss)]);
   }
 
   /**
