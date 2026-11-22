@@ -18,12 +18,14 @@ import { refreshMs } from './core/refresh';
 import { trimRenderTargets } from './core/renderTargets';
 import { fixArcadeGroupWalk } from './core/physicsFix';
 import { installUprightUploads } from './core/uprightUploads';
+import { skipClearCameraFills } from './core/fadeFix';
 import { roundTextureIds } from './core/texIdFix';
 import { warmBatchShaders } from './core/shaderWarm';
 
 // (before any scene: see physicsFix)
 fixArcadeGroupWalk();
 installUprightUploads();
+skipClearCameraFills();
 
 installInput();
 
