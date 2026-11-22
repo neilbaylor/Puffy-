@@ -28,6 +28,7 @@ import { BOARD, FB_FIELD_TILES, FB_FRAMES, FB_H, FB_SHADOW, FB_W, FBALL_FRAMES, 
 import { gearOf, wardrobe } from '../core/wardrobe';
 import { FLAME_FRAMES, FLAME_H, FLAME_W, drawDyingFlame, drawFlame, drawScorch } from './flame';
 import { ART_RES, ART_STYLE, CARRY_SWING, CHAR_H, CHAR_W, POSES, gearUp, canvas, carry, drawCharacter, ellipse, type CarryFrame, type Ctx, type Layer, type Pose } from './draw';
+import { SlicedDraw } from './slicedDraw';
 import { FACE_FRAMES, faceFromKey } from './face';
 import { STYLES } from './handdrawn';
 import { themesFor } from '../world/theme';
@@ -673,24 +674,65 @@ export const skyColours = (id: string): readonly string[] | undefined => (MOUNTA
 /** One background layer of one look (Part 1/3 looks and Part 2's mountain looks alike). */
 function makeBgLayer(scene: Phaser.Scene, id: string, layer: BgLayer, home = false) {
   const key = bgKey(layer, id, home);
+  // (being drawn by the quiet jobs, a slice at a time: the rest of it now — see lookJobs)
+  const sliced = slicing.get(key);
+  slicing.delete(key);
+  sliced?.play();
+  const c = sliced?.canvas ?? drawBgLayer(id, layer, home, hiresPadV);
+  if (!c) return;
+  // (the sky is a 4-pixel strip: its pixels are kept)
+  addCanvas(scene, key, c, undefined, layer === 'sky' ? undefined : { release: true });
+}
+
+/**
+ * A background layer's picture (not on the graphics chip yet: see makeBgLayer), drawn with `pad`
+ * (straight away, or noted down to be drawn in slices: see lookJobs).
+ */
+function drawBgLayer<T>(id: string, layer: BgLayer, home: boolean, pad: (w: number, h: number, res: number, fn: (ctx: Ctx) => void) => T): T | HTMLCanvasElement | null {
   const res = bgRes(home);
   const look = MOUNTAIN_LOOKS.find((l) => l.pal.id === id);
   const pal = look?.pal ?? PALETTES[id];
-  if (!pal) return;
+  if (!pal) return null;
   const L = BG_LAYERS;
-  const opts = { release: true };
-  if (layer === 'sky') addCanvas(scene, key, hires(4, 512, 1, (ctx) => drawSky(ctx, 4, 512, pal)));
-  else if (pal.sea) {
+  if (layer === 'sky') return hires(4, 512, 1, (ctx) => drawSky(ctx, 4, 512, pal));
+  if (pal.sea) {
     // (under the sea: hazy rock pillars, the reef, the sandy sea bed)
     const L2 = L[layer];
     const draw = layer === 'far' ? drawSeaFar : layer === 'hills' ? drawSeaMid : drawSeaNear;
-    addCanvas(scene, key, hiresPadV(L2.w, L2.h, res, (ctx) => draw(ctx, L2.w, L2.h, pal)), undefined, opts);
-  } else if (layer === 'far')
-    addCanvas(scene, key, hiresPadV(L.far.w, L.far.h, res, (ctx) => (look ? drawMountainFar(ctx, L.far.w, L.far.h, look) : drawFarLayer(ctx, L.far.w, L.far.h, pal))), undefined, opts);
-  else if (layer === 'hills')
-    addCanvas(scene, key, hiresPadV(L.hills.w, L.hills.h, res, (ctx) => (look ? drawMountainMid(ctx, L.hills.w, L.hills.h, look) : drawHillsLayer(ctx, L.hills.w, L.hills.h, pal))), undefined, opts);
-  else addCanvas(scene, key, hiresPadV(L.near.w, L.near.h, res, (ctx) => (look ? drawMountainNear(ctx, L.near.w, L.near.h, look) : drawNearLayer(ctx, L.near.w, L.near.h, pal))), undefined, opts);
+    return pad(L2.w, L2.h, res, (ctx) => draw(ctx, L2.w, L2.h, pal));
+  }
+  if (layer === 'far') return pad(L.far.w, L.far.h, res, (ctx) => (look ? drawMountainFar(ctx, L.far.w, L.far.h, look) : drawFarLayer(ctx, L.far.w, L.far.h, pal)));
+  if (layer === 'hills') return pad(L.hills.w, L.hills.h, res, (ctx) => (look ? drawMountainMid(ctx, L.hills.w, L.hills.h, look) : drawHillsLayer(ctx, L.hills.w, L.hills.h, pal)));
+  return pad(L.near.w, L.near.h, res, (ctx) => (look ? drawMountainNear(ctx, L.near.w, L.near.h, look) : drawNearLayer(ctx, L.near.w, L.near.h, pal)));
 }
+
+/** hiresPadV, noted down to be drawn a slice at a time (or drawn now, if it can't be: see SlicedDraw). */
+function slicedPadV(w: number, h: number, res: number, fn: (ctx: Ctx) => void): SlicedDraw | HTMLCanvasElement {
+  const { c, ctx } = canvas(Math.ceil(w * res), Math.ceil(h * res) + 4);
+  ctx.translate(0, 2);
+  ctx.scale(res, res);
+  return SlicedDraw.record(c, ctx, fn) ?? c;
+}
+
+/** Background layers being drawn a slice at a time by the quiet jobs, by key (see lookJobs). */
+const slicing = new Map<string, SlicedDraw>();
+/** Set while the start screen runs one of its quiet jobs itself, between frames of its fly-over (see lookJobs). */
+let slicingOn = false;
+/**
+ * Run a quiet job of the start screen's, between frames of its fly-over: a background layer it draws
+ * is drawn a slice a frame (see lookJobs). Behind a loading bar (the loading screen, the little
+ * loading card) it's drawn in one go, as before: nothing's moving there, and in one go is quicker.
+ */
+export function asQuietJob(job: () => void) {
+  slicingOn = true;
+  try {
+    job();
+  } finally {
+    slicingOn = false;
+  }
+}
+/** How many quiet jobs (frames) a background layer's drawing is shared over. */
+const LAYER_SLICES = 6;
 
 export const BG_LAYER_IDS: readonly BgLayer[] = ['sky', 'far', 'hills', 'near'];
 
@@ -705,8 +747,31 @@ export function ensureLook(scene: Phaser.Scene, id: string, home = false) {
  * a layer at a time keeps each pause short, so a tap is never kept waiting long).
  */
 export function lookJobs(scene: Phaser.Scene, id: string, home = false): (() => void)[] {
-  return BG_LAYER_IDS.map((l) => () => {
-    if (!scene.textures.exists(bgKey(l, id, home))) makeBgLayer(scene, id, l, home);
+  return BG_LAYER_IDS.flatMap((l) => {
+    const key = bgKey(l, id, home);
+    const make = () => {
+      if (!scene.textures.exists(key)) makeBgLayer(scene, id, l, home);
+    };
+    if (l === 'sky') return [make];
+    // (a hill or a ground layer: its drawing noted down in one job, drawn a slice per job over the
+    // next few, then sent to the graphics chip — see SlicedDraw. Drawn in one go, each was one long
+    // frame on the start screen, 150–550 ms at 4× slow CPU. One that's half drawn is finished, not
+    // started again, by whatever wants it next: a tap on its Part, say.)
+    const slice = () => {
+      const s = slicing.get(key);
+      if (s) s.play(Math.ceil(s.size / LAYER_SLICES));
+    };
+    return [
+      () => {
+        if (scene.textures.exists(key) || slicing.has(key)) return;
+        if (!slicingOn) return make();
+        const s = drawBgLayer(id, l, home, slicedPadV);
+        if (s instanceof SlicedDraw) slicing.set(key, s);
+        else if (s) addCanvas(scene, key, s, undefined, { release: true });
+      },
+      ...Array.from({ length: LAYER_SLICES }, () => slice),
+      make,
+    ];
   });
 }
 
@@ -727,6 +792,8 @@ export function ensureLevelLooks(scene: Phaser.Scene, level: number) {
  * its looks: memory stays the same however many levels there are).
  */
 export function freeLooksExcept(scene: Phaser.Scene, keep: readonly string[], homeKeep: readonly string[] | 'all' = []) {
+  // (and any layer a quiet job was half way through drawing: drawn again if it's wanted after all)
+  slicing.clear();
   // (the start screen's own copies, `bgh-`, only by `homeKeep`; a level keeps them all ('all'): coming
   // back home then has little to redraw)
   for (const k of scene.textures.getTextureKeys()) {

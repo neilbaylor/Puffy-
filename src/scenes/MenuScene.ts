@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { MIN_VIEW_W, TILE, VIEW_H } from '../config';
-import { BG_LAYER_IDS, HOME_SKY_SEP, bgKey, ensureLook, freeLooksExcept, lookJobs } from '../gfx/textures';
+import { BG_LAYER_IDS, HOME_SKY_SEP, asQuietJob, bgKey, ensureLook, freeLooksExcept, lookJobs } from '../gfx/textures';
 import { buildLevel1 } from '../level/level1';
 import { levelInfo, levelName, pickableLevels, progress } from '../level/levels';
 import { Background } from '../world/Background';
@@ -550,7 +550,7 @@ export class MenuScene extends Phaser.Scene {
     // (1.5 s after the last tap: someone tapping their way around the start screen is rarely kept
     // waiting behind one, and the other Parts still get ready while they look at each one)
     if (this.quiet.length && now - this.lastInput > 1500 && now >= this.nextQuiet) {
-      this.quiet.shift()!();
+      asQuietJob(this.quiet.shift()!);
       const took = performance.now() - now;
       // (a quick one: the next one straight after, on the next frame; a bigger one leaves the
       // frames after it free, the bigger the longer — about half the steps are quick, so the other
