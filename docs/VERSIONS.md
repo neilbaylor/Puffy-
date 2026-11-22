@@ -367,3 +367,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.362: Less drawing of things off screen (smoother levels and start screen) and a quicker start-up.
 - v0.363: Lite mode skips edge smoothing: smoother on slow devices (ropes and nets look a little more jagged there).
 - v0.364: Basketball rematches start with everyone standing ready; restarting King Bob's fishing contest no longer leaves a streak or a dangling line from the last one.
+- v0.365: If drawing the art ever hits a problem, the loading card no longer gets stuck.

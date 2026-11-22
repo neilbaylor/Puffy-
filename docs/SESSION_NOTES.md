@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.364)
+## Where things stand (v0.365)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -31,6 +31,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   Home screen (yellow).
 - Start screen: drone fly-over behind, logo hop, hero cards (pick = hop / backflip), Play, Part picker once a
   level is beaten, mute (top-left), full screen + **Battle** buttons (top-right, same height, side by side).
+- v0.365: artLoader.ts runSafely() per step + card removed in finally (a throwing step used to leave the card up and `starting` stuck: reproduced with scratchpad/tartfail.cjs); GameScene reachGoal stinger: boss not started if the Game scene was left (unreachable now: pause closed after the goal). Gamepad Y: battle already masks fire while bomb held (BattleScene buttons()). PR #31 closed (docs not merged). In progress: agent on claude/soft-shapes (soft-edged runtime shapes, then MSAA off everywhere).
 - v0.364: bug-hunt round 8-9 (PR #31 report on v0.361): cherry-picked #29 (HoopsScene.init resets kingAnim/heroAnim) and #30 (FishingScene.init resets heroLean, tipTrail, lureTrail, swing, dangle). #31 itself (docs/bug-hunt, 2.6k lines + screenshots) not merged into the game branch. Its unchecked suspicions: failing art step leaves the loading card stuck; 0.62 s quit-to-home race at the end of a boss level; gamepad Y does fire and bomb.
 - v0.363: light mode: WebGL context antialias (MSAA) off (main.ts makeGl `antialias: !LIGHT`); Phaser's render.antialias (texture filtering) unchanged. Owner approved after a side-by-side (only drawn lines — ropes, nets, cords — show steps). 4x swiftshader lite: frame gaps −21..28% (home 74→58 ms, Part 1 95→72, wrestle 95→68). ?diag line 'edge smoothing'. Owner to judge on the slow tablet.
 - v0.362: PERF ROUND G2 (agent, claude/perf-g2, ff-merged). GameScene.still()/stills culled in cullOffCamera (puddle bodies/fills, minigame fields/stands/nets) + minigames' cullWith for moving parts; Giant flies; Background rows hidden when wholly above/below the view (8 px margin) + near-hill fill; MenuScene ground plants culled at the sway reach (±80 px); input: getGamepads once a frame (once a second until gamepadconnected). LevelView opts.only [x0,x1]: start-up fly-overs skip trees/cloud platforms past the loop (±400 px), the shown Part's drawn last in its quiet jobs (laterJobs in planQuiet), else at the level's loading card. Measured not changed: grain strokes ~1/3 of art drawing (cheaper = look change), Play→running all needed art, antialias is the biggest GPU cost left (owner call), battle ~0.1-0.2 ms to gain. Agent scripts: scratchpad/g2/. Part-switch work checked identical (scratchpad/tswitch.cjs counts uploads/canvas ops per tap).
