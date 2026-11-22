@@ -444,6 +444,17 @@ export function drawFrontPost(ctx: Ctx) {
 }
 
 /** The announcers' table (stage units, untranslated: drawn where it stands). */
+/**
+ * The boxes (in the stage's units, with room to spare) that drawRingside draws anything in: the
+ * announcers' table and the two poo swirls. The rest of its picture is see-through: shown, it's
+ * only these bits that are drawn.
+ */
+export const RINGSIDE_PARTS: readonly (readonly [number, number, number, number])[] = [
+  [TABLE[0] - 10, TABLE[2] - 40, TABLE[1] - TABLE[0] + 20, RING.groundY + 16 - (TABLE[2] - 40)],
+  [330 - 30, RING.groundY + 8 - 45, 60, 55],
+  [960 - 25, RING.groundY + 14 - 38, 50, 48],
+];
+
 export function drawRingside(ctx: Ctx) {
   const [tx0, tx1, ttop] = TABLE;
   ST.shape(ctx, roundRectPts(tx0, ttop, tx1 - tx0, RING.groundY + 6 - ttop, 6), SKIRT, 40, { lw: 1.1 });

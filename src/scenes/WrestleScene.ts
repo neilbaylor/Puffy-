@@ -16,7 +16,7 @@ import { POOWAVE_H, POOWAVE_W, drawPooWave } from '../gfx/plopworld';
 import { drawPoo } from '../gfx/hazards';
 import { drawPrize } from '../gfx/prizes';
 import { STYLES } from '../gfx/handdrawn';
-import { CHAIR_H, CHAIR_W, KING_SEAT, PLOP_DOME, PLOP_DOME_RING, POO_PALACE, POO_PALACE_RING, setRingLook, drawFoldingChair, POST_BOX, PUDDLE, RING, RING_BOX, ROPE_COL, TUNNEL, backX, drawArenaPoo, drawFrontPost, drawRing, drawRingFloor, drawRingside, drawTunnel, wrestleJumboBar, WR_CRAWL, wrestleCrawlAt, wrestleCrawlItems } from '../gfx/wrestle';
+import { CHAIR_H, CHAIR_W, KING_SEAT, PLOP_DOME, PLOP_DOME_RING, POO_PALACE, POO_PALACE_RING, setRingLook, drawFoldingChair, POST_BOX, PUDDLE, RING, RING_BOX, ROPE_COL, TUNNEL, backX, drawArenaPoo, drawFrontPost, drawRing, drawRingFloor, drawRingside, RINGSIDE_PARTS, drawTunnel, wrestleJumboBar, WR_CRAWL, wrestleCrawlAt, wrestleCrawlItems } from '../gfx/wrestle';
 import { HERO_SHEET_M, PCHUTE_DOWN, PCHUTE_RES, PCHUTE_UP, PLOP_PAD, PLOP_RES, PLOP_TOP, addCanvas, hires, makeCarrySheet, makeJetFx, makePlopChutes, makePlops, makeWeaponArt } from '../gfx/textures';
 import { LedRibbon, LedStrip } from '../gfx/ledStrip';
 import { JumboScreen } from '../gfx/jumboScreen';
@@ -553,7 +553,7 @@ export class WrestleScene extends Phaser.Scene {
   private dark!: Phaser.GameObjects.Rectangle;
   private spot!: Phaser.GameObjects.Image;
   /** The announcers' table (POOPA TV), left of the ring. */
-  private ringside!: Phaser.GameObjects.Image;
+  private ringside!: Phaser.GameObjects.Image[];
   private camFocus: { x: number; y: number; zoom: number } | null = null;
   private camX = WORLD_W / 2;
   private camY = MAT_Y;
@@ -652,7 +652,17 @@ export class WrestleScene extends Phaser.Scene {
     this.jumboCrawl = new LedStrip(this, 'led-wcrawl', WX(JUMBO.x) + WR_CRAWL.x * jk, WY(JUMBO.y) + WR_CRAWL.y0 * jk, JUMBO.w - WR_CRAWL.x, JUMBO.h - WR_CRAWL.y0, jk, DEPTH_W.dark + 0.051);
     this.ribbon = new LedRibbon(this, WX(RIBBON.x), WY(RIBBON.y), K, DEPTH_W.dark + 0.052);
     this.add.image(WX(RING_BOX.x), WY(RING_BOX.y), this.tk('wr-ring')).setOrigin(0).setScale(K / RES).setDepth(DEPTH_W.ring);
-    this.ringside = this.add.image(WX(-160), WY(500), 'wr-ringside').setOrigin(0).setScale(K / 1.5).setDepth(DEPTH_W.ringside);
+    // (the ringside picture is a long strip, nearly all see-through: shown as its few bits — the
+    // table and two poo swirls — each the same picture cut down to its box, not all of it: the
+    // see-through rest still cost the graphics chip every one of its pixels, a fifth of a screen)
+    this.ringside = RINGSIDE_PARTS.map(([x, y, w, h]) =>
+      this.add
+        .image(WX(-160), WY(500), 'wr-ringside')
+        .setOrigin(0)
+        .setScale(K / 1.5)
+        .setDepth(DEPTH_W.ringside)
+        .setCrop((x + 160) * 1.5, (y - 500) * 1.5, w * 1.5, h * 1.5),
+    );
     for (const x of [RING.x0, RING.x1])
       this.add.image(WX(x), WY(RING.frontY), this.tk('wr-post')).setOrigin(0.5, (POST_BOX.h - 2) / POST_BOX.h).setScale(K / RES).setDepth(DEPTH_W.posts);
     this.ropesBack = softShapes(this).setDepth(DEPTH_W.backRopes);
@@ -2577,10 +2587,10 @@ export class WrestleScene extends Phaser.Scene {
       const ms = 5800;
       // (the announcers' table goes up in front of everything while he walks behind it, darkened to
       // match the dimmed arena: he's in front of the corner post but behind the table)
-      this.ringside.setDepth(DEPTH_W.spot + 0.4);
+      for (const r of this.ringside) r.setDepth(DEPTH_W.spot + 0.4);
       await this.glide(ms, (u) => {
         const shade = Math.round(255 * (1 - this.dark.fillAlpha));
-        this.ringside.setTint(Phaser.Display.Color.GetColor(shade, shade, shade));
+        for (const r of this.ringside) r.setTint(Phaser.Display.Color.GetColor(shade, shade, shade));
         let d = u * total;
         let i = 0;
         while (i < lens.length - 1 && d > lens[i]) d -= lens[i++];
@@ -2611,7 +2621,7 @@ export class WrestleScene extends Phaser.Scene {
     }
     // (facing the ring, and the challenger in it; the table back where it was)
     q.spr.setFlipX(true).setDepth(DEPTH_W.spot + 0.3);
-    this.ringside.setDepth(DEPTH_W.ringside).clearTint();
+    for (const r of this.ringside) r.setDepth(DEPTH_W.ringside).clearTint();
 
     // ── 3. he stops… and drops the robe: a jetpack on his back underneath ──
     if (!this.skipping) {
