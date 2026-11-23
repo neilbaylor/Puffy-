@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { coverGame } from '../core/coverSkip';
 import { CHARACTERS, characterById, type CharacterDef } from '../data/characters';
 import type { Session } from '../core/session';
 import { fadeOutMusic, playLevelClear, playLevelMusic, playLevelSong, playMenuMusic, preloadHoopsMusic, preloadLevelMusic, primeMusic, setMusicMuted, stopMusic } from '../core/music';
@@ -1070,6 +1071,8 @@ export class UI {
   private startStale = false;
   /** What was on when the Shop opened. */
   private shopWore = '';
+  /** The Shop's all the way up, covering the game (which isn't drawn meanwhile: see coverGame). */
+  private shopCovers = false;
   private showShop() {
     if (this.shopEl) return;
     const page = h(`<div class="shop-page" role="dialog" aria-label="Shop">
@@ -1087,6 +1090,12 @@ export class UI {
     // (slides up on the next frame, from where it starts: below the screen)
     void page.offsetWidth;
     page.classList.add('in');
+    // (once it's all the way up, the game under it isn't drawn: see coverGame)
+    page.addEventListener('transitionend', (e) => {
+      if (e.target !== page || this.shopEl !== page || this.shopCovers) return;
+      this.shopCovers = true;
+      coverGame(this.game, true);
+    });
     page.querySelector('.shop-x')!.addEventListener('click', () => {
       sfx.back();
       this.closeShop();
@@ -1128,6 +1137,10 @@ export class UI {
     const page = this.shopEl;
     if (!page) return;
     this.shopEl = null;
+    if (this.shopCovers) {
+      this.shopCovers = false;
+      coverGame(this.game, false);
+    }
     window.removeEventListener('resize', this.alignShopSoon);
     if (this.startStale) {
       this.startStale = false;

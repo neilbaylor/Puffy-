@@ -437,6 +437,26 @@ export function drawRing(ctx: Ctx) {
   ctx.fillRect(R.x0 - R.apron, R.skirtY, R.x1 - R.x0 + R.apron * 2, 6);
 }
 
+/**
+ * Where the ring's picture (drawRing, in RING_BOX) has nothing at all, in stage units: above the mat's
+ * back edge, either side of the back posts (their pads are 22 wide), and over the poo puddle's swirls
+ * and stink (its flies reach ~100 up) — each with room to spare. The ring leaves them out (see
+ * holedImage): its box is a third of the screen, and the strip over the mat is empty but for the posts.
+ */
+export function ringClear(): [number, number, number, number][] {
+  const R = RING;
+  const top = RING_BOX.y;
+  const above = R.backY - 12;
+  const l = backX(R.x0);
+  const r = backX(R.x1);
+  return [
+    [RING_BOX.x, top, l - 20, above],
+    [l + 20, top, PUDDLE.x - 100, above],
+    [PUDDLE.x - 100, top, r - 20, R.floorY + 3 - 125],
+    [r + 20, top, RING_BOX.x + RING_BOX.w, above],
+  ];
+}
+
 /** One front corner post with its turnbuckle pads (in front of the fighters). Box: 40 × (post + 16), foot at the bottom middle. */
 export const POST_BOX = { w: 40, h: RING.post + 16 };
 export function drawFrontPost(ctx: Ctx) {
