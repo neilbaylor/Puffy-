@@ -79,7 +79,7 @@ interface BandSpec {
   rainFrom: number;
 }
 const BANDS: readonly BandSpec[] = LIGHT
-  ? [{ key: 'f6-cloud-mid', parts: [['mid', 0]], h: 256, y: -60, sx: 0.3, sy: 0.55, k: 1.35, v: 7, depth: 0.12, rainFrom: 0.72 }]
+  ? [{ key: 'f6-cloud-mid', parts: [['mid', 0]], h: 256, y: -130, sx: 0.3, sy: 0.55, k: 1.35, v: 7, depth: 0.12, rainFrom: 0.72 }]
   : [
       {
         key: 'f6-cloud-all',
@@ -89,7 +89,7 @@ const BANDS: readonly BandSpec[] = LIGHT
           ['near', 0],
         ],
         h: 512,
-        y: -250,
+        y: -320,
         sx: 0.34,
         sy: 0.58,
         k: 1.35,
