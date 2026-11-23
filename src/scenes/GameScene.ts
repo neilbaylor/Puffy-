@@ -424,7 +424,10 @@ export class GameScene extends Phaser.Scene {
       if (!has('tennis')) for (const p of ['court-front-', 'court-back-']) dropTextures(this, p);
       if (!has('volley')) for (const p of ['volleysand-', 'volleyboard-']) dropTextures(this, p);
     }
-    this.lookNext = 0;
+    // (the level's other looks wait for the first few seconds of play, when a stutter shows most —
+    // unless the colours are about to drift into the next one: they drift 20 s in, and drawing them
+    // takes a second or two)
+    this.lookNext = themeClock.t < 8 ? 5 : 0;
     if (!this.scene.isActive('Menu') && !this.scene.isActive('Battle')) freeLooksExcept(this, themesFor(this.levelId), 'all');
     this.bg = new Background(this, (data.bgBottom ?? heightPx) - VIEW_H, false, !!data.vertical, data.water !== undefined);
     this.amb = new Ambience(this, this.levelId, (x, y, max) => {
