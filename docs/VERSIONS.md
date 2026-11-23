@@ -386,3 +386,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.381: Boss 6: after you catch King Bob, he challenges you to rock, paper, scissors, wins, and launches you to the Land of the Bloops.
 - v0.382: Boss 6: rock, paper, scissors played with the hero's own hand and King Bob's fin.
 - v0.383: Boss 6: nicer rock, paper, scissors hands for the heroes and King Bob.
+- v0.384: Boss 6: Play again after the ending works; Big Muscles' fist arm joined up; King Bob leaps out of his bowl to throw paper.
