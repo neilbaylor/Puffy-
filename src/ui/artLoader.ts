@@ -49,7 +49,8 @@ export function loadArt(steps: Step[], label = 'Loading…'): Promise<void> {
       for (let i = 0; i < steps.length; i++) {
         runSafely(steps[i].run);
         bar.style.setProperty('--p', String((i + 1) / steps.length));
-        if (performance.now() - slice > 40) {
+        // (a step that wants a frame of its own: the browser paints its drawing at the frame's end)
+        if (steps[i].own || performance.now() - slice > 40) {
           await nextFrame();
           slice = performance.now();
         }

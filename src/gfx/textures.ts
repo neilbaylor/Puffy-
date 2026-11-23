@@ -193,6 +193,54 @@ function sheet<F extends string>(
   addCanvas(scene, key, c, (t) => frames.forEach((f, i) => t.add(f, 0, g.x(i), g.y(i), fw, fh)), { release: !keepPixels(key) });
 }
 
+/** How many steps (frames) a big sheet drawn behind a loading card is spread over (see sheetSteps). */
+const SHEET_SLICES = 3;
+
+/**
+ * A sheet (as `sheet`, without `post`) as loading-card steps, each in a frame of its own: a few of its
+ * frames drawn a step, then it's sent to the graphics chip with the last few. Drawn in one step, a hero's or a Giant's
+ * sheet was one frame of 450-570 ms at 4x slow CPU behind Play's loading card, its bar stuck: the
+ * drawing code's own work, and the browser painting it all at the end of that frame. Now each step
+ * has a share of both (the browser paints what's been drawn at the end of each frame). The same
+ * drawing in the same order on the same canvas: the same picture.
+ */
+function sheetSteps<F extends string>(scene: Phaser.Scene, name: string, key: string, w: number, h: number, frames: readonly F[], draw: (ctx: Ctx, f: F) => void, res = ART_RES): Step[] {
+  const fw = Math.round(w * res);
+  const fh = Math.round(h * res);
+  const g = frameGrid(frames.length, fw, fh);
+  let cv: { c: HTMLCanvasElement; ctx: Ctx } | null = null;
+  const per = Math.ceil(frames.length / SHEET_SLICES);
+  const steps: Step[] = [];
+  for (let k = 0; k * per < frames.length; k++) {
+    const last = (k + 1) * per >= frames.length;
+    steps.push({
+      name: k ? `${name} ${k + 1}` : name,
+      // (the last share is sent to the graphics chip with the rest, in the same step: the browser
+      // paints it then anyway)
+      own: !last,
+      run: () => {
+        if (scene.textures.exists(key)) return;
+        cv ??= canvas(g.w, g.h);
+        const ctx = cv.ctx;
+        for (let i = k * per; i < Math.min(frames.length, (k + 1) * per); i++) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(g.x(i), g.y(i), fw, fh);
+          ctx.clip();
+          ctx.translate(g.x(i), g.y(i));
+          ctx.scale(res, res);
+          draw(ctx, frames[i]);
+          ctx.restore();
+        }
+        if (!last) return;
+        addCanvas(scene, key, cv.c, (t) => frames.forEach((f, i) => t.add(f, 0, g.x(i), g.y(i), fw, fh)), { release: !keepPixels(key) });
+        cv = null;
+      },
+    });
+  }
+  return steps;
+}
+
 // ─────────────────────────────────────────────────────────────
 
 /** The collision tilemap is invisible, but Phaser still wants a tileset image. */
@@ -205,8 +253,14 @@ function makeCollisionTiles(scene: Phaser.Scene) {
 /** A little extra room either side of a hero (the bazooka tip pokes out of the 56-unit cell). */
 const HERO_M = 8;
 /** One hero's animation frames (`face`: the standing pose with each little face they pull now and then). */
-function makeCharacter(scene: Phaser.Scene, ch: (typeof CHARACTERS)[number], face: boolean) {
-  makeHeroSheet(scene, face ? `char-${ch.id}-face` : `char-${ch.id}`, ch, face, wardrobe.wearKey);
+/** A hero's own sheet (or their faces) in what you've got on, as loading-card steps (see sheetSteps): as makeHeroSheet draws it. */
+function heroSheetSteps(scene: Phaser.Scene, name: string, ch: (typeof CHARACTERS)[number], face: boolean): Step[] {
+  const wear = wardrobe.wearKey;
+  const up = gearUp(wear);
+  const frames: readonly string[] = face ? FACE_FRAMES : POSES;
+  return sheetSteps(scene, name, face ? `char-${ch.id}-face` : `char-${ch.id}`, CHAR_W + HERO_M * 2, CHAR_H + up, frames, (ctx, f) =>
+    face ? drawCharacter(ctx, HERO_M, up, ch, 'idle0', faceFromKey(f), wear, 'all') : drawCharacter(ctx, HERO_M, up, ch, f as Pose, undefined, wear, 'all'),
+  );
 }
 
 /**
@@ -681,7 +735,7 @@ function makeBgLayer(scene: Phaser.Scene, id: string, layer: BgLayer, home = fal
   const c = sliced?.canvas ?? drawBgLayer(id, layer, home, hiresPadV);
   if (!c) return;
   // (its see-through top measured while its pixels are still here: see bgPieces)
-  if (layer !== 'sky') measurePieces(key, c);
+  if (layer !== 'sky' && !NO_PIECES) measurePieces(key, c);
   // (the sky is a 4-pixel strip: its pixels are kept)
   addCanvas(scene, key, c, undefined, layer === 'sky' ? undefined : { release: true });
 }
@@ -690,6 +744,14 @@ function makeBgLayer(scene: Phaser.Scene, id: string, layer: BgLayer, home = fal
 export type LayerPiece = { x: number; w: number; top: number };
 /** Each background layer's pieces, by key (see bgPieces). */
 const layerPieces = new Map<string, LayerPiece[]>();
+/** (localStorage puffy.noPieces = '1': layers shown whole, not measured — for side-by-side measurements) */
+const NO_PIECES = (() => {
+  try {
+    return localStorage.getItem('puffy.noPieces') === '1';
+  } catch {
+    return false;
+  }
+})();
 /** How many pieces a layer's picture is cut into, at most (see measurePieces). */
 export const LAYER_PIECES = 8;
 
@@ -898,7 +960,8 @@ export function freeLooksExcept(scene: Phaser.Scene, keep: readonly string[], ho
   }
 }
 
-export type Step = { name: string; run: () => void };
+/** A drawing step (`own`: in a frame of its own, behind a loading card — see sheetSteps). */
+export type Step = { name: string; run: () => void; own?: boolean };
 
 /**
  * The game's art in small steps. `now`: what the start screen needs (drawn behind the
@@ -974,8 +1037,8 @@ export function gameArtJobs(scene: Phaser.Scene, opts: { heroes: readonly string
       if (!T.exists(`char-${id}-sea-face`)) out.push({ name: `hero ${id} diving faces`, run: () => makeHeroSheet(scene, `char-${id}-sea-face`, ch, true, seaWear()) });
       continue;
     }
-    if (!T.exists(`char-${id}`)) out.push({ name: `hero ${id}`, run: () => makeCharacter(scene, ch, false) });
-    if (!T.exists(`char-${id}-face`)) out.push({ name: `hero ${id} faces`, run: () => makeCharacter(scene, ch, true) });
+    if (!T.exists(`char-${id}`)) out.push(...heroSheetSteps(scene, `hero ${id}`, ch, false));
+    if (!T.exists(`char-${id}-face`)) out.push(...heroSheetSteps(scene, `hero ${id} faces`, ch, true));
   }
   const want = opts.level == null ? [] : (BADDIES_FOR[String(opts.level)] ?? BADDIES_FOR[1]);
   // (crab tennis under the sea: the two teams of crabs, the clam, the net)
@@ -993,7 +1056,13 @@ export function gameArtJobs(scene: Phaser.Scene, opts: { heroes: readonly string
   if (want.includes('football')) for (const [name, run] of footballJobs(scene)) out.push({ name, run });
   if (want.includes('fish'))
     for (const k of want.includes('kai') ? (['badguy', 'badguybig', 'kai'] as const) : (['badguy', 'badguybig'] as const)) if (!T.exists(`fish-${k}`)) out.push({ name: `fish ${k}`, run: () => { makeFish(scene, k); makeFishBubble(scene); } });
-  for (const b of baddiePieces(scene)) if (want.includes(b.name) && !BADDIE_KEYS[b.name].every((k) => T.exists(k))) out.push(b);
+  // (the two big sheets spread over a few frames each: see sheetSteps)
+  const st = STYLES[ART_STYLE];
+  for (const b of baddiePieces(scene))
+    if (want.includes(b.name) && !BADDIE_KEYS[b.name].every((k) => T.exists(k)))
+      if (b.name === 'giant') out.push(...sheetSteps(scene, 'giant', 'giant', GIANT_W, GIANT_H, GIANT_FRAMES, (ctx, f) => drawGiant(ctx, 0, 0, f, st), 2.5));
+      else if (b.name === 'bigpuff') out.push(...sheetSteps(scene, 'bigpuff', 'bigpuff', BIGPUFF_W, BIGPUFF_H, BIGPUFF_FRAMES, (ctx, f) => drawBigPuff(ctx, 0, 0, f, st)));
+      else out.push(b);
   if (want.includes('plops')) (['small', 'medium', 'large'] as const).forEach((k) => !T.exists(`gplop-${k}`) && out.push({ name: `plops ${k}`, run: () => makePlops(scene, k) }));
   // (level 4's opening: the Plop King with his jetpack)
   if (want.includes('king') && !BADDIE_KEYS.king.every((k) => T.exists(k)))
