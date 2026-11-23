@@ -1,11 +1,11 @@
-import { LIGHT, LIGHT_KEY, maxTextureSize } from './light';
+import { LIGHT, LIGHT_KEY } from './light';
 import { VERSION } from '../version';
 
 /**
- * A hidden diagnostics box (only with `?diag` in the address): what the light-mode checks saw on
- * this device. For working out why a device is (or isn't) in light mode; players never see it.
+ * A hidden diagnostics box (only with `?diag` in the address): what this device reports, and which
+ * mode it's in. For working out how a device behaves; players never see it.
  */
-export const diag = { home: 'not started', check: '', refresh: '', view: '', smooth: '', seenAs: '' };
+export const diag = { refresh: '', view: '', smooth: '', seenAs: '' };
 
 export function showDiag() {
   let on = false;
@@ -20,15 +20,14 @@ export function showDiag() {
     'position:fixed;right:8px;bottom:8px;z-index:9999;margin:0;padding:8px 10px;max-width:60vw;white-space:pre-wrap;font:600 11px/1.35 ui-monospace,monospace;color:#fff;background:#000c;border-radius:8px;pointer-events:none';
   document.body.appendChild(box);
   const nav = navigator as Navigator & { deviceMemory?: number };
-  let maxTex = maxTextureSize;
-  if (!maxTex)
-    try {
-      const gl = document.createElement('canvas').getContext('webgl');
-      maxTex = gl ? (gl.getParameter(gl.MAX_TEXTURE_SIZE) as number) : 0;
-      gl?.getExtension('WEBGL_lose_context')?.loseContext();
-    } catch {
-      /* no WebGL */
-    }
+  let maxTex = 0;
+  try {
+    const gl = document.createElement('canvas').getContext('webgl');
+    maxTex = gl ? (gl.getParameter(gl.MAX_TEXTURE_SIZE) as number) : 0;
+    gl?.getExtension('WEBGL_lose_context')?.loseContext();
+  } catch {
+    /* no WebGL */
+  }
   const fill = () => {
     let key = '';
     try {
@@ -41,8 +40,6 @@ export function showDiag() {
       `memory: ${nav.deviceMemory ?? '?'} GB · cores: ${nav.hardwareConcurrency ?? '?'} · max picture: ${maxTex || '?'}`,
       `screen: ${innerWidth}×${innerHeight} @${devicePixelRatio} · refresh: ${diag.refresh}`,
       `page size: ${diag.view} · edge smoothing: ${diag.smooth} · seen as: ${diag.seenAs}`,
-      `auto check: ${diag.check}`,
-      `home screen: ${diag.home}`,
     ].join('\n');
   };
   fill();

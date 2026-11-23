@@ -1,20 +1,22 @@
 /**
- * Light mode, for older devices that can't hold the full-detail pictures: the screen is drawn at
- * 1x, the ground, backgrounds and clouds at a lower resolution (a little softer), and the start
- * screen doesn't build the other Parts ahead. On when the device says it has 2 GB or less, when
- * its graphics chip can't take pictures over 4096 px, or once the graphics have run out of memory
- * on it while playing (see main.ts) — that last one only until the next version, which tries full
- * mode again (a later version may need less memory; a device that really can't cope just switches
- * back, once).
+ * Light mode, for older devices that can't keep up with the full-detail pictures: the screen is drawn
+ * at 1x, the ground, backgrounds and clouds at a lower resolution (a little softer), and the start
+ * screen doesn't build the other Parts ahead. Picked by hand with the hidden links (?lite / ?full), or
+ * switched on once the graphics have run out of memory on the device while playing (see main.ts) —
+ * that last one only until the next version, which tries full mode again.
  *
- * `puffy.light`: '1' on, '0' off (set by hand, for testing), 'auto:<version>' switched on by a
- * graphics loss in that version, 'slow' switched on because the device was measured too slow for
- * full mode (the start screen or play running under ~35 fps: see main.ts) — kept for good.
+ * (There used to be automatic checks too — the device's memory and picture-size limit at start-up,
+ * and timing the start screen and play — but they guessed badly and the switching was annoying. A
+ * device benchmark is to decide instead. A device those checks already put in light mode ('slow')
+ * stays there until then.)
+ *
+ * `puffy.light`: '1' on, '0' off (picked by hand), 'auto:<version>' switched on by a graphics loss in
+ * that version, 'slow' switched on by the old speed check.
  */
 import { VERSION } from '../version';
 
 export const LIGHT_KEY = 'puffy.light';
-/** What main.ts stores when the device is measured too slow for full mode (kept for good: a slow chip stays slow). */
+/** What the old speed check stored when it found the device too slow for full mode (still honoured: see above). */
 export const LIGHT_SLOW = 'slow';
 /** What main.ts stores when the graphics run out of memory: light mode for this version. */
 export const LIGHT_AUTO = `auto:${VERSION}`;
@@ -41,9 +43,6 @@ function hiddenSwitch() {
   }
 }
 
-/** The graphics chip's biggest picture size (0: no WebGL), for the light-mode check and ?diag. */
-export let maxTextureSize = 0;
-
 export const LIGHT: boolean = (() => {
   hiddenSwitch();
   try {
@@ -64,17 +63,6 @@ export const LIGHT: boolean = (() => {
     if (v === '0') return false;
   } catch {
     /* private mode */
-  }
-  const mem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
-  if (mem !== undefined && mem <= 2) return true;
-  try {
-    const gl = document.createElement('canvas').getContext('webgl');
-    const max = gl ? (gl.getParameter(gl.MAX_TEXTURE_SIZE) as number) : 0;
-    maxTextureSize = max;
-    gl?.getExtension('WEBGL_lose_context')?.loseContext();
-    if (max && max <= 4096) return true;
-  } catch {
-    /* no WebGL here: the game falls back to its canvas renderer */
   }
   return false;
 })();

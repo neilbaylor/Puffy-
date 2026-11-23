@@ -10,9 +10,8 @@ import { FishingScene } from './scenes/FishingScene';
 import { UI } from './ui/ui';
 // (offline play: set up once the start screen is up)
 import './core/offline';
-import { LIGHT, LIGHT_AUTO, LIGHT_KEY, LIGHT_SLOW } from './core/light';
+import { LIGHT, LIGHT_AUTO, LIGHT_KEY } from './core/light';
 import { diag, showDiag } from './core/diag';
-import { savedResCap, saveResCap } from './core/res';
 import { trackBossArt } from './gfx/textures';
 import { refreshMs } from './core/refresh';
 import { trimRenderTargets } from './core/renderTargets';
@@ -37,10 +36,9 @@ installInput();
  * Each scene then zooms its camera so exactly VIEW_H world pixels are visible
  * vertically; the visible width follows the screen's aspect ratio.
  */
-// Cap the render resolution: full 2x on phones, 1.75x on big tablet screens (keeps Android tablets smooth).
-// A device found to be slow in play (see watchSpeed) is capped lower still for gameplay, and remembers
-// it; light mode (older devices: see core/light) draws at 1x everywhere.
-let resCap = LIGHT ? 1 : savedResCap();
+// Cap the render resolution: full 2x on phones, 1.75x on big tablet screens (keeps Android tablets smooth);
+// light mode (older devices: see core/light) draws at 1x everywhere.
+const resCap = LIGHT ? 1 : 0;
 // The start screen always draws at no more than 1.25x: its scenery is soft (a little less sharpness
 // doesn't show; the title and buttons are page elements, always sharp) and it keeps Part switching
 // smooth on every device. Gameplay draws at full sharpness again.
@@ -260,134 +258,8 @@ function start(refreshMs: number) {
     ev.on(Phaser.Scenes.Events.SHUTDOWN, () => setHome(false));
   });
 
-  /**
-   * Some devices (an old iPad, say) can't keep up drawing gameplay at full sharpness. Watch the
-   * first few seconds of real play: if it's running under ~47 fps, draw gameplay at a lower
-   * resolution (a little softer, much smoother), and check again (at most twice). Remembered for
-   * this version (see core/res).
-   */
-  const PLAY = ['Game', 'Hoops', 'Wrestle', 'Battle', 'Fishing'];
-  /**
-   * Too slow for full mode even so (the start screen, or play at the lowest resolution, under ~35
-   * fps): light mode for this device, for good. On the start screen it starts again in light mode
-   * straight away (a moment's note); during play, from the next start (nothing lost mid-level).
-   * Not where full mode was picked by hand ('0'), nor in test browsers.
-   */
-  const canGoLight = (() => {
-    try {
-      return !LIGHT && !navigator.webdriver && localStorage.getItem(LIGHT_KEY) !== '0';
-    } catch {
-      return false;
-    }
-  })();
-  let wentLight = false;
-  const goLight = (now: boolean) => {
-    if (wentLight || !canGoLight) return;
-    wentLight = true;
-    try {
-      localStorage.setItem(LIGHT_KEY, LIGHT_SLOW);
-    } catch {
-      return; // (private mode: can't remember it)
-    }
-    if (!now) return;
-    const note = document.createElement('div');
-    note.className = 'gl-lost';
-    note.textContent = 'Switching to light mode for this device…';
-    document.body.appendChild(note);
-    setTimeout(() => location.reload(), 900);
-  };
-  const slowDeltas = (deltas: number[]) => {
-    deltas.sort((a, b) => a - b);
-    const median = deltas[deltas.length >> 1];
-    // (a 30 fps cap — an iPhone in Low Power Mode — shows in the refresh rate measured at the start:
-    // frames come every 33 ms however little there is to draw. A struggling device on a 60 Hz screen
-    // also lands on 33 ms frames, but its refresh rate measured 60: that one IS slow)
-    const capped30 = refreshMs > 28;
-    return { median, capped30 };
-  };
-  /**
-   * The start screen, a few seconds after it's settled (nothing loading, nothing being drawn ahead),
-   * timed for 5 seconds once: under ~35 fps, light mode (see goLight).
-   */
-  const watchHome = () => {
-    const deltas: number[] = [];
-    let since = 0;
-    let last = 0;
-    let calm = 0; // when the start screen last became settled
-    let up = 0; // when the start screen was first up (drawing ahead that never ends doesn't hold the check off for good)
-    const onStep = () => {
-      const t = performance.now();
-      const delta = last ? t - last : 0;
-      last = t;
-      const menu = game.scene.getScene('Menu') as unknown as { quietLeft?: number } | null;
-      const shown = home && !document.hidden && game.scene.isActive('Menu') && !document.querySelector('.art-loader') && !document.body.classList.contains('booting');
-      if (shown && !up) up = t;
-      const settled = shown && (!(menu?.quietLeft ?? 0) || t - up > 15000);
-      if (!settled) {
-        calm = 0;
-        diag.home = !shown ? 'waiting for the start screen' : `waiting: ${menu?.quietLeft ?? 0} drawing jobs left`;
-        return;
-      }
-      if (!calm) calm = t;
-      diag.home = 'measuring…';
-      if (!delta || delta > 1000 || t - calm < 3000) return;
-      deltas.push(delta);
-      since += delta;
-      if (since < 5000 || deltas.length < 20) return;
-      game.events.off('step', onStep);
-      const long = deltas.filter((d) => d > 40).length / deltas.length;
-      const { median, capped30 } = slowDeltas(deltas);
-      // (slow on the whole — under ~50 fps — or stuttering: one frame in ten a long one)
-      const slow = (median > 20 && !capped30) || long > 0.1;
-      diag.home = `${Math.round(1000 / median)} fps, ${Math.round(long * 100)}% long frames → ${slow ? 'light mode' : 'stays full'}`;
-      if (slow) goLight(true);
-    };
-    game.events.on('step', onStep);
-  };
-  diag.check = LIGHT ? 'off (already light mode)' : canGoLight ? 'on' : 'off (full mode picked by hand, or a test browser)';
   diag.refresh = `${Math.round(1000 / refreshMs)} Hz${refreshMs > 28 ? ' (30 fps cap)' : ''}`;
-  if (canGoLight) watchHome();
   showDiag();
-  const watchSpeed = (rounds: number) => {
-    const deltas: number[] = [];
-    let since = 0;
-    let last = 0;
-    let playing = 0; // when this stretch of play began
-    const onStep = () => {
-      // (real time between frames: the frame time Phaser reports is smoothed and capped)
-      const t = performance.now();
-      const delta = last ? t - last : 0;
-      last = t;
-      const inPlay = !home && !document.hidden && PLAY.some((k) => game.scene.isActive(k));
-      if (!inPlay) {
-        playing = 0;
-        return;
-      }
-      if (!playing) playing = t;
-      // (skip the first 2 seconds of each stretch: building the scene and its first pictures
-      // are slow on purpose, and aren't the device being slow)
-      if (!delta || delta > 1000 || t - playing < 2000) return;
-      deltas.push(delta);
-      since += delta;
-      // (about 4 seconds' worth, however fast or slow the frames are)
-      if (since < 4000 || deltas.length < 20) return;
-      game.events.off('step', onStep);
-      deltas.sort((a, b) => a - b);
-      const median = deltas[deltas.length >> 1];
-      // (a steady 30 fps is a cap, e.g. an iPhone in Low Power Mode, not a struggling device)
-      // (a 30 fps cap — Low Power Mode — measured as such at the start; see slowDeltas)
-      const capped30 = refreshMs > 28;
-      const now = dpr();
-      if (median > 21 && !capped30 && now > 1.05 && rounds > 0) {
-        resCap = now > 1.4 ? 1.25 : 1;
-        saveResCap(resCap);
-        resize();
-        setTimeout(() => watchSpeed(rounds - 1), 1500);
-      } else if (median > 20 && !capped30) goLight(false); // (as low as it goes and still slow)
-    };
-    game.events.on('step', onStep);
-  };
-  if (!LIGHT) watchSpeed(2);
   (window as unknown as { __res: () => unknown }).__res = () => ({ dpr: dpr(), cap: resCap, home, renderer: game.renderer.type === Phaser.WEBGL ? 'WebGL' : 'Canvas' });
 
   new UI(game);

@@ -10,7 +10,6 @@ import { BattleUI } from './battleUi';
 import { loadArt, loadArtQueue } from './artLoader';
 import { MenuScene } from '../scenes/MenuScene';
 import { LIGHT } from '../core/light';
-import { savedResCap } from '../core/res';
 import { BG_LAYER_IDS, HOME_LO, asBossArt, asQuietJob, bgKey, disownBossArt, dropHeroSheets, freeBossArtExcept, gameArtJobs, homeKeepKeys, isSliceJob, lookJobs, missingLookSteps, ownFrame, seaWear, swimLevel, type Step } from '../gfx/textures';
 import { themesFor } from '../world/theme';
 import { SHOP, wardrobe } from '../core/wardrobe';
@@ -1038,10 +1037,9 @@ export class UI {
     }
   }
 
-  /** ' · lower res' on the version label when this device was found slow and draws at a lower resolution. */
+  /** ' · light' on the version label in light mode. */
   private lowRes() {
-    if (LIGHT) return ' · light';
-    return savedResCap() ? ' · lower res' : '';
+    return LIGHT ? ' · light' : '';
   }
 
   private play() {
