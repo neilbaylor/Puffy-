@@ -670,47 +670,29 @@ export class FishingScene extends Phaser.Scene {
     this.hero = this.add.sprite(0, 0, this.heroKey, 'c5').setOrigin(0.5, 1).setScale(this.heroScale).setDepth(5);
 
     // the near surface (it laps over the hull at the waterline), then the water's tint over all that's under it
-    if (this.v6) {
-      // (Boss 6: the storm's taller swell, the same way)
+    if (this.v6) this.stormSurface();
+    else {
       for (const [y, a, d, sp] of [
-        [WATER - STORM_WAVE.top - 14, 0.55, 3.9, 0.7],
-        [WATER - STORM_WAVE.top, 1, 6, 1.4],
+        [WATER - WAVE.top - 6, 0.55, 3.9, 0.6],
+        [WATER - WAVE.top, 1, 6, 1],
       ] as const) {
         const w = this.add
-          .tileSprite(WORLD_L, y, WORLD_W - WORLD_L + 400, STORM_WAVE.h, 'f6-wave')
+          .tileSprite(WORLD_L, y, WORLD_W - WORLD_L + 400, WAVE.h, 'fl-wave')
           .setOrigin(0, 0)
-          .setTileScale(1 / Storm.WAVE_RES, 1 / Storm.WAVE_RES)
+          .setTileScale(0.5, 0.5)
           .setDepth(d)
           .setAlpha(a);
         w.setData('sp', sp);
         this.waves.push(w);
       }
-      this.add
-        .rectangle(WORLD_L, WATER + STORM_WAVE.h - STORM_WAVE.top - 2, WORLD_W - WORLD_L + 400, WORLD_BOTTOM - WATER, 0x08243a)
-        .setOrigin(0, 0)
-        .setAlpha(0.32)
-        .setDepth(6.4);
-    } else for (const [y, a, d, sp] of [
-      [WATER - WAVE.top - 6, 0.55, 3.9, 0.6],
-      [WATER - WAVE.top, 1, 6, 1],
-    ] as const) {
-      const w = this.add
-        .tileSprite(WORLD_L, y, WORLD_W - WORLD_L + 400, WAVE.h, 'fl-wave')
-        .setOrigin(0, 0)
-        .setTileScale(0.5, 0.5)
-        .setDepth(d)
-        .setAlpha(a);
-      w.setData('sp', sp);
-      this.waves.push(w);
-    }
-    // (a plain colour: a rectangle, not a white picture tinted — the same, without a picture read
-    // for each of its pixels, a good part of the screen)
-    if (!this.v6)
+      // (a plain colour: a rectangle, not a white picture tinted — the same, without a picture read
+      // for each of its pixels, a good part of the screen)
       this.add
         .rectangle(WORLD_L, WATER + 22, WORLD_W - WORLD_L + 400, WORLD_BOTTOM - WATER, 0x0d5f92)
         .setOrigin(0, 0)
         .setAlpha(0.3)
         .setDepth(6.4);
+    }
 
     // the rods and the lines (drawn every frame), the bobbers
     this.rods = softShapes(this).setDepth(7);
@@ -784,6 +766,29 @@ export class FishingScene extends Phaser.Scene {
     this.game.events.emit('fishing-start', this);
     this.fitCamera(true);
     void this.run();
+  }
+
+  /** Boss 6's near surface: the storm's taller swell lapping the hull (as Boss 5's waves), and the murk's tint under it. */
+  private stormSurface() {
+    // (Boss 6: the storm's taller swell, the same way)
+    for (const [y, a, d, sp] of [
+      [WATER - STORM_WAVE.top - 14, 0.55, 3.9, 0.7],
+      [WATER - STORM_WAVE.top, 1, 6, 1.4],
+    ] as const) {
+      const w = this.add
+        .tileSprite(WORLD_L, y, WORLD_W - WORLD_L + 400, STORM_WAVE.h, 'f6-wave')
+        .setOrigin(0, 0)
+        .setTileScale(1 / Storm.WAVE_RES, 1 / Storm.WAVE_RES)
+        .setDepth(d)
+        .setAlpha(a);
+      w.setData('sp', sp);
+      this.waves.push(w);
+    }
+    this.add
+      .rectangle(WORLD_L, WATER + STORM_WAVE.h - STORM_WAVE.top - 2, WORLD_W - WORLD_L + 400, WORLD_BOTTOM - WATER, 0x08243a)
+      .setOrigin(0, 0)
+      .setAlpha(0.32)
+      .setDepth(6.4);
   }
 
   /** Boss 5's scenery: a sunny day, the sky, the far-off sea and an island, clouds and gulls, light down into the water. */
@@ -1623,14 +1628,14 @@ export class FishingScene extends Phaser.Scene {
           'THE BITES DON’T WAIT — STRIKE FAST!',
         ]
       : [
-      ...this.news,
-      'WATER 72°F',
-      'WIND NE 6 KNOTS',
-      'SEAS 1–2 FT',
-      'KING BOB: 312 CONTESTS, 312 WINS',
-      'PRO TIP: HOOK ALL 6 BITES AND THE FISH IS YOURS',
-      'THE BITES DON’T WAIT — STRIKE FAST!',
-    ];
+          ...this.news,
+          'WATER 72°F',
+          'WIND NE 6 KNOTS',
+          'SEAS 1–2 FT',
+          'KING BOB: 312 CONTESTS, 312 WINS',
+          'PRO TIP: HOOK ALL 6 BITES AND THE FISH IS YOURS',
+          'THE BITES DON’T WAIT — STRIKE FAST!',
+        ];
     span.textContent = items.join('   ◆   ') + '   ◆   ';
     span.style.animation = 'none';
     void span.offsetWidth;

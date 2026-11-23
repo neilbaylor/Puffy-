@@ -41,17 +41,57 @@ import {
  * flash is the camera's white-out and the bolt only (no lit-up pictures to hold).
  */
 
-/** The rain layers drawn (front last). */
-const RAIN: RainLayer[] = LIGHT ? ['mid'] : ['far', 'mid', 'near'];
-/** How much each rain layer slides as the camera pans (0: fixed to the screen, 1: to the world). */
-const RAIN_PARALLAX: Record<RainLayer, number> = { far: 0.25, mid: 0.5, near: 0.9 };
-/** The cloud bands: [band, world y of its top, scroll factor x, scroll factor y, scale]. */
-const BANDS: readonly (readonly [CloudBand, number, number, number, number])[] = LIGHT
-  ? [['mid', -60, 0.3, 0.55, 1.35]]
+/**
+ * The rain: tiles, each a TileSprite over the view from the clouds' bellies down to the sea (a layer
+ * of rain over the screen is a screenful for the graphics chip: the dear part of the storm). Full mode:
+ * the far and middle layers drawn into one tile (`back`), and the near layer's few big streaks as a
+ * handful of sprites of their own (NEAR_STREAKS) rather than a third screenful. Light: the middle layer.
+ */
+const RAIN_TILES: readonly { key: string; layers: RainLayer[]; speed: number; parallax: number }[] = LIGHT
+  ? [{ key: 'f6-rain-mid', layers: ['mid'], speed: RAIN_LAYERS.mid.speed, parallax: 0.5 }]
+  : [{ key: 'f6-rain-back', layers: ['far', 'mid'], speed: (RAIN_LAYERS.far.speed + RAIN_LAYERS.mid.speed) / 2, parallax: 0.4 }];
+/** The near rain's big streaks (full mode): how many on screen at once (design px: 1280 × 720 on screen). */
+const NEAR_STREAKS = LIGHT ? 0 : 26;
+const STREAK = { w: 6, h: 90 } as const;
+/**
+ * The clouds: one band, a TileSprite running the length of the world, its picture the clouds of one or
+ * more of CLOUD_BANDS drawn together (`parts`: which, and how far down the picture), back to front.
+ * Full mode: all three — the far ones lowest, the near ones darkest and on top — in the one picture:
+ * as three bands of their own they overlapped, up to three screenfuls over the sky, ~14 ms a frame at
+ * 4x slow CPU against ~7 for the one. Light: the middle ones. y: world y of its top; sx, sy: scroll
+ * factors; k: shown scale; v: drift (px/s); rainFrom: how far down it the rain starts (its bellies).
+ */
+interface BandSpec {
+  key: string;
+  parts: readonly (readonly [CloudBand, number])[];
+  h: number;
+  y: number;
+  sx: number;
+  sy: number;
+  k: number;
+  v: number;
+  depth: number;
+  rainFrom: number;
+}
+const BANDS: readonly BandSpec[] = LIGHT
+  ? [{ key: 'f6-cloud-mid', parts: [['mid', 0]], h: 256, y: -60, sx: 0.3, sy: 0.55, k: 1.35, v: 7, depth: 0.12, rainFrom: 0.55 }]
   : [
-      ['far', 40, 0.2, 0.5, 1.2],
-      ['mid', -80, 0.3, 0.55, 1.35],
-      ['near', -230, 0.42, 0.62, 1.6],
+      {
+        key: 'f6-cloud-all',
+        parts: [
+          ['far', 236],
+          ['mid', 118],
+          ['near', 0],
+        ],
+        h: 512,
+        y: -250,
+        sx: 0.34,
+        sy: 0.58,
+        k: 1.35,
+        v: 7,
+        depth: 0.12,
+        rainFrom: 0.48,
+      },
     ];
 /** The rows of swells: [world y of the crests' top, crest height, hills in a tile, tone 0 far … 1 near, seed, texture height]. */
 const SWELLS = (horizon: number) =>
@@ -93,9 +133,11 @@ export interface StormWorld {
 
 export class Storm {
   private sky!: Phaser.GameObjects.Graphics;
-  private bands: { ts: Phaser.GameObjects.TileSprite; key: string; v: number; x0: number }[] = [];
+  private bands: { ts: Phaser.GameObjects.TileSprite; spec: BandSpec; x0: number }[] = [];
   private swells: { ts: Phaser.GameObjects.TileSprite; key: string; v: number }[] = [];
-  private rain: { ts: Phaser.GameObjects.TileSprite; layer: RainLayer }[] = [];
+  private rain: { ts: Phaser.GameObjects.TileSprite; speed: number; parallax: number }[] = [];
+  /** The near rain's streaks: where each is on screen (0 … 1 across, 0 … 1 down) and how fast it falls (screens/s). */
+  private streaks: { img: Phaser.GameObjects.Image; u: number; w: number; v: number }[] = [];
   private splashes: { img: Phaser.GameObjects.Image; t: number; sea: boolean }[] = [];
   private bolt: Phaser.GameObjects.Image | null = null;
   private beam: Phaser.GameObjects.Image | null = null;
@@ -121,11 +163,17 @@ export class Storm {
     const add = (key: string, w: number, h: number, res: number, fn: (ctx: CanvasRenderingContext2D) => void, release = true) => {
       if (!T.exists(key)) steps.push({ name: key, run: () => void (T.exists(key) || addCanvas(scene, key, hires(w, h, res, fn), undefined, { release })) });
     };
-    for (const [band] of BANDS) {
-      const b = CLOUD_BANDS[band];
+    for (const band of BANDS)
       for (const flash of LIGHT ? [false] : [false, true])
-        add(`f6-cloud-${band}${flash ? '-flash' : ''}`, 1024, b.h, CLOUD_RES, (ctx) => drawCloudBand(ctx, 1024, b.h, b.clouds, flash, b.curtains));
-    }
+        add(`${band.key}${flash ? '-flash' : ''}`, 1024, band.h, CLOUD_RES, (ctx) => {
+          for (const [part, dy] of band.parts) {
+            const b = CLOUD_BANDS[part];
+            ctx.save();
+            ctx.translate(0, dy);
+            drawCloudBand(ctx, 1024, b.h, b.clouds, flash, b.curtains);
+            ctx.restore();
+          }
+        });
     const horizon = 446;
     SWELLS(horizon).forEach(([y, amp, n, tone, seed, th], i) => {
       for (const flash of LIGHT ? [false] : [false, true])
@@ -134,7 +182,21 @@ export class Storm {
     });
     // (the near swell: two rows of it lap the hull, as Boss 5's waves; 512 × 128 at 2x, the swell drawn in its top 90)
     add('f6-wave', STORM_WAVE.w, 128, WAVE_RES, (ctx) => drawStormWaveTile(ctx));
-    for (const l of RAIN) add(`f6-rain-${l}`, 256, 256, 1, (ctx) => drawRainTile(ctx, l, { far: 61, mid: 62, near: 63 }[l]));
+    for (const r of RAIN_TILES) add(r.key, 256, 256, 1, (ctx) => r.layers.forEach((l) => drawRainTile(ctx, l, { far: 61, mid: 62, near: 63 }[l])));
+    if (NEAR_STREAKS)
+      add('f6-streak', STREAK.w, STREAK.h, 1, (ctx) => {
+        const L = RAIN_LAYERS.near;
+        const g = ctx.createLinearGradient(0, 0, 0, STREAK.h);
+        g.addColorStop(0, `rgba(${L.col},0)`);
+        g.addColorStop(1, `rgba(${L.col},${L.a})`);
+        ctx.strokeStyle = g;
+        ctx.lineWidth = L.w;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(STREAK.w / 2, 2);
+        ctx.lineTo(STREAK.w / 2, STREAK.h - 2);
+        ctx.stroke();
+      });
     if (!LIGHT)
       add('f6-splash', SPLASH * SPLASH_FRAMES, SPLASH, 1.5, (ctx) => {
         for (let i = 0; i < SPLASH_FRAMES; i++) {
@@ -188,16 +250,14 @@ export class Storm {
     this.sky = s.add.graphics().setDepth(0);
     this.drawSky();
     // the clouds: bands that run the length of the world, further ones moving less as the camera pans
-    for (const [band, y, sx, sy, k] of BANDS) {
-      const key = `f6-cloud-${band}`;
-      const h = CLOUD_BANDS[band].h;
+    for (const spec of BANDS) {
       const ts = s.add
-        .tileSprite(left - 2000, y, W + 4000, h * k, key)
+        .tileSprite(left - 2000, spec.y, W + 4000, spec.h * spec.k, spec.key)
         .setOrigin(0, 0)
-        .setTileScale(k / CLOUD_RES, k / CLOUD_RES)
-        .setScrollFactor(sx, sy)
-        .setDepth(band === 'far' ? 0.11 : band === 'mid' ? 0.12 : 0.13);
-      this.bands.push({ ts, key, v: band === 'far' ? 4 : band === 'mid' ? 7 : 11, x0: Math.random() * 1024 });
+        .setTileScale(spec.k / CLOUD_RES, spec.k / CLOUD_RES)
+        .setScrollFactor(spec.sx, spec.sy)
+        .setDepth(spec.depth);
+      this.bands.push({ ts, spec, x0: Math.random() * 1024 });
     }
     // the far sea, the swells rolling by, the deep
     const sea = s.add.graphics().setDepth(0.2);
@@ -217,13 +277,20 @@ export class Storm {
     this.bolt = s.add.image(0, 0, 'f6-bolt').setOrigin(0.5, 0).setDepth(0.125).setVisible(false).setBlendMode(Phaser.BlendModes.ADD);
     this.beam = s.add.image(0, 0, 'f6-beam').setOrigin(0.5, 0).setScale(1.3, 2).setDepth(6.5).setVisible(false).setBlendMode(Phaser.BlendModes.ADD);
     // the rain: one tile each, kept over what the camera sees above the sea (see update)
-    RAIN.forEach((layer, i) => {
+    RAIN_TILES.forEach((r, i) => {
       const ts = s.add
-        .tileSprite(0, 0, 16, 16, `f6-rain-${layer}`)
+        .tileSprite(0, 0, 16, 16, r.key)
         .setOrigin(0, 0)
         .setDepth(7.6 + i * 0.05);
-      this.rain.push({ ts, layer });
+      this.rain.push({ ts, speed: r.speed, parallax: r.parallax });
     });
+    for (let i = 0; i < NEAR_STREAKS; i++)
+      this.streaks.push({
+        img: s.add.image(0, 0, 'f6-streak').setOrigin(0.5, 1).setRotation(-Math.atan(RAIN_SLANT)).setDepth(7.7).setVisible(false),
+        u: Math.random(),
+        w: Math.random(),
+        v: (RAIN_LAYERS.near.speed / 720) * (0.85 + Math.random() * 0.3),
+      });
     if (!LIGHT) {
       this.splashFrames();
       for (let i = 0; i < SPLASHES; i++) this.splashes.push({ img: s.add.image(0, 0, 'f6-splash', 's0').setOrigin(0.5, 0.8).setScale(1 / 1.5).setDepth(7.5).setVisible(false), t: -1, sea: false });
@@ -237,7 +304,7 @@ export class Storm {
     const s = dtMs / 1000;
     this.t += s;
     const cam = this.scene.cameras.main;
-    for (const b of this.bands) b.ts.tilePositionX = (b.x0 + this.t * b.v) / b.ts.tileScaleX;
+    for (const b of this.bands) b.ts.tilePositionX = (b.x0 + this.t * b.spec.v) / b.ts.tileScaleX;
     for (const w of this.swells) w.ts.tilePositionX += s * w.v;
     // the flash fading
     if (this.flashLeft > 0) {
@@ -245,20 +312,35 @@ export class Storm {
       if (this.bolt) this.bolt.setVisible(this.flashLeft > 0 && (this.flashLeft > 260 || Math.floor(this.flashLeft / 60) % 2 === 0));
       if (this.flashLeft <= 0) this.lit(false);
     }
-    // the rain: over the view, down to the sea, its streaks the same size on screen however close the camera is
+    // the rain: over the view from the front clouds' bellies (where they show, as the camera has them)
+    // down to the sea, its streaks the same size on screen however close the camera is
     const v = cam.worldView;
     const base = Math.max(this.scene.scale.width / 1280, this.scene.scale.height / 720);
     const z = cam.zoom / base;
-    const h = Math.min(v.bottom, this.w.water + 6) - v.y;
+    const fb = BANDS[BANDS.length - 1];
+    const from = Math.max(v.y, fb.y + cam.scrollY * (1 - fb.sy) + fb.h * fb.k * fb.rainFrom);
+    const h = Math.min(v.bottom, this.w.water + 6) - from;
     for (const r of this.rain) {
       const on = this.raining && h > 0;
       r.ts.setVisible(on);
       if (!on) continue;
-      const L = RAIN_LAYERS[r.layer];
-      const p = RAIN_PARALLAX[r.layer];
-      r.ts.setPosition(v.x, v.y).setSize(v.width, h).setTileScale(1 / z, 1 / z);
-      r.ts.tilePositionX = v.x * z * p - this.t * L.speed * RAIN_SLANT;
-      r.ts.tilePositionY = v.y * z * p - this.t * L.speed;
+      r.ts.setPosition(v.x, from).setSize(v.width, h).setTileScale(1 / z, 1 / z);
+      r.ts.tilePositionX = v.x * z * r.parallax - this.t * r.speed * RAIN_SLANT;
+      r.ts.tilePositionY = from * z * r.parallax - this.t * r.speed;
+    }
+    // (the near streaks: falling down the screen, a little sideways; hidden where they're under the sea or over the clouds)
+    for (const q of this.streaks) {
+      q.w += q.v * s;
+      q.u += q.v * s * RAIN_SLANT * (720 / 1280);
+      if (q.w > 1.15) {
+        q.w -= 1.3;
+        q.u = Math.random() * 1.1 - 0.1;
+      }
+      const x = v.x + q.u * v.width;
+      const y = v.y + q.w * v.height;
+      const on = this.raining && y > from + 20 && y < this.w.water + 6;
+      q.img.setVisible(on);
+      if (on) q.img.setPosition(x, y).setScale(1 / z).setAlpha(1 - this.clearing);
     }
     // splashes: a few frames each, popping up on the decks and the sea in view
     if (this.splashes.length && this.raining) {
@@ -300,7 +382,7 @@ export class Storm {
   /** Swap to the lit-up pictures (or back). */
   private lit(on: boolean) {
     if (!LIGHT) {
-      for (const b of this.bands) b.ts.setTexture(on ? `${b.key}-flash` : b.key);
+      for (const b of this.bands) b.ts.setTexture(on ? `${b.spec.key}-flash` : b.spec.key);
       for (const w of this.swells) w.ts.setTexture(on ? `${w.key}-flash` : w.key);
     }
     this.drawSky();
@@ -367,6 +449,7 @@ export class Storm {
     );
     this.raining = false;
     for (const r of this.rain) r.ts.setVisible(false);
+    for (const q of this.streaks) q.img.setVisible(false);
     for (const sp of this.splashes) sp.img.setVisible(false);
   }
   private skyStep = 0;
