@@ -26,14 +26,20 @@ import { LEVELS, canPickLevel, isTester, setTester, latestLevel, levelInfo, leve
 import { account } from '../core/account';
 import { bossData } from '../scenes/WrestleScene';
 
-/** The boss at the end of each level (the Bosses menu lists the ones from levels you've beaten). */
+/**
+ * The boss at the end of each level (the Bosses menu lists the ones from levels you've beaten). Boss 6,
+ * King Bob's rematch, ends Part 6: only where Part 6 is (its testers: see levels.ts), like the Part.
+ */
 const BOSSES = [
   { level: 1, name: 'King Puff Ball Basketball 1', scene: 'Hoops' },
   { level: 2, name: 'King Puff Ball Basketball 2', scene: 'Hoops' },
   { level: 3, name: 'Queen Plop Wrestling', scene: 'Wrestle' },
   { level: 4, name: 'Plop King Wrestling', scene: 'Wrestle' },
   { level: 5, name: 'King Bob Fishing', scene: 'Fishing' },
+  { level: 6, name: 'King Bob Fishing 2', scene: 'Fishing' },
 ] as const;
+/** A boss there is for this player: its level's in the game for them (Part 6 only for its testers). */
+const bossThere = (level: number) => LEVELS.some((l) => l.id === level);
 import { resetLives } from '../core/lives';
 import { bank } from '../core/bank';
 
@@ -1340,7 +1346,7 @@ export class UI {
   /** The Bosses menu: fight the boss of any level you've beaten, straight away (as practice). */
   private showBosses() {
     // (the testers get every boss)
-    const open = BOSSES.filter((b) => progress.beaten >= b.level || isTester());
+    const open = BOSSES.filter((b) => bossThere(b.level) && (progress.beaten >= b.level || isTester()));
     const el = h(`<div class="screen modal bosses">
       <div class="panel boss-panel">
         <h2>Boss Battles</h2>
@@ -1365,7 +1371,7 @@ export class UI {
       return;
     }
     const boss = BOSSES.find((b) => b.level === level);
-    if (!boss) return;
+    if (!boss || !bossThere(level)) return;
     unlockAudio();
     primeMusic();
     preloadHoopsMusic();
@@ -1407,7 +1413,12 @@ export class UI {
     const queen = boss.scene === 'Wrestle' && boss.level === 3;
     const plopKing = boss.level === 4;
     const kingBob = boss.level === 5;
-    const title = kingBob
+    const rematch = boss.level === 6;
+    const title = rematch
+      ? won
+        ? 'You caught King Bob!'
+        : 'King Bob wins again!'
+      : kingBob
       ? won
         ? 'You out-fished King Bob!'
         : 'King Bob wins!'

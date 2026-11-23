@@ -223,6 +223,12 @@ export const sfx = {
   },
   bump: () => tone({ type: 'triangle', from: 160, to: 90, dur: 0.1, vol: 0.25 }),
   crumble: () => noise(0.3, 0.4, 3000, 200),
+  /** A thunderclap: a sharp crack, then a long low rumble rolling away. */
+  thunder: () => {
+    noise(0.35, 0.45, 4200, 500);
+    noise(1.8, 0.4, 700, 50, 0.12);
+    tone({ type: 'sine', from: 70, to: 28, dur: 1.4, vol: 0.35, delay: 0.1 });
+  },
   hurt: () => {
     tone({ type: 'square', from: 520, to: 140, dur: 0.3, vol: 0.12 });
   },

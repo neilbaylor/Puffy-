@@ -402,6 +402,13 @@ function drawZippy(ctx: Ctx, st: Style, sw: number, flap: number) {
   for (const [dy, s] of [[-1, 1], [2, 2], [5, 3]] as const) st.line(ctx, [[cx + 10, cy + dy], [cx + 16, cy + dy - 1 + flap * 0.8], [cx + 21, cy + dy + 1]], 9410 + s, 0.55);
 }
 
+/**
+ * King Bob's look for the next drawings (Boss 6: the rematch, and caught on the hook): `askew`, his
+ * crown knocked sideways; `mad`, indignant (a steep scowl, a shouting mouth, red in the face);
+ * `fins`, two little fins thrown up ("bring it on"). All off by default: set, draw, and set back.
+ */
+export const kingBobLook = { askew: false, mad: false, fins: false };
+
 function drawKingBob(ctx: Ctx, st: Style, sw: number, _flap: number) {
   const BODY = F('#fff6ea', '#e3d4c2', '#ffffff');
   const ORANGE = '#ff9a3c';
@@ -419,15 +426,42 @@ function drawKingBob(ctx: Ctx, st: Style, sw: number, _flap: number) {
     ctx.ellipse(cx - 2, cy + 26, 22, 6, -0.05, 0, Math.PI * 2);
     ctx.fill();
   });
+  const { askew, mad } = kingBobLook;
   eye(st, ctx, cx - 1, cy - 6, 9, 11, 9504);
-  brow(st, ctx, cx - 1, cy - 20, 18, 9505);
-  // a rosy cheek under the eye
-  ctx.fillStyle = 'rgba(240,130,60,0.75)';
+  if (mad) {
+    // a steep, cross scowl right down onto the eye, and a little cross-vein over it
+    st.line(ctx, [[cx - 12, cy - 25], [cx + 10, cy - 14]], 9505, 2.1);
+    st.line(ctx, [[cx - 20, cy - 16], [cx - 17, cy - 19], [cx - 14, cy - 16]], 9510, 0.9, '#d9362c');
+    st.line(ctx, [[cx - 20, cy - 21], [cx - 17, cy - 18], [cx - 14, cy - 21]], 9511, 0.9, '#d9362c');
+  } else brow(st, ctx, cx - 1, cy - 20, 18, 9505);
+  // a rosy cheek under the eye (mad: red as a tomato)
+  ctx.fillStyle = mad ? 'rgba(232,60,50,0.8)' : 'rgba(240,130,60,0.75)';
   ctx.beginPath();
-  ctx.ellipse(cx - 2, cy + 10, 4.5, 3, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx - 2, cy + 10, mad ? 6 : 4.5, mad ? 4 : 3, 0, 0, Math.PI * 2);
   ctx.fill();
-  mouth(st, ctx, cx + 26, cy + 8, 9, 9506);
-  crown(st, ctx, cx + 8, cy - 23, 22, 14, 0.18, 9507);
+  if (mad) {
+    // shouting: a wide-open mouth at the front of the face, a tongue in it
+    const m = ellipsePts(cx + 19, cy + 10, 7, 8.5, 0.15, 24);
+    st.shape(ctx, m, F('#6a1d1d', '#4a1212', '#8a2a26'), 9506, { lw: 1.1, plain: true });
+    ctx.save();
+    ctx.beginPath();
+    m.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+    ctx.closePath();
+    ctx.clip();
+    ctx.fillStyle = '#ff7f8a';
+    ctx.beginPath();
+    ctx.ellipse(cx + 19, cy + 17, 5.5, 3.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  } else mouth(st, ctx, cx + 26, cy + 8, 9, 9506);
+  if (kingBobLook.fins) {
+    // fins up, like fists in front of his chin: put 'em up!
+    fin(st, ctx, cx + 12, cy + 26, 21, 12, -0.5, -0.75, F(ORANGE, '#e2661a', '#ffc98c'), 9512);
+    fin(st, ctx, cx + 20, cy + 22, 21, 12, -0.3, -0.75, F(ORANGE, '#e2661a', '#ffc98c'), 9513);
+  }
+  // the crown: on at a jaunty tilt — or knocked right over, slipping off the back of his head
+  if (askew) crown(st, ctx, cx - 14, cy - 19, 22, 14, -0.85, 9507);
+  else crown(st, ctx, cx + 8, cy - 23, 22, 14, 0.18, 9507);
 }
 
 function drawSlinger(ctx: Ctx, st: Style, sw: number, _flap: number) {

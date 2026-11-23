@@ -1120,26 +1120,105 @@ export function drawDock(ctx: Ctx) {
 }
 
 /**
+ * A sou'wester on the host's head (head centre hx, hy): a yellow oilskin dome, the brim turned up a
+ * touch at the front and sweeping down long over the back of his neck, a strap down under his chin.
+ * `popped`: jumped up off his head (shocked), so no strap.
+ */
+function drawSouwester(ctx: Ctx, hx: number, hy: number, fill: Fill, popped: boolean) {
+  // the long back brim and the short front one, one sweep (behind the dome)
+  st.shape(
+    ctx,
+    [
+      [hx + 40, hy - 26],
+      [hx + 30, hy - 20],
+      [hx + 6, hy - 22],
+      [hx - 20, hy - 18],
+      [hx - 42, hy - 6],
+      [hx - 58, hy + 18],
+      [hx - 50, hy + 24],
+      [hx - 32, hy + 4],
+      [hx - 34, hy - 4],
+    ],
+    fill,
+    1680,
+    { lw: 1.1 },
+  );
+  st.shape(
+    ctx,
+    [
+      [hx - 62, hy + 20],
+      [hx - 46, hy - 12],
+      [hx - 20, hy - 26],
+      [hx + 10, hy - 30],
+      [hx + 36, hy - 30],
+      [hx + 46, hy - 28],
+      [hx + 42, hy - 22],
+      [hx + 12, hy - 22],
+      [hx - 18, hy - 16],
+      [hx - 38, hy - 2],
+      [hx - 54, hy + 24],
+    ],
+    fill,
+    1681,
+    { lw: 1.1, light: [hx - 20, hy - 26] },
+  );
+  // the dome
+  st.shape(
+    ctx,
+    [
+      [hx - 34, hy - 20],
+      [hx - 30, hy - 40],
+      [hx - 12, hy - 52],
+      [hx + 10, hy - 53],
+      [hx + 28, hy - 44],
+      [hx + 34, hy - 26],
+      [hx + 10, hy - 22],
+      [hx - 14, hy - 20],
+    ],
+    fill,
+    1682,
+    { lw: 1.2, light: [hx - 10, hy - 48] },
+  );
+  // its seams and a shine
+  line(ctx, [[hx - 2, hy - 52], [hx - 4, hy - 22]], 1.3, 'rgba(150,100,10,0.5)');
+  line(ctx, [[hx - 30, hy - 26], [hx - 6, hy - 30], [hx + 30, hy - 30]], 1.3, 'rgba(150,100,10,0.45)');
+  line(ctx, [[hx - 22, hy - 40], [hx - 10, hy - 48]], 3, 'rgba(255,255,255,0.7)');
+  // the chin strap
+  if (!popped) line(ctx, [[hx - 26, hy - 10], [hx - 22, hy + 16], [hx - 8, hy + 31], [hx + 6, hy + 33]], 1.8, '#a8760c');
+}
+
+/**
  * The show's host: a round, cheery old-school TV sports man in a mustard check blazer and a red bow
  * tie, a slick of hair, a big moustache, holding a chrome ball microphone on a curly lead. Frames:
  * t0/t1 talking (mouth shut/open), p0/p1 pointing off to the right (towards the boat).
  */
 export const HOST = { w: 168, h: 190 } as const; // (wide enough for the pointing hand)
 export const HOST_FRAMES = ['t0', 't1', 'p0', 'p1', 's0', 's1'] as const;
-export function drawHost(ctx: Ctx, f: string) {
+/**
+ * `rain`: out in the storm (Boss 6's rematch), in a yellow oilskin rain coat over his shirt and bow
+ * tie, yellow wellies and a sou'wester (in the shocked frames it jumps up off his head). The hat
+ * reaches up past the frame's top: drawn for the game, it wants HOST_RAIN_UP more room over him.
+ */
+export const HOST_RAIN_UP = 26;
+export function drawHost(ctx: Ctx, f: string, rain = false) {
   const open = f.endsWith('1');
   const point = f.startsWith('p');
   // (s0/s1: shocked — eyes wide, brows up, mouth an O, a hand flung up)
   const shock = f.startsWith('s');
   const SKIN = F('#ffd6ad', '#e8aa7a', '#fff0dc');
-  const BLAZER = F('#d9a441', '#a87a24', '#f2cc78');
+  const BLAZER = rain ? F('#ffd23a', '#e0a00c', '#fff3a6') : F('#d9a441', '#a87a24', '#f2cc78');
   const PANTS = F('#6b4a2e', '#4a311d', '#8e6a48');
   const HAIR = F('#4a2f1c', '#2e1c10', '#7a5236');
   const cx = 62;
   // legs and shoes
   for (const dx of [-14, 12]) {
     st.shape(ctx, roundRectPts(cx + dx - 9, 142, 18, 36, 6), PANTS, 1600 + dx, { lw: 1 });
-    st.shape(ctx, ellipsePts(cx + dx + 4, 180, 15, 7, 0, 20), F('#2a2421', '#151210', '#4c423c'), 1602 + dx, { lw: 1 });
+    if (rain) {
+      // yellow wellies: up to the shin, a chunky dark sole, a shine down the front
+      st.shape(ctx, [[cx + dx - 10, 158], [cx + dx + 10, 158], [cx + dx + 11, 172], [cx + dx + 19, 176], [cx + dx + 19, 184], [cx + dx - 11, 184]], BLAZER, 1604 + dx, { lw: 1, light: [cx + dx - 6, 160] });
+      st.shape(ctx, roundRectPts(cx + dx - 12, 181, 32, 5, 2.5), F('#3a2c22', '#241a14', '#5a4636'), 1606 + dx, { lw: 0.9, plain: true });
+      line(ctx, [[cx + dx - 5, 162], [cx + dx - 5, 176]], 2, 'rgba(255,255,255,0.7)');
+    } else st.shape(ctx, ellipsePts(cx + dx + 4, 180, 15, 7, 0, 20), F('#2a2421', '#151210', '#4c423c'), 1602 + dx, { lw: 1 });
   }
   // the body: a round blazer, the shirt and the bow tie
   const body = ellipsePts(cx, 118, 40, 38, 0, 40);
@@ -1149,28 +1228,39 @@ export function drawHost(ctx: Ctx, f: string) {
   body.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
   ctx.closePath();
   ctx.clip();
+  if (rain) {
+    // the oilskin: a glossy shine down the front, the hem's seam, toggles down the front
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.beginPath();
+    ctx.ellipse(cx - 22, 112, 6, 20, 0.25, 0, Math.PI * 2);
+    ctx.fill();
+    line(ctx, [[cx - 40, 140], [cx, 146], [cx + 40, 140]], 1.6, 'rgba(150,100,10,0.55)');
+    for (const y of [124, 136]) st.shape(ctx, roundRectPts(cx + 7, y - 2, 9, 4, 2), F('#6b4a2e', '#4a311d', '#8e6a48'), 1617 + y, { lw: 0.6, plain: true });
+  }
   // the check pattern
-  ctx.strokeStyle = 'rgba(120,70,20,0.35)';
-  ctx.lineWidth = 2;
-  for (let x = cx - 44; x < cx + 44; x += 10) {
-    ctx.beginPath();
-    ctx.moveTo(x, 78);
-    ctx.lineTo(x, 160);
-    ctx.stroke();
-  }
-  for (let y = 82; y < 160; y += 10) {
-    ctx.beginPath();
-    ctx.moveTo(cx - 44, y);
-    ctx.lineTo(cx + 44, y);
-    ctx.stroke();
-  }
-  ctx.strokeStyle = 'rgba(190,60,40,0.3)';
-  ctx.lineWidth = 1;
-  for (let x = cx - 39; x < cx + 44; x += 20) {
-    ctx.beginPath();
-    ctx.moveTo(x, 78);
-    ctx.lineTo(x, 160);
-    ctx.stroke();
+  if (!rain) {
+    ctx.strokeStyle = 'rgba(120,70,20,0.35)';
+    ctx.lineWidth = 2;
+    for (let x = cx - 44; x < cx + 44; x += 10) {
+      ctx.beginPath();
+      ctx.moveTo(x, 78);
+      ctx.lineTo(x, 160);
+      ctx.stroke();
+    }
+    for (let y = 82; y < 160; y += 10) {
+      ctx.beginPath();
+      ctx.moveTo(cx - 44, y);
+      ctx.lineTo(cx + 44, y);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(190,60,40,0.3)';
+    ctx.lineWidth = 1;
+    for (let x = cx - 39; x < cx + 44; x += 20) {
+      ctx.beginPath();
+      ctx.moveTo(x, 78);
+      ctx.lineTo(x, 160);
+      ctx.stroke();
+    }
   }
   ctx.restore();
   st.shape(
@@ -1228,8 +1318,8 @@ export function drawHost(ctx: Ctx, f: string) {
     1615,
     { lw: 0.8 },
   );
-  // a pocket square
-  st.shape(
+  // a pocket square (not on the rain coat)
+  if (!rain) st.shape(
     ctx,
     [
       [cx + 18, 108],
@@ -1301,16 +1391,18 @@ export function drawHost(ctx: Ctx, f: string) {
     1632,
     { lw: 1.1, light: [hx - 8, hy - 40] },
   );
-  line(
-    ctx,
-    [
-      [hx - 18, hy - 32],
-      [hx + 6, hy - 37],
-      [hx + 26, hy - 34],
-    ],
-    2,
-    'rgba(255,255,255,0.45)',
-  );
+  if (rain) drawSouwester(ctx, hx, hy - (shock ? 16 : 0), BLAZER, shock);
+  else
+    line(
+      ctx,
+      [
+        [hx - 18, hy - 32],
+        [hx + 6, hy - 37],
+        [hx + 26, hy - 34],
+      ],
+      2,
+      'rgba(255,255,255,0.45)',
+    );
   // eyes and big raised brows (he's very excited; shocked: wide open, the pupils pinpricks)
   for (const dx of [-12, 12]) {
     st.shape(ctx, ellipsePts(hx + dx + 6, hy - 4, shock ? 8 : 6, shock ? 10 : 8, 0, 18), F('#ffffff', '#ececec', '#ffffff'), 1640 + dx, { lw: 0.9, plain: true });
@@ -1337,8 +1429,9 @@ export function drawHost(ctx: Ctx, f: string) {
   st.shape(ctx, ellipsePts(hx + 12, hy + 8, 6, 5, 0, 14), F('#ffc49a', '#e39a6c', '#ffe2c8'), 1650, { lw: 0.9 });
   if (shock) {
     st.shape(ctx, ellipsePts(hx + 10, hy + 25, open ? 8 : 6, open ? 11 : 8, 0, 24), F('#7a1f1f', '#5a1414', '#a8302c'), 1654, { lw: 1 });
-    // (and a lock of his hair sprung loose)
-    line(ctx, [[hx - 2, hy - 38], [hx - 8, hy - 52], [hx + 2, hy - 58]], 3, '#4a2f1c');
+    // (and a lock of his hair sprung loose; in the rain, his hat's jumped up instead: a couple of pop lines)
+    if (!rain) line(ctx, [[hx - 2, hy - 38], [hx - 8, hy - 52], [hx + 2, hy - 58]], 3, '#4a2f1c');
+    else for (const [a, b] of [[-40, -46], [36, -50], [44, -38]] as const) line(ctx, [[hx + a * 1.05, hy + b], [hx + a * 1.3, hy + b - 6]], 2.2, st.ink);
   } else if (open) {
     st.shape(ctx, ellipsePts(hx + 10, hy + 22, 11, 8, 0, 24), F('#7a1f1f', '#5a1414', '#a8302c'), 1651, { lw: 1 });
     ctx.fillStyle = '#ffffff';

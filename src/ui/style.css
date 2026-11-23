@@ -3022,6 +3022,8 @@ html.light .start .logo span { transform: rotate(-2deg); }
 /* the bite count under GOT IT! / MISSED! ("3 of 6"): big enough to read at a glance */
 .fsh-callout small.cnt { font-size: 0.8em; margin-top: 4px; letter-spacing: 0.03em; -webkit-text-stroke: 0.16em #0b2140; }
 .fsh-callout.big { font-size: clamp(44px, 12vmin, 92px); }
+/* Boss 6: GOTCHA! as King Bob's hooked — big, gold, tilted */
+.fsh-callout.gotcha { color: #ffd23f; font-size: clamp(52px, 14vmin, 110px); rotate: -6deg; top: 30%; }
 /* a new round: the TV wipe, a band sweeping across behind the words */
 .fsh-callout.turn { top: 46%; padding: 0.18em 0.9em 0.22em; }
 .fsh-callout.turn::before {
@@ -3206,6 +3208,10 @@ html.light .start .logo span { transform: rotate(-2deg); }
 .fsh-catch span { font: 900 clamp(14px, 2.8vmin, 19px) / 1.2 var(--body); }
 .fsh-catch.rare em { background: #ffd23f; color: #0b2140; }
 .fsh-catch.rare b { color: #c0392b; }
+/* Boss 6: you caught King Bob — the royal lower third */
+.fsh-catch.royal em { background: #7a2ec2; color: #ffd23f; }
+.fsh-catch.royal .lt { border-left-color: #7a2ec2; background: linear-gradient(100deg, #fffaf0 0 75%, #fff1c9); }
+.fsh-catch.royal b { color: #b8860b; }
 @media (max-height: 500px) {
   .fsh-board { zoom: 0.86; }
   .fsh-row { padding: 2px 0 2px 5px; }
