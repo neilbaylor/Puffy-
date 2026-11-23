@@ -5,7 +5,7 @@ import { edgeTexture } from '../gfx/softShapes';
 import { latestLevel, levelInfo } from '../level/levels';
 import { buildLevel1 } from '../level/level1';
 import { levelPieces } from '../world/LevelView';
-import type { MenuScene } from './MenuScene';
+import { MenuScene } from './MenuScene';
 
 /** Resolves on the next animation frame (or soon after, if frames are paused). */
 const nextFrame = () => new Promise<void>((r) => {
@@ -83,7 +83,11 @@ export class BootScene extends Phaser.Scene {
       step.run();
       times.push([`draw ${step.name}`, Math.round(performance.now() - s0)]);
       setProgress((++done / total) * PHASE1);
-      await breathe();
+      // (a step that wants a frame of its own: the browser paints its drawing at the frame's end)
+      if (step.own) {
+        await nextFrame();
+        slice = performance.now();
+      } else await breathe();
     }
     mark('art (incl. frames between steps)');
     // the level's terrain shapes worked out first, on their own (the slow part of putting the fly-over up)
@@ -96,6 +100,17 @@ export class BootScene extends Phaser.Scene {
       slice = performance.now();
     }
     mark('terrain shapes');
+    // the fly-over's opening pictures, one a step (see MenuScene.openingJobs)
+    {
+      // (the list grows as it goes: a for…of picks up what's added)
+      for (const job of MenuScene.openingJobs(this, level)) {
+        const s0 = performance.now();
+        job();
+        times.push(['draw fly-over picture', Math.round(performance.now() - s0)]);
+        await breathe();
+      }
+    }
+    mark('fly-over pictures');
     // the fly-over behind the start screen
     this.scene.launch('Menu', { silent: true, level });
     await nextFrame();

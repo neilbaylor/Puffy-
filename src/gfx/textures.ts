@@ -576,7 +576,6 @@ function itemParts(scene: Phaser.Scene, pal: WorldPalette): (() => void)[] {
         st.line(ctx, [[26, 28], [36, 20], [44, 19]], 2103, 0.7, '#fff6c8');
       }),
     );
-    sheet(scene, 'flame', FLAME_W, FLAME_H, FLAME_FRAMES, (ctx, f) => (f[0] === 'd' ? drawDyingFlame(ctx, +f[1]) : drawFlame(ctx, +f[1])));
     },
     () => {
     addCanvas(scene, 'scorch', hires(64, 16, PROP_RES, (ctx) => drawScorch(ctx)));
@@ -977,6 +976,9 @@ export function textureSteps(scene: Phaser.Scene, level = 1, pal: WorldPalette =
     now: [
       { name: 'tiles', run: () => makeCollisionTiles(scene) },
       ...itemParts(scene, pal).map((run, i) => ({ name: `items ${i}`, run })),
+      // (the flame's sheet, a few frames a step: drawn with the first items it was the loading
+      // screen's longest step, ~400 ms at 4x slow CPU; see sheetSteps)
+      ...sheetSteps(scene, 'flame', 'flame', FLAME_W, FLAME_H, FLAME_FRAMES, (ctx, f) => (f[0] === 'd' ? drawDyingFlame(ctx, +f[1]) : drawFlame(ctx, +f[1]))),
       ...lookJobs(scene, first).map((run, i) => ({ name: `bg-${first} ${i}`, run })),
     ],
     // (the game's own art — the heroes' game frames, the bad guys — is drawn when a game starts:

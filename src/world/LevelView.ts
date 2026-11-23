@@ -223,14 +223,16 @@ export class LevelView {
    */
   private readonly onlySpan: [number, number] | null;
   /** The pictures of what `onlySpan` left out: drawing them is a job each (key, draw). */
-  private later: { key: string; draw: () => void }[] = [];
+  private later: { key: string; draw: () => void; x0: number; x1: number }[] = [];
   private outside(x0: number, x1: number) {
     return !!this.onlySpan && (x1 < this.onlySpan[0] || x0 > this.onlySpan[1]);
   }
 
   /** The start screen: the pictures left out (see `onlySpan`) not drawn yet, a job each. */
-  laterJobs(): (() => void)[] {
-    return this.later.map((l) => () => {
+  laterJobs(within?: [number, number]): (() => void)[] {
+    // (`within`: only those that reach into that stretch — the ones a view with it as its `only` puts up)
+    const later = within ? this.later.filter((l) => !(l.x1 < within[0] || l.x0 > within[1])) : this.later;
+    return later.map((l) => () => {
       if (!this.scene.textures.exists(l.key)) l.draw();
     });
   }
@@ -669,7 +671,7 @@ export class LevelView {
           const head = modern ? PIER_HEAD_MODERN : PIER_HEAD;
           const draw = () => addCanvas(this.scene, key, hires(w, down + 14 + head, PROP_RES, (ctx) => (modern ? drawModernPier : drawPier)(ctx, w, down + 8)), undefined, { release: true });
           if (this.outside(x * TILE, x * TILE + w)) {
-            this.later.push({ key, draw });
+            this.later.push({ key, draw, x0: x * TILE, x1: x * TILE + w });
             continue;
           }
           if (!this.scene.textures.exists(key)) draw();
@@ -682,7 +684,7 @@ export class LevelView {
         }
         const draw = () => addCanvas(this.scene, key, hires(w + 24, 34, PROP_RES, (ctx) => drawCloudPlatform(ctx, 12, 8, w, DEFAULT_PALETTE, x * 7 + y)), undefined, { release: true });
         if (this.outside(x * TILE - 12, x * TILE + w + 12)) {
-          this.later.push({ key, draw });
+          this.later.push({ key, draw, x0: x * TILE - 12, x1: x * TILE + w + 12 });
           continue;
         }
         if (!this.scene.textures.exists(key)) draw();
@@ -770,7 +772,7 @@ export class LevelView {
           );
         const tx = s.x * TILE + TILE / 2;
         if (this.outside(tx - 48, tx + 48)) {
-          this.later.push({ key, draw });
+          this.later.push({ key, draw, x0: tx - 48, x1: tx + 48 });
           return;
         }
         if (!this.scene.textures.exists(key)) draw();

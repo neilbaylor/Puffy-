@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { MIN_VIEW_W, TILE, VIEW_H } from '../config';
-import { BG_LAYER_IDS, HOME_SKY_SEP, asQuietJob, bgKey, ensureLook, freeLooksExcept, isSliceJob, lookJobs } from '../gfx/textures';
+import { BG_LAYER_IDS, HOME_SKY_SEP, asQuietJob, bgKey, ensureLook, ensureSeaArt, freeLooksExcept, isSliceJob, lookJobs } from '../gfx/textures';
 import { buildLevel1 } from '../level/level1';
 import { levelInfo, levelName, pickableLevels, progress } from '../level/levels';
 import { Background } from '../world/Background';
@@ -278,15 +278,59 @@ export class MenuScene extends Phaser.Scene {
 
   /** Only what the fly-over's first view shows is drawn at once (the rest a chunk per frame, as it glides on). */
   private firstSpan(): [number, number] {
-    const vw = this.scale.width / Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W);
+    return MenuScene.firstSpanOf(this.scale);
+  }
+  private static firstSpanOf(scale: Phaser.Scale.ScaleManager): [number, number] {
+    const vw = scale.width / Math.min(scale.height / VIEW_H, scale.width / MIN_VIEW_W);
     return [100, vw + 150];
   }
 
   /** A climb: how high its start-screen glide's ground goes (see CLIMB; a good margin over it, for the drone's sway and a taller screen). */
   private skipAbove(data: { vertical?: boolean; height: number }) {
+    return MenuScene.skipAboveOf(this.scale, data);
+  }
+  private static skipAboveOf(scale: Phaser.Scale.ScaleManager, data: { vertical?: boolean; height: number }) {
     if (!data.vertical) return -Infinity;
-    const vh = this.scale.height / Math.min(this.scale.height / VIEW_H, this.scale.width / MIN_VIEW_W);
+    const vh = scale.height / Math.min(scale.height / VIEW_H, scale.width / MIN_VIEW_W);
     return data.height * TILE - vh - CLIMB - 300;
+  }
+
+  /**
+   * The pictures the start screen's fly-over of Part `id` puts up as it opens (its opening ground,
+   * the trees and cloud platforms along its loop), a picture a job, for the loading screen to draw
+   * before the start screen is made (scene: the loading screen's). Made all at once with the fly-over,
+   * they were one frame of ~900 ms at 4x slow CPU, the loading bar stuck. The same pictures, by the
+   * same views' rules: the fly-over then finds them drawn. (The list grows as it's worked through.)
+   */
+  static openingJobs(scene: Phaser.Scene, id: number): (() => void)[] {
+    const info = levelInfo(id);
+    if (!info.build) return [];
+    const data = info.build();
+    const x0 = MenuScene.startXOf(id);
+    const span = MenuScene.firstSpanOf(scene.scale);
+    const vw = scene.scale.width / Math.min(scene.scale.height / VIEW_H, scene.scale.width / MIN_VIEW_W);
+    const loopEnd = x0 + Math.max(GLIDE, vw);
+    const only = data.vertical ? undefined : MenuScene.onlySpanOf(x0, loopEnd, vw);
+    const before = new Set(scene.children.list);
+    const tidy = () => {
+      for (const o of scene.children.list.filter((c) => !before.has(c))) o.destroy();
+    };
+    const jobs: (() => void)[] = [
+      // (under the sea: the sea's own pictures first, in a step of their own)
+      () => data.water !== undefined && ensureSeaArt(scene),
+      // a view of it only to work them out (no ground, trees or clouds put up by the view itself;
+      // whatever a job puts up is taken down again): its jobs go on the end of this list
+      () => {
+        const view = new LevelView(scene, data, { lazyNear: x0, lazySpan: [-1e9, -1e9], ahead: false, trim: true, skipAbove: MenuScene.skipAboveOf(scene.scale, data), only: [-1e9, -1e9] });
+        tidy();
+        for (const job of [...view.pendingJobs(x0 - span[0], x0 + span[1]), ...view.laterJobs(only ?? [-Infinity, Infinity])])
+          jobs.push(() => {
+            job();
+            tidy();
+          });
+      },
+    ];
+    return jobs;
   }
 
   /**
@@ -295,10 +339,16 @@ export class MenuScene extends Phaser.Scene {
    * cloud platforms outside it aren't put up. (A climb's glide wanders more: all of it, as before.)
    */
   private onlySpan(data: { vertical?: boolean }, x0: number, loopEnd: number, vw: number): [number, number] | undefined {
-    return data.vertical ? undefined : [x0 - 400, loopEnd + vw + 400];
+    return data.vertical ? undefined : MenuScene.onlySpanOf(x0, loopEnd, vw);
+  }
+  private static onlySpanOf(x0: number, loopEnd: number, vw: number): [number, number] {
+    return [x0 - 400, loopEnd + vw + 400];
   }
 
   private startX(id: number) {
+    return MenuScene.startXOf(id);
+  }
+  private static startXOf(id: number) {
     return id === 2 ? 86 * 32 : id === 5 ? 14 * 32 : id === 6 ? 34 * 32 : 0;
   }
   private top: number | null = null;
