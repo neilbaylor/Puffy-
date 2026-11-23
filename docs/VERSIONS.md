@@ -374,3 +374,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.369: Bosses about 10% smoother, no freeze when a battle starts, the Shop scrolls at full speed, and loading screens keep moving instead of freezing.
 - v0.370: No more long freezes entering or leaving boss fights (loading card keeps moving instead), smoother battle lobby and countdown, and checkpoint restarts no longer redraw every cloud.
 - v0.371: Levels and the start screen about 10% smoother: hidden background scenery behind the ground isn't drawn any more.
+- v0.372: No more automatic "Switching to light mode" or lower-resolution switching; light mode is set by hand for now (a device benchmark will decide it later).
