@@ -123,10 +123,17 @@ const KING_CATCH = 0.51;
 const HERO_K = 2.38;
 /** How long the BITE button can be hit for (ms). */
 const BITE_MS = 589;
+/**
+ * Boss 6, the rematch, is a bit harder than Boss 5, in just these two ways (the owner's numbers: tune
+ * them here). King Bob lands a bit more of his casts (Boss 5: KING_CATCH, 51%)…
+ */
+const KING_CATCH6 = 0.57;
+/** …and the BITE! button stays up a bit shorter (Boss 5: BITE_MS, 589 ms). */
+const BITE_MS6 = 530;
 
 /**
- * How hard the contest is. Boss 5 (RULES5) as it always was; Boss 6, the rematch in the storm
- * (RULES6), a bit harder: the owner tunes it here.
+ * How the contest goes. Boss 5 (RULES5) as it always was; Boss 6 (RULES6): the two numbers above, and
+ * the storm's swell rocking the boat and the bobbers harder (only to look at: it changes nothing else).
  */
 interface Rules {
   /** bites in a row to land a fish (all of them: it's yours; one short, a coin toss; two short, a long shot) */
@@ -140,22 +147,11 @@ interface Rules {
   bob: number;
   /** the bobbers riding the swell (px up and down) */
   swell: number;
-  /** a false twitch of the bobber (the swell, not a fish): the chance of one in each wait between bites */
-  feint: number;
-  /** a lightning flash every so often (ms between them: least, most; 0: no storm) */
+  /** a lightning flash every so often, just weather (ms between them: least, most; 0: no storm) — never while a bite's coming or up */
   lightning: readonly [number, number];
 }
-const RULES5: Rules = { bites: BITES, biteMs: BITE_MS, kingCatch: KING_CATCH, rock: 0.018, bob: 3.2, swell: 2.5, feint: 0, lightning: [0, 0] };
-export const RULES6: Rules = {
-  bites: 7,
-  biteMs: 500,
-  kingCatch: 0.6,
-  rock: 0.034,
-  bob: 7,
-  swell: 6,
-  feint: 0.55,
-  lightning: [7000, 13000],
-};
+const RULES5: Rules = { bites: BITES, biteMs: BITE_MS, kingCatch: KING_CATCH, rock: 0.018, bob: 3.2, swell: 2.5, lightning: [0, 0] };
+const RULES6: Rules = { bites: BITES, biteMs: BITE_MS6, kingCatch: KING_CATCH6, rock: 0.03, bob: 6, swell: 4, lightning: [7000, 13000] };
 /** A key pressed sooner than this after BITE! shows wasn't a reaction (mashing): a miss. */
 const BITE_REACT_MS = 120;
 /** How far past the BITE! button's edge a tap still hits it (px): its cyan ring (~17) and a fingertip of slop. */
@@ -444,6 +440,7 @@ export class FishingScene extends Phaser.Scene {
     this.hostShock = false;
     this.noClear = false;
     this.lineShot = false;
+    this.kingShot = false;
     this.kingFree = false;
     this.heroHop = 0;
     this.boardBox = null;
@@ -1107,6 +1104,11 @@ export class FishingScene extends Phaser.Scene {
     // (Boss 6: King Bob's bowl is up on the flybridge, well over the hero: out on a line, or once he's
     // out of it, the shot isn't pulled up to take it in)
     if (this.v6 && (this.lineShot || this.kingFree)) boxes.pop();
+    // (and a shot of King Bob talking keeps him and his bubble in, the hero down below or not)
+    else if (this.v6 && this.kingShot) {
+      boxes.shift();
+      boxes[0][1] -= 90;
+    }
     for (const [x0, y0, x1, y1] of boxes) {
       const left = tx - vw / 2;
       if (x1 < left || x0 > left + vw) continue;
@@ -1128,6 +1130,8 @@ export class FishingScene extends Phaser.Scene {
   }
   /** The shot's out along a line (or after a fish on one), not on the boat. */
   private lineShot = false;
+  /** Boss 6: the shot's on King Bob, saying something (see keepInView). */
+  private kingShot = false;
   /** How much higher the shots of the boat sit (Boss 6: King Bob's bowl is up on the flybridge). */
   private get lift() {
     return this.v6 ? 150 : 0;
@@ -1616,7 +1620,7 @@ export class FishingScene extends Phaser.Scene {
           'SEAS 8–12 FT',
           'KING BOB: 313 CONTESTS, 312 WINS',
           `PRO TIP: HOOK ALL ${this.R.bites} BITES AND THE FISH IS YOURS`,
-          'WATCH OUT: THE SWELL TWITCHES THE BOBBER — WAIT FOR BITE!',
+          'THE BITES DON’T WAIT — STRIKE FAST!',
         ]
       : [
       ...this.news,
@@ -1921,23 +1925,15 @@ export class FishingScene extends Phaser.Scene {
       const tA = this.clock;
       const sx = fish.x;
       const sy = fish.y;
-      // (Boss 6: now and then the swell gives the bobber a twitch — not a bite: no BITE! comes)
-      const feintAt = this.R.feint > 0 && Math.random() < this.R.feint ? tA + approach * (0.25 + Math.random() * 0.45) : -1;
       while (this.clock - tA < approach) {
         reelTo();
         this.shotLine('hero');
         this.heroPose = Math.floor(this.clock / 140) % 2 ? 'r1' : 'r0';
-        if (feintAt > 0 && this.clock >= feintAt && this.clock < feintAt + 140) L.dip = 7 + Math.random() * 3;
-        else if (feintAt > 0 && this.clock >= feintAt + 140 && this.clock < feintAt + 180) {
-          L.dip = 0;
-          this.ripple(L.x, WATER, 0.45);
-        }
         const u = Phaser.Math.Easing.Sine.InOut(Math.min(1, (this.clock - tA) / approach));
         fish.x = sx + (L.x + (fromLeft ? -34 : 34) * shK - sx) * u;
         fish.y = sy + (WATER + 52 + deep - sy) * u + Math.sin(this.clock / 180) * 3;
         await this.wait(16);
       }
-      if (this.R.feint > 0) L.dip = 0;
       // nibble, nibble… BITE (no lightning from here till it's over)
       this.biteSoon = true;
       for (let k = 0; k < 2; k++) {
@@ -2658,7 +2654,7 @@ export class FishingScene extends Phaser.Scene {
       const b = this.onBoat(BOAT.king - 98, BOAT.kingFeet - 26);
       const f0 = { x: fish.x, y: fish.y };
       const o = { t: 0 };
-      this.cam = { x: (b.x + f0.x) / 2, y: WATER - 140, zoom: 1.05 };
+      this.cam = { x: (b.x + f0.x) / 2, y: WATER - 140 - this.lift, zoom: 1.05 };
       await this.tw({
         targets: o,
         t: 1,
@@ -2899,6 +2895,7 @@ export class FishingScene extends Phaser.Scene {
 
   private async kingWins() {
     this.shotBoat(1.25);
+    this.kingShot = true;
     this.cam.x = bx(BOAT.king) + 40;
     sfx.laugh();
     await this.kingSays('HA HA HA! Nobody beats the King!', 1900);
@@ -3031,6 +3028,7 @@ export class FishingScene extends Phaser.Scene {
     });
     while (!tw.isFinished() && !tw.isDestroyed()) await this.wait(30);
     this.camK = 2.5;
+    this.kingShot = true;
     await this.iwait(300);
     this.kingLook = 'm';
     await this.kingSays('You were lucky last time!', 2200);
@@ -3039,6 +3037,7 @@ export class FishingScene extends Phaser.Scene {
     this.kingLook = 'f';
     sfx.bloop();
     await this.kingSays('Not AGAIN!', 1800);
+    this.kingShot = false;
     this.kingPlain();
     this.camK = 2.2;
     this.shotBoat(1);
@@ -3143,8 +3142,8 @@ export class FishingScene extends Phaser.Scene {
     const r = this.rod.hero;
     const L = this.lures.hero;
     const k = this.kingSpr;
-    this.noClear = true;
-    this.boltAt = this.clock + 5000;
+    // (no more lightning: nothing to white out the catch)
+    this.boltAt = Infinity;
     // ── 1. YOU WIN! The hero hops for joy; King Bob's cross ──
     this.tweens.killTweensOf(this);
     this.heroLean = 0;
@@ -3153,6 +3152,9 @@ export class FishingScene extends Phaser.Scene {
     this.kingLook = 'm';
     this.camK = 2.4;
     const kb = this.bowlAt(0, 0);
+    // (the camera keeps King Bob out from under the scoreboard)
+    this.noClear = false;
+    this.lineShot = false;
     this.cam = { x: (this.hero.x + kb.x) / 2 + 20, y: (this.hero.y + kb.y) / 2 - 110, zoom: 1.35 };
     await this.wait(400);
     this.tweens.add({ targets: this, heroHop: 26, duration: 230, ease: 'Quad.easeOut', yoyo: true, repeat: 3, repeatDelay: 120 });
@@ -3162,11 +3164,13 @@ export class FishingScene extends Phaser.Scene {
 
     // ── 2. "Ha! You'll NEVER catch me!" and over the stern he goes ──
     this.noClear = false;
-    this.camK = 1.4;
-    this.cam = { x: kb.x + 150, y: kb.y - 80, zoom: 1.3 };
+    this.kingShot = true;
+    this.camK = 2.2;
+    this.cam = { x: kb.x + 150, y: kb.y - 120, zoom: 1.3 };
     await this.wait(1000);
     sfx.laugh();
     await this.kingSays("Ha! You'll NEVER catch me!", 2200);
+    this.kingShot = false;
     this.noClear = true;
     await this.kingLeap6();
 
@@ -3216,8 +3220,9 @@ export class FishingScene extends Phaser.Scene {
     r.reelRate = -4;
     this.callout('GOTCHA!', 'gotcha', 1700);
     const gx = L.x;
-    const camGotcha = this.frameOut(bx(BOAT.hero) - 160, gx, 0.62, 1.05, WATER - 120);
-    this.cam = camGotcha;
+    // (in on him: the line runs off to the boat)
+    this.camK = 3.5;
+    this.cam = { x: gx - 120, y: WATER - 150, zoom: 1.15 };
     // (bursting up out of the sea…)
     await this.during(380, (u) => {
       const e = Phaser.Math.Easing.Quadratic.Out(u);
@@ -3282,7 +3287,7 @@ export class FishingScene extends Phaser.Scene {
     // ── the storm breaks: the sunbeam, the confetti, the lower third ──
     this.heroPose = 'j0';
     const v = this.cameras.main.worldView;
-    void this.storm?.breakUp(2600, { x: this.hero.x + 120, y: v.y - 160 });
+    void this.storm?.breakUp(2600, { x: this.hero.x + 60, y: v.y - 120 });
     sfx.cheer();
     sfx.kaching();
     this.sparkle(k.x, k.y, 14);
@@ -3344,6 +3349,11 @@ export class FishingScene extends Phaser.Scene {
     sfx.splash();
     this.bowlSlosh(this.bowlAt(0, -BOWL.h + 22), 22, 380);
     this.kingLook = 'a';
+    this.noClear = false;
+    this.lineShot = false;
+    this.kingShot = true;
+    this.camK = 2.2;
+    this.cam = { x: home.x + 60, y: home.y - 90, zoom: 1.35 };
     await this.wait(700);
     sfx.groan();
     await this.kingSays('Best of three?', 2300);

@@ -75,6 +75,7 @@ const SPLASHES = 16;
 const SPLASH_RATE = 22;
 /** The bolt's picture (world px). */
 const BOLT = { w: 360, h: 520 } as const;
+/** The sunbeam's picture (drawn at half size, it's soft; shown at 1.3 × 2 of that: a shaft 585 world px wide at its foot). */
 const BEAM = { w: 900, h: 700 } as const;
 
 /** Where on screen things can be hit by rain: segments [x0, y0, x1, y1] in the world (the decks), asked for each splash. */
@@ -214,7 +215,7 @@ export class Storm {
     this.fill(deep, left, water, W, bottom - water + 40, STORM_DEEP);
     // the bolt (shown in a flash), the sunbeam (the ending): hidden till then
     this.bolt = s.add.image(0, 0, 'f6-bolt').setOrigin(0.5, 0).setDepth(0.125).setVisible(false).setBlendMode(Phaser.BlendModes.ADD);
-    this.beam = s.add.image(0, 0, 'f6-beam').setOrigin(0.5, 0).setScale(2).setDepth(6.5).setVisible(false).setBlendMode(Phaser.BlendModes.ADD);
+    this.beam = s.add.image(0, 0, 'f6-beam').setOrigin(0.5, 0).setScale(1.3, 2).setDepth(6.5).setVisible(false).setBlendMode(Phaser.BlendModes.ADD);
     // the rain: one tile each, kept over what the camera sees above the sea (see update)
     RAIN.forEach((layer, i) => {
       const ts = s.add
@@ -342,7 +343,7 @@ export class Storm {
     const o = { k: 0 };
     if (this.beam) {
       this.beam.setPosition(beamAt.x, beamAt.y).setAlpha(0).setVisible(true);
-      s.tweens.add({ targets: this.beam, alpha: 0.85, duration: ms, ease: 'Sine.easeOut' });
+      s.tweens.add({ targets: this.beam, alpha: 0.5, duration: ms, ease: 'Sine.easeOut' });
     }
     await new Promise<void>((res) =>
       s.tweens.add({
