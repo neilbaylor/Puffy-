@@ -379,3 +379,5 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.374: Boss 6 for testers: King Bob's rematch on a bigger boat in a thunderstorm, and this time you catch him.
 - v0.375: Boss 6 runs smoother in light mode (lighter rain).
 - v0.376: Boss 6's storm clouds sit a little higher.
+- v0.377: Light mode is picked automatically: a half-second check of the device on the first start of each version.
+- v0.378: Clearer fonts on older iPads (one font file per weight), and the loading screen waits for all the fonts.
