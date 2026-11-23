@@ -7,10 +7,11 @@ import { isMuted, setMuted, sfx, unlockAudio } from '../core/sfx';
 import { drawHeroCard, drawPortrait, renderPoseSet } from '../gfx/draw';
 import { NEUTRAL_FACE, type Face } from '../gfx/face';
 import { BattleUI } from './battleUi';
-import { loadArt } from './artLoader';
+import { loadArt, loadArtQueue } from './artLoader';
+import { MenuScene } from '../scenes/MenuScene';
 import { LIGHT } from '../core/light';
 import { savedResCap } from '../core/res';
-import { HOME_LO, asBossArt, dropHeroSheets, freeBossArtExcept, gameArtJobs, homeKeepKeys, missingLookSteps, seaWear, swimLevel, type Step } from '../gfx/textures';
+import { BG_LAYER_IDS, HOME_LO, asBossArt, asQuietJob, bgKey, disownBossArt, dropHeroSheets, freeBossArtExcept, gameArtJobs, homeKeepKeys, isSliceJob, lookJobs, missingLookSteps, ownFrame, seaWear, swimLevel, type Step } from '../gfx/textures';
 import { themesFor } from '../world/theme';
 import { SHOP, wardrobe } from '../core/wardrobe';
 import { groundPaintJobs } from '../world/LevelView';
@@ -1668,11 +1669,72 @@ export class UI {
   }
 
   private quitToStart() {
+    if (this.leaving) return;
     this.bossIntro = false;
     this.introEl?.remove();
     this.introEl = null;
     this.setScreen(null);
     stopMusic();
+    // (from a boss: the start screen's look for its Part drawn first, if it isn't — see homeLookSteps)
+    const queue = this.homeArt();
+    if (queue) {
+      this.leaving = true;
+      this.hud.hidden = true;
+      this.touch.hide();
+      for (const k of ['Hoops', 'Wrestle', 'Fishing']) if (this.game.scene.isActive(k)) this.game.scene.pause(k);
+      const before = new Set(this.game.textures.getTextureKeys());
+      void loadArtQueue(queue.take, queue.left, undefined, true).then(() => {
+        this.leaving = false;
+        this.toStart();
+        // (the start screen's: not let go with the boss's art when the next game starts)
+        disownBossArt(this.game.textures.getTextureKeys().filter((k) => !before.has(k)));
+      });
+      return;
+    }
+    this.toStart();
+  }
+
+  /** On the way home (see quitToStart). */
+  private leaving = false;
+
+  /**
+   * Back home from a boss: the look of the Part the start screen opens on (the boss's) if it isn't drawn,
+   * a slice of a layer a frame (see lookJobs), then its fly-over's opening pictures (see
+   * MenuScene.openingJobs), as a queue of jobs for the little loading card, the boss's arena standing
+   * still behind it. Light mode keeps only the Part the start screen showed: the start screen drew the
+   * boss's Part's look and opening scenery as it was made, in one frame of 0.8-1.3 s at 4x slow CPU.
+   * Null if there's nothing to draw (full mode keeps every Part's).
+   */
+  private homeArt(): { take: () => (() => void) | null; left: () => number } | null {
+    const host = ['Hoops', 'Wrestle', 'Fishing'].find((k) => this.game.scene.isActive(k) || this.game.scene.isPaused(k));
+    if (!host) return null;
+    const scene = this.game.scene.getScene('Menu');
+    const info = levelInfo(this.level);
+    if (!scene || !info.build) return null;
+    const look = themesFor(this.level)[0];
+    // (the start screen's own lower-resolution copy is there: it's shown instead, see MenuScene.create)
+    if (BG_LAYER_IDS.every((l) => this.game.textures.exists(bgKey(l, look))) || (HOME_LO && this.game.textures.exists(bgKey('far', look, true)))) return null;
+    const looks = lookJobs(scene, look, false, true);
+    // (worked out in the boss's scene, standing still behind the card — a view of the level needs a
+    // running scene's camera: whatever a job puts up there it takes down again; the list grows as it's
+    // worked through)
+    const opening = MenuScene.openingJobs(this.game.scene.getScene(host), this.level);
+    let i = 0;
+    let j = 0;
+    return {
+      take: () => {
+        if (i < looks.length) {
+          const job = looks[i++];
+          const run = () => asQuietJob(job);
+          return isSliceJob(job) ? ownFrame(run) : run;
+        }
+        return j < opening.length ? opening[j++] : null;
+      },
+      left: () => looks.length - i + opening.length - j,
+    };
+  }
+
+  private toStart() {
     this.game.scene.stop('Hoops');
     this.game.scene.stop('Wrestle');
     this.game.scene.stop('Fishing');

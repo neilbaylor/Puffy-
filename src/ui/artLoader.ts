@@ -1,4 +1,4 @@
-import type { Step } from '../gfx/textures';
+import { isSliceJob, type Step } from '../gfx/textures';
 
 /** Resolves on the next animation frame (or soon after, if frames are paused). */
 const nextFrame = () =>
@@ -74,7 +74,7 @@ export function loadArt(steps: Step[], label = 'Loading…'): Promise<void> {
  * The same small loading card, for a queue of drawing jobs that can grow as it goes (each job may
  * put more in line): `take` gives the next one (null: all done), `left` how many are waiting.
  */
-export function loadArtQueue(take: () => (() => void) | null, left: () => number, label = 'Loading…'): Promise<void> {
+export function loadArtQueue(take: () => (() => void) | null, left: () => number, label = 'Loading…', ownFrames = false): Promise<void> {
   const run = async () => {
     if (busy) await busy;
     const el = document.createElement('div');
@@ -92,7 +92,9 @@ export function loadArtQueue(take: () => (() => void) | null, left: () => number
       // (never backwards: a job that adds more only slows the bar down)
       const p = done / (done + left());
       bar.style.setProperty('--p', String(Math.max(Number(bar.style.getPropertyValue('--p') || 0), p)));
-      if (performance.now() - slice > 40) {
+      // (`ownFrames`: a job whose drawing the browser paints at the end of its frame has that frame to
+      // itself — see ownFrame)
+      if (performance.now() - slice > 40 || (ownFrames && isSliceJob(job))) {
         await nextFrame();
         slice = performance.now();
       }

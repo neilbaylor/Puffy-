@@ -1225,6 +1225,14 @@ export function asBossArt(game: Phaser.Game, id: string, steps: Step[]): Step[] 
 }
 
 /**
+ * Pictures drawn while a boss's scene was up that aren't its own (the start screen's, drawn behind the
+ * loading card on the way home: see UI.quitToStart): not let go with its art.
+ */
+export function disownBossArt(keys: Iterable<string>) {
+  for (const k of keys) for (const own of bossArt.values()) own.delete(k);
+}
+
+/**
  * Free the bosses' own pictures (all but `keep`'s, e.g. 'Hoops:1'), before a game's art is drawn. Never
  * a boss that's still up (its results card), anything a running scene is showing, the looks or the
  * heroes' own sheets (those are looked after elsewhere).
