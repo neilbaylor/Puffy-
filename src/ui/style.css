@@ -157,6 +157,11 @@ html:has(body.booting) body { background: #5fc4ff; }
   outline-offset: 3px;
 }
 .icon-btn {
+  /* (centred as a flex box: older Safari left a button's picture at the top and kept its own padding) */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   width: clamp(42px, 8vmin, 56px);
   height: clamp(42px, 8vmin, 56px);
   border-radius: 14px;
