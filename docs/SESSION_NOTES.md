@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.375)
+## Where things stand (v0.376)
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
@@ -31,6 +31,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   Home screen (yellow).
 - Start screen: drone fly-over behind, logo hop, hero cards (pick = hop / backflip), Play, Part picker once a
   level is beaten, mute (top-left), full screen + **Battle** buttons (top-right, same height, side by side).
+- v0.376: Boss 6 clouds 70 px higher (Storm.ts BANDS y: full -250 -> -320, light -60 -> -130; owner: 'a bit too low').
 - v0.375: owner chose lighter rain in light mode for Boss 6: Storm.ts LIGHT has no rain TileSprite, rain = 32 sprite streaks of the 'mid' layer look (STREAK_LAYER). tprobe L1 'all': ~32 -> ~27 ms at 4x (Boss 5 light 25-28).
 - v0.374: Boss 6 (testers only, follows Part 6): King Bob's rematch on Reel Royal II (gfx/fishing6.ts, boat in 3 parts for steps) in a storm (world/Storm.ts: one cloud band, far+mid rain tile, near rain as 26 sprite streaks, splashes, lightning every 7-13 s never during a bite). FishingScene runs it when level 6 (RULES6, KING_CATCH6 0.57 vs 0.51, BITE_MS6 530 vs 589; still 6 bites). intro6 (Chuck Rivers in rain gear, drawHost(...,rain), HOST_RAIN_UP), kingFlip6, kingLeap6, youWin6 (leap, cast, GOTCHA, dangling catch, storm breaks, 'Best of three?'). Tests: sketches/boss6/tests (tplay/tgate/tending/tpart6/tmoments/tprobe). Cost at 4x: full 39 ms vs Boss 5 27-30; light 36-37 vs 25-28 (rain tile ~8 ms; owner could pick sparser sprite rain in light). Open owner choices: light rain sparser?, host back in the win?, boat rocking strength (RULES6).
 - v0.373: hidden device check. `?bench` (entry.ts loads src/bench/benchPage.ts instead of main; src/core/bench.ts quickBench ~0.5 s / fullBench: CPU game-like update, GPU fill per screenful at game resolution, 1024x512 upload, canvas-2D start-screen layers, GPU setup, then the real start screen timed 10 s). Owner names the device + verdict (great/ok/struggles) -> POST /api/bench (server/users.ts bench_reports table, newest 500, 6/min/IP). `?bench=list` testers only (src/shared/testers.ts neil, founder; Bearer token). main.ts exports values the page reads; BENCH flag stops a graphics loss there switching the device to light. Next: owner runs it on devices, then thresholds -> quickBench in light.ts (plan in claude/bench report: 'bench:<ver>:<0|1>' in puffy.light, reset old 'slow'/'auto:' once; owner to choose first-start behaviour).
