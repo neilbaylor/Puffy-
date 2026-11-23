@@ -260,9 +260,14 @@ export interface Boat6 {
 // ───────────────────────────────────────── A: the sport-fisher ──
 
 const SA: Pt[] = [...quad([22, 318], [200, 394], [470, 424], 18), [880, 430], [1172, 436]];
+/** (drawn in three parts, so the game can spread the drawing over frames behind its loading card) */
+const SPORT_ON = 15;
+const SPORT_W = 580;
 function drawSport(ctx: Ctx) {
-  const W = 580;
-  const on = 15;
+  for (const part of SPORT_PARTS) part(ctx);
+}
+function sportTop(ctx: Ctx) {
+  const on = SPORT_ON;
   const far = deckBand(ctx, SA, 34, 22, 280, '#e3e8ec', TEAK.base);
   planks(ctx, SA, far, 860, 1172);
   // (the far side's transom edge)
@@ -310,6 +315,12 @@ function drawSport(ctx: Ctx) {
   st.shape(ctx, roundRectPts(488, 182, 24, 5, 2), STEEL, 2006, { lw: 0.5, plain: true });
   st.shape(ctx, ellipsePts(760, 180, 5, 4, 0, 12), F('#5fd7ff', '#2ea6d6', '#cff4ff'), 2007, { lw: 0.6, plain: true });
 
+  ctx.restore();
+}
+function sportMid(ctx: Ctx) {
+  const on = SPORT_ON;
+  ctx.save();
+  ctx.translate(0, -on);
   // ── the flybridge: its coaming (white, a navy stripe), the helm seats and screen peeping over ──
   for (const x of [560, 604]) {
     st.shape(ctx, roundRectPts(x, 252, 32, 36, 9), NAVY, 2010 + x, { lw: 1, light: [x + 6, 256] });
@@ -364,6 +375,9 @@ function drawSport(ctx: Ctx) {
     rackedRod(ctx, x, yAt(SA, x) - 2, a, 120, x > 1140 ? '#ffd23f' : '#e8463f');
   ctx.restore();
 
+}
+function sportHull(ctx: Ctx) {
+  const W = SPORT_W;
   // ── the hull: navy, a gold cove stripe, a white boot stripe, red bottom paint ──
   const H: Pt[] = [...SA, [1168, W + 24], ...quad([1060, W + 30], [420, W + 34], [190, W + 16], 12), ...quad([190, W + 16], [52, W - 40], [22, 318], 14).slice(1)];
   const under = (d: number): Pt[] => SA.map(([x, y], i) => [x + (i < 18 ? d * 0.2 : 0), y + d]);
@@ -392,6 +406,9 @@ function drawSport(ctx: Ctx) {
   for (const x of [150, 196, 242]) porthole(ctx, x, yAt(SA, x) + 44, 9, 2050 + x);
   st.shape(ctx, ellipsePts(34, 330, 4, 3, 0, 10), F('#e8463f', '#b92f2a', '#ff9a90'), 2060, { lw: 0.6, plain: true });
 }
+
+/** The sport-fisher (Boss 6's Reel Royal II) in drawing order: the deck, tower and hardtop; the flybridge, salon and cockpit; the hull. */
+export const SPORT_PARTS: ((ctx: Ctx) => void)[] = [sportTop, sportMid, sportHull];
 
 // ───────────────────────────────────────── B: the royal tug ──
 
@@ -1031,6 +1048,148 @@ export function drawHook(ctx: Ctx, x: number, y: number, s: number) {
     ctx.arc(x - s * 0.1, y - s * 0.25, s * 0.25, Math.PI, 0, true);
     ctx.lineTo(x + s * 0.15, y - s * 0.45);
     ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ───────────────────────────────────────── for the game (Boss 6) ──
+
+/** Clouds in a band: [x, y, w, h, seed, tone] (band units). */
+export type CloudSpec = readonly (readonly [number, number, number, number, number, number])[];
+/**
+ * A band of storm clouds that tiles across (w wide, so a TileSprite can run it the length of the
+ * world): each cloud drawn again a band's width to the left and right, so whatever hangs off one
+ * end comes back in at the other. `curtains`: rain hanging off the band's underside (the far band).
+ */
+export function drawCloudBand(ctx: Ctx, w: number, h: number, clouds: CloudSpec, flash = false, curtains: readonly (readonly [number, number])[] = []) {
+  for (const [x, s] of curtains)
+    for (const ox of [-w, 0, w]) {
+      if (x + ox > w || x + ox + 340 < 0) continue;
+      ctx.save();
+      ctx.translate(x + ox, h * 0.45);
+      drawRainCurtain(ctx, 300, h * 0.55, s, flash ? 0.35 : 0.22);
+      ctx.restore();
+    }
+  for (const [x, y, cw, ch, seed, tone] of clouds)
+    for (const ox of [-w, 0, w]) {
+      if (x + ox > w || x + ox + cw < 0) continue;
+      ctx.save();
+      ctx.translate(x + ox, y);
+      drawStormCloud(ctx, cw, ch, seed, tone, flash);
+      ctx.restore();
+    }
+}
+/** The game's three cloud bands (each 1024 wide): far (pale, rain curtains under it), mid, near (darkest, lowest). */
+export const CLOUD_BANDS = {
+  far: {
+    h: 256,
+    clouds: [
+      [-40, 30, 330, 120, 11, 0.05],
+      [300, 10, 400, 140, 12, 0.1],
+      [680, 40, 380, 120, 13, 0.05],
+    ],
+    curtains: [
+      [120, 3],
+      [640, 4],
+    ],
+  },
+  mid: {
+    h: 256,
+    clouds: [
+      [-60, 20, 460, 190, 21, 0.5],
+      [330, 0, 440, 200, 22, 0.55],
+      [700, 24, 440, 190, 23, 0.5],
+    ],
+    curtains: [],
+  },
+  near: {
+    h: 256,
+    clouds: [
+      [-120, 0, 600, 220, 31, 1],
+      [420, 10, 640, 230, 32, 0.95],
+    ],
+    curtains: [],
+  },
+} as const satisfies Record<string, { h: number; clouds: CloudSpec; curtains: readonly (readonly [number, number])[] }>;
+export type CloudBand = keyof typeof CLOUD_BANDS;
+
+/** Rain's splashes as a strip of frames (each SPLASH × SPLASH): 5 on a deck (a crown of drops, growing, fading), then 5 on the sea. */
+export const SPLASH = 40;
+export const SPLASH_FRAMES = 10;
+export function drawSplashFrame(ctx: Ctx, i: number) {
+  const k = (i % 5) / 4;
+  const s = 10 + k * 22;
+  const a = 0.95 - k * 0.55;
+  if (i < 5) drawDeckSplash(ctx, SPLASH / 2, SPLASH * 0.8, s, a);
+  else drawSeaSplash(ctx, SPLASH / 2, SPLASH * 0.75, s, a);
+}
+
+/** A sunbeam (w × h): warm light pouring down through a break in the clouds, fading out lower down (drawn added on). */
+export function drawSunbeam(ctx: Ctx, w: number, h: number) {
+  const g = ctx.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, 'rgba(255,236,170,0.75)');
+  g.addColorStop(0.6, 'rgba(255,226,150,0.3)');
+  g.addColorStop(1, 'rgba(255,214,140,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(w * 0.3, 0);
+  ctx.lineTo(w * 0.62, 0);
+  ctx.lineTo(w, h);
+  ctx.lineTo(0, h);
+  ctx.closePath();
+  ctx.fill();
+  // (and a couple of brighter shafts in it)
+  for (const [a, b, al] of [
+    [0.38, 0.16, 0.35],
+    [0.5, 0.58, 0.25],
+  ] as const) {
+    const g2 = ctx.createLinearGradient(0, 0, 0, h);
+    g2.addColorStop(0, `rgba(255,248,210,${al})`);
+    g2.addColorStop(1, 'rgba(255,248,210,0)');
+    ctx.fillStyle = g2;
+    ctx.beginPath();
+    ctx.moveTo(w * a, 0);
+    ctx.lineTo(w * (a + 0.06), 0);
+    ctx.lineTo(w * (b + 0.14), h);
+    ctx.lineTo(w * b, h);
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+/**
+ * A huge splash (GOTCHA!), centred on (w/2, the bottom): white sheets of water fanning up, foam on the
+ * water round it. w × h = 320 × 200.
+ */
+export const BIG_SPLASH = { w: 320, h: 200 } as const;
+export function drawBigSplash(ctx: Ctx) {
+  const x = BIG_SPLASH.w / 2;
+  const y = BIG_SPLASH.h - 14;
+  ctx.save();
+  ctx.fillStyle = 'rgba(240,250,252,0.95)';
+  ctx.strokeStyle = 'rgba(150,200,215,0.9)';
+  ctx.lineWidth = 2;
+  for (const [dx, h, w] of [
+    [-60, 70, 34],
+    [-30, 110, 30],
+    [0, 130, 34],
+    [30, 104, 30],
+    [62, 66, 32],
+  ] as const) {
+    ctx.beginPath();
+    ctx.moveTo(x + dx - w / 2, y);
+    ctx.quadraticCurveTo(x + dx - w * 0.2 + dx * 0.25, y - h * 0.6, x + dx * 1.3, y - h);
+    ctx.quadraticCurveTo(x + dx + w * 0.3 + dx * 0.2, y - h * 0.5, x + dx + w / 2, y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.fillStyle = 'rgba(244,251,252,0.95)';
+  const r = rng(8);
+  for (let i = 0; i < 18; i++) {
+    ctx.beginPath();
+    ctx.arc(x + (r() - 0.5) * 220, y + (r() - 0.3) * 10, 6 + r() * 8, 0, Math.PI * 2);
+    ctx.fill();
   }
   ctx.restore();
 }

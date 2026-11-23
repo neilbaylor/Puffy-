@@ -104,6 +104,8 @@ const WIP: LevelInfo[] = [
     build: buildLevel6,
     speech: 'Now for a nice relaxing dive',
     chase: true,
+    // (ends in King Bob's rematch: Boss 6, the fishing contest in a storm)
+    fishing: true,
     wip: true,
     testers: ['neil', 'founder'],
   },
