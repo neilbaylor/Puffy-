@@ -382,3 +382,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.377: Light mode is picked automatically: a half-second check of the device on the first start of each version.
 - v0.378: Clearer fonts on older iPads (one font file per weight), and the loading screen waits for all the fonts.
 - v0.379: Titles and the pause / sound buttons look right on older iPads.
+- v0.380: On older iPads: the logo, level titles, Back to the Start, boss callouts and the top buttons look right.
