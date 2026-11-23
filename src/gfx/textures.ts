@@ -204,40 +204,76 @@ const SHEET_SLICES = 3;
  * has a share of both (the browser paints what's been drawn at the end of each frame). The same
  * drawing in the same order on the same canvas: the same picture.
  */
-function sheetSteps<F extends string>(scene: Phaser.Scene, name: string, key: string, w: number, h: number, frames: readonly F[], draw: (ctx: Ctx, f: F) => void, res = ART_RES): Step[] {
+function sheetSteps<F extends string>(
+  scene: Phaser.Scene,
+  name: string,
+  key: string,
+  w: number,
+  h: number,
+  frames: readonly F[],
+  draw: (ctx: Ctx, f: F) => void,
+  res = ART_RES,
+  /** (as `sheet`'s: the whole sheet swapped for this, then `over` on each frame — in a step of its own) */
+  post?: { swap: (c: HTMLCanvasElement) => HTMLCanvasElement; over: (ctx: Ctx, f: F) => void },
+): Step[] {
   const fw = Math.round(w * res);
   const fh = Math.round(h * res);
   const g = frameGrid(frames.length, fw, fh);
   let cv: { c: HTMLCanvasElement; ctx: Ctx } | null = null;
   const per = Math.ceil(frames.length / SHEET_SLICES);
   const steps: Step[] = [];
+  const each = (ctx: Ctx, i0: number, i1: number, fn: (ctx: Ctx, f: F) => void) => {
+    for (let i = i0; i < i1; i++) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(g.x(i), g.y(i), fw, fh);
+      ctx.clip();
+      ctx.translate(g.x(i), g.y(i));
+      ctx.scale(res, res);
+      fn(ctx, frames[i]);
+      ctx.restore();
+    }
+  };
+  const upload = () => {
+    addCanvas(scene, key, cv!.c, (t) => frames.forEach((f, i) => t.add(f, 0, g.x(i), g.y(i), fw, fh)), { release: !keepPixels(key) });
+    cv = null;
+  };
   for (let k = 0; k * per < frames.length; k++) {
     const last = (k + 1) * per >= frames.length;
     steps.push({
       name: k ? `${name} ${k + 1}` : name,
       // (the last share is sent to the graphics chip with the rest, in the same step: the browser
       // paints it then anyway)
-      own: !last,
+      own: !last || !!post,
       run: () => {
         if (scene.textures.exists(key)) return;
         cv ??= canvas(g.w, g.h);
-        const ctx = cv.ctx;
-        for (let i = k * per; i < Math.min(frames.length, (k + 1) * per); i++) {
-          ctx.save();
-          ctx.beginPath();
-          ctx.rect(g.x(i), g.y(i), fw, fh);
-          ctx.clip();
-          ctx.translate(g.x(i), g.y(i));
-          ctx.scale(res, res);
-          draw(ctx, frames[i]);
-          ctx.restore();
-        }
-        if (!last) return;
-        addCanvas(scene, key, cv.c, (t) => frames.forEach((f, i) => t.add(f, 0, g.x(i), g.y(i), fw, fh)), { release: !keepPixels(key) });
-        cv = null;
+        each(cv.ctx, k * per, Math.min(frames.length, (k + 1) * per), draw);
+        if (last && !post) upload();
       },
     });
   }
+  if (post)
+    // (a battle player's colour: the recolouring reads the whole sheet back, so the browser paints the
+    // last share then, in this step's frame; the sheet goes to the graphics chip in the next)
+    steps.push(
+      {
+        name: `${name} colour`,
+        own: true,
+        run: () => {
+          if (scene.textures.exists(key) || !cv) return;
+          const c = post.swap(cv.c);
+          cv = { c, ctx: c.getContext('2d')! };
+          each(cv.ctx, 0, frames.length, post.over);
+        },
+      },
+      {
+        name: `${name} up`,
+        run: () => {
+          if (!scene.textures.exists(key) && cv) upload();
+        },
+      },
+    );
   return steps;
 }
 
@@ -261,6 +297,21 @@ function heroSheetSteps(scene: Phaser.Scene, name: string, ch: (typeof CHARACTER
   return sheetSteps(scene, name, face ? `char-${ch.id}-face` : `char-${ch.id}`, CHAR_W + HERO_M * 2, CHAR_H + up, frames, (ctx, f) =>
     face ? drawCharacter(ctx, HERO_M, up, ch, 'idle0', faceFromKey(f), wear, 'all') : drawCharacter(ctx, HERO_M, up, ch, f as Pose, undefined, wear, 'all'),
   );
+}
+
+/**
+ * makeHeroSheet as steps, each in a frame of its own (see sheetSteps): the same drawing in the same
+ * order on the same canvas, the same picture. (For a battle's players, drawn while they wait in the lobby.)
+ */
+export function playerSheetSteps(scene: Phaser.Scene, key: string, ch: (typeof CHARACTERS)[number], face: boolean, wear: string, recolor?: (c: HTMLCanvasElement) => HTMLCanvasElement, res = ART_RES): Step[] {
+  const M = HERO_M;
+  const up = gearUp(wear);
+  const layered = !!recolor && gearOf(wear).eyes;
+  const draw = (ctx: Ctx, f: string, layer: Layer) =>
+    face ? drawCharacter(ctx, M, up, ch, 'idle0', faceFromKey(f), wear, layer) : drawCharacter(ctx, M, up, ch, f as Pose, undefined, wear, layer);
+  const frames: readonly string[] = face ? FACE_FRAMES : POSES;
+  return sheetSteps(scene, key, key, CHAR_W + M * 2, CHAR_H + up, frames, (ctx, f) => draw(ctx, f, recolor && layered ? 'body' : 'all'), res,
+    recolor ? { swap: recolor, over: (ctx, f) => layered && draw(ctx, f, 'eyes') } : undefined);
 }
 
 /**
@@ -868,6 +919,11 @@ const slicing = new Map<string, SlicedDraw>();
 /** The jobs that draw a slice of a layer (see lookJobs): quick, so the next can follow on the next frame. */
 const sliceJobs = new WeakSet<() => void>();
 export const isSliceJob = (job: () => void) => sliceJobs.has(job);
+/** A job whose drawing is painted by the browser at the end of its frame: whoever runs it leaves the rest of that frame be (see isSliceJob). */
+export function ownFrame<J extends () => void>(job: J): J {
+  sliceJobs.add(job);
+  return job;
+}
 /** Set while the start screen runs one of its quiet jobs itself, between frames of its fly-over (see lookJobs). */
 let slicingOn = false;
 /**

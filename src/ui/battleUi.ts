@@ -13,10 +13,10 @@ import { drawHeroCard, drawPortrait } from '../gfx/draw';
 import { FaceClock, faceFromKey } from '../gfx/face';
 import { recolorForSlot, recolorPixels, slotRecolors } from '../gfx/recolor';
 import { gearOf } from '../core/wardrobe';
-import { freeBossArtExcept, gameArtJobs } from '../gfx/textures';
+import { asQuietJob, freeBossArtExcept, gameArtJobs, isSliceJob } from '../gfx/textures';
 import { loadArt } from './artLoader';
 import { BattleNet, battleUrl, type NetStatus } from '../net/battleNet';
-import { battleArtJobs, freeBattleArt, type BattleHud } from '../scenes/BattleScene';
+import { BattleScene, battleArtJobs, freeBattleArt, type BattleHud } from '../scenes/BattleScene';
 import { LIGHT } from '../core/light';
 
 /** The results card's Leave button ignores taps this long after it shows (mashed shoot taps). */
@@ -501,6 +501,7 @@ export class BattleUI {
       this.showLobby();
     }
     const lobby = this.lobby!;
+    if (r.phase === 'lobby' || r.phase === 'countdown') this.preparePlayers(r);
     // (your name card wears your colour)
     const spectator = !!me && me.slot < 0;
     if (me && me.slot >= 0) lobby.style.setProperty('--my', SLOT_COLORS[me.slot]);
@@ -593,6 +594,12 @@ export class BattleUI {
     this.arenaRaf = 0;
     const menu = this.host.game.scene.getScene('Menu');
     this.arenaJobs = menu?.sys.isActive() ? battleArtJobs(menu) : [];
+    this.runArenaJobs();
+  }
+
+  /** Work through arenaJobs, from the next frame on (if it isn't already). */
+  private runArenaJobs() {
+    if (this.arenaRaf || !this.arenaJobs.length) return;
     const step = () => {
       this.arenaRaf = 0;
       const t0 = performance.now();
@@ -600,11 +607,15 @@ export class BattleUI {
         const job = this.arenaJobs.shift();
         if (!job) break;
         try {
-          job();
+          // (as one of the start screen's quiet jobs: the look's hills and ground are drawn a slice a
+          // job — see lookJobs)
+          asQuietJob(job);
         } catch (e) {
           // (the battle draws it again as it's built, or shows Phaser's "missing" picture: the game goes on)
           console.error('A drawing step failed:', e);
         }
+        // (a job whose drawing the browser paints at the end of this frame: nothing more in it)
+        if (isSliceJob(job)) break;
       } while (this.arenaJobs.length && performance.now() - t0 < 4);
       if (this.arenaJobs.length) this.arenaRaf = requestAnimationFrame(step);
       else if (this.watchLater) {
@@ -612,7 +623,32 @@ export class BattleUI {
         if (this.lobby?.classList.contains('watching')) this.watch(true);
       }
     };
-    if (this.arenaJobs.length) this.arenaRaf = requestAnimationFrame(step);
+    this.arenaRaf = requestAnimationFrame(step);
+  }
+
+  /** The players whose hero pictures are being drawn ahead (see preparePlayers), by key. */
+  private sheetsAhead = new Set<string>();
+
+  /**
+   * Each player's hero in their colour (and its faces), drawn in the lobby as soon as they're in a
+   * square — ahead of the arena's pictures, a step a frame (see BattleScene.sheetJobs) — not as the
+   * countdown runs out, when the battle's built (it only has to put them up then).
+   */
+  private preparePlayers(r: RoomState) {
+    const menu = this.host.game.scene.getScene('Menu');
+    if (!menu?.sys.isActive() || this.inBattle || this.warmed) return;
+    const jobs: (() => void)[] = [];
+    for (const p of r.players) {
+      if (p.slot < 0 || !p.connected) continue;
+      const wear = p.wear ?? '';
+      const id = `${p.hero}|${p.slot}|${wear}`;
+      if (this.sheetsAhead.has(id)) continue;
+      this.sheetsAhead.add(id);
+      jobs.push(...BattleScene.sheetJobs(menu, p.hero, p.slot, wear));
+    }
+    if (!jobs.length) return;
+    this.arenaJobs.unshift(...jobs);
+    this.runArenaJobs();
   }
 
   /** Stop drawing the arena ahead (left the room; or the battle's being built: it draws what's left). */
@@ -620,6 +656,7 @@ export class BattleUI {
     cancelAnimationFrame(this.arenaRaf);
     this.arenaRaf = 0;
     this.arenaJobs = [];
+    this.sheetsAhead.clear();
     this.watchLater = false;
   }
 

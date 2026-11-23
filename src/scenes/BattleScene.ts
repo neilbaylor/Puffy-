@@ -5,7 +5,7 @@ import { sfx } from '../core/sfx';
 import { characterById } from '../data/characters';
 import { ART_RES, CARRY_SWING, CHAR_H, CHAR_W, WALK_FRAMES, bodyLift, carryHand, gearUp } from '../gfx/draw';
 import { recolorForSlot, slotRecolors } from '../gfx/recolor';
-import { HERO_SHEET_M, addCanvas, ensureLook, frameGrid, hires, lookJobs, makeCarrySheet, makeHeroSheet } from '../gfx/textures';
+import { HERO_SHEET_M, addCanvas, ensureLook, frameGrid, hires, lookJobs, makeCarrySheet, makeHeroSheet, ownFrame, playerSheetSteps } from '../gfx/textures';
 import { wardrobe } from '../core/wardrobe';
 import { PRIZE_COLOR, drawBombBall, drawChute, drawFireball, drawPrize } from '../gfx/prizes';
 import { PLOP_FRAMES, PLOP_H, PLOP_W, drawPlop } from '../gfx/plops';
@@ -253,27 +253,50 @@ function battleItemMakers(scene: Phaser.Scene): [string, () => void][] {
   add('bfire', 40, 26, (ctx) => drawFireball(ctx, 26, 13, 9, 1));
   add('bpoo', 26, 24, (ctx) => drawPoo(ctx, 13, 21, 1));
   add('bice', 60, 70, (ctx) => drawIceBlock(ctx, 60, 70));
-  for (const kind of ['small', 'medium', 'large'] as const) {
-    const key = `bplop-${kind}`;
-    out.push([key, () => {
-      // (a margin each side: the leaf arms reach past the art's own frame)
-      const R2 = PLOP_RES[kind];
-      const fw = Math.round((PLOP_W + PLOP_PAD * 2) * R2);
-      const fh = Math.round((PLOP_H + PLOP_TOP) * R2);
-      const g = frameGrid(PLOP_FRAMES.length, fw, fh);
-      const { c, ctx } = canvas(g.w, g.h);
-      PLOP_FRAMES.forEach((f, i) => {
+  for (const kind of ['small', 'medium', 'large'] as const) out.push([`bplop-${kind}`, () => plopSheetJobs(scene, kind).forEach((job) => job())]);
+  add('bpellet', 16, 16, (ctx) => drawPellet(ctx), false);
+  return out;
+}
+
+/** How many jobs (frames) a battle Plop's sheet is drawn over in the lobby (see plopSheetJobs). */
+const PLOP_SHARES = 4;
+
+/**
+ * A battle Plop's sheet (`bplop-<kind>`), a share of its frames a job, sent to the graphics chip with
+ * the last share. In the lobby each job has a frame of its own (see ownFrame): drawn in one go, the big
+ * one was a frame of 300-420 ms at 4x slow CPU (the drawing, and the browser painting it all at the end
+ * of that frame). The same drawing in the same order on the same canvas: the same picture.
+ */
+function plopSheetJobs(scene: Phaser.Scene, kind: 'small' | 'medium' | 'large'): (() => void)[] {
+  const key = `bplop-${kind}`;
+  // (a margin each side: the leaf arms reach past the art's own frame)
+  const R2 = PLOP_RES[kind];
+  const fw = Math.round((PLOP_W + PLOP_PAD * 2) * R2);
+  const fh = Math.round((PLOP_H + PLOP_TOP) * R2);
+  const g = frameGrid(PLOP_FRAMES.length, fw, fh);
+  let cv: { c: HTMLCanvasElement; ctx: CanvasRenderingContext2D } | null = null;
+  const per = Math.ceil(PLOP_FRAMES.length / PLOP_SHARES);
+  const jobs: (() => void)[] = [];
+  for (let k = 0; k * per < PLOP_FRAMES.length; k++) {
+    const last = (k + 1) * per >= PLOP_FRAMES.length;
+    const job = () => {
+      if (scene.textures.exists(key)) return;
+      cv ??= canvas(g.w, g.h);
+      const ctx = cv.ctx;
+      for (let i = k * per; i < Math.min(PLOP_FRAMES.length, (k + 1) * per); i++) {
         ctx.save();
         ctx.translate(g.x(i), g.y(i));
         ctx.scale(R2, R2);
-        drawPlop(ctx, PLOP_PAD, PLOP_TOP, f, STYLES.polished, kind);
+        drawPlop(ctx, PLOP_PAD, PLOP_TOP, PLOP_FRAMES[i], STYLES.polished, kind);
         ctx.restore();
-      });
-      addCanvas(scene, key, c, (t) => PLOP_FRAMES.forEach((f, i) => t.add(f, 0, g.x(i), g.y(i), fw, fh)), { release: true });
-    }]);
+      }
+      if (!last) return;
+      addCanvas(scene, key, cv.c, (t) => PLOP_FRAMES.forEach((f, i) => t.add(f, 0, g.x(i), g.y(i), fw, fh)), { release: true });
+      cv = null;
+    };
+    jobs.push(last ? job : ownFrame(job));
   }
-  add('bpellet', 16, 16, (ctx) => drawPellet(ctx), false);
-  return out;
+  return jobs;
 }
 
 /**
@@ -291,12 +314,15 @@ export function battleArtJobs(scene: Phaser.Scene): (() => void)[] {
   const view = new LevelView(scene, buildArena(), { lazyNear: -1e9, lazySpan: [0, 0], ahead: false, keep: true, only: [-1e9, -1e9] });
   for (const o of scene.children.list.filter((c) => !before.has(c))) o.destroy();
   jobs.push(...view.paintJobs().map((j) => () => void j()), ...view.laterJobs());
+  // (its look's hills and ground a slice a job: run as quiet jobs, see asQuietJob)
   jobs.push(...lookJobs(scene, BATTLE_LOOKS[0], false, true));
   for (const [key, make] of battleItemMakers(scene))
     if (!scene.textures.exists(key))
-      jobs.push(() => {
-        if (!scene.textures.exists(key)) make();
-      });
+      if (key.startsWith('bplop-')) jobs.push(...plopSheetJobs(scene, key.slice(6) as 'small' | 'medium' | 'large'));
+      else
+        jobs.push(() => {
+          if (!scene.textures.exists(key)) make();
+        });
   return jobs;
 }
 
@@ -804,12 +830,32 @@ export class BattleScene extends Phaser.Scene {
    * drawn), else drawn for them — coloured before the sunglasses go on, so those stay orange.
    */
   private textureFor(hero: string, slot: number, wear: string, face = false) {
+    const key = BattleScene.sheetKey(hero, slot, wear, face);
+    if (!this.textures.exists(key)) makeHeroSheet(this, key, characterById(hero), face, wear, slotRecolors(slot) ? (c) => recolorForSlot(c, slot) : undefined, BattleScene.sheetRes(key));
+    return key;
+  }
+
+  /** The key of a player's hero pictures (see textureFor). */
+  static sheetKey(hero: string, slot: number, wear: string, face = false) {
     const recolor = slotRecolors(slot);
     const mine = !recolor && wardrobe.wearKey === wear;
     const f = face ? '-face' : '';
-    const key = mine ? `char-${hero}${f}` : `bchar-${hero}-w${wear ? wear.replace(/,/g, '+') : 'none'}${recolor ? `-${slot}` : ''}${f}`;
-    if (!this.textures.exists(key)) makeHeroSheet(this, key, characterById(hero), face, wear, recolor ? (c) => recolorForSlot(c, slot) : undefined, BattleScene.sheetRes(key));
-    return key;
+    return mine ? `char-${hero}${f}` : `bchar-${hero}-w${wear ? wear.replace(/,/g, '+') : 'none'}${recolor ? `-${slot}` : ''}${f}`;
+  }
+
+  /**
+   * A player's hero pictures (and faces) as textureFor makes them, as jobs that each want a frame of
+   * their own (see ownFrame), for the lobby to draw as soon as they've joined. Made as the countdown
+   * ran out instead (the battle built ahead, see create), another player's sheet in their colour was
+   * one frame of 350-390 ms at 4x slow CPU, the countdown's clock stuck meanwhile.
+   */
+  static sheetJobs(scene: Phaser.Scene, hero: string, slot: number, wear: string): (() => void)[] {
+    return [false, true].flatMap((face) => {
+      const key = BattleScene.sheetKey(hero, slot, wear, face);
+      if (scene.textures.exists(key)) return [];
+      const steps = playerSheetSteps(scene, key, characterById(hero), face, wear, slotRecolors(slot) ? (c) => recolorForSlot(c, slot) : undefined, BattleScene.sheetRes(key));
+      return steps.map((st) => (st.own ? ownFrame(() => st.run()) : () => st.run()));
+    });
   }
 
   /**
