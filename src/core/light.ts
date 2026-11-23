@@ -1,22 +1,19 @@
 /**
  * Light mode, for older devices that can't keep up with the full-detail pictures: the screen is drawn
  * at 1x, the ground, backgrounds and clouds at a lower resolution (a little softer), and the start
- * screen doesn't build the other Parts ahead. Picked by hand with the hidden links (?lite / ?full), or
- * switched on once the graphics have run out of memory on the device while playing (see main.ts) —
- * that last one only until the next version, which tries full mode again.
+ * screen doesn't build the other Parts ahead. Chosen by measuring the device once a version, before
+ * the game starts (see core/lightPick); or picked by hand with the hidden links (?lite / ?full); or
+ * switched on once the graphics have run out of memory while playing (see main.ts), until the next
+ * version.
  *
- * (There used to be automatic checks too — the device's memory and picture-size limit at start-up,
- * and timing the start screen and play — but they guessed badly and the switching was annoying. A
- * device benchmark is to decide instead. A device those checks already put in light mode ('slow')
- * stays there until then.)
- *
- * `puffy.light`: '1' on, '0' off (picked by hand), 'auto:<version>' switched on by a graphics loss in
- * that version, 'slow' switched on by the old speed check.
+ * `puffy.light`: '1' on, '0' off (picked by hand), 'bench:<version>:<0|1>' measured in that version,
+ * 'auto:<version>' switched on by a graphics loss in that version; 'slow' (the old speed check,
+ * before v0.372) is measured afresh.
  */
 import { VERSION } from '../version';
 
 export const LIGHT_KEY = 'puffy.light';
-/** What the old speed check stored when it found the device too slow for full mode (still honoured: see above). */
+/** What the old speed check (before v0.372) stored: measured afresh now (see core/lightPick). */
 export const LIGHT_SLOW = 'slow';
 /** What main.ts stores when the graphics run out of memory: light mode for this version. */
 export const LIGHT_AUTO = `auto:${VERSION}`;
@@ -65,8 +62,10 @@ export const LIGHT: boolean = (() => {
       localStorage.removeItem(LIGHT_KEY); // (an older version's switch: full mode again)
       v = null;
     }
-    if (v === '1' || v === LIGHT_SLOW) return true;
+    if (v === '1') return true;
     if (v === '0') return false;
+    // (measured this version: see core/lightPick)
+    if (v?.startsWith(`bench:${VERSION}:`)) return v.endsWith(':1');
   } catch {
     /* private mode */
   }

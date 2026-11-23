@@ -250,6 +250,7 @@ function lightWhy(saved: string, light: boolean) {
   if (saved === '1') return 'picked by hand (?lite)';
   if (saved === '0') return 'picked by hand (?full)';
   if (saved === 'slow') return 'switched on by the old speed check (before v0.372)';
+  if (saved.startsWith('bench:')) return `measured by the device check (v${saved.split(':')[1]}): ${saved.endsWith(':1') ? 'light' : 'full'}`;
   if (saved.startsWith('auto:')) return light ? `the graphics ran out of memory in v${saved.slice(5)}` : `an older version's memory switch (v${saved.slice(5)}), cleared`;
   if (saved === '(no storage)') return "can't store a choice here (private browsing?)";
   return light ? 'light (nothing stored)' : 'the default: nothing picked or switched';

@@ -8,6 +8,7 @@ import './ui/fonts.css';
 import './ui/style.css';
 // (the screen's refresh rate: measured from now on, while the game's code loads)
 import './core/refresh';
+import { pickLight } from './core/lightPick';
 
 // (the hidden device-check page, `?bench` in the address: its own small file, fetched only then — it
 // starts the game itself when it needs it. See src/bench)
@@ -17,7 +18,9 @@ let go = false;
 const start = () => {
   if (go) return;
   go = true;
-  void (bench ? import('./bench/benchPage') : import('./main'));
+  if (bench) void import('./bench/benchPage');
+  // (light mode or not, measured on a version's first start, behind the loading screen: see core/lightPick)
+  else void pickLight().then(() => import('./main'));
 };
 // (just after the next paint; or straight away where nothing's painted, e.g. a background tab)
 if (document.hidden) start();

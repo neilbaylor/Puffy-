@@ -1,4 +1,5 @@
 import { LIGHT, LIGHT_KEY } from './light';
+import { LIGHT_AT } from './lightPick';
 import { VERSION } from '../version';
 
 /**
@@ -6,6 +7,17 @@ import { VERSION } from '../version';
  * mode it's in. For working out how a device behaves; players never see it.
  */
 export const diag = { refresh: '', view: '', smooth: '', seenAs: '' };
+
+/** The light-mode check's last scores (see core/lightPick), in a line. */
+function benchLine() {
+  try {
+    const b = JSON.parse(localStorage.getItem('puffy.bench') ?? 'null');
+    if (!b) return 'not run here';
+    return `v${b.v}: cpu ${b.cpu} ms · fill ${b.fill} ms · upload ${b.upload} ms → score ${b.score} (light at ${LIGHT_AT}) · took ${b.took} ms`;
+  } catch {
+    return '?';
+  }
+}
 
 export function showDiag() {
   let on = false;
@@ -40,6 +52,7 @@ export function showDiag() {
       `memory: ${nav.deviceMemory ?? '?'} GB · cores: ${nav.hardwareConcurrency ?? '?'} · max picture: ${maxTex || '?'}`,
       `screen: ${innerWidth}×${innerHeight} @${devicePixelRatio} · refresh: ${diag.refresh}`,
       `page size: ${diag.view} · edge smoothing: ${diag.smooth} · seen as: ${diag.seenAs}`,
+      `device check: ${benchLine()}`,
     ].join('\n');
   };
   fill();
