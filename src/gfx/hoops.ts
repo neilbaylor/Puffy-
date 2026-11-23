@@ -2250,6 +2250,23 @@ export function drawSpotlight(ctx: Ctx, w: number, h: number) {
   }
 }
 
+/**
+ * The spotlight's outline (drawSpotlight's, w × h), for outlineImage: its widest cone with 3 px to
+ * spare each side (the soft edge, and the graphics chip's blending), cut off at the picture's sides
+ * near its foot. The cone is narrow in a wide box: nearly half of the box is see-through, and the
+ * chip worked through every pixel of it.
+ */
+export function spotlightOutline(w: number, h: number): [number, number, number][] {
+  const m = 3;
+  // (where the spare edge reaches the picture's sides)
+  const yEdge = Math.floor(((w / 2 - 8 - m) * h) / (w / 2 - 8));
+  return [
+    [0, w / 2 - 8 - m, w / 2 + 8 + m],
+    [yEdge, 0, w],
+    [h, 0, w],
+  ];
+}
+
 /** A camera flash in the crowd (for additive blending). */
 export function drawCameraFlash(ctx: Ctx, r: number) {
   const g = ctx.createRadialGradient(r, r, 0, r, r, r);

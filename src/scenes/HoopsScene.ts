@@ -40,6 +40,7 @@ import {
   type ArenaStyle,
   drawSpotBrush,
   drawSpotlight,
+  spotlightOutline,
   drawJumboBandGlass,
   jumboCrawlItems,
   paintCrawl,
@@ -50,6 +51,7 @@ import {
 } from '../gfx/hoops';
 import { stingerReveal, stingerTitle } from '../ui/stinger';
 import { addCanvas, frameGrid, hires, type Step } from '../gfx/textures';
+import { outlineImage } from '../gfx/cutImage';
 import { BOOM_FRAMES, BOOM_SIZE, drawBoomFrame } from '../gfx/boom';
 import { drawEmber, drawFireball, drawFluffChunk, drawSmoke } from '../gfx/blast';
 import { gamepadSources } from '../input/gamepad';
@@ -79,6 +81,8 @@ export interface HoopsData {
 
 type Outcome = 'swish' | 'rimIn' | 'rimOut' | 'short' | 'long' | 'wide';
 
+/** The spotlight picture's outline (see spotlightOutline). */
+const SPOT_OUTLINE = spotlightOutline(300, 700);
 /** King Puff Ball makes about this share of his shots. */
 const KING_MAKE = 0.45;
 /** Part 2's rematch is a little harder: the King shoots better, the meters move a bit faster. */
@@ -195,7 +199,7 @@ export class HoopsScene extends Phaser.Scene {
   private darkRT!: Phaser.GameObjects.RenderTexture;
   private brush!: Phaser.GameObjects.Image;
   private dark = { level: 0 };
-  private spots: { x: number; y: number; sx: number; sy: number; on: boolean; src: { x: number; y: number }; beam: Phaser.GameObjects.Image }[] = [];
+  private spots: { x: number; y: number; sx: number; sy: number; on: boolean; src: { x: number; y: number }; beam: Phaser.GameObjects.Rope }[] = [];
   // the live jumbotron
   private jumboScreen!: JumboScreen;
   private jumbo: JumboContent = { kind: 'title' };
@@ -363,9 +367,11 @@ export class HoopsScene extends Phaser.Scene {
     this.board = this.add.image(bb.x, bb.y, this.k('backboard')).setOrigin(0.5, 220 / 420).setScale(1 / 3).setDepth(5);
 
     // spotlights
+    // (each shown as just its cone, not its whole box: see spotlightOutline — the two of them were
+    // about a seventh of the graphics chip's work on every frame here)
     for (const sp of [SPOTS.hero, SPOTS.king]) {
       const p = A(sp.x, sp.y);
-      const l = this.add.image(p.x, p.y + 20, 'spot').setOrigin(0.5, 1).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.45).setDepth(3);
+      const l = outlineImage(this, p.x, p.y + 20, 'spot', SPOT_OUTLINE, 0.5, 1).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.45).setDepth(3);
       this.tweens.add({ targets: l, angle: { from: -4, to: 4 }, yoyo: true, repeat: -1, duration: 2200, ease: 'Sine.easeInOut' });
     }
 
@@ -409,7 +415,7 @@ export class HoopsScene extends Phaser.Scene {
     this.darkRT = this.add.renderTexture(0, 0, ARENA_W, ARENA_H).setOrigin(0, 0).setDepth(11).setVisible(false);
     this.brush = new Phaser.GameObjects.Image(this, 0, 0, 'spotbrush').setOrigin(0.5);
     for (const src of [A(230, -90), A(1330, -90)]) {
-      const beam = this.add.image(src.x, src.y, 'spot').setOrigin(0.5, 0).setBlendMode(Phaser.BlendModes.ADD).setDepth(11.4).setVisible(false);
+      const beam = outlineImage(this, src.x, src.y, 'spot', SPOT_OUTLINE, 0.5, 0).setBlendMode(Phaser.BlendModes.ADD).setDepth(11.4).setVisible(false);
       this.spots.push({ x: src.x, y: 500, sx: 1, sy: 1, on: false, src, beam });
     }
 
