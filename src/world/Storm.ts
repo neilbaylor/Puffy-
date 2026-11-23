@@ -39,7 +39,7 @@ import {
  * camera's own flash (not drawn once it's faded: core/fadeFix). Nothing is left on screen see-through:
  * whatever's faded out is hidden.
  *
- * Light mode: the middle clouds alone, two rows of swells, one layer of rain, no near streaks, no
+ * Light mode: the middle clouds alone, two rows of swells, the rain as a few dozen streaks only, no
  * splashes, and the flash is the camera's white-out and the bolt only (no lit-up pictures to hold).
  */
 
@@ -47,13 +47,16 @@ import {
  * The rain: tiles, each a TileSprite over the view from the clouds' bellies down to the sea (a layer
  * of rain over the screen is a screenful for the graphics chip: the dear part of the storm). Full mode:
  * the far and middle layers drawn into one tile (`back`), and the near layer's few big streaks as a
- * handful of sprites of their own (NEAR_STREAKS) rather than a third screenful. Light: the middle layer.
+ * handful of sprites of their own (NEAR_STREAKS) rather than a third screenful. Light: no tile at all
+ * (that screenful of rain was most of what the storm cost there), just a few dozen of the middle
+ * layer's thinner streaks as sprites — sparser rain, nearly free.
  */
 const RAIN_TILES: readonly { key: string; layers: RainLayer[]; speed: number; parallax: number }[] = LIGHT
-  ? [{ key: 'f6-rain-mid', layers: ['mid'], speed: RAIN_LAYERS.mid.speed, parallax: 0.5 }]
+  ? []
   : [{ key: 'f6-rain-back', layers: ['far', 'mid'], speed: (RAIN_LAYERS.far.speed + RAIN_LAYERS.mid.speed) / 2, parallax: 0.4 }];
-/** The near rain's big streaks (full mode): how many on screen at once (design px: 1280 × 720 on screen). */
-const NEAR_STREAKS = LIGHT ? 0 : 26;
+/** The rain's streaks as sprites: how many on screen at once (design px: 1280 × 720 on screen), and which layer's look and speed (full mode: the near rain's big ones; light: all its rain, the middle layer's). */
+const NEAR_STREAKS = LIGHT ? 32 : 26;
+const STREAK_LAYER: RainLayer = LIGHT ? 'mid' : 'near';
 const STREAK = { w: 6, h: 90 } as const;
 /**
  * The clouds: one band, a TileSprite running the length of the world, its picture the clouds of one or
@@ -186,7 +189,7 @@ export class Storm {
     for (const r of RAIN_TILES) add(r.key, 256, 256, 1, (ctx) => r.layers.forEach((l) => drawRainTile(ctx, l, { far: 61, mid: 62, near: 63 }[l])));
     if (NEAR_STREAKS)
       add('f6-streak', STREAK.w, STREAK.h, 1, (ctx) => {
-        const L = RAIN_LAYERS.near;
+        const L = RAIN_LAYERS[STREAK_LAYER];
         const g = ctx.createLinearGradient(0, 0, 0, STREAK.h);
         g.addColorStop(0, `rgba(${L.col},0)`);
         g.addColorStop(1, `rgba(${L.col},${L.a})`);
@@ -303,7 +306,7 @@ export class Storm {
         img: s.add.image(0, 0, 'f6-streak').setOrigin(0.5, 1).setRotation(-Math.atan(RAIN_SLANT)).setDepth(7.7).setVisible(false),
         u: Math.random(),
         w: Math.random(),
-        v: (RAIN_LAYERS.near.speed / 720) * (0.85 + Math.random() * 0.3),
+        v: (RAIN_LAYERS[STREAK_LAYER].speed / 720) * (0.85 + Math.random() * 0.3),
       });
     if (!LIGHT) {
       this.splashFrames();
