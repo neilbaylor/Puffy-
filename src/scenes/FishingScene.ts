@@ -51,6 +51,7 @@ import { SimpleConfetti } from '../world/SimpleConfetti';
 import { softCircle, softShapes, type SoftShapes } from '../gfx/softShapes';
 import { partSteps } from '../gfx/textures';
 import { setOutlined } from '../ui/outline';
+import { BLOOPS_RES, bloopsLand, rpsHands } from '../gfx/bloops';
 
 export interface FishingData {
   session: Session;
@@ -991,9 +992,16 @@ export class FishingScene extends Phaser.Scene {
       const kc = this.bowlAt(2, -(BOWL.h - BOWL.cy) + 10 + Math.sin(this.clock / 700) * 3);
       this.kingSpr.setPosition(kc.x, kc.y).setRotation(a + Math.sin(this.clock / 900) * 0.05);
     }
+    if (this.heroFree) return;
     const h = this.onBoat(BOAT.hero, BOAT.feet + 2);
     this.hero.setPosition(h.x, h.y - this.heroHop).setRotation(a + this.heroLean);
   }
+  /** Boss 6's ending: the hero's off the boat (launched), placed by the cut scene, the rod put away. */
+  private heroFree = false;
+  /** Boss 6's ending: the rods put down for rock, paper, scissors. */
+  private rodsDown = false;
+  /** Boss 6's ending: the camera's free of the world's edges (following the hero up into the sky). */
+  private freeCam = false;
 
   /** The hero's hands (world), from the frame shown. */
   private heroHands(frameA: number) {
@@ -1036,8 +1044,8 @@ export class FishingScene extends Phaser.Scene {
     const cam = this.cameras.main;
     this.baseZoom = Math.max(this.scale.width / 1280, this.scale.height / 720);
     const z = this.baseZoom * this.cam.zoom;
-    const c0 = this.clearOfBoard(z);
-    const { tx, ty } = this.keepInView(c0.tx, c0.ty, z);
+    const c0 = this.freeCam ? { tx: this.cam.x, ty: this.cam.y } : this.clearOfBoard(z);
+    const { tx, ty } = this.freeCam ? c0 : this.keepInView(c0.tx, c0.ty, z);
     const k = snap ? 1 : 1 - Math.exp(-Math.min(0.1, this.game.loop.delta / 1000) * this.camK);
     const zoom = cam.zoom + (z - cam.zoom) * k;
     cam.setZoom(zoom);
@@ -1045,8 +1053,8 @@ export class FishingScene extends Phaser.Scene {
     const vh = this.scale.height / zoom;
     const cx = cam.midPoint.x + (tx - cam.midPoint.x) * k;
     const cy = cam.midPoint.y + (ty - cam.midPoint.y) * k;
-    const x = Phaser.Math.Clamp(snap ? tx : cx, WORLD_L + 20 + vw / 2, WORLD_W + 380 - vw / 2);
-    const y = Phaser.Math.Clamp(snap ? ty : cy, WORLD_TOP + vh / 2, WORLD_BOTTOM - vh / 2);
+    const x = this.freeCam ? (snap ? tx : cx) : Phaser.Math.Clamp(snap ? tx : cx, WORLD_L + 20 + vw / 2, WORLD_W + 380 - vw / 2);
+    const y = this.freeCam ? (snap ? ty : cy) : Phaser.Math.Clamp(snap ? ty : cy, WORLD_TOP + vh / 2, WORLD_BOTTOM - vh / 2);
     cam.centerOn(x, y);
   }
 
@@ -1386,6 +1394,7 @@ export class FishingScene extends Phaser.Scene {
   private drawRods() {
     const g = this.rods;
     g.clear();
+    if (this.heroFree || this.rodsDown) return;
     // the rod tip's streak through the whip, fading fast
     this.tipTrail = this.tipTrail.filter((q) => this.clock - q.t < 240);
     for (let i = 1; i < this.tipTrail.length; i++) {
@@ -3366,13 +3375,211 @@ export class FishingScene extends Phaser.Scene {
     this.camK = 2.2;
     this.cam = { x: home.x + 60, y: home.y - 90, zoom: 1.35 };
     await this.wait(700);
-    sfx.groan();
-    await this.kingSays('Best of three?', 2300);
-    await this.wait(500);
     card.hidden = true;
+    sfx.groan();
+    await this.kingSays('Hmph! But I have ONE more trick up my sleeve...', 2700);
+    await this.kingSays('Rock, paper, scissors! Winner takes ALL!', 2500);
+
+    // ── 7. rock, paper, scissors: King Bob's paper covers your rock ──
+    await this.rps6();
+    // ── 8. …and King Bob's trick: a spout of sea right under you, and up you go ──
+    await this.launch6();
+    // ── 9. down, far away: the Land of the Bloops ──
+    await this.bloops6();
     fadeOutMusic(500);
     const result: ResultState = { ...this.fd.result, hoops: score, level: this.fd.level ?? 6 };
     this.game.events.emit('level-complete', result);
+  }
+
+  /**
+   * Rock, paper, scissors after the rematch: rods down, a fist each (the hero's hand, King Bob's fin
+   * at his bowl's rim), pumping on ROCK… PAPER… SCISSORS…, then SHOOT! — you show rock, King Bob
+   * shows paper. He wins, and laughs.
+   */
+  private async rps6() {
+    rpsHands(this);
+    const kb = this.kingHome();
+    this.kingShot = false;
+    this.noClear = true;
+    this.camK = 2.2;
+    // (both of you in: King Bob's up on the flybridge, the hero down on the deck)
+    this.cam = { x: (this.hero.x + kb.x) / 2 + 40, y: (this.hero.y + kb.y - 150) / 2, zoom: 1.3 };
+    await this.wait(500);
+    await this.heroSays("You're on!", 1400);
+    // (the rods put down: hands free; each of you shows a hand — the hero's, and King Bob's fin at his bowl's rim)
+    this.rodsDown = true;
+    const yours = this.add.image(0, 0, 'f6-rps', 'rock').setScale(0).setFlipX(true).setDepth(5.5);
+    const his = this.add.image(0, 0, 'f6-rps', 'rock').setScale(0).setDepth(4.45);
+    // (his fin a little out of the water: King Bob's the one in the bowl)
+    const pump = { y: 0 };
+    // (held out to the side, towards each other: the hero's in front of their body, King Bob's out over his bowl's rim)
+    const heroH = HERO_K * CHAR_H * characterById(this.fd.charId).scale;
+    const follow = () => {
+      const k = this.kingSpr;
+      yours.setPosition(this.hero.x - 52, this.hero.y - heroH * 0.5 + pump.y).setRotation(-0.2 + pump.y * 0.01);
+      his.setPosition(k.x + 96, k.y - 6 + pump.y).setRotation(0.2 - pump.y * 0.01);
+    };
+    this.events.on('update', follow);
+    this.events.once('shutdown', () => this.events.off('update', follow));
+    for (const g of [yours, his]) this.tweens.add({ targets: g, scale: 0.28, duration: 260, ease: 'Back.easeOut' });
+    sfx.pop();
+    await this.wait(500);
+    for (const word of ['ROCK...', 'PAPER...', 'SCISSORS...']) {
+      this.tweens.add({ targets: pump, y: -30, duration: 150, ease: 'Quad.easeOut', yoyo: true });
+      sfx.thud();
+      void this.callout(word, 'small', 560);
+      await this.wait(680);
+    }
+    // SHOOT!
+    this.tweens.add({ targets: pump, y: -30, duration: 120, ease: 'Quad.easeOut', yoyo: true });
+    this.time.delayedCall(120, () => {
+      his.setFrame('paper');
+      for (const g of [yours, his]) this.tweens.add({ targets: g, scale: 0.36, duration: 140, ease: 'Quad.easeOut', yoyo: true });
+      sfx.pop();
+    });
+    await this.callout('SHOOT!', 'big', 900);
+    await this.wait(250);
+    sfx.groan();
+    void this.callout('PAPER COVERS ROCK!<small>King Bob wins!</small>', 'bad small', 2000);
+    await this.wait(2200);
+    // he's delighted
+    this.kingShot = true;
+    this.noClear = false;
+    this.cam = { x: kb.x + 60, y: kb.y - 100, zoom: 1.4 };
+    this.tweens.add({ targets: this.kingSpr, scaleY: this.kingSpr.scaleY * 1.08, duration: 160, yoyo: true, repeat: 5 });
+    sfx.laugh();
+    await this.kingSays('MWA-HA-HA-HA! Off you GO!', 2200);
+    for (const g of [yours, his]) this.tweens.add({ targets: g, scale: 0, duration: 200, ease: 'Back.easeIn', onComplete: () => g.destroy() });
+    this.time.delayedCall(220, () => this.events.off('update', follow));
+    this.kingShot = false;
+  }
+
+  /** King Bob's trick: a spout of sea bursts up through the deck under you and fires you up into the sky, out of sight. */
+  private async launch6() {
+    const ch = characterById(this.fd.charId);
+    const heroH = HERO_K * CHAR_H * ch.scale;
+    this.noClear = true;
+    this.camK = 3;
+    this.cam = { x: this.hero.x + 40, y: this.hero.y - 140, zoom: 1.3 };
+    await this.wait(500);
+    // a rumble under the boat
+    sfx.crumble();
+    this.cameras.main.shake(500, 0.004);
+    this.heroPose = 'j0';
+    this.tweens.add({ targets: this, heroHop: 6, duration: 60, yoyo: true, repeat: 7 });
+    await this.wait(600);
+    // the spout
+    const x0 = this.hero.x;
+    const y0 = this.hero.y;
+    this.heroFree = true;
+    const L = this.lures.hero;
+    if (L?.img) L.img.setVisible(false);
+    sfx.splash();
+    sfx.whoosh();
+    const spout = this.add.image(x0, y0 + 10, 'f6-bigsplash').setOrigin(0.5, 1 - 14 / BIG_SPLASH.h).setScale(0.3 / 1.5, 0.2).setDepth(5.2);
+    this.tweens.add({ targets: spout, scaleX: 1.1 / 1.5, scaleY: 3.2 / 1.5, duration: 380, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: spout, alpha: 0, delay: 900, duration: 600, onComplete: () => spout.destroy() });
+    this.bowlSlosh({ x: x0, y: y0 }, 26, 520);
+    void this.callout('WHOOOAAAA!', 'you', 1600);
+    // up, spinning, the camera following, smaller and smaller
+    const top = WORLD_TOP - 2600;
+    this.freeCam = true;
+    this.noClear = true;
+    this.camK = 6;
+    const s0 = this.hero.scaleX;
+    await this.during(1700, (u) => {
+      const e = Phaser.Math.Easing.Quadratic.In(u);
+      const y = y0 + (top - y0) * e;
+      this.hero.setPosition(x0 + Math.sin(u * 9) * 18 * u, y).setRotation(u * 14);
+      if (u > 0.55) this.hero.setScale(s0 * (1 - (u - 0.55) * 1.6));
+      this.cam = { x: x0, y: Math.max(y - heroH / 2, top + 200) + (u < 0.5 ? 0 : 120 * (u - 0.5)), zoom: 1.3 - 0.4 * u };
+    });
+    // a twinkle where you went
+    this.hero.setVisible(false);
+    const tw = this.add.image(this.hero.x, this.hero.y, 'fl-burst').setDepth(11).setBlendMode(Phaser.BlendModes.ADD).setScale(0.05);
+    sfx.powerup();
+    this.tweens.add({ targets: tw, scale: 0.5, angle: 180, duration: 260, yoyo: true, ease: 'Quad.easeOut', onComplete: () => tw.destroy() });
+    await this.wait(900);
+  }
+
+  /**
+   * Down, far away: the Land of the Bloops (a stand-in land till its art's made). Its own camera on its
+   * own corner of the world, the boat's camera switched off: you fall in from the sky, land with a
+   * thump and see stars; then, looking about: "Oh no, now the Bloops!" and its title comes up.
+   */
+  private async bloops6() {
+    const LX = 200000;
+    const LY = 0;
+    bloopsLand(this);
+    const land: Phaser.GameObjects.GameObject[] = [];
+    land.push(this.add.image(LX, LY, 'bl-land').setOrigin(0).setScale(1 / BLOOPS_RES).setDepth(9));
+    const ch = characterById(this.fd.charId);
+    const k = 1.35;
+    const hero = this.add.sprite(LX + 640, LY - 120, this.heroKey, 'j0').setOrigin(0.5, 1).setScale(this.heroScale * k).setDepth(9.5);
+    land.push(hero);
+    const cam = this.cameras.add(0, 0, this.scale.width, this.scale.height);
+    const fit = () => {
+      cam.setSize(this.scale.width, this.scale.height);
+      cam.setZoom(Math.max(this.scale.width / 1280, this.scale.height / 720));
+      cam.centerOn(LX + 640, LY + 360);
+    };
+    fit();
+    this.scale.on('resize', fit);
+    this.events.once('shutdown', () => this.scale.off('resize', fit));
+    cam.ignore(this.children.list.filter((o) => !land.includes(o)));
+    this.cameras.main.setVisible(false);
+    this.dom.querySelector<HTMLElement>('.fsh-board')!.hidden = true;
+    this.dom.querySelector<HTMLElement>('.tv-ticker')!.hidden = true;
+    cam.fadeIn(600, 255, 255, 255);
+    await this.wait(500);
+    // falling in, spinning
+    sfx.whistle();
+    const groundY = LY + 604;
+    await this.during(900, (u) => {
+      const e = Phaser.Math.Easing.Quadratic.In(u);
+      hero.setPosition(LX + 640 - 60 * (1 - u), LY - 120 + (groundY - (LY - 120)) * e).setRotation((1 - u) * 6);
+    });
+    // THUMP
+    hero.setRotation(0).setPosition(LX + 640, groundY);
+    sfx.thud();
+    sfx.stomp();
+    cam.shake(260, 0.012);
+    const sx = hero.scaleX;
+    const sy = hero.scaleY;
+    this.tweens.add({ targets: hero, scaleX: sx * 1.25, scaleY: sy * 0.72, duration: 90, yoyo: true, ease: 'Quad.easeOut' });
+    for (let i = 0; i < 10; i++) {
+      const side = i % 2 ? 1 : -1;
+      const d = softCircle(this, LX + 640 + side * (10 + Math.random() * 20), groundY - 6, 8 + Math.random() * 8, 0xe9d6b0, 0.9).setDepth(9.6);
+      this.tweens.add({ targets: d, x: d.x + side * (50 + Math.random() * 70), y: d.y - 10 - Math.random() * 26, scale: 1.8, alpha: 0, duration: 600 + Math.random() * 300, ease: 'Quad.easeOut', onComplete: () => d.destroy() });
+    }
+    await this.wait(250);
+    hero.setFrame('c5');
+    // seeing stars
+    const heroH = HERO_K * CHAR_H * ch.scale * k;
+    const stars = [0, 1, 2].map(() => this.add.image(0, 0, 'fl-burst').setScale(0.09).setDepth(9.6).setTint(0xffe066));
+    const t0 = this.clock;
+    const spin = this.time.addEvent({
+      delay: 16,
+      loop: true,
+      callback: () => stars.forEach((st, i) => {
+        const a = (this.clock - t0) / 260 + (i * Math.PI * 2) / 3;
+        st.setPosition(hero.x + Math.cos(a) * 34, hero.y - heroH - 6 + Math.sin(a) * 9).setDepth(Math.sin(a) > 0 ? 9.6 : 9.4);
+      }),
+    });
+    this.tweens.add({ targets: hero, rotation: 0.12, duration: 300, yoyo: true, repeat: 3, ease: 'Sine.easeInOut' });
+    // a moment to come round, a look about…
+    await this.wait(1400);
+    spin.remove();
+    stars.forEach((st) => st.destroy());
+    hero.setFlipX(true);
+    await this.wait(450);
+    hero.setFlipX(false);
+    await this.wait(450);
+    sfx.groan();
+    await this.say('Oh no, now the Bloops!', { x: hero.x + 14, y: hero.y - heroH + 6 }, 2400);
+    sfx.drum();
+    await this.callout('THE LAND OF<br>THE BLOOPS', 'king big', 2800);
+    await this.wait(300);
   }
 
   /** Where King Bob sits in his water (world), as placeBoat puts him (without his sway). */

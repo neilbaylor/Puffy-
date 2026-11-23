@@ -25,7 +25,7 @@ require('fs').mkdirSync(DIR, { recursive: true });
   await p.evaluate((lose) => { const f = window.__fishing; f.score = lose ? { hero: [false, false], king: [true, true, true] } : { hero: [true, true, true, true], king: [true, false, true] }; f.waits = []; f.renderBoard(4); lose ? f.kingWins() : f.youWin6(); }, lose);
   let i = 0;
   const t0 = Date.now();
-  while (Date.now() - t0 < 90000) {
+  while (Date.now() - t0 < 150000) {
     const modal = await p.evaluate(() => document.querySelector('.screen h2')?.textContent ?? '').catch(() => 'gone');
     await p.screenshot({ path: `${DIR}/e-${String(i++).padStart(3, '0')}.png` });
     if (modal) { console.log('result card:', modal); break; }
