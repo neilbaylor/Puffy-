@@ -1,0 +1,50 @@
+// The moments of Boss 6, each caught when it happens: args port light
+const { chromium } = require('playwright');
+const [port, light] = [process.argv[2] || '8411', process.argv[3] || '0'];
+const DIR = `shots/boss6/moments-L${light}`;
+require('fs').mkdirSync(DIR, { recursive: true });
+(async () => {
+  const br = await chromium.launch({ args: ['--use-gl=swiftshader'] });
+  const ctx = await br.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 2 });
+  await ctx.addInitScript((lt) => { if (!sessionStorage.getItem('x')) { sessionStorage.setItem('x', '1'); localStorage.setItem('puffy.beaten', '6'); localStorage.setItem('puffy.dev', '1'); localStorage.setItem('puffy.hero', 'puffy'); localStorage.setItem('puffy.light', lt); } }, light);
+  const p = await ctx.newPage();
+  const errs = []; p.on('pageerror', (e) => errs.push(e.message));
+  const shot = (n) => p.screenshot({ path: `${DIR}/${n}.png` });
+  const until = (fn, arg, t = 120000) => p.waitForFunction(fn, arg, { timeout: t, polling: 30 });
+  await p.goto(`http://localhost:${port}/`);
+  await until(() => window.game?.registry?.get('ready'), null, 300000);
+  await p.waitForTimeout(600);
+  await p.click('[data-act=bosses]'); await p.waitForTimeout(500); await p.click('[data-boss="6"]');
+  await until(() => window.__fishing?.scene?.isActive?.());
+  const f = 'window.__fishing';
+  await until(() => window.__fishing.hostTalk && document.querySelector('.tvo-cc')?.textContent.length > 30); await p.waitForTimeout(500); await shot('01-announcer-line1');
+  await until(() => window.__fishing.hostPoint && document.querySelector('.tvo-cc')?.textContent.length > 40); await p.waitForTimeout(400); await shot('02-announcer-line2');
+  await until(() => window.__fishing.hostShock && document.querySelector('.tvo-cc')?.textContent.length > 35); await p.waitForTimeout(400); await shot('03-announcer-hat-jumps');
+  await until(() => window.__fishing.kingLook === 'm' && !window.__fishing.dom.querySelector('.tv-old') || window.__fishing.kingLook === 'm'); await p.waitForTimeout(700); await shot('04-kingbob-lucky-last-time');
+  await until(() => window.__fishing.kingFree); await p.waitForTimeout(380); await shot('05-kingbob-flip-up');
+  await p.waitForTimeout(420); await shot('06-kingbob-flip-over');
+  await until(() => !window.__fishing.kingFree); await p.waitForTimeout(60); await shot('07-kingbob-splooosh');
+  await until(() => window.__fishing.kingLook === 'f'); await p.waitForTimeout(500); await shot('08-kingbob-not-again');
+  await until(() => !window.__fishing.inIntro);
+  await until(() => window.__fishing.lures.hero.mode === 'float'); await p.waitForTimeout(1200); await shot('09-contest-rain');
+  await until(() => !window.__fishing.dom.querySelector('.fsh-bite').hidden); await p.waitForTimeout(120); await shot('10-contest-bite');
+  // a flash, now (not near a bite)
+  await until(() => !window.__fishing.biteSoon && window.__fishing.lures.hero.mode === 'float');
+  await p.evaluate(() => window.__fishing.storm.flash()); await p.waitForTimeout(90); await shot('11-lightning');
+  await p.waitForTimeout(600);
+  // the ending
+  await p.evaluate(() => { const f = window.__fishing; f.score = { hero: [true, true, true, true], king: [true, false, true] }; f.waits = []; f.renderBoard(4); f.youWin6(); });
+  await until(() => /YOU WIN/.test(document.querySelector('.fsh-callout.show')?.textContent ?? '')); await p.waitForTimeout(500); await shot('12-you-win');
+  await until(() => window.__fishing.children.list.some((o) => o.type === 'Text' && /NEVER/.test(o.text))); await p.waitForTimeout(400); await shot('13-end-never-catch-me');
+  await until(() => window.__fishing.kingFree); await p.waitForTimeout(700); await shot('14-end-leap-over-stern');
+  await until(() => window.__fishing.children.list.some((o) => o.type === 'Text' && /Not so fast/.test(o.text))); await p.waitForTimeout(400); await shot('15-end-not-so-fast');
+  await until(() => window.__fishing.lures.hero.mode === 'fly'); await p.waitForTimeout(500); await shot('16-end-cast-after-him');
+  await until(() => /GOTCHA/.test(document.querySelector('.fsh-callout.show')?.textContent ?? '')); await p.waitForTimeout(500); await shot('17-end-gotcha');
+  await until(() => window.__fishing.children.list.some((o) => o.type === 'Text' && /Unhand/.test(o.text))); await p.waitForTimeout(600); await shot('18-end-unhand-me');
+  await until(() => window.__fishing.kingHooked); await p.waitForTimeout(800); await shot('19-end-reeled-up');
+  await until(() => window.__fishing.children.list.some((o) => o.type === 'Text' && /un-royal/.test(o.text))); await p.waitForTimeout(900); await shot('20-end-put-me-down');
+  await until(() => window.__fishing.children.list.some((o) => o.type === 'Text' && /Best of three/.test(o.text))); await p.waitForTimeout(500); await shot('21-end-best-of-three');
+  await until(() => !!document.querySelector('.screen h2')); await p.waitForTimeout(700); await shot('22-results');
+  console.log(errs.join('\n') || 'no errors');
+  await br.close();
+})();

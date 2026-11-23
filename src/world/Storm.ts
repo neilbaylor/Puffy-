@@ -207,7 +207,20 @@ export class Storm {
           ctx.restore();
         }
       });
-    add('f6-bolt', BOLT.w, BOLT.h, 1, (ctx) => drawLightning(ctx, BOLT.w * 0.4, 6, BOLT.w * 0.6, BOLT.h - 10, 7));
+    add('f6-bolt', BOLT.w, BOLT.h, 1, (ctx) => {
+      drawLightning(ctx, BOLT.w * 0.4, 6, BOLT.w * 0.6, BOLT.h - 10, 7);
+      // (its glow faded out towards the picture's sides: cut off by them, it showed as a lit box; its
+      // top's in the clouds and its foot behind the far sea)
+      ctx.globalCompositeOperation = 'destination-in';
+      const g = ctx.createLinearGradient(0, 0, BOLT.w, 0);
+      g.addColorStop(0, 'rgba(0,0,0,0)');
+      g.addColorStop(0.2, 'rgba(0,0,0,1)');
+      g.addColorStop(0.8, 'rgba(0,0,0,1)');
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, BOLT.w, BOLT.h);
+      ctx.globalCompositeOperation = 'source-over';
+    });
     add('f6-beam', BEAM.w, BEAM.h, 0.5, (ctx) => drawSunbeam(ctx, BEAM.w, BEAM.h));
     return steps;
   }
