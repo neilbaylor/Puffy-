@@ -5,7 +5,7 @@ import { sfx } from '../core/sfx';
 import { characterById } from '../data/characters';
 import { ART_RES, CARRY_SWING, CHAR_H, CHAR_W, WALK_FRAMES, bodyLift, carryHand, gearUp } from '../gfx/draw';
 import { recolorForSlot, slotRecolors } from '../gfx/recolor';
-import { HERO_SHEET_M, addCanvas, ensureLook, frameGrid, hires, makeCarrySheet, makeHeroSheet } from '../gfx/textures';
+import { HERO_SHEET_M, addCanvas, ensureLook, frameGrid, hires, lookJobs, makeCarrySheet, makeHeroSheet } from '../gfx/textures';
 import { wardrobe } from '../core/wardrobe';
 import { PRIZE_COLOR, drawBombBall, drawChute, drawFireball, drawPrize } from '../gfx/prizes';
 import { PLOP_FRAMES, PLOP_H, PLOP_W, drawPlop } from '../gfx/plops';
@@ -218,6 +218,86 @@ export function freeBattleArt(game: Phaser.Game) {
   };
   for (const sc of game.scene.getScenes(true)) look(sc.children.list);
   for (const k of game.textures.getTextureKeys()) if (BATTLE_ONLY.test(k) && !shown.has(k)) game.textures.remove(k);
+}
+
+/**
+ * The battle's still pictures — the bonuses and their parachutes, the bombs, rocks, anvils, the chair,
+ * the halo, fireballs, poo, ice, the Plops' sheets and the pellets — a maker each (key, draw it).
+ */
+function battleItemMakers(scene: Phaser.Scene): [string, () => void][] {
+  const R = ART_RES;
+  // (still pictures: their canvas pixels go once they're on the graphics chip, nothing reads them back)
+  const REL = { release: true };
+  const out: [string, () => void][] = [];
+  const add = (key: string, w: number, h: number, draw: (ctx: CanvasRenderingContext2D) => void, release = true) =>
+    out.push([key, () => addCanvas(scene, key, hires(w, h, R, draw), undefined, release ? REL : undefined)]);
+  for (const k of PRIZE_KINDS) add(`prize-${k}`, 30, 30, (ctx) => drawPrize(ctx, k));
+  add('bbomb', 24, 24, (ctx) => drawBombBall(ctx, 11, 13, 7));
+  add('brock', 42, 42, (ctx) => drawRock(ctx));
+  add('banvil', 42, 40, (ctx) => drawAnvil(ctx));
+  add('wr-chair', CHAIR_W + 8, CHAIR_H + 4, (ctx) => (ctx.translate(4, 2), drawFoldingChair(ctx)));
+  add('bhalo', 96, 96, (ctx) => {
+    // a soft white-gold glow with a brighter ring at its edge
+    const g = ctx.createRadialGradient(48, 48, 10, 48, 48, 47);
+    g.addColorStop(0, 'rgba(255,248,210,0)');
+    g.addColorStop(0.55, 'rgba(255,240,170,0.18)');
+    g.addColorStop(0.8, 'rgba(255,236,150,0.55)');
+    g.addColorStop(0.9, 'rgba(255,255,235,0.8)');
+    g.addColorStop(1, 'rgba(255,236,150,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(48, 48, 47, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  for (const k of PRIZE_KINDS) add(`prize-chute-${k}`, 30, 22, (ctx) => drawChute(ctx, k));
+  add('bfire', 40, 26, (ctx) => drawFireball(ctx, 26, 13, 9, 1));
+  add('bpoo', 26, 24, (ctx) => drawPoo(ctx, 13, 21, 1));
+  add('bice', 60, 70, (ctx) => drawIceBlock(ctx, 60, 70));
+  for (const kind of ['small', 'medium', 'large'] as const) {
+    const key = `bplop-${kind}`;
+    out.push([key, () => {
+      // (a margin each side: the leaf arms reach past the art's own frame)
+      const R2 = PLOP_RES[kind];
+      const fw = Math.round((PLOP_W + PLOP_PAD * 2) * R2);
+      const fh = Math.round((PLOP_H + PLOP_TOP) * R2);
+      const g = frameGrid(PLOP_FRAMES.length, fw, fh);
+      const { c, ctx } = canvas(g.w, g.h);
+      PLOP_FRAMES.forEach((f, i) => {
+        ctx.save();
+        ctx.translate(g.x(i), g.y(i));
+        ctx.scale(R2, R2);
+        drawPlop(ctx, PLOP_PAD, PLOP_TOP, f, STYLES.polished, kind);
+        ctx.restore();
+      });
+      addCanvas(scene, key, c, (t) => PLOP_FRAMES.forEach((f, i) => t.add(f, 0, g.x(i), g.y(i), fw, fh)), { release: true });
+    }]);
+  }
+  add('bpellet', 16, 16, (ctx) => drawPellet(ctx), false);
+  return out;
+}
+
+/**
+ * The battle's own pictures not drawn yet — the arena's ground, clouds and trees, its look, and the
+ * still pictures above — a job each. The lobby draws them a job a frame while you wait (see BattleUI):
+ * the arena used to be drawn all at once as the countdown ran out, in one frame of 1.3-1.6 s on a 4x
+ * slowed CPU (~75 pictures drawn and sent to the graphics chip), the countdown's clock stuck meanwhile.
+ * The battle itself then only puts them up; anything not drawn yet it still draws as before.
+ */
+export function battleArtJobs(scene: Phaser.Scene): (() => void)[] {
+  const jobs: (() => void)[] = [];
+  // the arena's ground (as the battle draws it: not cut short at the bottom), clouds and trees: a view
+  // of it is made only to work them out, nothing of it stays up
+  const before = new Set(scene.children.list);
+  const view = new LevelView(scene, buildArena(), { lazyNear: -1e9, lazySpan: [0, 0], ahead: false, keep: true, only: [-1e9, -1e9] });
+  for (const o of scene.children.list.filter((c) => !before.has(c))) o.destroy();
+  jobs.push(...view.paintJobs().map((j) => () => void j()), ...view.laterJobs());
+  jobs.push(...lookJobs(scene, BATTLE_LOOKS[0], false, true));
+  for (const [key, make] of battleItemMakers(scene))
+    if (!scene.textures.exists(key))
+      jobs.push(() => {
+        if (!scene.textures.exists(key)) make();
+      });
+  return jobs;
 }
 
 export interface BattleHud {
@@ -507,51 +587,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private makePrizeTextures() {
-    const R = ART_RES;
-    // (still pictures: their canvas pixels go once they're on the graphics chip, nothing reads them back)
-    const REL = { release: true };
-    for (const k of PRIZE_KINDS) if (!this.textures.exists(`prize-${k}`)) addCanvas(this, `prize-${k}`, hires(30, 30, R, (ctx) => drawPrize(ctx, k)), undefined, REL);
-    if (!this.textures.exists('bbomb')) addCanvas(this, 'bbomb', hires(24, 24, R, (ctx) => drawBombBall(ctx, 11, 13, 7)), undefined, REL);
-    if (!this.textures.exists('brock')) addCanvas(this, 'brock', hires(42, 42, R, (ctx) => drawRock(ctx)), undefined, REL);
-    if (!this.textures.exists('banvil')) addCanvas(this, 'banvil', hires(42, 40, R, (ctx) => drawAnvil(ctx)), undefined, REL);
-    if (!this.textures.exists('wr-chair')) addCanvas(this, 'wr-chair', hires(CHAIR_W + 8, CHAIR_H + 4, R, (ctx) => (ctx.translate(4, 2), drawFoldingChair(ctx))), undefined, REL);
-    if (!this.textures.exists('bhalo'))
-      addCanvas(this, 'bhalo', hires(96, 96, R, (ctx) => {
-        // a soft white-gold glow with a brighter ring at its edge
-        const g = ctx.createRadialGradient(48, 48, 10, 48, 48, 47);
-        g.addColorStop(0, 'rgba(255,248,210,0)');
-        g.addColorStop(0.55, 'rgba(255,240,170,0.18)');
-        g.addColorStop(0.8, 'rgba(255,236,150,0.55)');
-        g.addColorStop(0.9, 'rgba(255,255,235,0.8)');
-        g.addColorStop(1, 'rgba(255,236,150,0)');
-        ctx.fillStyle = g;
-        ctx.beginPath();
-        ctx.arc(48, 48, 47, 0, Math.PI * 2);
-        ctx.fill();
-      }), undefined, REL);
-    for (const k of PRIZE_KINDS) if (!this.textures.exists(`prize-chute-${k}`)) addCanvas(this, `prize-chute-${k}`, hires(30, 22, R, (ctx) => drawChute(ctx, k)), undefined, REL);
-    if (!this.textures.exists('bfire')) addCanvas(this, 'bfire', hires(40, 26, R, (ctx) => drawFireball(ctx, 26, 13, 9, 1)), undefined, REL);
-    if (!this.textures.exists('bpoo')) addCanvas(this, 'bpoo', hires(26, 24, R, (ctx) => drawPoo(ctx, 13, 21, 1)), undefined, REL);
-    if (!this.textures.exists('bice')) addCanvas(this, 'bice', hires(60, 70, R, (ctx) => drawIceBlock(ctx, 60, 70)), undefined, REL);
-    for (const kind of ['small', 'medium', 'large'] as const) {
-      const key = `bplop-${kind}`;
-      if (this.textures.exists(key)) continue;
-      // (a margin each side: the leaf arms reach past the art's own frame)
-      const R2 = PLOP_RES[kind];
-      const fw = Math.round((PLOP_W + PLOP_PAD * 2) * R2);
-      const fh = Math.round((PLOP_H + PLOP_TOP) * R2);
-      const g = frameGrid(PLOP_FRAMES.length, fw, fh);
-      const { c, ctx } = canvas(g.w, g.h);
-      PLOP_FRAMES.forEach((f, i) => {
-        ctx.save();
-        ctx.translate(g.x(i), g.y(i));
-        ctx.scale(R2, R2);
-        drawPlop(ctx, PLOP_PAD, PLOP_TOP, f, STYLES.polished, kind);
-        ctx.restore();
-      });
-      addCanvas(this, key, c, (t) => PLOP_FRAMES.forEach((f, i) => t.add(f, 0, g.x(i), g.y(i), fw, fh)), { release: true });
-    }
-    if (!this.textures.exists('bpellet')) addCanvas(this, 'bpellet', hires(16, 16, R, (ctx) => drawPellet(ctx)));
+    for (const [key, make] of battleItemMakers(this)) if (!this.textures.exists(key)) make();
   }
 
   /** The wooden ramp up to the middle island (its surface is the physics' ramp line). */

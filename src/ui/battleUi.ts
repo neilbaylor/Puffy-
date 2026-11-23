@@ -16,7 +16,7 @@ import { gearOf } from '../core/wardrobe';
 import { freeBossArtExcept, gameArtJobs } from '../gfx/textures';
 import { loadArt } from './artLoader';
 import { BattleNet, battleUrl, type NetStatus } from '../net/battleNet';
-import { freeBattleArt, type BattleHud } from '../scenes/BattleScene';
+import { battleArtJobs, freeBattleArt, type BattleHud } from '../scenes/BattleScene';
 import { LIGHT } from '../core/light';
 
 /** The results card's Leave button ignores taps this long after it shows (mashed shoot taps). */
@@ -154,6 +154,7 @@ export class BattleUI {
     const name = storedName();
     this.lastPhase = '';
     this.showLobby();
+    this.drawArena();
     if (!url) return this.status('offline', 'Online battles work on the game’s web address (not a saved copy).');
     this.status('connecting');
     playMenuMusic(); // (the start screen's song carries on in the lobby)
@@ -181,6 +182,7 @@ export class BattleUI {
     this.host.game.events.off('battle-hud', this.onHud);
     this.stopBattle();
     this.dropWarm();
+    this.stopArena();
     this.homeStill(false);
     this.lobby = null;
     this.askCode();
@@ -197,6 +199,7 @@ export class BattleUI {
     this.host.game.events.off('battle-hud', this.onHud);
     this.stopBattle();
     this.dropWarm();
+    this.stopArena();
     // (done with battles for now: the pictures only a battle shows go — they're drawn again, as the first
     // time, if you come back)
     freeBattleArt(this.host.game);
@@ -573,12 +576,61 @@ export class BattleUI {
     this.clockRaf = requestAnimationFrame(tick);
   }
 
+  // ── the arena's pictures, drawn while you're in the lobby (see battleArtJobs) ──
+
+  private arenaJobs: (() => void)[] = [];
+  private arenaRaf = 0;
+  /** Watching was asked for while the arena's pictures were still being drawn (see watch). */
+  private watchLater = false;
+
+  /**
+   * The arena's ground, clouds, trees, bonuses and Plops, drawn a job a frame (a few small ones
+   * together) while you wait in the lobby, so building the arena as the countdown runs out only has
+   * to put them up. Each job sends its picture to the graphics chip in its own frame too.
+   */
+  private drawArena() {
+    cancelAnimationFrame(this.arenaRaf);
+    this.arenaRaf = 0;
+    const menu = this.host.game.scene.getScene('Menu');
+    this.arenaJobs = menu?.sys.isActive() ? battleArtJobs(menu) : [];
+    const step = () => {
+      this.arenaRaf = 0;
+      const t0 = performance.now();
+      do {
+        const job = this.arenaJobs.shift();
+        if (!job) break;
+        try {
+          job();
+        } catch (e) {
+          // (the battle draws it again as it's built, or shows Phaser's "missing" picture: the game goes on)
+          console.error('A drawing step failed:', e);
+        }
+      } while (this.arenaJobs.length && performance.now() - t0 < 4);
+      if (this.arenaJobs.length) this.arenaRaf = requestAnimationFrame(step);
+      else if (this.watchLater) {
+        this.watchLater = false;
+        if (this.lobby?.classList.contains('watching')) this.watch(true);
+      }
+    };
+    if (this.arenaJobs.length) this.arenaRaf = requestAnimationFrame(step);
+  }
+
+  /** Stop drawing the arena ahead (left the room; or the battle's being built: it draws what's left). */
+  private stopArena() {
+    cancelAnimationFrame(this.arenaRaf);
+    this.arenaRaf = 0;
+    this.arenaJobs = [];
+    this.watchLater = false;
+  }
+
   /** Build the arena now (hidden), while the countdown runs. */
   private warmed = false;
   private warmUp() {
     const g = this.host.game;
     if (!this.net || g.scene.isActive('Battle')) return;
     this.warmed = true;
+    // (anything of the arena not drawn yet, the battle draws as it's built)
+    this.stopArena();
     g.scene.start('Battle', { net: this.net, spectate: true, warm: true });
   }
   private coolDown() {
@@ -628,6 +680,10 @@ export class BattleUI {
 
   private watch(on: boolean) {
     const g = this.host.game;
+    // (joined while a battle's on: the live window waits for the arena's pictures, drawn a job a frame,
+    // rather than having them all drawn in the one frame it opens with)
+    this.watchLater = on && !this.spectating && this.arenaJobs.length > 0;
+    if (this.watchLater) return;
     if (on && !this.spectating && this.net) {
       this.spectating = true;
       this.watchRate(true);
@@ -683,6 +739,7 @@ export class BattleUI {
     }
     this.inBattle = true;
     this.stopClock();
+    this.stopArena();
     const g = this.host.game;
     const net = this.net;
     const old = this.lobby;
