@@ -371,3 +371,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.366: Full mode runs smoother (about a quarter faster per frame on slow tablets): screen-edge smoothing is off, and ropes, nets, lines and shadows draw their own soft edges instead.
 - v0.367: Big speed-up everywhere (about a third faster per frame on slow tablets, in full and light mode): less invisible drawing, skies and glows drawn more cheaply.
 - v0.368: Fewer stutters: no freezes when switching Parts on the start screen or entering bosses, smoother start to the Part 4 climb, backgrounds drawn more cheaply everywhere, and a slow memory leak on boss visits fixed.
+- v0.369: Bosses about 10% smoother, no freeze when a battle starts, the Shop scrolls at full speed, and loading screens keep moving instead of freezing.
