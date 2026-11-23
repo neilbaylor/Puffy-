@@ -384,3 +384,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.379: Titles and the pause / sound buttons look right on older iPads.
 - v0.380: On older iPads: the logo, level titles, Back to the Start, boss callouts and the top buttons look right.
 - v0.381: Boss 6: after you catch King Bob, he challenges you to rock, paper, scissors, wins, and launches you to the Land of the Bloops.
+- v0.382: Boss 6: rock, paper, scissors played with the hero's own hand and King Bob's fin.
