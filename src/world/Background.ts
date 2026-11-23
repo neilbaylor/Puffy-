@@ -118,6 +118,18 @@ interface Tile {
   imgs: Phaser.GameObjects.Image[];
   /** How many of `imgs` are in use. */
   n: number;
+  /** Each piece in use: its box in the picture (x, w; from row `top`, `h` rows), and how many of those rows it's showing now (see hideUnder). */
+  boxes: { x: number; w: number; top: number; h: number; shown: number }[];
+}
+
+/**
+ * Where a level's ground hides whatever's drawn behind it (see LevelView.cover): `at(x0, x1)`, the
+ * height (world px) from which it's solid all the way down, all across x0…x1 (Infinity: not all across);
+ * `on()`, whether that holds as far down as the camera shows this frame (nothing's cut if not).
+ */
+export interface GroundCover {
+  at: (x0: number, x1: number) => number;
+  on: () => boolean;
 }
 
 interface Layer {
@@ -296,7 +308,7 @@ export class Background {
       // over what stays the same)
       const imgs: Phaser.GameObjects.Image[] = [];
       for (let k = 0; k < LAYER_PIECES; k++) imgs.push(this.scene.add.image(0, 0, key).setOrigin(0, 0).setScale(1 / this.res).setDepth(depth));
-      const tile: Tile = { imgs, n: 0 };
+      const tile: Tile = { imgs, n: 0, boxes: [] };
       this.cut(tile, key);
       tiles.push(tile);
     }
@@ -307,16 +319,51 @@ export class Background {
   private cut(tile: Tile, key: string) {
     const pieces = this.pieces ? bgPieces(key) : undefined;
     if (!pieces) {
-      tile.imgs[0].setTexture(key).setCrop();
+      const img = tile.imgs[0].setTexture(key).setCrop();
       tile.n = 1;
+      tile.boxes = [{ x: 0, w: img.frame.width, top: 0, h: img.frame.height, shown: img.frame.height }];
     } else {
       tile.n = pieces.length;
-      pieces.forEach((p, i) => {
+      tile.boxes = pieces.map((p, i) => {
         const img = tile.imgs[i].setTexture(key);
-        img.setCrop(p.x, p.top, p.w, img.frame.height - p.top);
+        const h = img.frame.height - p.top;
+        img.setCrop(p.x, p.top, p.w, h);
+        return { x: p.x, w: p.w, top: p.top, h, shown: h };
       });
     }
     for (let i = tile.n; i < tile.imgs.length; i++) tile.imgs[i].setVisible(false);
+  }
+
+  /**
+   * The level's ground in front (see GroundCover): what of the far scenery, hills and cloud sea it
+   * hides isn't drawn. Each of their pieces stops where the ground in front of it is solid all the way
+   * down (and goes altogether if that's above its top): it was drawn there every frame, only to be
+   * painted over by the ground — a level's camera sits low over the ground, which fills the bottom
+   * quarter of the screen or so, and the three layers run down behind it. The graphics chip blends
+   * every pixel of every picture, so on a slow one the drawing time goes with the pixels drawn. What's
+   * on screen stays the same: only pixels the ground paints over are left out.
+   */
+  hideUnder(cover: GroundCover | null) {
+    this.cover = cover;
+  }
+  private cover: GroundCover | null = null;
+
+  /** Show a piece of a layer's picture (see hideUnder): `ground` is the ground's cover where it is (null: none). */
+  private showPiece(img: Phaser.GameObjects.Image, b: Tile['boxes'][number], x: number, y: number, ground: { x0: number; x1: number } | null) {
+    let h = b.h;
+    if (ground) {
+      const at = this.cover!.at(Math.max(x + b.x / this.res, ground.x0), Math.min(x + (b.x + b.w) / this.res, ground.x1));
+      // (the rows above that height; a piece wholly under it isn't drawn)
+      if (at < Infinity) h = Math.min(h, Math.ceil((at - y) * this.res) - b.top);
+    }
+    if (h <= 0) {
+      img.setVisible(false);
+      return;
+    }
+    if (h !== b.shown) {
+      b.shown = h;
+      img.setCrop(b.x, b.top, b.w, h);
+    }
   }
 
   /** Pieces (see Tile): with WebGL only (the canvas renderer draws only what's in a picture anyway). */
@@ -566,6 +613,9 @@ export class Background {
     }
     this.drawClouds(view, camUp, dt);
     this.drawSeeds(view, dt);
+    // (the ground's cover: across the view and a little either side — a shake moves the picture a
+    // few pixels)
+    const ground = this.cover?.on() ? { x0: view.left - 40, x1: view.left + view.width + 40 } : null;
     for (const l of this.layers) {
       l.offset += l.drift * dt;
       l.y = view.top + view.height * l.anchor + camUp * l.fy;
@@ -591,6 +641,7 @@ export class Background {
             const img = t.imgs[j];
             img.setVisible(show).setPosition(x, l.y);
             if (t === b[i]) img.setAlpha(this.wB);
+            if (show) this.showPiece(img, t.boxes[j], x, l.y, ground);
           }
       }
     }
@@ -599,11 +650,13 @@ export class Background {
     const fillTop = near.y + near.h - 2;
     // (not drawn at all while it's below the view: its few pixels' strip off the bottom of the screen
     // still cost a break in the drawing's batching, every frame)
-    const fillOn = fillTop < view.top + view.height + 8;
+    // (nor what of it the ground hides, all across the view: see hideUnder)
+    const fillEnd = Math.min(view.top + view.height + 4, ground ? this.cover!.at(ground.x0, ground.x1) : Infinity);
+    const fillOn = fillTop < view.top + view.height + 8 && fillTop < fillEnd;
     this.fill.setVisible(fillOn);
     if (fillOn) {
       this.fill.setPosition(view.left - 2, fillTop);
-      this.fill.setSize(view.width + 4, Math.max(0, view.top + view.height - fillTop + 4));
+      this.fill.setSize(view.width + 4, Math.max(0, fillEnd - fillTop));
     }
   }
 }

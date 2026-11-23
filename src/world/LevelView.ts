@@ -8,6 +8,7 @@ import { GRASS_FILLS, KELP_H, KELP_W, PIER_HEAD, PIER_HEAD_MODERN, SEA_PROPS, SW
 import { DEFAULT_PALETTE, PALETTES, drawCloudPlatform, drawPuffTree, drawTerrainPiece, roundPoly, traceCellList, type TerrainKind, type WorldPalette } from '../gfx/world';
 import { drawPine } from '../gfx/mountain';
 import type { Cell, LevelData } from '../level/builder';
+import type { GroundCover } from './Background';
 import { ONE_WAY_TILES, SOLID_TILES } from '../level/tiles';
 
 const PAD = 34; // room around each terrain piece for grass blades / roots
@@ -17,6 +18,13 @@ const CHUNK = 800;
 const CHUNK_V = 1024;
 /** How far under a level's bottom its ground pictures go (px): the camera shows 28 px at most there. */
 const TRIM_KEEP = 64;
+/**
+ * groundHides' margins (world px): the columns either side of a stretch that count too (a piece's corner
+ * is rounded off by up to 12 px, its outline wobbles by up to 1.6), and how far under the ground's top
+ * the cover starts (the wobble, the inked edge and the blending of the picture's edge pixels).
+ */
+const GROUND_HIDE_X = 40;
+const GROUND_HIDE_Y = 16;
 /** Colour of the deep rock under each terrain chunk (sampled once, when the chunk is drawn). */
 const DEEP_FILL = new Map<string, number>();
 /** Each level's terrain pieces (outline + bounds), worked out once (see LevelView.pieces). */
@@ -415,6 +423,64 @@ export class LevelView {
   }
 
   /** Top of the ground in column at world x (for framing the camera), or the level bottom. */
+
+  /**
+   * Where the ground hides whatever's drawn behind it (see Background.hideUnder): from how high (world
+   * px) the ground and rock stand unbroken all the way down to the level's bottom, in each tile
+   * column — Infinity where they don't (a pit, a gap under a ledge). Only one kind counts, the one at
+   * the bottom: where ground and rock meet, each has its own wobbly inked outline, and a hair of what's
+   * behind could show between them. Worked out once, from the level's cells.
+   */
+  private solidTops: Float64Array | null = null;
+
+  /**
+   * How far down the ground is sure to hide everything behind it, all across x0…x1 (world px; see
+   * Background.hideUnder): the lowest of its solid tops there, and a column's worth either side (the
+   * corners of a piece are rounded, by up to 12 px), plus a margin for its wobbly outline and the
+   * blending at its edge. Infinity if any of it is open (a pit nearby, or past the level's ends).
+   * (Down to TRIM_KEEP under the level's bottom only: the ground's pictures stop there — see cover.)
+   */
+  groundHides(x0: number, x1: number): number {
+    if (!(x1 >= x0)) return Infinity;
+    const tops = (this.solidTops ??= this.findSolidTops());
+    const c0 = Math.floor((x0 - GROUND_HIDE_X) / TILE);
+    const c1 = Math.floor((x1 + GROUND_HIDE_X) / TILE);
+    if (c0 < 0 || c1 >= tops.length) return Infinity;
+    let at = -Infinity;
+    for (let c = c0; c <= c1; c++) if (tops[c] > at) at = tops[c];
+    return at + GROUND_HIDE_Y;
+  }
+
+  /**
+   * The ground's cover, for the Background behind it (see groundHides) — only while the camera shows
+   * nothing lower than where the ground's pictures are sure to reach (TRIM_KEEP under the level's
+   * bottom): the lowest it shows, turned as it is, and a shake's worth.
+   */
+  get cover(): GroundCover {
+    return {
+      at: (x0, x1) => this.groundHides(x0, x1),
+      on: () => {
+        const cam = this.scene.cameras.main;
+        const r = (cam as unknown as { rotation: number }).rotation;
+        const low = cam.scrollY + cam.height / 2 + (cam.height / cam.zoom / 2) * Math.abs(Math.cos(r)) + (cam.width / cam.zoom / 2) * Math.abs(Math.sin(r));
+        return low + 16 <= this.heightPx + TRIM_KEEP;
+      },
+    };
+  }
+
+  private findSolidTops() {
+    const W = this.data.width;
+    const H = this.data.height;
+    const tops = new Float64Array(W).fill(Infinity);
+    for (let x = 0; x < W; x++) {
+      const kind = this.cell(x, H - 1);
+      if (kind !== 'ground' && kind !== 'rock') continue;
+      let y = H - 1;
+      while (y > 0 && this.cell(x, y - 1) === kind) y--;
+      tops[x] = y * TILE;
+    }
+    return tops;
+  }
 
   /** The lowest ground surface (largest y) between two x positions, ignoring pits. */
   private deepestSurface(xa: number, xb: number) {

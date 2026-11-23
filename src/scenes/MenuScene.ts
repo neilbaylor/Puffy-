@@ -202,6 +202,7 @@ export class MenuScene extends Phaser.Scene {
         const look0 = themesFor(id)[0];
         ensureLook(this, look0, lo);
         const bg = new Background(this, (data.bgBottom ?? lv.heightPx) - VIEW_H, true, !!data.vertical, data.water !== undefined, lo);
+        bg.hideUnder(lv.cover);
         const mix = themeMix(0, themesFor(id));
         bg.setTheme(mix);
         lv.setTint(mixTint(mix));
@@ -514,6 +515,7 @@ export class MenuScene extends Phaser.Scene {
     ensureLook(this, look0, level.lo);
     // (still clouds on the start screen: re-drawing their shapes is a constant job it doesn't need)
     const bg = new Background(this, (data.bgBottom ?? level.heightPx) - VIEW_H, true, !!data.vertical, data.water !== undefined, level.lo);
+    bg.hideUnder(level.cover);
     const mix = themeMix(0, themesFor(id));
     bg.setTheme(mix);
     level.setTint(mixTint(mix));
