@@ -377,3 +377,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.372: No more automatic "Switching to light mode" or lower-resolution switching; light mode is set by hand for now (a device benchmark will decide it later).
 - v0.373: Hidden device check page (?bench) for working out which devices need light mode.
 - v0.374: Boss 6 for testers: King Bob's rematch on a bigger boat in a thunderstorm, and this time you catch him.
+- v0.375: Boss 6 runs smoother in light mode (lighter rain).
