@@ -460,9 +460,9 @@ function drawKingBob(ctx: Ctx, st: Style, sw: number, _flap: number) {
     fin(st, ctx, cx + 20, cy + 22, 21, 12, -0.3, -0.75, F(ORANGE, '#e2661a', '#ffc98c'), 9513);
   }
   if (kingBobLook.rps) {
-    // rock, paper, scissors (Boss 6's ending): his front fin up out of the water towards you, well clear
-    // of his face — curled into a fist (pumped up or down); or for paper, spread out flat: a round fan
-    // of fin, scalloped at its edge, its rays running out to each scallop
+    // rock, paper, scissors (Boss 6's ending): his front fin curled into a fist in front of his chest
+    // (pumped up or down: kept inside his bowl); or for paper — thrown as he leaps up out of the bowl —
+    // spread out flat: a round fan of fin, scalloped at its edge, its rays running out to each scallop
     const FIN = F(ORANGE, '#e2661a', '#ffc98c');
     const bx = cx + 24;
     const by = cy + 24;
@@ -490,10 +490,13 @@ function drawKingBob(ctx: Ctx, st: Style, sw: number, _flap: number) {
       // where it joins him
       st.shape(ctx, ellipsePts(bx, by, 7.5, 6.5, -0.5, 16), FIN, 9536, { lw: 0.9 });
     } else {
-      const a = kingBobLook.rps === 'up' ? -0.85 : -0.2;
-      // (the fin's root out to the fist: a short round arm of fin)
-      st.shape(ctx, ellipsePts(bx + Math.cos(a) * 13, by + Math.sin(a) * 13, 15, 6.4, a, 24), FIN, 9520, { lw: 0.9 });
-      drawRpsHand(ctx, st, bx + Math.cos(a) * 29, by + Math.sin(a) * 29, a, 'rock', FIN, 9521, 11);
+      // (the fist kept in close, in front of his chest — inside his bowl: he only comes out of it for paper)
+      // (below his mouth, the arm out level and the fist pumped up and down)
+      const a = kingBobLook.rps === 'up' ? -0.55 : -0.1;
+      const fx = cx + 16;
+      const fy = cy + 28;
+      st.shape(ctx, ellipsePts(fx + Math.cos(a) * 6, fy + Math.sin(a) * 6, 8.5, 5, a, 24), FIN, 9520, { lw: 0.9 });
+      drawRpsHand(ctx, st, fx + Math.cos(a) * 14, fy + Math.sin(a) * 14, a, 'rock', FIN, 9521, 7.5);
     }
   }
   // the crown: on at a jaunty tilt — or knocked right over, slipping off the back of his head

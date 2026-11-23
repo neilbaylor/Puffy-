@@ -3468,14 +3468,43 @@ export class FishingScene extends Phaser.Scene {
       void this.callout(word, 'small', 560);
       await this.wait(680);
     }
-    // SHOOT!
+    // SHOOT! — and King Bob leaps up out of his bowl to throw his paper (his fin never pokes through the glass)
     this.heroPose = 'u';
     this.kingRps = 'k0';
+    const k = this.kingSpr;
+    const rim = this.bowlAt(0, -BOWL.h + 22);
+    // (pulled back and up, and the scoreboard out of the way: King Bob's leap all in the shot)
+    this.cam = { x: this.cam.x - 40, y: this.cam.y - 90, zoom: 1.0 };
+    const board = this.dom.querySelector<HTMLElement>('.fsh-board')!;
+    board.hidden = true;
     this.time.delayedCall(140, () => {
       this.heroPose = 'r';
       this.kingRps = 'kp';
       this.tweens.add({ targets: this, heroHop: 8, duration: 120, ease: 'Quad.easeOut', yoyo: true });
       sfx.pop();
+      sfx.whoosh();
+      this.kingFree = true;
+      k.setDepth(8.6);
+      this.bowlSlosh(rim, 14, 380);
+      const y0 = k.y;
+      const x0 = k.x;
+      this.tweens.chain({
+        targets: k,
+        tweens: [
+          { y: y0 - 130, x: x0 + 16, duration: 320, ease: 'Quad.easeOut' },
+          { y: y0 - 118, duration: 650, ease: 'Sine.easeInOut' },
+          { y: y0, x: x0, duration: 320, ease: 'Quad.easeIn' },
+        ],
+        onComplete: () => {
+          // splash: back in his bowl, his fin back in too
+          k.setDepth(4.35);
+          this.kingFree = false;
+          this.kingRps = null;
+          board.hidden = false;
+          this.bowlSlosh(rim, 30, 480);
+          sfx.splash();
+        },
+      });
     });
     await this.callout('SHOOT!', 'big', 900);
     await this.wait(250);
