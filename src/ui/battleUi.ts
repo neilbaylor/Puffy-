@@ -225,6 +225,7 @@ export class BattleUI {
   private dropWarm() {
     const g = this.host.game;
     this.warmed = false;
+    this.warmLater = false;
     if (!this.inBattle && g.scene.isActive('Battle')) g.scene.stop('Battle');
   }
 
@@ -618,6 +619,7 @@ export class BattleUI {
         if (isSliceJob(job)) break;
       } while (this.arenaJobs.length && performance.now() - t0 < 4);
       if (this.arenaJobs.length) this.arenaRaf = requestAnimationFrame(step);
+      else if (this.warmLater) this.buildWarm();
       else if (this.watchLater) {
         this.watchLater = false;
         if (this.lobby?.classList.contains('watching')) this.watch(true);
@@ -658,6 +660,7 @@ export class BattleUI {
     this.arenaJobs = [];
     this.sheetsAhead.clear();
     this.watchLater = false;
+    this.warmLater = false;
   }
 
   /** Build the arena now (hidden), while the countdown runs. */
@@ -666,12 +669,27 @@ export class BattleUI {
     const g = this.host.game;
     if (!this.net || g.scene.isActive('Battle')) return;
     this.warmed = true;
-    // (anything of the arena not drawn yet, the battle draws as it's built)
+    // (the arena's pictures not all drawn yet — a quick Start now — it's built once they are, the
+    // drawing going on a job a frame as the countdown runs: built straight away, the battle drew what
+    // was left as it was built, in one frame of up to a second at 4x slow CPU, the clock stuck)
+    if (this.arenaJobs.length) {
+      this.warmLater = true;
+      return;
+    }
+    this.buildWarm();
+  }
+  /** The arena's to be built once its pictures are all drawn (see warmUp). */
+  private warmLater = false;
+  private buildWarm() {
+    const g = this.host.game;
+    this.warmLater = false;
+    if (!this.net || !this.warmed || g.scene.isActive('Battle')) return;
     this.stopArena();
     g.scene.start('Battle', { net: this.net, spectate: true, warm: true });
   }
   private coolDown() {
     this.warmed = false;
+    this.warmLater = false;
     const g = this.host.game;
     if (!this.inBattle && !this.spectating && g.scene.isActive('Battle')) g.scene.stop('Battle');
   }
