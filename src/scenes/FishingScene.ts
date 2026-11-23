@@ -459,6 +459,12 @@ export class FishingScene extends Phaser.Scene {
     this.kingFree = false;
     this.heroHop = 0;
     this.boardBox = null;
+    // (Boss 6's ending leaves the hero launched off the boat, the rods down and the camera free of the
+    // world's edges: the next contest in this scene — Play again, or Boss 5 — starts back on the boat)
+    this.heroFree = false;
+    this.rodsDown = false;
+    this.freeCam = false;
+    this.kingRps = null;
   }
 
   // ───────────────────────────────────────────── setup ──
