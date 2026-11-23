@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.378)
+## Where things stand (v0.379)
 Live site: https://playpuffy.world (device check: /?bench, reports: /?bench=list signed in as a tester).
 
 ### Main game
@@ -32,6 +32,7 @@ Live site: https://playpuffy.world (device check: /?bench, reports: /?bench=list
   Home screen (yellow).
 - Start screen: drone fly-over behind, logo hop, hero cards (pick = hop / backflip), Play, Part picker once a
   level is beaten, mute (top-left), full screen + **Battle** buttons (top-right, same height, side by side).
+- v0.379: OLD SAFARI. Owner's photo (old iPad, Safari 16.6): outlined DOM titles were black blobs: -webkit-text-stroke painted OVER the fill (paint-order ignored there). src/core/oldSafari.ts adds html.no-po on WebKit-only UAs with iOS/Safari major < 17 (16.6 confirmed broken; 18+ fine; 17 untested). src/ui/oldSafari.css (GENERATED: `python3 scripts/old_safari_css.py src/ui/style.css src/ui/oldSafari.css` — rerun after changing any outlined text in style.css) replaces each stroke with a 16-point text-shadow ring of half the stroke width (+ existing shadows). Checked by forcing the Safari 16 UA in Chromium: looks near-identical. Also .icon-btn is now inline-flex centred with padding 0 (pause/mute icons sat off-centre on that iPad). The v0.378 font change didn't fix the photo's problem (wasn't fonts), kept anyway.
 - v0.378: FONTS. Nunito latin/latin-ext are now static per-weight files (600/800/900, cut from Google's variable woff2 with `python3 -m fontTools.varLib.instancer <in> wght=N --static`); cyrillic/vietnamese still variable. Owner: old iPad (iPadOS/Safari 16.6) showed fonts badly. BootScene now waits for Lilita + Nunito 600/800/900 (cap 2.5 s, was Lilita only, 0.9 s): canvas words drawn before a font arrives keep the stand-in font. Unconfirmed it fixes the iPad (asked owner for a photo).
 - v0.377: AUTO LIGHT MODE from a measurement. src/core/lightPick.ts: entry.ts runs pickLight() before import('./main') — quickBench() (~0.4-0.6 s, gives up at 3 s) once per version; score = avg(cpuMs/3.0, fillMs/0.65); light if >= 0.70 (LIGHT_AT) or no WebGL. Stored puffy.light='bench:<ver>:<0|1>', scores in puffy.bench (shown in ?diag 'device check'). Skipped for webdriver, ?lite/?full, hand picks '1'/'0', auto:<this ver>. 'slow' and other versions' auto:/bench: are re-measured. Owner devices: slow tablet 1.2, old iPad 0.83 (owner wants light), Henry SM-X230 0.58, iPhone/desktop <0.2.
 - v0.376: Boss 6 clouds 70 px higher (Storm.ts BANDS y: full -250 -> -320, light -60 -> -130; owner: 'a bit too low').
