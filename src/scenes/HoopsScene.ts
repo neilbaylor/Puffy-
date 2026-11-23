@@ -71,6 +71,7 @@ import { JumboScreen } from '../gfx/jumboScreen';
 import { PLOP_H, PLOP_KINDS, PLOP_SCALE, PLOP_W, drawPlop, type PlopFrame, type PlopKind } from '../gfx/plops';
 import { STYLES } from '../gfx/handdrawn';
 import { softCircle, softShapes, type SoftShapes } from '../gfx/softShapes';
+import { setOutlined } from '../ui/outline';
 
 export interface HoopsData {
   session: Session;
@@ -578,7 +579,7 @@ export class HoopsScene extends Phaser.Scene {
     const el = this.dom.querySelector<HTMLElement>('.hoops-callout')!;
     el.className = `hoops-callout show ${cls}`;
     if (cls.includes('speech')) this.kingTalkUntil = this.clock + Math.min(ms, 1500);
-    el.innerHTML = text;
+    setOutlined(el, text);
     void el.offsetWidth;
     const token = ++this.calloutToken;
     return this.wait(ms).then(() => {

@@ -45,11 +45,13 @@ def ring(width, color):
             pts.append(f'{fmt(r*0.6*math.cos(t))} {fmt(r*0.6*math.sin(t))} 0 {color}')
     return ', '.join(pts)
 
-out = ['/* Generated from style.css by scripts/old_safari_css.py (see core/oldSafari.ts): outlines as text-shadow rings for */',
+out = ['/* Generated from style.css by scripts/old_safari_css.py (see index.html: html.no-po): outlines as text-shadow rings for */',
        '/* browsers that paint -webkit-text-stroke over the letters (Safari 16 and older ignore paint-order on HTML text). */']
+# outlined by stacking two copies instead (src/ui/outline.ts): no ring
+STACKED = ('.banner', '.li-title strong', '.st-title strong', '.hoops-callout', '.wr-callout', '.fsh-callout', '.shop-paid')
 for media, sel, body in rules(src_nc):
     stroke = decl(body, '-webkit-text-stroke')
-    if stroke is None: continue
+    if stroke is None or sel.strip().startswith(STACKED): continue
     sels = ', '.join('html.no-po ' + s.strip() for s in sel.split(','))
     if stroke == '0' or stroke.startswith('0 '):
         css = f'{sels} {{ text-shadow: {decl(body, "text-shadow") or "none"}; }}'
@@ -67,6 +69,7 @@ for media, sel, body in rules(src_nc):
     sh = decl(body, 'text-shadow')
     if not sh or decl(body, '-webkit-text-stroke') is not None: continue
     for s1 in (x.strip() for x in sel.split(',')):
+        if s1.startswith(STACKED): continue
         best = max((st for st in stroked if st[0] == media and s1 != st[1] and s1.startswith(st[1]) and re.match(r'[.:\s\[]', s1[len(st[1]):])), key=lambda st: len(st[1]), default=None)
         if not best or best[2] == '0': continue
         w, *c = best[2].split(None, 1)

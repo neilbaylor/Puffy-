@@ -42,6 +42,7 @@ const BOSSES = [
 const bossThere = (level: number) => LEVELS.some((l) => l.id === level);
 import { resetLives } from '../core/lives';
 import { bank } from '../core/bank';
+import { outlined, colorOutline, setOutlined } from './outline';
 
 /** A count kept short where space is tight: 1000 and up as 1.0k, 10.4k… (rounded down, so it never shows more than you have). */
 export function shortCount(n: number): string {
@@ -350,7 +351,7 @@ export class UI {
     this.touch = new TouchControls(this.root);
     this.rotate = h(`<div class="rotate" hidden>
       <i class="rc rc1"></i><i class="rc rc2"></i><i class="rc rc3"></i>
-      <div class="logo"><span>P</span><span>U</span><span>F</span><span>F</span><span>Y</span></div>
+      <div class="logo"><span data-c="P">P</span><span data-c="U">U</span><span data-c="F">F</span><span data-c="F">F</span><span data-c="Y">Y</span></div>
       <div class="rotate-stage"><div class="rotate-phone"><div class="rotate-hero"><canvas width="200" height="200"></canvas></div></div></div>
       <p>Turn your phone sideways to play!</p>
       <div class="rotate-hill"></div>
@@ -401,7 +402,7 @@ export class UI {
       this.touch.hide();
       this.introEl = h(`<div class="lvl-intro">
         <i class="li-bar"></i><i class="li-bar"></i>
-        <div class="li-title"><strong>${i.title}</strong><em>${i.part}</em></div>
+        <div class="li-title"><strong>${outlined(i.title)}</strong><em>${i.part}</em></div>
         <button class="li-skip">Skip ›</button>
       </div>`);
       this.introEl.querySelector('.li-skip')!.addEventListener('pointerdown', (e) => {
@@ -409,6 +410,7 @@ export class UI {
         game.events.emit('skip-intro');
       });
       this.root.appendChild(this.introEl);
+      colorOutline(this.introEl);
       void this.introEl.offsetWidth;
       this.introEl.classList.add('on');
     });
@@ -550,7 +552,8 @@ export class UI {
   }
 
   private showBanner(html: string, ms: number) {
-    this.banner.innerHTML = `<div>${html}</div>`;
+    this.banner.innerHTML = `<div>${outlined(html)}</div>`;
+    colorOutline(this.banner);
     this.banner.hidden = false;
     this.banner.classList.remove('out');
     clearTimeout((this.banner as unknown as { _t: number })._t);
@@ -571,7 +574,7 @@ export class UI {
     playMenuMusic();
     const el = h(`<div class="screen start${canPickLevel() ? '' : ' no-levels'}">
       <header class="start-head">
-        <div class="logo"><span>P</span><span>U</span><span>F</span><span>F</span><span>Y</span></div>
+        <div class="logo"><span data-c="P">P</span><span data-c="U">U</span><span data-c="F">F</span><span data-c="F">F</span><span data-c="Y">Y</span></div>
         <p class="world-name" aria-label="${levelName(this.level)}">${waveText(levelName(this.level))}</p>
       </header>
       <h2>Pick your player</h2>
@@ -1083,7 +1086,7 @@ export class UI {
     const page = h(`<div class="shop-page" role="dialog" aria-label="Shop">
       <button class="icon-btn shop-x" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 5.5 18.5 18.5M18.5 5.5 5.5 18.5"/></svg></button>
       <header class="bl-head">
-        <h1 class="bl-title shop-title" aria-label="Shop!">${[...'Shop!'].map((ch, i) => `<span style="--i:${i}">${ch}</span>`).join('')}</h1>
+        <h1 class="bl-title shop-title" aria-label="Shop!">${[...'Shop!'].map((ch, i) => `<span style="--i:${i}" data-c="${ch}">${ch}</span>`).join('')}</h1>
         <p class="bl-sub shop-rb"></p>
       </header>
       <p class="shop-welcome">Welcome to The Puffy Boutique</p>
@@ -1245,8 +1248,8 @@ export class UI {
     count.textContent = String(from);
     const drop = document.createElement('span');
     drop.className = 'shop-paid';
-    drop.innerHTML = `−${paid} <i class="rb-ico"></i>`;
     pill.appendChild(drop);
+    setOutlined(drop, `−${paid} <i class="rb-ico"></i>`);
     setTimeout(() => drop.remove(), 2100);
     // (a quick till: ~0.8 s for 20 bottles, 1.2 s for 50, easing off for the last few; it starts a
     // moment after the tap, once the Shop's pictures have been redrawn, so it doesn't hitch)

@@ -15,9 +15,19 @@
     <link rel="apple-touch-icon" href="apple-touch-icon.png" />
     <link rel="icon" type="image/png" href="icon-192.png" />
     <meta name="apple-mobile-web-app-title" content="Puffy!" />
+    <script>
+      // Older Safari (16 and before; every iPhone/iPad browser is Safari underneath) paints a word's
+      // outline over its letters: html.no-po switches to outlines it draws right (ui/oldSafari*.css).
+      (function () {
+        var ua = navigator.userAgent;
+        if (!/AppleWebKit/.test(ua) || /Chrome\/|Chromium\/|Edg\//.test(ua)) return;
+        var m = /\bOS (\d+)_\d+(?:_\d+)? like Mac OS X/.exec(ua) || /Version\/(\d+)[.\d]* (?:Mobile\/\S+ )?Safari\//.exec(ua);
+        if (m && +m[1] < 17) document.documentElement.className += ' no-po';
+      })();
+    </script>
   </head>
   <body class="booting">
-    <div id="boot"><div class="boot-in"><div class="logo boot-logo"><span>P</span><span>U</span><span>F</span><span>F</span><span>Y</span></div><p>Loading Puff Ball Planet…</p><div class="boot-bar"></div></div></div>
+    <div id="boot"><div class="boot-in"><div class="logo boot-logo"><span data-c="P">P</span><span data-c="U">U</span><span data-c="F">F</span><span data-c="F">F</span><span data-c="Y">Y</span></div><p>Loading Puff Ball Planet…</p><div class="boot-bar"></div></div></div>
     <div id="game"></div>
     <div id="ui"></div>
     <script type="module" src="/src/entry.ts"></script>

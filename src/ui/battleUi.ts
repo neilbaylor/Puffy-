@@ -330,7 +330,7 @@ export class BattleUI {
       <button class="icon-btn bl-back" aria-label="Back">‹</button>
       <button class="bl-roomtag" aria-label="Room code (change room)">Room <b>${esc(this.code)}</b></button>
       <header class="bl-head">
-        <h1 class="bl-title" aria-label="Battle!">${[...'Battle!'].map((ch, i) => `<span style="--i:${i}">${ch}</span>`).join('')}</h1>
+        <h1 class="bl-title" aria-label="Battle!">${[...'Battle!'].map((ch, i) => `<span style="--i:${i}" data-c="${ch}">${ch}</span>`).join('')}</h1>
         <p class="bl-sub">Up to ${MAX_BATTLERS} friends</p>
       </header>
       <div class="bl-preview" hidden><b class="bl-live">● LIVE</b></div>

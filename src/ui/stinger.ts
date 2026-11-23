@@ -1,3 +1,4 @@
+import { setOutlined } from './outline';
 /**
  * A TV-sports "stinger": diagonal gold and purple bars sweep across the
  * screen, hold a title card, then sweep away to reveal the next scene.
@@ -23,7 +24,7 @@ export async function stingerCover() {
 export function stingerTitle(html: string) {
   if (!el) return;
   const t = el.querySelector<HTMLElement>('.st-title')!;
-  t.innerHTML = html;
+  setOutlined(t, html);
   t.classList.remove('show');
   void t.offsetWidth;
   t.classList.add('show');

@@ -32,6 +32,7 @@ import { SimpleConfetti } from '../world/SimpleConfetti';
 import { softShapes, type SoftShapes } from '../gfx/softShapes';
 import { soloSource, sourceById } from '../input/devices';
 import type { GameOverState, HudState, ResultState } from './GameScene';
+import { setOutlined } from '../ui/outline';
 
 /**
  * Part 3's boss: Queen Plop, in a wrestling ring in the Poo Palace (see sketches/wrestling/DESIGN.md).
@@ -2028,8 +2029,8 @@ export class WrestleScene extends Phaser.Scene {
   private calloutToken = 0;
   private callout(html: string, cls = '', ms = 1200) {
     const el = this.dom.querySelector<HTMLElement>('.wr-callout')!;
-    el.innerHTML = html;
     el.className = `wr-callout show ${cls}`;
+    setOutlined(el, html);
     const token = ++this.calloutToken;
     this.time.delayedCall(ms, () => token === this.calloutToken && (el.className = 'wr-callout'));
   }

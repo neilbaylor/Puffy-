@@ -7,7 +7,7 @@
 import './ui/fonts.css';
 import './ui/style.css';
 import './ui/oldSafari.css';
-import './core/oldSafari';
+import './ui/oldSafariExtra.css';
 // (the screen's refresh rate: measured from now on, while the game's code loads)
 import './core/refresh';
 import { pickLight } from './core/lightPick';

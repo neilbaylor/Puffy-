@@ -50,6 +50,7 @@ import { loseLife } from '../core/lives';
 import { SimpleConfetti } from '../world/SimpleConfetti';
 import { softCircle, softShapes, type SoftShapes } from '../gfx/softShapes';
 import { partSteps } from '../gfx/textures';
+import { setOutlined } from '../ui/outline';
 
 export interface FishingData {
   session: Session;
@@ -1572,7 +1573,7 @@ export class FishingScene extends Phaser.Scene {
   private callout(html: string, cls = '', ms = 1300) {
     const el = this.dom.querySelector<HTMLElement>('.fsh-callout')!;
     el.className = `fsh-callout ${cls}`;
-    el.innerHTML = html;
+    setOutlined(el, html);
     void el.offsetWidth;
     el.classList.add('show');
     const tok = (this.calloutTok = (this.calloutTok + 1) % 1e6);

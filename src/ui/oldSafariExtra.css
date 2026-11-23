@@ -1,0 +1,32 @@
+/*
+ * Older Safari (html.no-po, set in index.html): hand-written additions to the generated oldSafari.css.
+ */
+/* The display font without fake bold (Lilita One has one weight; older Safari smudged a faked 900). */
+html.no-po { --display: 'Lilita One Flat', 'Arial Black', system-ui, sans-serif; }
+/* The PUFFY logos and the Battle! / Shop! titles (letters that hop on their own): a ring of shadows looked fuzzy at this size, so each letter gets a copy of itself
+   behind it with the real outline (data-c holds the letter): the same look as the outline elsewhere. */
+html.no-po .logo,
+html.no-po .bl-title { text-shadow: none; }
+html.no-po .logo span,
+html.no-po .bl-title span { position: relative; z-index: 0; }
+html.no-po .logo span::before,
+html.no-po .bl-title span::before {
+  content: attr(data-c);
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: -1;
+  color: var(--ink);
+  -webkit-text-stroke: 0.07em var(--ink);
+  text-shadow: 0 0.08em 0 var(--ink);
+}
+html.no-po .bl-title span::before { -webkit-text-stroke-width: 0.07em; text-shadow: 0 0.07em 0 var(--ink); }
+/* Big titles and callouts (the level's name, "Back to the Start", GO!, the boss title cards, the
+   Basketball / Wrestle / Fishing callouts, the Shop's "−20"): the words twice, stacked (ui/outline.ts).
+   The back copy, filled with the outline's colour (--olc), keeps the real outline; the front has none.
+   (These keep their outline from style.css: oldSafari.css leaves them out.) */
+.ol { display: grid; }
+.ol > span { grid-area: 1 / 1; }
+.banner .ol > span { display: flex; flex-direction: column; align-items: center; }
+.ol-b, .ol-b * { -webkit-text-fill-color: var(--olc, currentColor); }
+.ol-f, .ol-f * { -webkit-text-stroke-width: 0 !important; text-shadow: none !important; }
