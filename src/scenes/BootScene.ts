@@ -55,9 +55,12 @@ export class BootScene extends Phaser.Scene {
       times.push([name, Math.round(t - t0)]);
       t0 = t;
     };
-    // the display font is needed for the start screen and the art
+    // the fonts are needed for the start screen and the art: the game's words are drawn into pictures
+    // once, so a word drawn before its font arrives keeps the stand-in font (a slow iPad showed that).
+    // All of them, up to 2.5 s (from the second start on they're stored on the device: instant).
     try {
-      await Promise.race([document.fonts.load('22px "Lilita One"'), new Promise((r) => setTimeout(r, 900))]);
+      const faces = ['22px "Lilita One"', '600 16px Nunito', '800 16px Nunito', '900 16px Nunito'];
+      await Promise.race([Promise.all(faces.map((f) => document.fonts.load(f))), new Promise((r) => setTimeout(r, 2500))]);
     } catch {
       /* fall back to a system font */
     }
