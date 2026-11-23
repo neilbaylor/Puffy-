@@ -166,8 +166,7 @@ const KING_ROD_LEN = 150;
 const BOAT6_RES = LIGHT ? 1.2 : 1.5;
 /**
  * King Bob's looks for Boss 6 (one sheet, `f6-kingbob`): [frame, his frame drawn, the look]. m: cross;
- * a: cross, his crown knocked askew; f: and his fins up, ready for a fight; k0 / k1 / kp: rock, paper,
- * scissors (his fin a fist, up and down; then paper).
+ * a: cross, his crown knocked askew; f: and his fins up, ready for a fight.
  */
 const KING_LOOKS = [
   ['m0', 'sw0', { mad: true }],
@@ -177,11 +176,15 @@ const KING_LOOKS = [
   ['a4', 'sw4', { mad: true, askew: true }],
   ['f0', 'sw0', { mad: true, askew: true, fins: true }],
   ['f2', 'sw2', { mad: true, askew: true, fins: true }],
-  // rock, paper, scissors (the ending): his fin curled into a fist, up and down; then spread out, paper
-  ['k0', 'sw0', { rps: 'up' }],
-  ['k1', 'sw2', { rps: 'dn' }],
-  ['kp', 'sw0', { rps: 'paper' }],
 ] as const;
+/** King Bob's rock, paper, scissors (`f6-kingrps`, a wider picture: the fin's right out): his fin a fist up, down; then spread, paper. */
+const KING_RPS = [
+  ['k0', 'sw0', 'up'],
+  ['k1', 'sw2', 'dn'],
+  ['kp', 'sw0', 'paper'],
+] as const;
+/** (how far past his usual picture the fin reaches, each side, units) */
+const KING_RPS_PAD = 40;
 
 /**
  * What you can catch: the fish, what it's called, its weight range (lb), how common, and how big it's shown.
@@ -593,12 +596,37 @@ export class FishingScene extends Phaser.Scene {
             ctx.restore();
           } finally {
             kingBobLook.mad = kingBobLook.askew = kingBobLook.fins = false;
-            kingBobLook.rps = '';
           }
         }),
       );
       addCanvas(this, 'f6-kingbob', c, (t) => KING_LOOKS.forEach(([name], i) => t.add(name, 0, g.x(i), g.y(i), fw, fh)), { release: true });
     });
+    if (this.v6)
+      sheet('f6-kingrps', () => {
+        const { w, h } = FISH_SIZE.kingbob;
+        const res = 2;
+        const fw = Math.round((w + KING_RPS_PAD * 2) * res);
+        const fh = Math.round(h * res);
+        const g = frameGrid(KING_RPS.length, fw, fh);
+        const c = hires(g.w, g.h, 1, (ctx) =>
+          KING_RPS.forEach(([, f, rps], i) => {
+            kingBobLook.rps = rps;
+            try {
+              ctx.save();
+              ctx.beginPath();
+              ctx.rect(g.x(i), g.y(i), fw, fh);
+              ctx.clip();
+              ctx.translate(g.x(i), g.y(i));
+              ctx.scale(res, res);
+              drawFish(ctx, KING_RPS_PAD, 0, 'kingbob', f);
+              ctx.restore();
+            } finally {
+              kingBobLook.rps = '';
+            }
+          }),
+        );
+        addCanvas(this, 'f6-kingrps', c, (t) => KING_RPS.forEach(([name], i) => t.add(name, 0, g.x(i), g.y(i), fw, fh)), { release: true });
+      });
     for (const c of CATCHES) sheet(`fl-fish-${c.kind}`, () => makeFishFrames(this, `fl-fish-${c.kind}`, c.kind, ['sw0', 'sw2', 'sw4'], fishRes(c)));
     if (ch) sheet(`char-${ch.id}-cast`, () => makeCastSheet(this, ch));
     return steps;
@@ -1004,7 +1032,7 @@ export class FishingScene extends Phaser.Scene {
   }
   /** Boss 6's ending: the hero's off the boat (launched), placed by the cut scene, the rod put away. */
   private heroFree = false;
-  /** Boss 6's ending: King Bob's rock, paper, scissors frame (k0 / k1 / kp on f6-kingbob), or null. */
+  /** Boss 6's ending: King Bob's rock, paper, scissors frame (k0 / k1 / kp on f6-kingrps), or null. */
   private kingRps: string | null = null;
   /** Boss 6's ending: the rods put down for rock, paper, scissors. */
   private rodsDown = false;
@@ -1226,7 +1254,7 @@ export class FishingScene extends Phaser.Scene {
     this.hero.setFrame(this.heroPose ?? cf.frame);
     const kf = Math.floor(t * 5) % 6;
     // (swimming off: his tail going like mad)
-    if (this.kingRps) this.kingSpr.setTexture('f6-kingbob', this.kingRps);
+    if (this.kingRps) this.kingSpr.setTexture('f6-kingrps', this.kingRps);
     else if (this.kingLook) this.kingFrame(t);
     else this.kingSpr.setFrame(this.kingFree ? `sw${Math.floor(t * 16) % 6}` : Math.floor(t * 0.7) % 5 === 0 && t % 1.4 < 0.15 ? 'bl1' : `sw${kf}`);
     if (this.kingSwim) this.swimKing(s);

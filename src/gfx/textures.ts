@@ -492,11 +492,12 @@ export function makeRpsSheet(scene: Phaser.Scene, ch: (typeof CHARACTERS)[number
   const key = `char-${ch.id}-rps`;
   if (scene.textures.exists(key)) return key;
   const wear = fishingWear();
-  const A = { u: -0.75, d: 0.35, r: 0 } as const;
+  const A = { u: -1.25, d: 0.35, r: 0 } as const;
   carry.on = true;
   carry.rps = 'rock';
   try {
-    const up = gearUp(wear);
+    // (room over the head for the fist pumped up)
+    const up = gearUp(wear) + 10;
     sheet(scene, key, CHAR_W + HERO_M * 2, CHAR_H + up, ['u', 'd', 'r'] as const, (ctx, f) => {
       carry.a = A[f];
       drawCharacter(ctx, HERO_M, up, ch, f === 'r' ? 'idle1' : 'idle0', undefined, wear);

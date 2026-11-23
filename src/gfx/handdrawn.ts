@@ -430,30 +430,58 @@ export const STYLES: Record<StyleId, Style> = { storybook, polished, watercolor,
 
 
 /**
- * A hero's hand making rock or paper (King Bob's rock, paper, scissors), at the end of an arm along
- * `rot`, in the arm's own fill and the style's line: rock, a round fist with knuckles at its front;
- * paper, a flat open hand, fingers fanned out along the arm. `r`: the hand's size (units).
+ * A hand making rock or paper (Boss 6's rock, paper, scissors: a hero's hand, King Bob's fin), at the
+ * end of an arm along `rot`, in the arm's own fill and the style's line. Rock: a chunky fist — the
+ * back of the hand, four curled fingers in a row along its front, the thumb wrapped across them.
+ * Paper: a flat open hand, four fingers spread along the arm, the thumb out to the side. `r`: size
+ * (units). `flip`: the thumb on the other side (it's on the lower side, for a hand reaching right).
  */
-export function drawRpsHand(ctx: CanvasRenderingContext2D, st: Style, x: number, y: number, rot: number, kind: 'rock' | 'paper', fill: Fill, seed: number, r: number) {
+export function drawRpsHand(ctx: CanvasRenderingContext2D, st: Style, x: number, y: number, rot: number, kind: 'rock' | 'paper', fill: Fill, seed: number, r: number, flip = false) {
   const c = Math.cos(rot);
   const s = Math.sin(rot);
+  const sd = flip ? -1 : 1;
+  /** a point `f` along the arm and `n` across it (+ = the thumb's side) from (x, y) */
+  const at = (f: number, n: number): Pt => [x + c * f * r - s * n * r * sd, y + s * f * r + c * n * r * sd];
   if (kind === 'rock') {
-    st.shape(ctx, ellipsePts(x + c * r * 0.3, y + s * r * 0.3, r * 1.1, r * 0.95, rot, 28), fill, seed, { lw: 0.85 });
-    // the knuckles, along its front
-    for (let i = -1; i <= 1; i++) {
-      const kx = x + c * r * 1.05 - s * i * r * 0.55;
-      const ky = y + s * r * 1.05 + c * i * r * 0.55;
-      st.shape(ctx, ellipsePts(kx, ky, r * 0.36, r * 0.32, rot, 14), fill, seed + 2 + i, { lw: 0.7 });
+    // the back of the hand
+    const [bx, by] = at(0.35, -0.1);
+    st.shape(ctx, ellipsePts(bx, by, r * 1.15, r * 1.02, rot, 30), fill, seed, { lw: 0.85, light: at(0.1, -0.6) });
+    // the curled fingers, a row of four along its front (from the far side round to the thumb's)
+    for (let i = 0; i < 4; i++) {
+      const [fx, fy] = at(1.18 - Math.abs(i - 1.5) * 0.1, -0.78 + i * 0.44);
+      st.shape(ctx, ellipsePts(fx, fy, r * 0.44, r * 0.34, rot, 16), fill, seed + 2 + i, { lw: 0.7 });
     }
-    // the curled fingers' crease
-    st.line(ctx, [[x + c * r * 0.55 - s * r * 0.7, y + s * r * 0.55 + c * r * 0.7], [x + c * r * 0.25, y + s * r * 0.25], [x + c * r * 0.55 + s * r * 0.7, y + s * r * 0.55 - c * r * 0.7]], seed + 5, 0.55);
+    // the thumb, wrapped across the front of the fingers
+    const [tx, ty] = at(0.82, 0.62);
+    st.shape(ctx, ellipsePts(tx, ty, r * 0.7, r * 0.32, rot - 0.35 * sd, 18), fill, seed + 8, { lw: 0.75 });
     return;
   }
-  // paper: fingers first (fanned along the arm), the thumb out to the side, then the palm over their roots
+  // paper: the fingers spread (along the arm), the thumb out to its side, then the palm over their roots
   for (let i = 0; i < 4; i++) {
-    const a = rot - 0.42 + i * 0.28;
-    st.shape(ctx, petalPts(x + c * r * 0.4, y + s * r * 0.4, r * 1.9, r * 0.62, a, 20), fill, seed + i, { lw: 0.7 });
+    const a = rot + (-0.5 + i * 0.27) * -sd;
+    const [px, py] = at(0.55, -0.45 + i * 0.3);
+    st.shape(ctx, roundRectAlong(px, py, r * 1.55, r * 0.5, a), fill, seed + i, { lw: 0.7 });
   }
-  st.shape(ctx, petalPts(x, y, r * 1.35, r * 0.62, rot - 1.25, 20), fill, seed + 6, { lw: 0.7 });
-  st.shape(ctx, ellipsePts(x + c * r * 0.35, y + s * r * 0.35, r * 0.95, r * 1.0, rot, 24), fill, seed + 7, { lw: 0.85 });
+  const [tx, ty] = at(0.15, 0.75);
+  st.shape(ctx, roundRectAlong(tx, ty, r * 1.15, r * 0.5, rot + 0.95 * sd), fill, seed + 6, { lw: 0.7 });
+  const [cx2, cy2] = at(0.3, 0);
+  st.shape(ctx, ellipsePts(cx2, cy2, r * 0.95, r * 1.0, rot, 26), fill, seed + 7, { lw: 0.85, light: at(0.1, -0.5) });
+}
+
+/** A rounded finger: from (x, y) out `l` along angle a, `w` wide, round at both ends. */
+function roundRectAlong(x: number, y: number, l: number, w: number, a: number, n = 24): Pt[] {
+  const out: Pt[] = [];
+  const c = Math.cos(a);
+  const s = Math.sin(a);
+  const rr = w / 2;
+  for (let i = 0; i <= n; i++) {
+    // the far end's round, then the near end's
+    const t = i / n;
+    const ang = t < 0.5 ? -Math.PI / 2 + t * 2 * Math.PI : Math.PI / 2 + (t - 0.5) * 2 * Math.PI;
+    const along = t < 0.5 ? l - rr : rr;
+    const px = along + Math.cos(ang) * rr;
+    const py = Math.sin(ang) * rr;
+    out.push([x + c * px - s * py, y + s * px + c * py]);
+  }
+  return out;
 }

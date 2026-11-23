@@ -16,7 +16,7 @@
  * touch; the toothy one chomps as it goes.
  */
 import type { Ctx } from './draw';
-import { STYLES, ellipsePts, grow, type Fill, type Pt, type Style } from './handdrawn';
+import { STYLES, drawRpsHand, ellipsePts, grow, type Fill, type Pt, type Style } from './handdrawn';
 
 export type FishKind = 'badguy' | 'badguybig' | 'kai' | 'fat' | 'zippy' | 'kingbob' | 'slinger' | 'stone';
 export const FISH_KINDS: FishKind[] = ['badguy', 'badguybig', 'kai', 'fat', 'zippy', 'kingbob', 'slinger', 'stone'];
@@ -460,32 +460,40 @@ function drawKingBob(ctx: Ctx, st: Style, sw: number, _flap: number) {
     fin(st, ctx, cx + 20, cy + 22, 21, 12, -0.3, -0.75, F(ORANGE, '#e2661a', '#ffc98c'), 9513);
   }
   if (kingBobLook.rps) {
-    // rock, paper, scissors (Boss 6's ending): his front fin up out of the water towards you — curled into
-    // a round fist, pumped up or down; or for paper, spread out flat, a fan of rays
+    // rock, paper, scissors (Boss 6's ending): his front fin up out of the water towards you, well clear
+    // of his face — curled into a fist (pumped up or down); or for paper, spread out flat: a round fan
+    // of fin, scalloped at its edge, its rays running out to each scallop
     const FIN = F(ORANGE, '#e2661a', '#ffc98c');
+    const bx = cx + 24;
+    const by = cy + 24;
     if (kingBobLook.rps === 'paper') {
-      const bx = cx + 26;
-      const by = cy + 18;
-      for (let i = 0; i < 5; i++) fin(st, ctx, bx, by, 30, 11, -1.0 + i * 0.22, 0.05, FIN, 9520 + i);
-      // the rays across the spread fin
-      for (let i = 0; i < 5; i++) {
-        const a = -1.0 + i * 0.22;
-        st.line(ctx, [[bx + Math.cos(a) * 6, by + Math.sin(a) * 6], [bx + Math.cos(a) * 24, by + Math.sin(a) * 24]], 9530 + i, 0.6, '#c9581a');
+      const R = 40;
+      const a0 = -0.85;
+      const a1 = 0.35;
+      const lobes = 5;
+      // the scallops round the edge first (outlined), then the fan's body over their inner halves
+      for (let i = 0; i < lobes; i++) {
+        const a = a0 + ((a1 - a0) * i) / (lobes - 1);
+        st.shape(ctx, ellipsePts(bx + Math.cos(a) * R, by + Math.sin(a) * R, 9.6, 8.8, a, 18), FIN, 9520 + i, { lw: 0.9 });
       }
+      const fan: Pt[] = [[bx, by]];
+      for (let k = 0; k <= 16; k++) {
+        const a = a0 + ((a1 - a0) * k) / 16;
+        fan.push([bx + Math.cos(a) * R, by + Math.sin(a) * R]);
+      }
+      st.shape(ctx, fan, FIN, 9526, { noLine: true, light: [bx + 16, by - 18] });
+      st.line(ctx, [[bx + Math.cos(a0) * (R - 9), by + Math.sin(a0) * (R - 9)], [bx, by], [bx + Math.cos(a1) * (R - 9), by + Math.sin(a1) * (R - 9)]], 9527, 0.9);
+      for (let i = 0; i < lobes; i++) {
+        const a = a0 + ((a1 - a0) * i) / (lobes - 1);
+        st.line(ctx, [[bx + Math.cos(a) * 5, by + Math.sin(a) * 5], [bx + Math.cos(a) * (R + 2), by + Math.sin(a) * (R + 2)]], 9530 + i, 0.6, '#c9581a');
+      }
+      // where it joins him
+      st.shape(ctx, ellipsePts(bx, by, 7.5, 6.5, -0.5, 16), FIN, 9536, { lw: 0.9 });
     } else {
-      const a = kingBobLook.rps === 'up' ? -0.8 : -0.15;
-      const bx = cx + 24;
-      const by = cy + 18;
-      fin(st, ctx, bx, by, 24, 10, a, 0, FIN, 9520);
-      const fx = bx + Math.cos(a) * 24;
-      const fy = by + Math.sin(a) * 24;
-      st.shape(ctx, ellipsePts(fx, fy, 8, 7.2, a, 28), FIN, 9521, { lw: 1 });
-      // the curled fin's folds
-      for (const d of [-3.2, 0, 3.2]) {
-        const nx = -Math.sin(a);
-        const ny = Math.cos(a);
-        st.line(ctx, [[fx + Math.cos(a) * 2 + nx * d, fy + Math.sin(a) * 2 + ny * d], [fx + Math.cos(a) * 7 + nx * d * 1.1, fy + Math.sin(a) * 7 + ny * d * 1.1]], 9522 + d, 0.6, '#c9581a');
-      }
+      const a = kingBobLook.rps === 'up' ? -0.85 : -0.2;
+      // (the fin's root out to the fist: a short round arm of fin)
+      st.shape(ctx, ellipsePts(bx + Math.cos(a) * 13, by + Math.sin(a) * 13, 15, 6.4, a, 24), FIN, 9520, { lw: 0.9 });
+      drawRpsHand(ctx, st, bx + Math.cos(a) * 29, by + Math.sin(a) * 29, a, 'rock', FIN, 9521, 11);
     }
   }
   // the crown: on at a jaunty tilt — or knocked right over, slipping off the back of his head

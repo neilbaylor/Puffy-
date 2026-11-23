@@ -217,8 +217,13 @@ function drawMusclesPose(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style
   }
 
   if (ca) {
+    // (rock, paper, scissors: the arm's reaching right out, so a couple more lumps along it to join it up)
+    if (carry.rps) {
+      const [p0, , p2] = carryArm(ca.front);
+      for (const t of [0.3, 0.7]) st.shape(ctx, ellipsePts(p0[0] + (p2[0] - p0[0]) * t, p0[1] + (p2[1] - p0[1]) * t, 4.4, 3.8, ca.front.rot, 24), MUSCLES.body, seed + 16 + t * 10, { lw: 0.8 });
+    }
     arm(ctx, st, carryArm(ca.front), [3.8, 4.2, 3.3], MUSCLES.body, seed + 14);
-    if (carry.rps) drawRpsHand(ctx, st, ca.hand[0], ca.hand[1], ca.front.rot, carry.rps, MUSCLES.body, seed + 15, 4.6);
+    if (carry.rps) drawRpsHand(ctx, st, ca.hand[0], ca.hand[1], ca.front.rot, carry.rps, MUSCLES.body, seed + 15, 5.4);
     return;
   }
   // the big bazooka (heavy hitter)

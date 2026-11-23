@@ -1,0 +1,27 @@
+<!doctype html><html><body style="margin:0;background:#cfe8ff"><canvas id="c" width="1800" height="900"></canvas>
+<script type="module">
+import { drawCharacter, carry, CHAR_W, CHAR_H } from '/src/gfx/draw.ts';
+import { CHARACTERS } from '/src/data/characters.ts';
+import { drawFish, kingBobLook, FISH_SIZE } from '/src/gfx/fish.ts';
+const ctx = document.getElementById('c').getContext('2d');
+const K = 4.5;
+let x = 10;
+const A = { u: -1.25, d: 0.35, r: 0 };
+CHARACTERS.forEach((ch, row) => {
+  ['u', 'd', 'r'].forEach((f, i) => {
+    ctx.save(); ctx.translate(20 + i * 320, 20 + row * 280); ctx.scale(K, K);
+    carry.on = true; carry.rps = 'rock'; carry.a = A[f];
+    drawCharacter(ctx, 4, 0, ch, f === 'r' ? 'idle1' : 'idle0', undefined, '');
+    carry.on = false; carry.rps = '';
+    ctx.restore();
+  });
+});
+['up', 'dn', 'paper'].forEach((r, i) => {
+  ctx.save(); ctx.translate(1000, 20 + i * 290); ctx.scale(2.6, 2.6);
+  kingBobLook.rps = r;
+  drawFish(ctx, 0, 0, 'kingbob', 'sw0');
+  kingBobLook.rps = '';
+  ctx.restore();
+});
+document.title = 'done';
+</script></body></html>

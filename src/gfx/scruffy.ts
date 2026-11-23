@@ -157,7 +157,7 @@ function drawScruffyPose(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style
 
   if (ca) {
     st.shape(ctx, paddlePts(ca.front.x, ca.front.y, ca.front.len, 5, ca.front.rot), SCRUFFY.body, seed + 11, { lw: 0.8 });
-    if (carry.rps) drawRpsHand(ctx, st, ca.hand[0], ca.hand[1], ca.front.rot, carry.rps, SCRUFFY.body, seed + 12, 3.4);
+    if (carry.rps) drawRpsHand(ctx, st, ca.hand[0], ca.hand[1], ca.front.rot, carry.rps, SCRUFFY.body, seed + 12, 4.3);
     return;
   }
   // a smaller bazooka, held low
