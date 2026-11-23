@@ -84,6 +84,13 @@ function setCloudCrop(c: Cloud, pts: Float32Array) {
   tex.box = { x: bx, y: by, w: Math.max(1, bw), h: Math.max(1, bh) };
 }
 
+/** The clouds' clock (see Background.cloudClock). */
+export interface CloudClock {
+  t: number;
+  scroll: number;
+  next: number[][];
+}
+
 /** A band of living clouds at one parallax depth. */
 interface CloudBand {
   clouds: Cloud[];
@@ -493,6 +500,25 @@ export class Background {
         for (; n < c.imgs.length; n++) c.imgs[n].setVisible(false);
       }
     }
+  }
+
+  /** The clouds' clock (how far they've drifted and changed shape, and when each is next redrawn): see carryOn. */
+  get cloudClock(): CloudClock {
+    return { t: this.t, scroll: this.cloudScroll, next: this.bands.map((b) => b.clouds.map((c) => c.next)) };
+  }
+
+  /**
+   * Carry on the clouds of another Background of the same sky from where they were (a checkpoint
+   * restart: the level's built again). Their pictures are shared, and hold the shapes that clock last
+   * drew: so nothing needs drawing now — they drift on, each redrawn on its own beat as before. (From a
+   * clock of their own, every cloud was drawn and sent to the graphics chip again in the restart's
+   * first frame, ~1.6 MB.)
+   */
+  carryOn(k: CloudClock) {
+    if (k.next.length !== this.bands.length || k.next.some((n, i) => n.length !== this.bands[i].clouds.length)) return;
+    this.t = k.t;
+    this.cloudScroll = k.scroll;
+    this.bands.forEach((b, i) => b.clouds.forEach((c, j) => (c.next = k.next[i][j])));
   }
 
   /** Re-draw every cloud on its next showing (their pictures are shared between Backgrounds: after a switch they may be in another look's colours). */
