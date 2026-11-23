@@ -5,7 +5,7 @@
  */
 import type { Ctx, Pose } from './draw';
 import { carry, carryArms, gait } from './draw';
-import { ellipsePts, paddlePts, type Fill, type Pt, type Style } from './handdrawn';
+import { drawRpsHand, ellipsePts, paddlePts, type Fill, type Pt, type Style } from './handdrawn';
 import { drawBazooka } from './bazooka';
 import { face, markEyes } from './face';
 
@@ -89,7 +89,7 @@ function drawScruffyPose(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style
 
   // back arm (or both arms up, carrying something)
   const ca = carry.on ? carryArms('scruffy', ox, oy) : null;
-  if (ca) st.shape(ctx, paddlePts(ca.back.x, ca.back.y, ca.back.len, 5, ca.back.rot), SCRUFFY.limb, seed + 1, { lw: 0.8 });
+  if (ca && !carry.rps) st.shape(ctx, paddlePts(ca.back.x, ca.back.y, ca.back.len, 5, ca.back.rot), SCRUFFY.limb, seed + 1, { lw: 0.8 });
   else st.shape(ctx, paddlePts(cx - rx + 3, cy + 3, 9, 5, Math.PI - armBack), SCRUFFY.limb, seed + 1, { lw: 0.8 });
 
   const leg = (hx: number, dx: number, lift: number, fill: Fill, s: number) => {
@@ -157,6 +157,7 @@ function drawScruffyPose(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style
 
   if (ca) {
     st.shape(ctx, paddlePts(ca.front.x, ca.front.y, ca.front.len, 5, ca.front.rot), SCRUFFY.body, seed + 11, { lw: 0.8 });
+    if (carry.rps) drawRpsHand(ctx, st, ca.hand[0], ca.hand[1], ca.front.rot, carry.rps, SCRUFFY.body, seed + 12, 3.4);
     return;
   }
   // a smaller bazooka, held low

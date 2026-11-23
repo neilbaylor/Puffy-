@@ -7,7 +7,7 @@
 import { face, markEyes } from './face';
 import type { Ctx, Pose } from './draw';
 import { carry, carryArms, gait } from './draw';
-import { ellipsePts, petalPts, roundRectPts, type Fill, type Pt, type Style } from './handdrawn';
+import { drawRpsHand, ellipsePts, petalPts, roundRectPts, type Fill, type Pt, type Style } from './handdrawn';
 import { drawBazooka } from './bazooka';
 
 export const MUSCLES = {
@@ -95,7 +95,7 @@ function drawMusclesPose(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style
     const m: Pt = [(a.x + h[0]) / 2 - Math.sin(a.rot) * 2.2, (a.y + h[1]) / 2 + Math.cos(a.rot) * 2.2];
     return [[a.x, a.y], m, h];
   };
-  if (ca) arm(ctx, st, carryArm(ca.back), [4.2, 4.6, 3.6], MUSCLES.limb, seed + 1);
+  if (ca && !carry.rps) arm(ctx, st, carryArm(ca.back), [4.2, 4.6, 3.6], MUSCLES.limb, seed + 1);
   else arm(ctx, st, [shoulder, elbow, fist], [4.2, 4.6, 3.6], MUSCLES.limb, seed + 1);
 
   // long thick legs with curled feet
@@ -218,6 +218,7 @@ function drawMusclesPose(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style
 
   if (ca) {
     arm(ctx, st, carryArm(ca.front), [3.8, 4.2, 3.3], MUSCLES.body, seed + 14);
+    if (carry.rps) drawRpsHand(ctx, st, ca.hand[0], ca.hand[1], ca.front.rot, carry.rps, MUSCLES.body, seed + 15, 4.6);
     return;
   }
   // the big bazooka (heavy hitter)

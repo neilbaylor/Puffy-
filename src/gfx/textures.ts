@@ -483,6 +483,32 @@ export function carrySteps(scene: Phaser.Scene, ch: (typeof CHARACTERS)[number])
 
 /** The arm angles of a hero's fishing-rod frames (c0…c8): from wound right back over the head to reaching forward. */
 export const CAST_ANGLES = [-2.6, -2.25, -1.9, -1.55, -1.2, -0.85, -0.5, -0.15, 0.2] as const;
+/**
+ * A hero playing rock, paper, scissors (Boss 6's ending), their front arm out ending in a fist: up by
+ * their head (u) and down (d) for the pumps on ROCK… PAPER… SCISSORS…, and thrust out (r) on SHOOT!.
+ * The other arm hangs as usual. Made when needed.
+ */
+export function makeRpsSheet(scene: Phaser.Scene, ch: (typeof CHARACTERS)[number]) {
+  const key = `char-${ch.id}-rps`;
+  if (scene.textures.exists(key)) return key;
+  const wear = fishingWear();
+  const A = { u: -0.75, d: 0.35, r: 0 } as const;
+  carry.on = true;
+  carry.rps = 'rock';
+  try {
+    const up = gearUp(wear);
+    sheet(scene, key, CHAR_W + HERO_M * 2, CHAR_H + up, ['u', 'd', 'r'] as const, (ctx, f) => {
+      carry.a = A[f];
+      drawCharacter(ctx, HERO_M, up, ch, f === 'r' ? 'idle1' : 'idle0', undefined, wear);
+    });
+  } finally {
+    carry.on = false;
+    carry.rps = '';
+    carry.a = -1.75;
+  }
+  return key;
+}
+
 /** What a hero has on out fishing: their gear, less the skateboard (they're on a boat). */
 export const fishingWear = () => wardrobe.wearKey.split(',').filter((w) => w && w !== 'board').join(',');
 /**

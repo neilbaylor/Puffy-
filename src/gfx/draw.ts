@@ -109,9 +109,10 @@ export function gearUp(wear: string | null | undefined) {
 /**
  * Carrying something over the head in both hands (the folding chair in the ring): no bazooka, both
  * arms reach out along angle `a` (0 = forward, −π/2 = straight up, from the hero facing right). Set
- * only while the carry sheets are drawn.
+ * only while the carry sheets are drawn. With `rps` (rock, paper, scissors: Boss 6's ending), only the
+ * front arm reaches out, ending in a hand making rock or paper; the back arm hangs as usual.
  */
-export const carry = { on: false, a: -1.75 };
+export const carry: { on: boolean; a: number; rps: '' | 'rock' | 'paper' } = { on: false, a: -1.75, rps: '' };
 /** The carry sheet's extra frames: winding up, the swing, the follow-through; and bending to pick it up. */
 export const CARRY_SWING = { sw0: -2.3, sw1: -1.25, sw2: -0.4, sw3: 0.2, lift: 0.95 } as const;
 export type CarryFrame = keyof typeof CARRY_SWING;
@@ -129,7 +130,8 @@ export function carryHand(id: string, a: number): [number, number] {
 /** Both arms, as (shoulder, length, angle), meeting at the hands. */
 export function carryArms(id: string, ox: number, oy: number) {
   const c = CARRY_ARM[id] ?? CARRY_ARM.puffy;
-  const [hx, hy] = carryHand(id, carry.a);
+  // (rock, paper, scissors: the arm right out, the hand clear of the face)
+  const [hx, hy] = carry.rps ? [c.f[0] + Math.cos(carry.a) * c.len * 1.45, c.f[1] + Math.sin(carry.a) * c.len * 1.45] : carryHand(id, carry.a);
   const arm = (s: [number, number]) => ({ x: ox + s[0], y: oy + s[1], len: Math.hypot(hx - s[0], hy - s[1]), rot: Math.atan2(hy - s[1], hx - s[0]) });
   return { front: arm(c.f), back: arm(c.b), hand: [ox + hx, oy + hy] as [number, number] };
 }

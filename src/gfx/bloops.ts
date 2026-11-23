@@ -3,9 +3,8 @@ import { addCanvas } from './textures';
 import { LIGHT } from '../core/light';
 
 /**
- * Boss 6's new ending (King Bob's rock, paper, scissors, and the launch to the Land of the Bloops):
- * the cartoon hands in the bubbles, and a stand-in Land of the Bloops (a plain sunny land of hills
- * and puff trees, till the land's own art is made). Drawn on first use.
+ * Boss 6's new ending (the launch to the Land of the Bloops): a stand-in Land of the Bloops (a plain
+ * sunny land of hills and puff trees, till the land's own art is made). Drawn on first use.
  */
 
 const INK = '#3a2418';
@@ -32,79 +31,6 @@ function blob(ctx: CanvasRenderingContext2D, shapes: ((c: CanvasRenderingContext
 const rr = (x: number, y: number, w: number, h: number, r: number) => (c: CanvasRenderingContext2D) => c.roundRect(x, y, w, h, r);
 const circ = (x: number, y: number, r: number) => (c: CanvasRenderingContext2D) => c.arc(x, y, r, 0, Math.PI * 2);
 
-/** 'f6-rps': two 256 × 256 frames, a fist ('rock') and an open hand ('paper'), white cartoon gloves, facing right. */
-export function rpsHands(scene: Phaser.Scene) {
-  if (scene.textures.exists('f6-rps')) return;
-  const c = document.createElement('canvas');
-  c.width = 512;
-  c.height = 256;
-  const ctx = c.getContext('2d')!;
-  const glove = '#fffaf0';
-  // ── rock: a fist side on, knuckles to the right, thumb across the front ──
-  blob(ctx, [rr(28, 104, 62, 74, 14), rr(66, 62, 132, 136, 46), circ(196, 92, 24), circ(202, 128, 24), circ(198, 164, 23)], glove, 6);
-  ctx.strokeStyle = INK;
-  ctx.lineWidth = 5;
-  ctx.lineCap = 'round';
-  for (const y of [110, 146]) {
-    ctx.beginPath();
-    ctx.moveTo(168, y);
-    ctx.quadraticCurveTo(186, y + 2, 206, y);
-    ctx.stroke();
-  }
-  // the thumb, across the front
-  blob(ctx, [rr(92, 150, 92, 34, 17)], glove, 5);
-  // the cuff's stripes
-  ctx.lineWidth = 4;
-  for (const x of [46, 62]) {
-    ctx.beginPath();
-    ctx.moveTo(x, 114);
-    ctx.lineTo(x, 168);
-    ctx.stroke();
-  }
-  // ── paper: an open hand, fingers up, thumb out ──
-  ctx.save();
-  ctx.translate(256, 0);
-  blob(
-    ctx,
-    [
-      rr(86, 104, 108, 104, 36),
-      rr(90, 34, 26, 96, 13),
-      rr(118, 22, 26, 106, 13),
-      rr(146, 26, 26, 102, 13),
-      rr(172, 44, 24, 86, 12),
-      (k) => {
-        k.save();
-        k.translate(84, 150);
-        k.rotate(-0.85);
-        k.roundRect(-14, -58, 28, 74, 14);
-        k.restore();
-      },
-      rr(104, 196, 74, 46, 12),
-    ],
-    glove,
-    6,
-  );
-  ctx.strokeStyle = INK;
-  ctx.lineWidth = 4;
-  // a crease or two in the palm, the cuff's stripes
-  ctx.beginPath();
-  ctx.moveTo(118, 150);
-  ctx.quadraticCurveTo(140, 164, 168, 150);
-  ctx.stroke();
-  for (const y of [212, 226]) {
-    ctx.beginPath();
-    ctx.moveTo(110, y);
-    ctx.lineTo(172, y);
-    ctx.stroke();
-  }
-  ctx.restore();
-  addCanvas(scene, 'f6-rps', c, (tex) => {
-    tex.add('rock', 0, 0, 0, 256, 256);
-    tex.add('paper', 0, 256, 0, 256, 256);
-  });
-}
-
-/** 'bl-land': the stand-in Land of the Bloops, 1280 × 720 (at 1.5x, or 1x in light mode); its ground's top at y ≈ 604. */
 /** 'bl-land''s resolution (its picture is 1280 × 720 times this). */
 export const BLOOPS_RES = LIGHT ? 1 : 1.5;
 

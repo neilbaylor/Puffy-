@@ -5,7 +5,7 @@ import type { Session } from '../core/session';
 import { fadeOutMusic, playHoops } from '../core/music';
 import { sfx } from '../core/sfx';
 import { ART_RES, CHAR_H, CHAR_W, carryHand, drawCharacter } from '../gfx/draw';
-import { CAST_ANGLES, HERO_SHEET_M, addCanvas, fishingWear, frameGrid, hires, makeCastSheet, makeFishFrames, type Step } from '../gfx/textures';
+import { CAST_ANGLES, HERO_SHEET_M, addCanvas, fishingWear, frameGrid, hires, makeCastSheet, makeFishFrames, makeRpsSheet, type Step } from '../gfx/textures';
 import {
   DEEP_STOPS,
   FAR_SEA_STOPS,
@@ -51,7 +51,7 @@ import { SimpleConfetti } from '../world/SimpleConfetti';
 import { softCircle, softShapes, type SoftShapes } from '../gfx/softShapes';
 import { partSteps } from '../gfx/textures';
 import { setOutlined } from '../ui/outline';
-import { BLOOPS_RES, bloopsLand, rpsHands } from '../gfx/bloops';
+import { BLOOPS_RES, bloopsLand } from '../gfx/bloops';
 
 export interface FishingData {
   session: Session;
@@ -166,7 +166,8 @@ const KING_ROD_LEN = 150;
 const BOAT6_RES = LIGHT ? 1.2 : 1.5;
 /**
  * King Bob's looks for Boss 6 (one sheet, `f6-kingbob`): [frame, his frame drawn, the look]. m: cross;
- * a: cross, his crown knocked askew; f: and his fins up, ready for a fight.
+ * a: cross, his crown knocked askew; f: and his fins up, ready for a fight; k0 / k1 / kp: rock, paper,
+ * scissors (his fin a fist, up and down; then paper).
  */
 const KING_LOOKS = [
   ['m0', 'sw0', { mad: true }],
@@ -176,6 +177,10 @@ const KING_LOOKS = [
   ['a4', 'sw4', { mad: true, askew: true }],
   ['f0', 'sw0', { mad: true, askew: true, fins: true }],
   ['f2', 'sw2', { mad: true, askew: true, fins: true }],
+  // rock, paper, scissors (the ending): his fin curled into a fist, up and down; then spread out, paper
+  ['k0', 'sw0', { rps: 'up' }],
+  ['k1', 'sw2', { rps: 'dn' }],
+  ['kp', 'sw0', { rps: 'paper' }],
 ] as const;
 
 /**
@@ -588,6 +593,7 @@ export class FishingScene extends Phaser.Scene {
             ctx.restore();
           } finally {
             kingBobLook.mad = kingBobLook.askew = kingBobLook.fins = false;
+            kingBobLook.rps = '';
           }
         }),
       );
@@ -998,6 +1004,8 @@ export class FishingScene extends Phaser.Scene {
   }
   /** Boss 6's ending: the hero's off the boat (launched), placed by the cut scene, the rod put away. */
   private heroFree = false;
+  /** Boss 6's ending: King Bob's rock, paper, scissors frame (k0 / k1 / kp on f6-kingbob), or null. */
+  private kingRps: string | null = null;
   /** Boss 6's ending: the rods put down for rock, paper, scissors. */
   private rodsDown = false;
   /** Boss 6's ending: the camera's free of the world's edges (following the hero up into the sky). */
@@ -1218,7 +1226,8 @@ export class FishingScene extends Phaser.Scene {
     this.hero.setFrame(this.heroPose ?? cf.frame);
     const kf = Math.floor(t * 5) % 6;
     // (swimming off: his tail going like mad)
-    if (this.kingLook) this.kingFrame(t);
+    if (this.kingRps) this.kingSpr.setTexture('f6-kingbob', this.kingRps);
+    else if (this.kingLook) this.kingFrame(t);
     else this.kingSpr.setFrame(this.kingFree ? `sw${Math.floor(t * 16) % 6}` : Math.floor(t * 0.7) % 5 === 0 && t % 1.4 < 0.15 ? 'bl1' : `sw${kf}`);
     if (this.kingSwim) this.swimKing(s);
     this.updateRods(s);
@@ -3392,12 +3401,11 @@ export class FishingScene extends Phaser.Scene {
   }
 
   /**
-   * Rock, paper, scissors after the rematch: rods down, a fist each (the hero's hand, King Bob's fin
-   * at his bowl's rim), pumping on ROCK… PAPER… SCISSORS…, then SHOOT! — you show rock, King Bob
-   * shows paper. He wins, and laughs.
+   * Rock, paper, scissors after the rematch: rods down, the hero's own hand a fist (makeRpsSheet) and
+   * King Bob's fin curled into one (his k0 / k1 frames), pumping on ROCK… PAPER… SCISSORS…, then
+   * SHOOT! — you show rock, King Bob spreads his fin: paper. He wins, and laughs.
    */
   private async rps6() {
-    rpsHands(this);
     const kb = this.kingHome();
     this.kingShot = false;
     this.noClear = true;
@@ -3406,35 +3414,33 @@ export class FishingScene extends Phaser.Scene {
     this.cam = { x: (this.hero.x + kb.x) / 2 + 40, y: (this.hero.y + kb.y - 150) / 2, zoom: 1.3 };
     await this.wait(500);
     await this.heroSays("You're on!", 1400);
-    // (the rods put down: hands free; each of you shows a hand — the hero's, and King Bob's fin at his bowl's rim)
+    // (the rods put down, hands free: the hero's fist out in front, King Bob's fin curled into one)
     this.rodsDown = true;
-    const yours = this.add.image(0, 0, 'f6-rps', 'rock').setScale(0).setFlipX(true).setDepth(5.5);
-    const his = this.add.image(0, 0, 'f6-rps', 'rock').setScale(0).setDepth(4.45);
-    // (his fin a little out of the water: King Bob's the one in the bowl)
-    const pump = { y: 0 };
-    // (held out to the side, towards each other: the hero's in front of their body, King Bob's out over his bowl's rim)
-    const heroH = HERO_K * CHAR_H * characterById(this.fd.charId).scale;
-    const follow = () => {
-      const k = this.kingSpr;
-      yours.setPosition(this.hero.x - 52, this.hero.y - heroH * 0.5 + pump.y).setRotation(-0.2 + pump.y * 0.01);
-      his.setPosition(k.x + 96, k.y - 6 + pump.y).setRotation(0.2 - pump.y * 0.01);
-    };
-    this.events.on('update', follow);
-    this.events.once('shutdown', () => this.events.off('update', follow));
-    for (const g of [yours, his]) this.tweens.add({ targets: g, scale: 0.28, duration: 260, ease: 'Back.easeOut' });
+    this.hero.setTexture(makeRpsSheet(this, characterById(this.fd.charId)), 'd');
+    // (turned round to face King Bob, up on his flybridge behind them)
+    this.hero.setFlipX(true);
+    this.heroPose = 'd';
+    this.kingRps = 'k1';
     sfx.pop();
     await this.wait(500);
     for (const word of ['ROCK...', 'PAPER...', 'SCISSORS...']) {
-      this.tweens.add({ targets: pump, y: -30, duration: 150, ease: 'Quad.easeOut', yoyo: true });
-      sfx.thud();
+      this.heroPose = 'u';
+      this.kingRps = 'k0';
+      this.time.delayedCall(170, () => {
+        this.heroPose = 'd';
+        this.kingRps = 'k1';
+        sfx.thud();
+      });
       void this.callout(word, 'small', 560);
       await this.wait(680);
     }
     // SHOOT!
-    this.tweens.add({ targets: pump, y: -30, duration: 120, ease: 'Quad.easeOut', yoyo: true });
-    this.time.delayedCall(120, () => {
-      his.setFrame('paper');
-      for (const g of [yours, his]) this.tweens.add({ targets: g, scale: 0.36, duration: 140, ease: 'Quad.easeOut', yoyo: true });
+    this.heroPose = 'u';
+    this.kingRps = 'k0';
+    this.time.delayedCall(140, () => {
+      this.heroPose = 'r';
+      this.kingRps = 'kp';
+      this.tweens.add({ targets: this, heroHop: 8, duration: 120, ease: 'Quad.easeOut', yoyo: true });
       sfx.pop();
     });
     await this.callout('SHOOT!', 'big', 900);
@@ -3449,8 +3455,9 @@ export class FishingScene extends Phaser.Scene {
     this.tweens.add({ targets: this.kingSpr, scaleY: this.kingSpr.scaleY * 1.08, duration: 160, yoyo: true, repeat: 5 });
     sfx.laugh();
     await this.kingSays('MWA-HA-HA-HA! Off you GO!', 2200);
-    for (const g of [yours, his]) this.tweens.add({ targets: g, scale: 0, duration: 200, ease: 'Back.easeIn', onComplete: () => g.destroy() });
-    this.time.delayedCall(220, () => this.events.off('update', follow));
+    // (hands down; the hero back to their usual sheet, still without the rod)
+    this.kingRps = null;
+    this.heroPose = 'd';
     this.kingShot = false;
   }
 
@@ -3465,6 +3472,7 @@ export class FishingScene extends Phaser.Scene {
     // a rumble under the boat
     sfx.crumble();
     this.cameras.main.shake(500, 0.004);
+    this.hero.setTexture(this.heroKey, 'j0').setFlipX(false);
     this.heroPose = 'j0';
     this.tweens.add({ targets: this, heroHop: 6, duration: 60, yoyo: true, repeat: 7 });
     await this.wait(600);

@@ -407,7 +407,7 @@ function drawZippy(ctx: Ctx, st: Style, sw: number, flap: number) {
  * crown knocked sideways; `mad`, indignant (a steep scowl, a shouting mouth, red in the face);
  * `fins`, two little fins thrown up ("bring it on"). All off by default: set, draw, and set back.
  */
-export const kingBobLook = { askew: false, mad: false, fins: false };
+export const kingBobLook: { askew: boolean; mad: boolean; fins: boolean; rps: '' | 'up' | 'dn' | 'paper' } = { askew: false, mad: false, fins: false, rps: '' };
 
 function drawKingBob(ctx: Ctx, st: Style, sw: number, _flap: number) {
   const BODY = F('#fff6ea', '#e3d4c2', '#ffffff');
@@ -458,6 +458,35 @@ function drawKingBob(ctx: Ctx, st: Style, sw: number, _flap: number) {
     // fins up, like fists in front of his chin: put 'em up!
     fin(st, ctx, cx + 12, cy + 26, 21, 12, -0.5, -0.75, F(ORANGE, '#e2661a', '#ffc98c'), 9512);
     fin(st, ctx, cx + 20, cy + 22, 21, 12, -0.3, -0.75, F(ORANGE, '#e2661a', '#ffc98c'), 9513);
+  }
+  if (kingBobLook.rps) {
+    // rock, paper, scissors (Boss 6's ending): his front fin up out of the water towards you — curled into
+    // a round fist, pumped up or down; or for paper, spread out flat, a fan of rays
+    const FIN = F(ORANGE, '#e2661a', '#ffc98c');
+    if (kingBobLook.rps === 'paper') {
+      const bx = cx + 26;
+      const by = cy + 18;
+      for (let i = 0; i < 5; i++) fin(st, ctx, bx, by, 30, 11, -1.0 + i * 0.22, 0.05, FIN, 9520 + i);
+      // the rays across the spread fin
+      for (let i = 0; i < 5; i++) {
+        const a = -1.0 + i * 0.22;
+        st.line(ctx, [[bx + Math.cos(a) * 6, by + Math.sin(a) * 6], [bx + Math.cos(a) * 24, by + Math.sin(a) * 24]], 9530 + i, 0.6, '#c9581a');
+      }
+    } else {
+      const a = kingBobLook.rps === 'up' ? -0.8 : -0.15;
+      const bx = cx + 24;
+      const by = cy + 18;
+      fin(st, ctx, bx, by, 24, 10, a, 0, FIN, 9520);
+      const fx = bx + Math.cos(a) * 24;
+      const fy = by + Math.sin(a) * 24;
+      st.shape(ctx, ellipsePts(fx, fy, 8, 7.2, a, 28), FIN, 9521, { lw: 1 });
+      // the curled fin's folds
+      for (const d of [-3.2, 0, 3.2]) {
+        const nx = -Math.sin(a);
+        const ny = Math.cos(a);
+        st.line(ctx, [[fx + Math.cos(a) * 2 + nx * d, fy + Math.sin(a) * 2 + ny * d], [fx + Math.cos(a) * 7 + nx * d * 1.1, fy + Math.sin(a) * 7 + ny * d * 1.1]], 9522 + d, 0.6, '#c9581a');
+      }
+    }
   }
   // the crown: on at a jaunty tilt — or knocked right over, slipping off the back of his head
   if (askew) crown(st, ctx, cx - 14, cy - 19, 22, 14, -0.85, 9507);

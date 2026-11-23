@@ -9,7 +9,7 @@
 import type { Ctx, Pose } from './draw';
 import { carry, carryArms, gait } from './draw';
 import { drawBazooka } from './bazooka';
-import { ellipsePts, paddlePts, type Fill, type Pt, type Style } from './handdrawn';
+import { drawRpsHand, ellipsePts, paddlePts, type Fill, type Pt, type Style } from './handdrawn';
 import { face, markEyes } from './face';
 
 export const PUFFY = {
@@ -97,7 +97,7 @@ function drawPuffyPose(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style, 
 
   // back arm (or both arms up, carrying something)
   const ca = carry.on ? carryArms('puffy', ox, oy) : null;
-  if (ca) st.shape(ctx, paddlePts(ca.back.x, ca.back.y, ca.back.len, 7, ca.back.rot), PUFFY.limb, seed + 1, { lw: 0.85 });
+  if (ca && !carry.rps) st.shape(ctx, paddlePts(ca.back.x, ca.back.y, ca.back.len, 7, ca.back.rot), PUFFY.limb, seed + 1, { lw: 0.85 });
   else st.shape(ctx, paddlePts(cx - 7, cy + 3, 14, 7, Math.PI + 0.2 - armBack), PUFFY.limb, seed + 1, { lw: 0.85 });
 
   const leg = (hx: number, dx: number, lift: number, fill: Fill, s: number) => {
@@ -165,6 +165,7 @@ function drawPuffyPose(ctx: Ctx, ox: number, oy: number, pose: Pose, st: Style, 
 
   if (ca) {
     st.shape(ctx, paddlePts(ca.front.x, ca.front.y, ca.front.len, 7.5, ca.front.rot), PUFFY.body, seed + 11, { lw: 0.85 });
+    if (carry.rps) drawRpsHand(ctx, st, ca.hand[0], ca.hand[1], ca.front.rot, carry.rps, PUFFY.body, seed + 12, 4.4);
     return;
   }
   // bazooka, tucked low under the front arm (kicks back 3 units when firing)

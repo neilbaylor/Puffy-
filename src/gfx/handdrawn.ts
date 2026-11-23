@@ -428,3 +428,32 @@ const sticker: Style = {
 
 export const STYLES: Record<StyleId, Style> = { storybook, polished, watercolor, sticker };
 
+
+/**
+ * A hero's hand making rock or paper (King Bob's rock, paper, scissors), at the end of an arm along
+ * `rot`, in the arm's own fill and the style's line: rock, a round fist with knuckles at its front;
+ * paper, a flat open hand, fingers fanned out along the arm. `r`: the hand's size (units).
+ */
+export function drawRpsHand(ctx: CanvasRenderingContext2D, st: Style, x: number, y: number, rot: number, kind: 'rock' | 'paper', fill: Fill, seed: number, r: number) {
+  const c = Math.cos(rot);
+  const s = Math.sin(rot);
+  if (kind === 'rock') {
+    st.shape(ctx, ellipsePts(x + c * r * 0.3, y + s * r * 0.3, r * 1.1, r * 0.95, rot, 28), fill, seed, { lw: 0.85 });
+    // the knuckles, along its front
+    for (let i = -1; i <= 1; i++) {
+      const kx = x + c * r * 1.05 - s * i * r * 0.55;
+      const ky = y + s * r * 1.05 + c * i * r * 0.55;
+      st.shape(ctx, ellipsePts(kx, ky, r * 0.36, r * 0.32, rot, 14), fill, seed + 2 + i, { lw: 0.7 });
+    }
+    // the curled fingers' crease
+    st.line(ctx, [[x + c * r * 0.55 - s * r * 0.7, y + s * r * 0.55 + c * r * 0.7], [x + c * r * 0.25, y + s * r * 0.25], [x + c * r * 0.55 + s * r * 0.7, y + s * r * 0.55 - c * r * 0.7]], seed + 5, 0.55);
+    return;
+  }
+  // paper: fingers first (fanned along the arm), the thumb out to the side, then the palm over their roots
+  for (let i = 0; i < 4; i++) {
+    const a = rot - 0.42 + i * 0.28;
+    st.shape(ctx, petalPts(x + c * r * 0.4, y + s * r * 0.4, r * 1.9, r * 0.62, a, 20), fill, seed + i, { lw: 0.7 });
+  }
+  st.shape(ctx, petalPts(x, y, r * 1.35, r * 0.62, rot - 1.25, 20), fill, seed + 6, { lw: 0.7 });
+  st.shape(ctx, ellipsePts(x + c * r * 0.35, y + s * r * 0.35, r * 0.95, r * 1.0, rot, 24), fill, seed + 7, { lw: 0.85 });
+}
