@@ -22,6 +22,12 @@ export const LIGHT_SLOW = 'slow';
 export const LIGHT_AUTO = `auto:${VERSION}`;
 
 /**
+ * The hidden device-check page (`?bench`, see src/bench) starts the game to time its start screen:
+ * nothing that happens there changes this device's mode (see main.ts).
+ */
+export const BENCH = /[?&]bench(?:[=&]|$)/.test(location.search);
+
+/**
  * Hidden links for a device that needs it: `?lite` puts this device in light mode for good, `?full`
  * in full mode for good (both as if picked by hand: the automatic checks leave it alone). Taken
  * out of the address straight away, so the saved home-screen link stays plain.

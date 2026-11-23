@@ -5,6 +5,7 @@ import { buildLevel3 } from './level3';
 import { buildLevel4 } from './level4';
 import { buildLevel5 } from './level5';
 import { buildLevel6 } from './level6';
+import { isTesterName } from '../shared/testers';
 
 export interface LevelInfo {
   /** 1-based level number. */
@@ -78,7 +79,7 @@ export const LEVELS: LevelInfo[] = [
 
 /**
  * Work in progress, only on devices switched to it (localStorage puffy.dev = 1, or ?dev in the
- * address), or for the testers' accounts (TESTERS): Plop Invasion · Part 2. Everyone else never sees it.
+ * address), or for the testers' accounts (TESTERS, in shared/testers): Plop Invasion · Part 2. Everyone else never sees it.
  */
 export const DEV = (() => {
   try {
@@ -91,8 +92,6 @@ export const DEV = (() => {
     return /[?&]dev\b/.test(location.search);
   }
 })();
-/** Accounts that get the work-in-progress levels (names, any case), and every boss in the Bosses menu. */
-const TESTERS = ['neil', 'founder'];
 /** Levels still being made: only testers see them. */
 const WIP: LevelInfo[] = [
   {
@@ -117,7 +116,7 @@ export const isTester = () => tester;
  */
 export function setTester(name: string | null | undefined): boolean {
   const who = (name ?? '').trim().toLowerCase();
-  const on = DEV || TESTERS.includes(who);
+  const on = DEV || isTesterName(who);
   tester = on;
   // (each work-in-progress level for its own testers, or every tester)
   const want = on ? WIP.filter((l) => DEV || !l.testers || l.testers.includes(who)) : [];

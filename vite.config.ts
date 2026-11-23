@@ -9,13 +9,16 @@ import { offline } from './scripts/offline-plugin';
  * the page), not only once the first script asks for it. The loading screen's font too (a preload:
  * otherwise it's only asked for once the page's styles are in).
  */
+/** The hidden device-check page's own file (src/bench/benchPage.ts, fetched only for `?bench`). */
+const BENCH_FILE = /(^|\/)benchPage-[\w-]+\.js$/;
 const preloadGame: Plugin = {
   name: 'preload-game',
   apply: 'build',
   transformIndexHtml: {
     order: 'post',
     handler: (_html, { chunk, bundle }) => [
-      ...(chunk?.dynamicImports ?? []).map((file) => ({ tag: 'link', attrs: { rel: 'modulepreload', crossorigin: '', href: `./${file}` }, injectTo: 'head' as const })),
+      // (not the hidden ?bench page's file: only that page asks for it)
+      ...(chunk?.dynamicImports ?? []).filter((file) => !BENCH_FILE.test(file)).map((file) => ({ tag: 'link', attrs: { rel: 'modulepreload', crossorigin: '', href: `./${file}` }, injectTo: 'head' as const })),
       ...Object.keys(bundle ?? {})
         .filter((file) => /\/lilita-one-latin-[\w-]{8}\.woff2$/.test(file))
         .map((file) => ({ tag: 'link', attrs: { rel: 'preload', as: 'font', type: 'font/woff2', crossorigin: '', href: `./${file}` }, injectTo: 'head' as const })),

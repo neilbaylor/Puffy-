@@ -38,7 +38,9 @@ export function offline(): Plugin {
         };
         walk(outDir);
         const sha = (f: string) => createHash('sha256').update(readFileSync(join(outDir, f))).digest('hex');
-        const list = files.filter((f) => f !== 'sw.js' && !f.endsWith('.map')).sort();
+        // (not the hidden ?bench page's file: it's for checking a device, online, and no player needs
+        // it kept — fetched once, if ever, like any other /assets/ file)
+        const list = files.filter((f) => f !== 'sw.js' && !f.endsWith('.map') && !/(^|\/)benchPage-[\w-]+\.js$/.test(f)).sort();
         const isMusic = (f: string) => /\.(m4a|mp3|ogg|wav)$/.test(f);
         const id = createHash('sha256')
           .update(list.map((f) => `${f}:${sha(f)}`).join('\n'))

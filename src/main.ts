@@ -10,7 +10,7 @@ import { FishingScene } from './scenes/FishingScene';
 import { UI } from './ui/ui';
 // (offline play: set up once the start screen is up)
 import './core/offline';
-import { LIGHT, LIGHT_AUTO, LIGHT_KEY } from './core/light';
+import { BENCH, LIGHT, LIGHT_AUTO, LIGHT_KEY } from './core/light';
 import { diag, showDiag } from './core/diag';
 import { trackBossArt } from './gfx/textures';
 import { refreshMs } from './core/refresh';
@@ -284,7 +284,8 @@ function start(refreshMs: number) {
       again();
       return;
     }
-    if (!LIGHT) {
+    // (not on the ?bench page: checking a device doesn't change its mode — it starts again quietly, below)
+    if (!LIGHT && !BENCH) {
       const note = document.createElement('div');
       note.className = 'gl-lost';
       // the first time: switch this device to light mode (until the next version) and start again
@@ -317,3 +318,12 @@ function start(refreshMs: number) {
 }
 
 void refreshMs.then(start);
+
+// What the hidden ?bench page (src/bench) reads from the game once it's started it: taken from here
+// so none of the game's code is copied into the page's own file (or split out of this one).
+export { LIGHT } from './core/light';
+export { diag } from './core/diag';
+export { VERSION } from './version';
+export { stopMusic } from './core/music';
+export { BG_LAYERS } from './gfx/textures';
+export { DEFAULT_PALETTE, drawFarLayer, drawHillsLayer, drawNearLayer } from './gfx/world';

@@ -14,18 +14,26 @@
  *   GET  /api/me        (Authorization: Bearer token) → { user }
  *   PUT  /api/progress  (Bearer) { rootbeer, nuggies, kills, level, spent?, items?, wear? } → { user }
  *   POST /api/logout    (Bearer)                      → 204
+ *   POST /api/bench     { report }                    → 201 { id } (a device check, from the hidden ?bench page)
+ *   GET  /api/bench     (Bearer, a tester)            → { reports: [{ id, at, ua, name, feel, report }] }, newest first
  * where user = { name, rootbeer, nuggies, kills, level, spent, items, wear } (root beer is every bottle
  * ever found, spent what the Shop has had; items the Shop ids owned and wear the ones on, comma
  * separated — 'none' when everything's off, '' never chosen).
  *
  * What's been bought is a row each in user_items (user, item, equipped: whether it's on), so a
  * player keeps it whatever browser they play on. Things are never taken away once bought.
+ *
+ * Device checks (the hidden ?bench page, see src/bench): a row each in bench_reports — the device's
+ * scores as the page sent them (JSON, up to 32 KB), the name the owner gave the device, how they
+ * said the game plays on it, the browser's user-agent and when it came in. Nothing else about who
+ * sent it. Only the newest BENCH_KEEP are kept. Only testers' accounts (shared/testers) can list them.
  */
 import { createHash, randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
+import { isTesterName } from '../src/shared/testers';
 
 const scryptAsync = promisify(scrypt) as (pw: string, salt: Buffer, len: number) => Promise<Buffer>;
 
@@ -40,6 +48,20 @@ export interface PublicUser {
   items: string;
   wear: string;
 }
+
+/** A stored device check (see the top of this file). */
+export interface BenchRow {
+  id: number;
+  at: string;
+  ua: string;
+  name: string;
+  /** How the owner said the game plays on it: 'great', 'ok' or 'struggles'. */
+  feel: string;
+  /** The page's report (JSON). */
+  report: string;
+}
+/** How many device checks are kept (the oldest go). */
+const BENCH_KEEP = 500;
 
 interface UserRow extends PublicUser {
   id: number;
@@ -66,6 +88,10 @@ interface Store {
   addSession(tokenHash: string, userId: number): void;
   session(tokenHash: string): number | undefined;
   dropSession(tokenHash: string): void;
+  /** Keep a device check (the oldest go past BENCH_KEEP); its id. */
+  addBench(b: Omit<BenchRow, 'id' | 'at'>): number;
+  /** Every device check kept, newest first. */
+  benches(): BenchRow[];
 }
 
 /** What's on, from each thing's equipped flag: the ids, 'none' if everything's off, '' if there's nothing. */
@@ -107,6 +133,14 @@ async function openSqlite(file: string): Promise<Store> {
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+    CREATE TABLE IF NOT EXISTS bench_reports (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+      ua TEXT NOT NULL DEFAULT '',
+      name TEXT NOT NULL,
+      feel TEXT NOT NULL,
+      report TEXT NOT NULL
+    );
   `);
   // (a database made before a column existed gets it added)
   const cols = (db.prepare('PRAGMA table_info(users)').all() as { name: string }[]).map((c) => c.name);
@@ -132,6 +166,9 @@ async function openSqlite(file: string): Promise<Store> {
     addSession: db.prepare('INSERT INTO sessions (token_hash, user_id) VALUES (?, ?)'),
     session: db.prepare('SELECT user_id FROM sessions WHERE token_hash = ?'),
     dropSession: db.prepare('DELETE FROM sessions WHERE token_hash = ?'),
+    addBench: db.prepare('INSERT INTO bench_reports (ua, name, feel, report) VALUES (?, ?, ?, ?)'),
+    trimBench: db.prepare(`DELETE FROM bench_reports WHERE id NOT IN (SELECT id FROM bench_reports ORDER BY id DESC LIMIT ${BENCH_KEEP})`),
+    benches: db.prepare('SELECT id, at, ua, name, feel, report FROM bench_reports ORDER BY id DESC'),
   };
   const row = (r: unknown) => {
     if (!r) return undefined;
@@ -157,15 +194,22 @@ async function openSqlite(file: string): Promise<Store> {
     addSession: (t, id) => void q.addSession.run(t, id),
     session: (t) => (q.session.get(t) as { user_id: number } | undefined)?.user_id,
     dropSession: (t) => void q.dropSession.run(t),
+    addBench: (b) => {
+      const id = Number(q.addBench.run(b.ua, b.name, b.feel, b.report).lastInsertRowid);
+      q.trimBench.run();
+      return id;
+    },
+    benches: () => q.benches.all() as unknown as BenchRow[],
   };
 }
 
 /** The fallback: everything in one small JSON file, written (atomically) on every change. */
 function openJson(file: string): Store {
   type Row = Omit<UserRow, 'items' | 'wear'> & { gear?: { item: string; equipped: boolean }[]; items?: string; hat?: string };
-  type Data = { next: number; users: Row[]; sessions: Record<string, number> };
+  type Data = { next: number; users: Row[]; sessions: Record<string, number>; bench?: BenchRow[] };
   let data: Data = { next: 1, users: [], sessions: {} };
   if (existsSync(file)) data = JSON.parse(readFileSync(file, 'utf8')) as Data;
+  const bench = (data.bench ??= []);
   for (const u of data.users) {
     u.kills ??= 0;
     u.spent ??= 0;
@@ -216,6 +260,14 @@ function openJson(file: string): Store {
       delete data.sessions[t];
       save();
     },
+    addBench: (b) => {
+      const id = (bench[bench.length - 1]?.id ?? 0) + 1;
+      bench.push({ id, at: new Date().toISOString().slice(0, 19) + 'Z', ...b });
+      if (bench.length > BENCH_KEEP) bench.splice(0, bench.length - BENCH_KEEP);
+      save();
+      return id;
+    },
+    benches: () => [...bench].reverse(),
   };
 }
 
@@ -255,13 +307,14 @@ function send(res: ServerResponse, status: number, body?: unknown) {
   res.end(body === undefined ? undefined : JSON.stringify(body));
 }
 
-function readBody(req: IncomingMessage): Promise<Record<string, unknown>> {
+/** The request's JSON body (an object; `max` bytes at most, else 'too big'). */
+function readBody(req: IncomingMessage, max = 4096): Promise<Record<string, unknown>> {
   return new Promise((ok, fail) => {
     let size = 0;
     const parts: Buffer[] = [];
     req.on('data', (c: Buffer) => {
       size += c.length;
-      if (size > 4096) {
+      if (size > max) {
         fail(new Error('too big'));
         req.destroy();
       } else parts.push(c);
@@ -280,18 +333,31 @@ function readBody(req: IncomingMessage): Promise<Record<string, unknown>> {
 
 /** A few tries a minute per address at signing in (stops someone guessing passwords). */
 const attempts = new Map<string, { n: number; at: number }>();
-function tooMany(ip: string) {
+/** Device checks sent, per address (a handful a minute is plenty: each takes half a minute to make). */
+const benchSends = new Map<string, { n: number; at: number }>();
+function tooMany(ip: string, seen = attempts, max = 12) {
   const now = Date.now();
   // (old entries go: one per address that's ever tried would grow for good)
-  if (attempts.size > 1000) for (const [k, v] of attempts) if (now - v.at > 60_000) attempts.delete(k);
-  const a = attempts.get(ip);
+  if (seen.size > 1000) for (const [k, v] of seen) if (now - v.at > 60_000) seen.delete(k);
+  const a = seen.get(ip);
   if (!a || now - a.at > 60_000) {
-    attempts.set(ip, { n: 1, at: now });
+    seen.set(ip, { n: 1, at: now });
     return false;
   }
   a.n++;
-  return a.n > 12;
+  return a.n > max;
 }
+
+/** The caller's address: Railway's edge sets X-Real-IP; else X-Forwarded-For's last entry, else the socket's. */
+function addressOf(req: IncomingMessage) {
+  const real = req.headers['x-real-ip'];
+  return (typeof real === 'string' && real.trim()) || String(req.headers['x-forwarded-for'] ?? req.socket.remoteAddress ?? '').split(',').pop()!.trim();
+}
+
+/** How the owner says the game plays on a device (the ?bench page's three choices). */
+const FEELS = new Set(['great', 'ok', 'struggles']);
+/** A device check's report: 32 KB at most (they're ~3 KB). */
+const BENCH_MAX = 32 * 1024;
 
 /** Make the /api handler (returns true if it handled the request). */
 export async function createUserApi() {
@@ -320,9 +386,7 @@ export async function createUserApi() {
         // whatever the caller sent, so keying on the first let anyone skip the limit)
         // (Railway's edge sets X-Real-IP to the player's own address — the header its docs promise;
         // X-Forwarded-For's last entry if not, else the socket's: running locally)
-        const real = req.headers['x-real-ip'];
-        const ip = (typeof real === 'string' && real.trim()) || String(req.headers['x-forwarded-for'] ?? req.socket.remoteAddress ?? '').split(',').pop()!.trim();
-        if (tooMany(ip)) return void send(res, 429, { error: 'Too many tries. Wait a minute.' }), true;
+        if (tooMany(addressOf(req))) return void send(res, 429, { error: 'Too many tries. Wait a minute.' }), true;
         const body = await readBody(req);
         const name = String(body.name ?? '').trim();
         const password = String(body.password ?? '');
@@ -362,6 +426,30 @@ export async function createUserApi() {
         const wear = body.wear !== undefined ? String(body.wear) : body.hat !== undefined ? String(body.hat) : '';
         store.setItems(u.id, ids(body.items, 50).split(',').filter(Boolean), wear ? ids(wear, 10).split(',').filter((x) => x && x !== 'none') : null);
         return void send(res, 200, { user: pub(store.byId(u.id)!) }), true;
+      }
+      if (route === 'POST /api/bench') {
+        // a device check from the ?bench page: kept as it came, with a name and a verdict that make sense
+        if (tooMany(addressOf(req), benchSends, 6)) return void send(res, 429, { error: 'Too many reports. Wait a minute.' }), true;
+        const body = await readBody(req, BENCH_MAX + 1024);
+        const report = body.report;
+        if (!report || typeof report !== 'object' || Array.isArray(report)) return void send(res, 400, { error: 'No report.' }), true;
+        const r = report as Record<string, unknown>;
+        const name = String(r.name ?? '').replace(/\s+/g, ' ').trim();
+        const feel = String(r.feel ?? '');
+        if (!name || name.length > 60) return void send(res, 400, { error: 'Give the device a name (up to 60 characters).' }), true;
+        if (!FEELS.has(feel)) return void send(res, 400, { error: 'Pick how the game plays on it.' }), true;
+        const json = JSON.stringify({ ...r, name });
+        if (json.length > BENCH_MAX) return void send(res, 413, { error: 'Report too big.' }), true;
+        const ua = String(req.headers['user-agent'] ?? '').slice(0, 400);
+        return void send(res, 201, { id: store.addBench({ ua, name, feel, report: json }) }), true;
+      }
+      if (route === 'GET /api/bench') {
+        // (testers only: the same accounts that get the work-in-progress levels)
+        const u = userFrom(req);
+        if (!u) return void send(res, 401, { error: 'Not signed in.' }), true;
+        if (!isTesterName(u.name)) return void send(res, 403, { error: 'Testers only.' }), true;
+        const reports = store.benches().map((b) => ({ ...b, report: JSON.parse(b.report) as unknown }));
+        return void send(res, 200, { reports }), true;
       }
       if (route === 'POST /api/logout') {
         const m = /^Bearer (.+)$/.exec(req.headers.authorization ?? '');
