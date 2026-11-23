@@ -19,6 +19,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
 ## Where things stand (v0.376)
+Live site: https://playpuffy.world (device check: /?bench, reports: /?bench=list signed in as a tester).
 
 ### Main game
 - Heroes: Puffy (fire every 0.38 s), Scruffy (light, knocked back further, 10% bigger, does a backflip when
