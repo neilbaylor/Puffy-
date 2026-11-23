@@ -1143,6 +1143,9 @@ const SKINS = ['#f2a65a', '#f7c690', '#ffb3c6', '#e8a46c', '#f08a3c', '#ffd4a8',
 
 const SIGNS = ['GO KING!', 'PUFF!', '#1 FAN', 'KING ME', 'D-FENSE'];
 
+/** How many rows of seats a part of a crowd's drawing (see crowdParts), behind a loading card. */
+export const CROWD_ROWS = 6;
+
 /**
  * The crowd: thousands of little puffball fans in the King's purple and gold,
  * packed into an upper deck and a lower bowl with stair aisles, lit by the
@@ -1150,9 +1153,6 @@ const SIGNS = ['GO KING!', 'PUFF!', '#1 FAN', 'KING ME', 'D-FENSE'];
  * `excited` stands them up with arms in the air (the scene flips between the
  * two when someone scores).
  */
-/** How many rows of seats a part of a crowd's drawing (see crowdParts), behind a loading card. */
-export const CROWD_ROWS = 6;
-
 export function drawCrowd(ctx: Ctx, excited = false) {
   for (const part of crowdParts(excited)) part(ctx);
 }

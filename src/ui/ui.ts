@@ -1675,7 +1675,7 @@ export class UI {
     this.introEl = null;
     this.setScreen(null);
     stopMusic();
-    // (from a boss: the start screen's look for its Part drawn first, if it isn't — see homeLookSteps)
+    // (from a boss: the start screen's look and opening scenery for its Part drawn first, if they aren't — see homeArt)
     const queue = this.homeArt();
     if (queue) {
       this.leaving = true;
