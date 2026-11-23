@@ -1380,6 +1380,18 @@ export function arenaFrontSolid(): [number, number, number, number][] {
 }
 
 /**
+ * Where the front layer (drawArenaFront, the basketball arena's: the wrestling ring's has a haze all
+ * over it) has nothing at all, in stage units: the arena's whole width between the upper deck's
+ * fascia and the lower bowl's glass rail — the crowd, behind, shows through. The front leaves it out
+ * (see holedImage). (Read back: nothing in it, from the fascia's last row to the rail's first.)
+ */
+export function arenaFrontClear(): [number, number, number, number] {
+  return [L, RIBBON_Y1 + 16 + FRONT_CLEAR_M, R, BOARD_Y0 - 22 - FRONT_CLEAR_M];
+}
+/** (room to spare, stage units: the graphics chip blends each pixel from its neighbours) */
+const FRONT_CLEAR_M = 6;
+
+/**
  * Stage boxes as holes in one of the arena's pictures (drawn at `res` px per stage unit), each
  * shrunk by `inset` stage units on every side, and by `dy` more above and below (for a picture that
  * moves up and down by up to that much).

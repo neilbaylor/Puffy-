@@ -42,6 +42,7 @@ import {
   drawSpotlight,
   spotlightOutline,
   arenaFrontSolid,
+  arenaFrontClear,
   arenaHoles,
   drawJumboBandGlass,
   jumboCrawlItems,
@@ -365,7 +366,8 @@ export class HoopsScene extends Phaser.Scene {
     const solid = arenaFrontSolid();
     for (const im of holedImage(this, 0, 0, this.k('arena'), arenaHoles(solid, ARENA_RES, 2))) im.setScale(1 / ARENA_RES).setDepth(0);
     this.crowd = holedImage(this, 0, 0, this.k('crowd'), arenaHoles(solid, ARENA_RES, 2, CROWD_MOVE)).map((im) => im.setScale(1 / ARENA_RES).setDepth(1));
-    this.add.image(0, 0, this.k('arenafront')).setOrigin(0, 0).setScale(1 / ARENA_RES).setDepth(2);
+    // (and the front without its empty band over the crowd: see arenaFrontClear)
+    for (const im of holedImage(this, 0, 0, this.k('arenafront'), arenaHoles([arenaFrontClear()], ARENA_RES, 0))) im.setScale(1 / ARENA_RES).setDepth(2);
     // the crowd sways a little all the time
     this.tweens.add({ targets: this.crowd, y: 1.2, duration: 800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     this.flashIn = 300;
