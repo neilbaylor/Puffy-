@@ -35,3 +35,38 @@ export function outlineImage(scene: Phaser.Scene, x: number, y: number, key: str
   rope.dirty = false;
   return rope;
 }
+
+/** A box of a picture, [x0, y0, x1, y1] (picture px). */
+export type Hole = readonly [number, number, number, number];
+
+/**
+ * A big still picture (top-left origin) that other pictures drawn over it always hide in places
+ * (solid, never see-through, never moved, faded or hidden), shown as the cells of a grid cut along
+ * the edges of those places (`holes`), without the cells inside them: the graphics chip used to work
+ * through every pixel of it only to have them painted over.
+ *
+ * A grid, all the way across and down, so that every cell shares whole edges with its neighbours:
+ * cells that met partway along an edge could leave a pixel uncovered between them now and then as
+ * the camera turns. Each hole is shrunk to whole pixels inside it (a little more is drawn, never
+ * less); the holes must be inside what hides them by a pixel or two (the graphics chip blends each
+ * pixel on screen from its neighbours in the picture, so the edge of something solid isn't quite).
+ */
+export function holedImage(scene: Phaser.Scene, x: number, y: number, key: string, holes: readonly Hole[]): Phaser.GameObjects.Image[] {
+  const fr = scene.textures.getFrame(key);
+  const W = fr.realWidth;
+  const H = fr.realHeight;
+  const hs = holes
+    .map(([x0, y0, x1, y1]) => [Math.max(0, Math.ceil(x0)), Math.max(0, Math.ceil(y0)), Math.min(W, Math.floor(x1)), Math.min(H, Math.floor(y1))] as const)
+    .filter(([x0, y0, x1, y1]) => x1 > x0 && y1 > y0);
+  const cuts = (n: number, i: 0 | 1) => [...new Set([0, n, ...hs.flatMap((h) => [h[i], h[i + 2]])])].sort((a, b) => a - b);
+  const xs = cuts(W, 0);
+  const ys = cuts(H, 1);
+  const out: Phaser.GameObjects.Image[] = [];
+  for (let r = 0; r + 1 < ys.length; r++)
+    for (let c = 0; c + 1 < xs.length; c++) {
+      const [cx0, cx1, cy0, cy1] = [xs[c], xs[c + 1], ys[r], ys[r + 1]];
+      if (hs.some(([x0, y0, x1, y1]) => cx0 >= x0 && cx1 <= x1 && cy0 >= y0 && cy1 <= y1)) continue;
+      out.push(scene.add.image(x, y, key).setOrigin(0, 0).setCrop(cx0, cy0, cx1 - cx0, cy1 - cy0));
+    }
+  return out;
+}

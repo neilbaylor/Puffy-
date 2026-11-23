@@ -1366,6 +1366,34 @@ export function drawArenaFront(ctx: Ctx) {
 }
 
 /**
+ * The parts of the front layer (drawArenaFront) that are solid all through, in stage units: the
+ * jumbotron's screen, and the LED ribbon and courtside boards (each on a dark backing the arena's
+ * whole width, 3 units past its lights above and below). Whatever's behind them never shows: the
+ * arena and the crowd leave them out (see holedImage).
+ */
+export function arenaFrontSolid(): [number, number, number, number][] {
+  return [
+    [JUMBO.x, JUMBO.y, JUMBO.x + JUMBO.w * JUMBO.s, JUMBO.y + JUMBO.h * JUMBO.s],
+    [L, RIBBON_Y0 - 3, R, RIBBON_Y1 + 3],
+    [L, BOARD_Y0 - 3, R, BOARD_Y1 + 3],
+  ];
+}
+
+/**
+ * Stage boxes as holes in one of the arena's pictures (drawn at `res` px per stage unit), each
+ * shrunk by `inset` stage units on every side, and by `dy` more above and below (for a picture that
+ * moves up and down by up to that much).
+ */
+export function arenaHoles(boxes: readonly (readonly [number, number, number, number])[], res: number, inset: number, dy = 0): [number, number, number, number][] {
+  return boxes.map(([x0, y0, x1, y1]) => [
+    (x0 + STAGE_OX + inset) * res,
+    (y0 + STAGE_OY + inset + dy) * res,
+    (x1 + STAGE_OX - inset) * res,
+    (y1 + STAGE_OY - inset - dy) * res,
+  ]);
+}
+
+/**
  * The jumbotron's screen in stage coordinates (the scene draws live content there).
  * Content is laid out in w × h units and shown `s` times bigger; it hangs from the
  * same bottom edge as before and grows upward (it's the only scoreboard now).

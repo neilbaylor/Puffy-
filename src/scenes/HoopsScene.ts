@@ -41,6 +41,8 @@ import {
   drawSpotBrush,
   drawSpotlight,
   spotlightOutline,
+  arenaFrontSolid,
+  arenaHoles,
   drawJumboBandGlass,
   jumboCrawlItems,
   paintCrawl,
@@ -51,7 +53,7 @@ import {
 } from '../gfx/hoops';
 import { stingerReveal, stingerTitle } from '../ui/stinger';
 import { addCanvas, frameGrid, hires, type Step } from '../gfx/textures';
-import { outlineImage } from '../gfx/cutImage';
+import { holedImage, outlineImage } from '../gfx/cutImage';
 import { BOOM_FRAMES, BOOM_SIZE, drawBoomFrame } from '../gfx/boom';
 import { drawEmber, drawFireball, drawFluffChunk, drawSmoke } from '../gfx/blast';
 import { gamepadSources } from '../input/gamepad';
@@ -81,6 +83,8 @@ export interface HoopsData {
 
 type Outcome = 'swish' | 'rimIn' | 'rimOut' | 'short' | 'long' | 'wide';
 
+/** The most the crowd moves up or down (stage units): it bobs 1.2, and jumps 4 a cheer, cheers up to 1.6 big. */
+const CROWD_MOVE = 8;
 /** The spotlight picture's outline (see spotlightOutline). */
 const SPOT_OUTLINE = spotlightOutline(300, 700);
 /** King Puff Ball makes about this share of his shots. */
@@ -192,7 +196,7 @@ export class HoopsScene extends Phaser.Scene {
   private tapped = false;
   private score = { you: [] as boolean[], king: [] as boolean[] };
   private baseZoom = 1;
-  private crowd!: Phaser.GameObjects.Image;
+  private crowd!: Phaser.GameObjects.Image[];
   private camFocus = { x: 800, y: 450, zoom: 1 };
   private heroRefl!: Phaser.GameObjects.Sprite;
   // lighting: the arena can go dark, with spotlights cut out of the darkness
@@ -355,8 +359,12 @@ export class HoopsScene extends Phaser.Scene {
     const ch = characterById(this.hd.charId);
     clearWith(this, '#140a26');
 
-    this.add.image(0, 0, this.k('arena')).setOrigin(0, 0).setScale(1 / ARENA_RES).setDepth(0);
-    this.crowd = this.add.image(0, 0, this.k('crowd')).setOrigin(0, 0).setScale(1 / ARENA_RES).setDepth(1);
+    // (the arena and the crowd without what the front layer's solid parts always hide — the jumbotron's
+    // screen, the LED ribbon and boards: see holedImage; the crowd's holes smaller by the most it
+    // jumps and bobs, it moves under them)
+    const solid = arenaFrontSolid();
+    for (const im of holedImage(this, 0, 0, this.k('arena'), arenaHoles(solid, ARENA_RES, 2))) im.setScale(1 / ARENA_RES).setDepth(0);
+    this.crowd = holedImage(this, 0, 0, this.k('crowd'), arenaHoles(solid, ARENA_RES, 2, CROWD_MOVE)).map((im) => im.setScale(1 / ARENA_RES).setDepth(1));
     this.add.image(0, 0, this.k('arenafront')).setOrigin(0, 0).setScale(1 / ARENA_RES).setDepth(2);
     // the crowd sways a little all the time
     this.tweens.add({ targets: this.crowd, y: 1.2, duration: 800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
@@ -620,7 +628,7 @@ export class HoopsScene extends Phaser.Scene {
     // the crowd: on its feet after a basket, and camera flashes popping all the time
     const excited = this.clock < this.excitedUntil;
     const want = this.k(excited && Math.floor(this.clock / 170) % 3 !== 2 ? 'crowd2' : 'crowd');
-    if (this.crowd.texture.key !== want) this.crowd.setTexture(want);
+    if (this.crowd[0].texture.key !== want) for (const im of this.crowd) im.setTexture(want);
     this.flashIn -= dt;
     if (this.flashIn <= 0) {
       this.flashIn = excited ? 25 + Math.random() * 60 : 140 + Math.random() * 420;

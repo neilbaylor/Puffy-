@@ -10,7 +10,8 @@ import { loseLife, lives } from '../core/lives';
 import { bank } from '../core/bank';
 import { ART_RES, CARRY_SWING, CHAR_H, CHAR_W, bodyLift, canvas, carryHand } from '../gfx/draw';
 import { wardrobe } from '../core/wardrobe';
-import { ARENA_H, ARENA_W, CROWD_H, FRONT_H, JUMBO, RIBBON, STAGE_OX, STAGE_OY, drawArena, drawArenaFront, drawCrowd, drawCameraFlash, drawSpotlight, paintCrawl, setArenaStyle, type JumboContent } from '../gfx/hoops';
+import { holedImage } from '../gfx/cutImage';
+import { ARENA_H, ARENA_W, CROWD_H, FRONT_H, JUMBO, RIBBON, STAGE_OX, STAGE_OY, arenaFrontSolid, arenaHoles, drawArena, drawArenaFront, drawCrowd, drawCameraFlash, drawSpotlight, paintCrawl, setArenaStyle, type JumboContent } from '../gfx/hoops';
 import { PLOP_FRAMES, PLOP_H, PLOP_W, QUEEN_KO_FRAMES, QUEEN_KO_GROUND, QUEEN_KO_H, QUEEN_KO_W, drawPlop, drawQueen, drawQueenKO, type PlopFrame } from '../gfx/plops';
 import { POOWAVE_H, POOWAVE_W, drawPooWave } from '../gfx/plopworld';
 import { drawPoo } from '../gfx/hazards';
@@ -516,7 +517,7 @@ export class WrestleScene extends Phaser.Scene {
   private hearts = HEARTS_START;
   private ended = false;
   private fighting = false;
-  private crowd!: Phaser.GameObjects.Image;
+  private crowd!: Phaser.GameObjects.Image[];
   private excitedUntil = 0;
   private jumboScreen!: JumboScreen;
   /** The jumbotron's crawl and the ribbon's sponsor panels, slid along by the graphics chip. */
@@ -641,8 +642,12 @@ export class WrestleScene extends Phaser.Scene {
 
     // ── the arena (the basketball one, in poo browns), the ring, the floor and steps around it ──
     const AS_ = K / ARENA_RES;
-    this.add.image(0, 0, this.tk('wr-arena')).setOrigin(0).setScale(AS_).setDepth(DEPTH_W.arena);
-    this.crowd = this.add.image(0, 0, this.tk('wr-crowd')).setOrigin(0).setScale(AS_).setDepth(DEPTH_W.crowd);
+    // (the arena and the crowd without what's always hidden behind something solid: the front layer's
+    // jumbotron screen, LED ribbon and boards, and — the arena — the ring's mat and skirt; see holedImage)
+    const solid = arenaFrontSolid();
+    const ringSolid = [backX(RING.x0), RING.backY, backX(RING.x1), RING.skirtY] as const;
+    for (const im of holedImage(this, 0, 0, this.tk('wr-arena'), arenaHoles([...solid, ringSolid], ARENA_RES, 2))) im.setScale(AS_).setDepth(DEPTH_W.arena);
+    this.crowd = holedImage(this, 0, 0, this.tk('wr-crowd'), arenaHoles(solid, ARENA_RES, 2)).map((im) => im.setScale(AS_).setDepth(DEPTH_W.crowd));
     this.add.image(0, 0, this.tk('wr-front')).setOrigin(0).setScale(AS_).setDepth(DEPTH_W.front);
     // (the screens glow: they're in front of the darkness when the lights go down, like the basketball
     // jumbotron; layers the graphics chip puts together, see JumboScreen)
@@ -1485,7 +1490,7 @@ export class WrestleScene extends Phaser.Scene {
     // the crowd on its feet for the big moments
     const excited = this.clock < this.excitedUntil && Math.floor(this.clock / 170) % 3 !== 2;
     const want = this.tk(excited ? 'wr-crowd2' : 'wr-crowd');
-    if (this.crowd.texture.key !== want) this.crowd.setTexture(want);
+    if (this.crowd[0].texture.key !== want) for (const im of this.crowd) im.setTexture(want);
     if (this.jumbo.kind === 'big' && this.jumboUntil && this.clock > this.jumboUntil) {
       this.jumboUntil = 0;
       // (before the fight, back to her title: the hits to go only go up once it's on)
