@@ -372,3 +372,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.367: Big speed-up everywhere (about a third faster per frame on slow tablets, in full and light mode): less invisible drawing, skies and glows drawn more cheaply.
 - v0.368: Fewer stutters: no freezes when switching Parts on the start screen or entering bosses, smoother start to the Part 4 climb, backgrounds drawn more cheaply everywhere, and a slow memory leak on boss visits fixed.
 - v0.369: Bosses about 10% smoother, no freeze when a battle starts, the Shop scrolls at full speed, and loading screens keep moving instead of freezing.
+- v0.370: No more long freezes entering or leaving boss fights (loading card keeps moving instead), smoother battle lobby and countdown, and checkpoint restarts no longer redraw every cloud.
