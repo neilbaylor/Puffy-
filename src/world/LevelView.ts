@@ -25,6 +25,39 @@ const TRIM_KEEP = 64;
  */
 const GROUND_HIDE_X = 40;
 const GROUND_HIDE_Y = 16;
+/**
+ * How many rows at the top of each terrain chunk's picture are see-through, by key (measured as it's
+ * drawn: see clearTop). A chunk's picture starts well above the highest ground in it, to leave room for
+ * whatever grows on top (grass, puffs, dandelions); it's shown from just above its first row with anything
+ * in it. The graphics chip blends every pixel of a picture's box, see-through or not: on flat ground
+ * that strip of nothing ran the width of the screen. The same picture in the same place, less of nothing.
+ */
+const TERRAIN_TOP = new Map<string, number>();
+/** How far down a chunk's top is looked at for its first row with anything in it (world px; its rows below that are drawn whatever). */
+const TERRAIN_TOP_SCAN = 96;
+
+/**
+ * How many rows at the top of a picture are see-through, looking at its first `rows` only (none if it
+ * can't be read), less 2: the graphics chip blends each pixel on screen from the rows either side of it,
+ * so the see-through row next to the first with anything in it still counts — it's kept. What's on
+ * screen is the same (to a shade or two here and there: the graphics chip places a picture's corners
+ * to a fraction of a pixel, and the top corners have moved).
+ */
+function clearTop(c: HTMLCanvasElement, rows: number) {
+  try {
+    const W = c.width;
+    const H = Math.min(c.height, rows);
+    if (H <= 2) return 0;
+    const px = c.getContext('2d')!.getImageData(0, 0, W, H).data;
+    for (let y = 0; y < H; y++) {
+      const row = y * W * 4;
+      for (let x = 0; x < W; x++) if (px[row + x * 4 + 3]) return Math.max(0, y - 2);
+    }
+    return H - 2;
+  } catch {
+    return 0;
+  }
+}
 /** Colour of the deep rock under each terrain chunk (sampled once, when the chunk is drawn). */
 const DEEP_FILL = new Map<string, number>();
 /** Each level's terrain pieces (outline + bounds), worked out once (see LevelView.pieces). */
@@ -667,6 +700,8 @@ export class LevelView {
               cctx.fillRect(0, fullPx - fadeH, c.width, fadeH);
               cctx.restore();
             }
+            // (how much of its top is see-through, while its pixels are still here: see TERRAIN_TOP)
+            TERRAIN_TOP.set(key, clearTop(c, Math.ceil(TERRAIN_TOP_SCAN * res)));
             addCanvas(this.scene, key, c, undefined, { release: true });
             return true;
           }
@@ -684,6 +719,9 @@ export class LevelView {
             .setOrigin(0, 0)
             .setScale(1 / res)
             .setDepth(DEPTH.tiles);
+          // (shown from its first row with anything in it: see TERRAIN_TOP)
+          const clear = TERRAIN_TOP.get(key) ?? 0;
+          if (clear > 0) chunk.setCrop(0, clear, chunk.frame.width, chunk.frame.height - clear);
           // (drawn later, in lazy mode: it joins the colour grade too)
           if (this.scenery) {
             this.scenery.push(chunk);
