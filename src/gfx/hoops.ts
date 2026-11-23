@@ -1150,24 +1150,77 @@ const SIGNS = ['GO KING!', 'PUFF!', '#1 FAN', 'KING ME', 'D-FENSE'];
  * `excited` stands them up with arms in the air (the scene flips between the
  * two when someone scores).
  */
+/** How many rows of seats a part of a crowd's drawing (see crowdParts), behind a loading card. */
+export const CROWD_ROWS = 6;
+
 export function drawCrowd(ctx: Ctx, excited = false) {
-  ctx.save();
-  ctx.translate(STAGE_OX, STAGE_OY);
-  const lay = AS.layout;
-  drawTier(ctx, { ...UPPER, y0: lay.upperY0, aisles: lay.aislesU, rows: Math.round(17 * (118 - lay.upperY0) / 164) }, rng(lay.seeds[0]), excited);
-  drawTier(ctx, { ...LOWER, aisles: lay.aislesL }, rng(lay.seeds[1]), excited);
-  ctx.restore();
+  for (const part of crowdParts(excited)) part(ctx);
 }
 
-function drawTier(dst: Ctx, tier: Tier, r: () => number, excited: boolean) {
+/**
+ * drawCrowd in parts, to be drawn one after another on the same canvas — a few rows of a tier of seats
+ * each (on the tier's own canvas), then the tier put onto the picture — so a loading card can give each
+ * part a frame of its own (see partSteps): in one go a crowd was a frame of 0.5-0.85 s at 4x slow CPU.
+ * The same drawing in the same order: the same picture. The arena's style is read as each part draws
+ * (as drawCrowd did), so it's set before each (see setArenaStyle). `rowsPer`: how many rows a part.
+ */
+export function crowdParts(excited = false, rowsPer = Infinity): ((ctx: Ctx) => void)[] {
+  const parts: ((ctx: Ctx) => void)[] = [];
+  // (the tiers as drawCrowd laid them out, worked out when the first part draws: the style's set by then)
+  let tiers: { tier: Tier; r: () => number }[] | null = null;
+  const tierAt = (i: number) => {
+    if (!tiers) {
+      const lay = AS.layout;
+      tiers = [
+        { tier: { ...UPPER, y0: lay.upperY0, aisles: lay.aislesU, rows: Math.round(17 * (118 - lay.upperY0) / 164) }, r: rng(lay.seeds[0]) },
+        { tier: { ...LOWER, aisles: lay.aislesL }, r: rng(lay.seeds[1]) },
+      ];
+    }
+    return tiers[i];
+  };
+  for (const i of [0, 1]) {
+    let tc: TierCanvas | null = null;
+    /** Rows drawn so far. */
+    let drawn = 0;
+    const more = (n: number) => {
+      const { tier, r } = tierAt(i);
+      tc ??= tierCanvas(tier);
+      const to = Math.min(tier.rows, drawn + n);
+      tierRows(tc, tier, r, excited, drawn, to);
+      drawn = Math.max(drawn, to);
+      return tc;
+    };
+    // (the upper tier's rows depend on the layout, 17 as a rule: parts for that many, then the tier put
+    // onto the picture in a part of its own, with any rows left)
+    const rows = i === 0 ? UPPER.rows : LOWER.rows;
+    for (let n = 0; n < rows; n += rowsPer) parts.push(() => void more(rowsPer));
+    parts.push((ctx) => {
+      const c = more(Infinity);
+      ctx.save();
+      ctx.translate(STAGE_OX, STAGE_OY);
+      tierOnto(ctx, c);
+      ctx.restore();
+    });
+  }
+  return parts;
+}
+
+/** A tier of seats' own canvas (drawn at its own resolution, then put onto the picture: see tierOnto). */
+type TierCanvas = { c: HTMLCanvasElement; ctx: Ctx; top: number; bottom: number };
+function tierCanvas(tier: Tier): TierCanvas {
   const top = tier.y0 - 40;
   const bottom = tier.y1 + 24;
   const { c, ctx } = canvas(Math.ceil((R - L) * tier.q), Math.ceil((bottom - top) * tier.q));
   ctx.scale(tier.q, tier.q);
   ctx.translate(-L, -top);
+  return { c, ctx, top, bottom };
+}
+
+/** Rows `from` to `to` of a tier, on its own canvas. */
+function tierRows({ ctx }: TierCanvas, tier: Tier, r: () => number, excited: boolean, from: number, to: number) {
   const inAisle = (x: number) => tier.aisles.some((a) => Math.abs(x - a) < tier.aisleW / 2 + 2);
 
-  for (let row = 0; row < tier.rows; row++) {
+  for (let row = from; row < to; row++) {
     const t = row / (tier.rows - 1);
     const s = tier.s0 + (tier.s1 - tier.s0) * t;
     const y = tier.y0 + (tier.y1 - tier.y0) * t;
@@ -1197,6 +1250,10 @@ function drawTier(dst: Ctx, tier: Tier, r: () => number, excited: boolean) {
       fan(ctx, x, y + (v.size - 0.5) * s * 0.5, ps, light, v, tier.near && ps > 7.4, excited);
     }
   }
+}
+
+/** A tier's canvas put onto the picture. */
+function tierOnto(dst: Ctx, { c, top, bottom }: TierCanvas) {
   dst.imageSmoothingEnabled = true;
   dst.imageSmoothingQuality = 'high';
   dst.drawImage(c, L, top, R - L, bottom - top);

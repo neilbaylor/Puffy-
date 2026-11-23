@@ -26,7 +26,8 @@ import {
   drawBackboard,
   drawCameraFlash,
   drawBall,
-  drawCrowd,
+  crowdParts,
+  CROWD_ROWS,
   drawKing,
   drawKingCrown,
   kingCrownAt,
@@ -53,7 +54,7 @@ import {
   type JumboContent,
 } from '../gfx/hoops';
 import { stingerReveal, stingerTitle } from '../ui/stinger';
-import { addCanvas, frameGrid, hires, type Step } from '../gfx/textures';
+import { addCanvas, frameGrid, frameShares, hires, partSteps, type Step } from '../gfx/textures';
 import { holedImage, outlineImage } from '../gfx/cutImage';
 import { BOOM_FRAMES, BOOM_SIZE, drawBoomFrame } from '../gfx/boom';
 import { drawEmber, drawFireball, drawFluffChunk, drawSmoke } from '../gfx/blast';
@@ -297,23 +298,25 @@ export class HoopsScene extends Phaser.Scene {
         });
     };
     add(k('arena'), () => addCanvas(this, k('arena'), hires(ARENA_W, ARENA_H, ARENA_RES, (ctx) => drawArena(ctx)), undefined, { release: true }));
-    add('king', () => {
+    // (the King's sheet a third at a time, and each crowd a few rows at a time, each in a frame of its own
+    // behind the Bosses menu's loading card: see partSteps — in one step each was a frame of 0.4-0.85 s
+    // at 4x slow CPU)
+    {
       const fw = Math.ceil(KING_W * KING_RES);
       const fh = Math.ceil(KING_H * KING_RES);
       const g = frameGrid(KING_FRAMES.length, fw, fh);
-      const { c, ctx } = canvas(g.w, g.h);
-      KING_FRAMES.forEach((f, i) => {
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(g.x(i), g.y(i), fw, fh);
-        ctx.clip();
-        ctx.translate(g.x(i), g.y(i));
-        ctx.scale(KING_RES, KING_RES);
-        drawKing(ctx, 0, 0, f, false);
-        ctx.restore();
-      });
-      addCanvas(this, 'king', c, (t) => KING_FRAMES.forEach((f, i) => t.add(f, 0, g.x(i), g.y(i), fw, fh)), { release: true });
-    });
+      if (!T.exists('king'))
+        steps.push(...partSteps('king', () => T.exists('king'), () => canvas(g.w, g.h), frameShares(KING_FRAMES.length, 3, ({ ctx }, i) => {
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(g.x(i), g.y(i), fw, fh);
+          ctx.clip();
+          ctx.translate(g.x(i), g.y(i));
+          ctx.scale(KING_RES, KING_RES);
+          drawKing(ctx, 0, 0, KING_FRAMES[i], false);
+          ctx.restore();
+        }), ({ c }) => addCanvas(this, 'king', c, (t) => KING_FRAMES.forEach((f, i) => t.add(f, 0, g.x(i), g.y(i), fw, fh)), { release: true }), () => setArenaStyle(style)));
+    }
     // (the Plop family's parade: Part 2's ending only, so only there; and only the poses it strikes)
     if (hard)
     for (const kind of PLOP_KINDS) {
@@ -335,8 +338,9 @@ export class HoopsScene extends Phaser.Scene {
       });
     }
     add('kingcrown', () => addCanvas(this, 'kingcrown', hires(64, 44, KING_RES, (ctx) => drawKingCrown(ctx, 32, 40)), undefined, { release: true }));
-    add(k('crowd'), () => addCanvas(this, k('crowd'), hires(ARENA_W, CROWD_H, ARENA_RES, (ctx) => drawCrowd(ctx, false)), undefined, { release: true }));
-    add(k('crowd2'), () => addCanvas(this, k('crowd2'), hires(ARENA_W, CROWD_H, ARENA_RES, (ctx) => drawCrowd(ctx, true)), undefined, { release: true }));
+    for (const [key, excited] of [[k('crowd'), false], [k('crowd2'), true]] as const)
+      if (!T.exists(key))
+        steps.push(...partSteps(key, () => T.exists(key), () => hires(ARENA_W, CROWD_H, ARENA_RES, () => {}), crowdParts(excited, CROWD_ROWS).map((part) => (c: HTMLCanvasElement) => part(c.getContext('2d')!)), (c) => addCanvas(this, key, c, undefined, { release: true }), () => setArenaStyle(style)));
     add(k('arenafront'), () => addCanvas(this, k('arenafront'), hires(ARENA_W, FRONT_H, ARENA_RES, (ctx) => drawArenaFront(ctx)), undefined, { release: true }));
     add('camflash', () => addCanvas(this, 'camflash', hires(48, 48, 1, (ctx) => drawCameraFlash(ctx, 24)), undefined, { release: true }));
     add('hball', () => addCanvas(this, 'hball', hires(52, 52, 3, (ctx) => drawBall(ctx, 26, 26, 24)), undefined, { release: true }));

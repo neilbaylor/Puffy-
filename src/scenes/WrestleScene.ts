@@ -11,14 +11,14 @@ import { bank } from '../core/bank';
 import { ART_RES, CARRY_SWING, CHAR_H, CHAR_W, bodyLift, canvas, carryHand } from '../gfx/draw';
 import { wardrobe } from '../core/wardrobe';
 import { holedImage } from '../gfx/cutImage';
-import { ARENA_H, ARENA_W, CROWD_H, FRONT_H, JUMBO, RIBBON, STAGE_OX, STAGE_OY, arenaFrontSolid, arenaHoles, drawArena, drawArenaFront, drawCrowd, drawCameraFlash, drawSpotlight, paintCrawl, setArenaStyle, type JumboContent } from '../gfx/hoops';
+import { ARENA_H, ARENA_W, CROWD_H, FRONT_H, JUMBO, RIBBON, STAGE_OX, STAGE_OY, arenaFrontSolid, arenaHoles, crowdParts, CROWD_ROWS, drawArena, drawArenaFront, drawCameraFlash, drawSpotlight, paintCrawl, setArenaStyle, type JumboContent } from '../gfx/hoops';
 import { PLOP_FRAMES, PLOP_H, PLOP_W, QUEEN_KO_FRAMES, QUEEN_KO_GROUND, QUEEN_KO_H, QUEEN_KO_W, drawPlop, drawQueen, drawQueenKO, type PlopFrame } from '../gfx/plops';
 import { POOWAVE_H, POOWAVE_W, drawPooWave } from '../gfx/plopworld';
 import { drawPoo } from '../gfx/hazards';
 import { drawPrize } from '../gfx/prizes';
 import { STYLES } from '../gfx/handdrawn';
 import { CHAIR_H, CHAIR_W, KING_SEAT, PLOP_DOME, PLOP_DOME_RING, POO_PALACE, POO_PALACE_RING, setRingLook, drawFoldingChair, POST_BOX, PUDDLE, RING, RING_BOX, ROPE_COL, TUNNEL, backX, drawArenaPoo, drawFrontPost, drawRing, drawRingFloor, drawRingside, RINGSIDE_PARTS, ringClear, drawTunnel, wrestleJumboBar, WR_CRAWL, wrestleCrawlAt, wrestleCrawlItems } from '../gfx/wrestle';
-import { HERO_SHEET_M, PCHUTE_DOWN, PCHUTE_RES, PCHUTE_UP, PLOP_PAD, PLOP_RES, PLOP_TOP, addCanvas, hires, makeCarrySheet, makeJetFx, makePlopChutes, makePlops, makeWeaponArt, type Step } from '../gfx/textures';
+import { HERO_SHEET_M, PCHUTE_DOWN, PCHUTE_RES, PCHUTE_UP, PLOP_PAD, PLOP_RES, PLOP_TOP, addCanvas, carrySteps, frameShares, hires, makeCarrySheet, makeJetFx, makePlopChutes, makeWeaponArt, partSteps, plopSteps, type Step } from '../gfx/textures';
 import { LedRibbon, LedStrip } from '../gfx/ledStrip';
 import { JumboScreen } from '../gfx/jumboScreen';
 import { BLASTER, SAW, W_RES } from '../gfx/weapons';
@@ -821,8 +821,21 @@ export class WrestleScene extends Phaser.Scene {
         drawRingFloor(ctx);
       }), undefined, { release: true }),
     );
-    once(tk('wr-crowd'), () => addCanvas(this, tk('wr-crowd'), hires(ARENA_W, CROWD_H, ARENA_RES, (ctx) => (drawCrowd(ctx, false), drawTunnel(ctx))), undefined, { release: true }));
-    once(tk('wr-crowd2'), () => addCanvas(this, tk('wr-crowd2'), hires(ARENA_W, CROWD_H, ARENA_RES, (ctx) => (drawCrowd(ctx, true), drawTunnel(ctx))), undefined, { release: true }));
+    // (each crowd a few rows at a time, and the big sheets below a share of their frames at a time, each in
+    // a frame of its own behind the Bosses menu's loading card: see partSteps — in one step each was a
+    // frame of 0.5-1.2 s at 4x slow CPU)
+    for (const [key, excited] of [[tk('wr-crowd'), false], [tk('wr-crowd2'), true]] as const)
+      if (!T.exists(key))
+        steps.push(
+          ...partSteps(
+            key,
+            () => T.exists(key),
+            () => hires(ARENA_W, CROWD_H, ARENA_RES, () => {}),
+            [...crowdParts(excited, CROWD_ROWS), drawTunnel].map((part) => (c: HTMLCanvasElement) => part(c.getContext('2d')!)),
+            (c) => addCanvas(this, key, c, undefined, { release: true }),
+            look,
+          ),
+        );
     once(tk('wr-front'), () =>
       addCanvas(this, tk('wr-front'), hires(ARENA_W, FRONT_H, ARENA_RES, (ctx) => {
         drawArenaFront(ctx);
@@ -844,21 +857,30 @@ export class WrestleScene extends Phaser.Scene {
     );
     // Queen Plop and the King, all their frames (a grid: one long strip is too wide for some phones)
     // (`frames`: only those, for one that only strikes a few poses)
-    const sheetOf = (key: string, draw: (ctx: CanvasRenderingContext2D, f: PlopFrame) => void, frames: readonly PlopFrame[] = PLOP_FRAMES) => once(key, () => {
+    const sheetOf = (key: string, draw: (ctx: CanvasRenderingContext2D, f: PlopFrame) => void, frames: readonly PlopFrame[] = PLOP_FRAMES) => {
+      if (T.exists(key)) return;
       const fw = Math.round((PLOP_W + Q_PAD * 2) * Q_RES);
       const fh = Math.round((PLOP_H + Q_TOP) * Q_RES);
       // (five across, or as few rows as fit and the frames shared out evenly between them)
       const COLS = Math.ceil(frames.length / Math.ceil(frames.length / 5));
-      const { c, ctx } = canvas(fw * COLS, fh * Math.ceil(frames.length / COLS));
-      frames.forEach((f, i) => {
-        ctx.save();
-        ctx.translate((i % COLS) * fw, Math.floor(i / COLS) * fh);
-        ctx.scale(Q_RES, Q_RES);
-        draw(ctx, f);
-        ctx.restore();
-      });
-      addCanvas(this, key, c, (t) => frames.forEach((f, i) => t.add(f, 0, (i % COLS) * fw, Math.floor(i / COLS) * fh, fw, fh)), { release: true });
-    });
+      steps.push(
+        ...partSteps(
+          key,
+          () => T.exists(key),
+          () => canvas(fw * COLS, fh * Math.ceil(frames.length / COLS)),
+          // (two frames a part: the Plop King's sheets were the longest steps of all, 0.7-1.2 s each)
+          frameShares(frames.length, Math.ceil(frames.length / 2), ({ ctx }, i) => {
+            ctx.save();
+            ctx.translate((i % COLS) * fw, Math.floor(i / COLS) * fh);
+            ctx.scale(Q_RES, Q_RES);
+            draw(ctx, frames[i]);
+            ctx.restore();
+          }),
+          ({ c }) => addCanvas(this, key, c, (t) => frames.forEach((f, i) => t.add(f, 0, (i % COLS) * fw, Math.floor(i / COLS) * fh, fw, fh)), { release: true }),
+          look,
+        ),
+      );
+    };
     if (kingFight) {
       // the Plop King: in his robe (walking in), and stripped for the fight with his jetpack on his back
       // (his own art has the Plop drawn 25, 34 into its box: moved to where the Queen's sheet has it)
@@ -868,7 +890,7 @@ export class WrestleScene extends Phaser.Scene {
       // (each of these makers does nothing for what's there)
       step(['jetflame', 'jetsmoke'], () => makeJetFx(this));
       step(['pchute'], () => makePlopChutes(this));
-      for (const k of ['small', 'medium', 'large'] as const) step([`gplop-${k}`], () => makePlops(this, k));
+      for (const k of ['small', 'medium', 'large'] as const) steps.push(...plopSteps(this, k));
       step(['w-blaster', 'w-saw', 'w-ball', 'w-bullet'], () => makeWeaponArt(this));
       once('wr-duck', () => addCanvas(this, 'wr-duck', hires(28, 24, 3, (ctx) => drawDuck(ctx)), undefined, { release: true }));
       once('wr-boom', () => {
@@ -934,7 +956,7 @@ export class WrestleScene extends Phaser.Scene {
     once('wr-chair', () => addCanvas(this, 'wr-chair', hires(CHAIR_W + 8, CHAIR_H + 4, ART_RES, (ctx) => (ctx.translate(4, 2), drawFoldingChair(ctx))), undefined, { release: true }));
     once('wr-chair-bent', () => addCanvas(this, 'wr-chair-bent', hires(CHAIR_W + 8, CHAIR_H + 4, ART_RES, (ctx) => (ctx.translate(4, 2), drawFoldingChair(ctx, true))), undefined, { release: true }));
     // (the hero's chair-carrying frames, for when a chair comes in)
-    if (ch) step([`char-${ch.id}-carry`], () => makeCarrySheet(this, ch));
+    if (ch) steps.push(...carrySteps(this, ch));
     return steps;
   }
 

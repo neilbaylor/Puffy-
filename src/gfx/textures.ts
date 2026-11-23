@@ -277,6 +277,48 @@ function sheetSteps<F extends string>(
   return steps;
 }
 
+/**
+ * A picture drawn in parts, as loading-card steps each in a frame of its own (as sheetSteps: the browser
+ * paints what's been drawn at the end of each frame, so each frame has a share of that too): `begin`
+ * makes its canvas, the parts draw on it in turn, and `end` sends it to the graphics chip with the last
+ * part. The same drawing in the same order on the same canvas: the same picture. `exists`: it's been
+ * drawn meanwhile (by whatever wanted it first) — nothing more to do. `pre`: before each part (the
+ * drawing style the parts draw in).
+ */
+export function partSteps<S>(name: string, exists: () => boolean, begin: () => S, parts: ((s: S) => void)[], end: (s: S) => void, pre?: () => void): Step[] {
+  let st: S | null = null;
+  return parts.map((part, i) => {
+    const last = i === parts.length - 1;
+    return {
+      name: i ? `${name} ${i + 1}` : name,
+      own: !last,
+      run: () => {
+        if (exists()) {
+          st = null;
+          return;
+        }
+        pre?.();
+        st ??= begin();
+        part(st);
+        if (!last) return;
+        end(st);
+        st = null;
+      },
+    };
+  });
+}
+
+/** `n` frames in `shares` lots, as parts for partSteps: `draw(s, i)` for each frame in turn. */
+export function frameShares<S>(n: number, shares: number, draw: (s: S, i: number) => void): ((s: S) => void)[] {
+  const per = Math.ceil(n / shares);
+  const out: ((s: S) => void)[] = [];
+  for (let k = 0; k * per < n; k++)
+    out.push((s) => {
+      for (let i = k * per; i < Math.min(n, (k + 1) * per); i++) draw(s, i);
+    });
+  return out;
+}
+
 // ─────────────────────────────────────────────────────────────
 
 /** The collision tilemap is invisible, but Phaser still wants a tileset image. */
@@ -400,20 +442,42 @@ export const HERO_SHEET_M = HERO_M;
 export function makeCarrySheet(scene: Phaser.Scene, ch: (typeof CHARACTERS)[number]) {
   const key = `char-${ch.id}-carry`;
   if (scene.textures.exists(key)) return key;
-  const frames: (Pose | CarryFrame)[] = [...POSES, ...(Object.keys(CARRY_SWING) as CarryFrame[])];
   carry.on = true;
   try {
     const up = gearUp(wardrobe.wearKey);
-    sheet(scene, key, CHAR_W + HERO_M * 2, CHAR_H + up, frames, (ctx, f) => {
-      const sw = (CARRY_SWING as Record<string, number>)[f];
-      carry.a = sw ?? -1.75;
-      drawCharacter(ctx, HERO_M, up, ch, sw === undefined ? (f as Pose) : f === 'lift' ? 'idle1' : 'idle0');
-    });
+    sheet(scene, key, CHAR_W + HERO_M * 2, CHAR_H + up, CARRY_FRAMES, (ctx, f) => drawCarryFrame(ctx, ch, up, f));
   } finally {
     carry.on = false;
     carry.a = -1.75;
   }
   return key;
+}
+
+const CARRY_FRAMES: readonly (Pose | CarryFrame)[] = [...POSES, ...(Object.keys(CARRY_SWING) as CarryFrame[])];
+/** One of a hero's chair-carrying frames (with `carry.on`). */
+function drawCarryFrame(ctx: Ctx, ch: (typeof CHARACTERS)[number], up: number, f: Pose | CarryFrame) {
+  const sw = (CARRY_SWING as Record<string, number>)[f];
+  carry.a = sw ?? -1.75;
+  drawCharacter(ctx, HERO_M, up, ch, sw === undefined ? (f as Pose) : f === 'lift' ? 'idle1' : 'idle0');
+}
+
+/**
+ * makeCarrySheet as loading-card steps, a share of the frames each, in a frame of its own (see
+ * sheetSteps): in one step it was a frame of 230-360 ms at 4x slow CPU behind the Plop King's card.
+ */
+export function carrySteps(scene: Phaser.Scene, ch: (typeof CHARACTERS)[number]): Step[] {
+  const key = `char-${ch.id}-carry`;
+  if (scene.textures.exists(key)) return [];
+  const up = gearUp(wardrobe.wearKey);
+  return sheetSteps(scene, key, key, CHAR_W + HERO_M * 2, CHAR_H + up, CARRY_FRAMES, (ctx, f) => {
+    carry.on = true;
+    try {
+      drawCarryFrame(ctx, ch, up, f);
+    } finally {
+      carry.on = false;
+      carry.a = -1.75;
+    }
+  });
 }
 
 
@@ -570,29 +634,48 @@ export function makePlopRef(scene: Phaser.Scene) {
 }
 
 export function makePlops(scene: Phaser.Scene, kind: PlopKind) {
+  for (const step of plopSteps(scene, kind)) step.run();
+}
+
+/**
+ * makePlops as loading-card steps: the sheet a third at a time, each in a frame of its own (see
+ * partSteps; in one step each sheet was a frame of 340-410 ms at 4x slow CPU behind the Plop King's
+ * loading card), then what Plops throw and leave about.
+ */
+export function plopSteps(scene: Phaser.Scene, kind: PlopKind): Step[] {
   const key = `gplop-${kind}`;
-  if (scene.textures.exists(key)) return;
+  if (scene.textures.exists(key)) return [];
   const st = STYLES[ART_STYLE];
   const fw = Math.round((PLOP_W + PLOP_PAD * 2) * PLOP_RES);
   const fh = Math.round((PLOP_H + PLOP_TOP) * PLOP_RES);
   const g = frameGrid(PLOP_FRAMES.length, fw, fh);
-  const { c, ctx } = canvas(g.w, g.h);
-  PLOP_FRAMES.forEach((f, i) => {
-    ctx.save();
-    ctx.translate(g.x(i), g.y(i));
-    ctx.scale(PLOP_RES, PLOP_RES);
-    drawPlop(ctx, PLOP_PAD, PLOP_TOP, f, st, kind);
-    ctx.restore();
-  });
-  addCanvas(scene, key, c, (t) => PLOP_FRAMES.forEach((f, i) => t.add(f, 0, g.x(i), g.y(i), fw, fh)), { release: true });
-  if (!scene.textures.exists('poo')) {
-    addCanvas(scene, 'poo', hires(26, 24, ART_RES, (ctx2) => drawPoo(ctx2, 13, 22, 1)));
-    sheet(scene, 'poowave', POOWAVE_W, POOWAVE_H, ['w0', 'w1', 'w2', 'w3'] as const, (ctx2, f) => drawPooWave(ctx2, +f[1]), 3);
-    addCanvas(scene, 'stink', hires(12, 26, 2, (ctx2) => drawStink(ctx2)));
-    // beach volleyball (Plop Invasion's mid-level match)
-    addCanvas(scene, 'volleyball', hires(26, 26, ART_RES, (ctx2) => drawVolleyball(ctx2, 13, 13, 11)));
-    addCanvas(scene, 'volleynet', hires(20, 112, 3, (ctx2) => drawVolleyNetSide(ctx2, 20, 108, 66)));
-  }
+  return [
+    ...partSteps(
+      `plops ${kind}`,
+      () => scene.textures.exists(key),
+      () => canvas(g.w, g.h),
+      frameShares(PLOP_FRAMES.length, 3, ({ ctx }, i) => {
+        ctx.save();
+        ctx.translate(g.x(i), g.y(i));
+        ctx.scale(PLOP_RES, PLOP_RES);
+        drawPlop(ctx, PLOP_PAD, PLOP_TOP, PLOP_FRAMES[i], st, kind);
+        ctx.restore();
+      }),
+      ({ c }) => addCanvas(scene, key, c, (t) => PLOP_FRAMES.forEach((f, i) => t.add(f, 0, g.x(i), g.y(i), fw, fh)), { release: true }),
+    ),
+    {
+      name: `plops ${kind} extras`,
+      run: () => {
+        if (scene.textures.exists('poo')) return;
+        addCanvas(scene, 'poo', hires(26, 24, ART_RES, (ctx2) => drawPoo(ctx2, 13, 22, 1)));
+        sheet(scene, 'poowave', POOWAVE_W, POOWAVE_H, ['w0', 'w1', 'w2', 'w3'] as const, (ctx2, f) => drawPooWave(ctx2, +f[1]), 3);
+        addCanvas(scene, 'stink', hires(12, 26, 2, (ctx2) => drawStink(ctx2)));
+        // beach volleyball (Plop Invasion's mid-level match)
+        addCanvas(scene, 'volleyball', hires(26, 26, ART_RES, (ctx2) => drawVolleyball(ctx2, 13, 13, 11)));
+        addCanvas(scene, 'volleynet', hires(20, 112, 3, (ctx2) => drawVolleyNetSide(ctx2, 20, 108, 66)));
+      },
+    },
+  ];
 }
 
 
@@ -1121,7 +1204,7 @@ export function gameArtJobs(scene: Phaser.Scene, opts: { heroes: readonly string
       if (b.name === 'giant') out.push(...sheetSteps(scene, 'giant', 'giant', GIANT_W, GIANT_H, GIANT_FRAMES, (ctx, f) => drawGiant(ctx, 0, 0, f, st), 2.5));
       else if (b.name === 'bigpuff') out.push(...sheetSteps(scene, 'bigpuff', 'bigpuff', BIGPUFF_W, BIGPUFF_H, BIGPUFF_FRAMES, (ctx, f) => drawBigPuff(ctx, 0, 0, f, st)));
       else out.push(b);
-  if (want.includes('plops')) (['small', 'medium', 'large'] as const).forEach((k) => !T.exists(`gplop-${k}`) && out.push({ name: `plops ${k}`, run: () => makePlops(scene, k) }));
+  if (want.includes('plops')) (['small', 'medium', 'large'] as const).forEach((k) => out.push(...plopSteps(scene, k)));
   // (level 4's opening: the Plop King with his jetpack)
   if (want.includes('king') && !BADDIE_KEYS.king.every((k) => T.exists(k)))
     out.push({
@@ -1211,6 +1294,7 @@ export function trackBossArt(game: Phaser.Game) {
 export function asBossArt(game: Phaser.Game, id: string, steps: Step[]): Step[] {
   return steps.map((s) => ({
     name: s.name,
+    own: s.own,
     run: () => {
       const before = new Set(game.textures.getTextureKeys());
       try {
