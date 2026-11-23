@@ -26,19 +26,21 @@ import {
 
 /**
  * King Bob's rematch (Boss 6) out in a storm: the scenery round the contest, and its weather. Back to
- * front: the storm sky (a gradient), cloud bands, the far sea and rows of swells with whitecaps, the
+ * front: the storm sky (a gradient), the clouds, the far sea and rows of swells with whitecaps, the
  * deep; in front of everything, the rain, and splashes on the decks and the sea; now and then a
- * flash of lightning. At the end the storm breaks: the rain stops, the clouds part, a sunbeam.
+ * flash of lightning. At the end the storm breaks: the rain stops, the clouds thin, a sunbeam.
  *
  * Cheap by design (see the perf rounds): the sky and the water are a handful of shaded rectangles;
- * each cloud band, row of swells and layer of rain is one TileSprite (one quad) over a small picture
- * that repeats, moved by sliding the picture in it; the splashes are a pool of 16 little sprites. A
- * flash swaps the cloud and swell pictures for lit-up ones for a moment (no extra layer drawn) and
- * shows a bolt; the white-out is the camera's own flash (not drawn once it's faded: core/fadeFix).
- * Nothing is left on screen see-through: whatever's faded out is hidden.
+ * the clouds, each row of swells and the rain are one TileSprite each (one quad) over a small picture
+ * that repeats, moved by sliding the picture in it; the near rain's big streaks and the splashes are
+ * small pools of sprites. What a frame costs here is the graphics chip filling the screen, so the
+ * layers that cover it are as few as can be (see BANDS, RAIN_TILES). A flash swaps the cloud and swell
+ * pictures for lit-up ones for a moment (no extra layer drawn) and shows a bolt; the white-out is the
+ * camera's own flash (not drawn once it's faded: core/fadeFix). Nothing is left on screen see-through:
+ * whatever's faded out is hidden.
  *
- * Light mode: one plain cloud band, two rows of swells, one layer of rain, no splashes, and the
- * flash is the camera's white-out and the bolt only (no lit-up pictures to hold).
+ * Light mode: the middle clouds alone, two rows of swells, one layer of rain, no near streaks, no
+ * splashes, and the flash is the camera's white-out and the bolt only (no lit-up pictures to hold).
  */
 
 /**
@@ -74,7 +76,7 @@ interface BandSpec {
   rainFrom: number;
 }
 const BANDS: readonly BandSpec[] = LIGHT
-  ? [{ key: 'f6-cloud-mid', parts: [['mid', 0]], h: 256, y: -60, sx: 0.3, sy: 0.55, k: 1.35, v: 7, depth: 0.12, rainFrom: 0.55 }]
+  ? [{ key: 'f6-cloud-mid', parts: [['mid', 0]], h: 256, y: -60, sx: 0.3, sy: 0.55, k: 1.35, v: 7, depth: 0.12, rainFrom: 0.72 }]
   : [
       {
         key: 'f6-cloud-all',
@@ -90,7 +92,7 @@ const BANDS: readonly BandSpec[] = LIGHT
         k: 1.35,
         v: 7,
         depth: 0.12,
-        rainFrom: 0.48,
+        rainFrom: 0.72,
       },
     ];
 /** The rows of swells: [world y of the crests' top, crest height, hills in a tile, tone 0 far … 1 near, seed, texture height]. */
@@ -174,11 +176,10 @@ export class Storm {
             ctx.restore();
           }
         });
-    const horizon = 446;
-    SWELLS(horizon).forEach(([y, amp, n, tone, seed, th], i) => {
+    // (the rows' pictures don't depend on where they are)
+    SWELLS(0).forEach(([, amp, n, tone, seed, th], i) => {
       for (const flash of LIGHT ? [false] : [false, true])
         add(`f6-swell${i}${flash ? '-flash' : ''}`, SWELL_W, th, 1, (ctx) => drawSwells(ctx, SWELL_W, th, amp, n, tone, seed, flash));
-      void y;
     });
     // (the near swell: two rows of it lap the hull, as Boss 5's waves; 512 × 128 at 2x, the swell drawn in its top 90)
     add('f6-wave', STORM_WAVE.w, 128, WAVE_RES, (ctx) => drawStormWaveTile(ctx));

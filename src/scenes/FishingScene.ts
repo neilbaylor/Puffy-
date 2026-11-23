@@ -246,6 +246,11 @@ interface Rod {
  * six times: each time a round BITE! button pops up and fades fast. Hit all six and it's yours; five,
  * a 50% chance; four, 20%; fewer and it gets away. Hooked, it's a fight, a leap, and up it comes.
  * King Bob's turn is quicker (about five seconds): he casts, reels like mad, and lands about half.
+ *
+ * Boss 6, Part 6's boss (the scene's level 6): King Bob's rematch, the same contest on a bigger boat
+ * (the Reel Royal II: his bowl up on her flybridge, the hero in the cockpit) out in a storm (world/
+ * Storm), a little harder (RULES6), with its own intro (intro6) and ending (youWin6: this time the
+ * hero catches him). Everything else is Boss 5's, as it was.
  */
 export class FishingScene extends Phaser.Scene {
   private fd!: FishingData;
