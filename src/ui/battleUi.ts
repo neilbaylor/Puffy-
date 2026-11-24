@@ -13,10 +13,10 @@ import { drawHeroCard, drawPortrait } from '../gfx/draw';
 import { FaceClock, faceFromKey } from '../gfx/face';
 import { recolorForSlot, recolorPixels, slotRecolors } from '../gfx/recolor';
 import { gearOf } from '../core/wardrobe';
-import { asQuietJob, freeBossArtExcept, gameArtJobs, isSliceJob } from '../gfx/textures';
+import { freeBossArtExcept, gameArtJobs, isSliceJob, type Step } from '../gfx/textures';
 import { loadArt } from './artLoader';
 import { BattleNet, battleUrl, type NetStatus } from '../net/battleNet';
-import { BattleScene, battleArtJobs, freeBattleArt, type BattleHud } from '../scenes/BattleScene';
+import { BattleScene, battleArtSteps, freeBattleArt, type BattleHud } from '../scenes/BattleScene';
 import { LIGHT } from '../core/light';
 import { setSlowFrames } from '../core/frames';
 
@@ -115,11 +115,6 @@ function slotCard(tmp: HTMLCanvasElement, hero: string, slot: number, pose: 'idl
   return out.getContext('2d')!.getImageData(0, 0, out.width, out.height);
 }
 
-/**
- * The lobby's first moments: nothing drawn ahead for the battle (its arena, the players' sheets) nor its
- * song decoded, while the lobby itself comes up and settles — unless the battle's coming soon.
- */
-const SETTLE_MS = 1800;
 
 /** How many of its hero's looks (pose and face) a lobby square keeps drawn (see liveSlot). */
 const SLOT_LOOKS = 6;
@@ -144,11 +139,15 @@ export class BattleUI {
       this.host.game.events.once('assets-ready', () => this.open(code));
       return;
     }
-    // the battle's bad guys, drawn first if they aren't yet (the last boss's arena let go first). Not every
-    // hero's sheets, as before (2.5-3 s of this card at 4x slow CPU, the first time in): the players'
-    // heroes, in their colours, are drawn in the lobby (preparePlayers), the others were never shown
+    // the battle's art that isn't anyone's own — the bad guys, the arena's ground, clouds, trees, bonuses
+    // and Plops — drawn first behind the loading card, whatever isn't drawn yet (the last boss's arena let
+    // go first): the lobby draws nothing. (The players' heroes in their colours are drawn as the battle's
+    // about to start, while everyone's got ready: see drawSheets)
     freeBossArtExcept(this.host.game);
-    const jobs = gameArtJobs(this.host.game.scene.getScene('Menu'), { heroes: [], level: 'battle' });
+    // (and the battle's song decoded meanwhile — in the lobby it was a hitch or two, the first time in)
+    preloadBattleMusic();
+    const menu = this.host.game.scene.getScene('Menu');
+    const jobs = [...gameArtJobs(menu, { heroes: [], level: 'battle' }), ...battleArtSteps(menu)];
     if (jobs.length) {
       void loadArt(jobs).then(() => this.open(code));
       return;
@@ -159,14 +158,9 @@ export class BattleUI {
     const name = storedName();
     this.lastPhase = '';
     this.showLobby();
-    this.openedAt = performance.now();
-    this.drawArena();
     if (!url) return this.status('offline', 'Online battles work on the game’s web address (not a saved copy).');
     this.status('connecting');
     playMenuMusic(); // (the start screen's song carries on in the lobby)
-    // (the battle's song decoded once the lobby has settled, as its drawing is: see arenaGentle)
-    clearTimeout(this.musicT);
-    this.musicT = window.setTimeout(preloadBattleMusic, SETTLE_MS);
     this.net = new BattleNet(url, name, this.host.hero());
     this.net.onStatus = (s) => this.status(s);
     this.net.onRoom = (r) => this.room(r);
@@ -183,7 +177,6 @@ export class BattleUI {
   private changeRoom() {
     window.removeEventListener('pagehide', this.onPageHide);
     clearTimeout(this.retryT);
-    clearTimeout(this.musicT);
     this.stopClock();
     this.watch(false);
     this.net?.close();
@@ -201,7 +194,6 @@ export class BattleUI {
   leave() {
     window.removeEventListener('pagehide', this.onPageHide);
     clearTimeout(this.retryT);
-    clearTimeout(this.musicT);
     this.stopClock();
     this.watch(false);
     this.net?.close();
@@ -532,7 +524,6 @@ export class BattleUI {
       this.showLobby();
     }
     const lobby = this.lobby!;
-    if (r.phase === 'lobby' || r.phase === 'countdown') this.preparePlayers(r);
     // (your name card wears your colour)
     const spectator = !!me && me.slot < 0;
     if (me && me.slot >= 0) lobby.style.setProperty('--my', SLOT_COLORS[me.slot]);
@@ -561,6 +552,8 @@ export class BattleUI {
     lobby.querySelector('.bl-clock')!.classList.toggle('readying', counting && (r.waiting ?? 0) > 0);
     if (counting) this.runClock(r.timer, phaseChanged);
     else this.stopClock();
+    // (held for someone: if it's us, our players' heroes are drawn now)
+    if (counting && r.waiting) this.drawSheets(r);
     this.sayReady();
     // (the countdown stopped without a battle: drop the warmed-up arena)
     if (!counting && !watching && this.warmed) this.coolDown();
@@ -613,134 +606,88 @@ export class BattleUI {
     this.clockRaf = requestAnimationFrame(tick);
   }
 
-  // ── the arena's pictures, drawn while you're in the lobby (see battleArtJobs) ──
+  // ── the players' heroes in their colours, drawn as the battle's about to start ──
 
-  private arenaJobs: (() => void)[] = [];
-  private arenaRaf = 0;
-  /** Watching was asked for while the arena's pictures were still being drawn (see watch). */
-  private watchLater = false;
+  /** Drawing steps waiting (one or a few a frame), and the frame they're drawn in. */
+  private sheetJobs: (() => void)[] = [];
+  private sheetRaf = 0;
+  /** A small loading card's up for the pictures of a battle we're about to watch (see watch). */
+  private watchLoading = false;
 
   /**
-   * The arena's ground, clouds, trees, bonuses and Plops, drawn a job a frame (a few small ones
-   * together) while you wait in the lobby, so building the arena as the countdown runs out only has
-   * to put them up. Each job sends its picture to the graphics chip in its own frame too.
+   * The players' heroes in their colours (and their faces) not drawn yet, as drawing jobs (each wanting
+   * a frame of its own: see BattleScene.sheetJobs). They stay drawn for the next battles of this visit.
    */
-  private drawArena() {
-    cancelAnimationFrame(this.arenaRaf);
-    this.arenaRaf = 0;
+  private missingSheets(r: RoomState, playingOnly = false) {
+    // (any scene will do to draw them with — they're the game's — even the start screen when it isn't
+    // up, after a battle)
     const menu = this.host.game.scene.getScene('Menu');
-    this.arenaJobs = menu?.sys.isActive() ? battleArtJobs(menu) : [];
-    this.runArenaJobs();
+    const jobs: (() => void)[] = [];
+    for (const p of r.players) if (p.slot >= 0 && p.connected && (!playingOnly || p.playing)) jobs.push(...BattleScene.sheetJobs(menu, p.hero, p.slot, p.wear ?? ''));
+    return jobs;
   }
 
-  /** Work through arenaJobs, from the next frame on (if it isn't already). */
-  private runArenaJobs() {
-    if (this.arenaRaf || !this.arenaJobs.length) return;
+  /**
+   * The countdown's held before its last seconds while someone's game gets the battle ready ("Getting
+   * everyone ready…", see sayReady): if it's ours, the players' heroes not drawn yet are drawn now, one
+   * after another (nothing in the lobby is drawn while you wait in it: the arena was drawn behind the
+   * card coming in), and the server's told once they are.
+   */
+  private drawSheets(r: RoomState) {
+    if (this.sheetRaf || this.inBattle) return;
+    this.sheetJobs = this.missingSheets(r);
+    if (!this.sheetJobs.length) return;
     const step = () => {
-      this.arenaRaf = 0;
+      this.sheetRaf = 0;
       const t0 = performance.now();
-      // (none in the lobby's first moments, and then each leaves the frames after it free, the bigger
-      // the longer, as the start screen's quiet jobs do — unless the arena's wanted soon: one after
-      // another from the start, they were every frame of the lobby's first seconds, each a long one
-      // on a tablet)
-      if ((t0 - this.openedAt < SETTLE_MS || t0 < this.arenaNext || this.arenaSkip > 0) && this.arenaGentle()) {
-        this.arenaSkip--;
-        this.arenaRaf = requestAnimationFrame(step);
-        return;
-      }
       do {
-        const job = this.arenaJobs.shift();
+        const job = this.sheetJobs.shift();
         if (!job) break;
         try {
-          // (as one of the start screen's quiet jobs: the look's hills and ground are drawn a slice a
-          // job — see lookJobs)
-          asQuietJob(job);
+          job();
         } catch (e) {
           // (the battle draws it again as it's built, or shows Phaser's "missing" picture: the game goes on)
           console.error('A drawing step failed:', e);
         }
         // (a job whose drawing the browser paints at the end of this frame: nothing more in it)
         if (isSliceJob(job)) break;
-      } while (this.arenaJobs.length && performance.now() - t0 < 4);
-      const took = performance.now() - t0;
-      // (and at least a frame: much of a picture's cost is the browser painting it at the frame's end)
-      this.arenaNext = performance.now() + Math.min(250, took * 3);
-      this.arenaSkip = 1;
-      if (this.arenaJobs.length) this.arenaRaf = requestAnimationFrame(step);
-      else if (this.warmLater) this.buildWarm();
-      else if (this.watchLater) {
-        this.watchLater = false;
-        if (this.lobby?.classList.contains('watching')) this.watch(true);
+      } while (this.sheetJobs.length && performance.now() - t0 < 4);
+      if (this.sheetJobs.length) this.sheetRaf = requestAnimationFrame(step);
+      else {
+        // (someone joined or changed hero meanwhile: theirs too)
+        const r2 = this.net?.room;
+        if (r2?.waiting && r2.phase === 'countdown') this.drawSheets(r2);
+        if (this.warmLater) this.buildWarm();
+        this.sayReady();
       }
-      if (!this.arenaJobs.length) this.sayReady();
     };
-    this.arenaRaf = requestAnimationFrame(step);
+    this.sheetRaf = requestAnimationFrame(step);
   }
 
   /** The room's `prep` we last told the server we're ready for (-1: not yet on this connection). */
   private readySent = -1;
   /**
-   * Tell the server once everything for the next battle is drawn here — the arena's pictures, every
-   * player's hero in their colours (see preparePlayers), and the arena itself if it's being built ahead
-   * — for the players as they are now (the room's `prep`). It holds the countdown before its last
-   * seconds till everyone has (a few seconds at most), so nobody's battle starts with drawing left to do.
+   * Tell the server once everything for the next battle is drawn here — the players' heroes in their
+   * colours, and the arena if it's being built ahead — for the players as they are now (the room's
+   * `prep`). It holds the countdown before its last seconds till everyone has (a few seconds at most),
+   * so nobody's battle starts with drawing left to do; their heroes are drawn then (see drawSheets).
    */
   private sayReady() {
     const r = this.net?.room;
     if (!r || r.prep === undefined || r.prep === this.readySent || this.inBattle) return;
     if (r.phase !== 'lobby' && r.phase !== 'countdown') return;
-    if (this.arenaJobs.length || this.warmLater) return;
+    if (this.sheetRaf || this.warmLater) return;
+    if (this.missingSheets(r).length) return;
     if (this.warmed && !this.host.game.scene.isActive('Battle')) return;
     this.readySent = r.prep;
     this.net!.ready(r.prep);
   }
 
-  /** The next arena job waits till then, and this many frames (see runArenaJobs). */
-  private arenaNext = 0;
-  private arenaSkip = 0;
-  /** When the room was opened (the lobby's first moments: see runArenaJobs). */
-  private openedAt = 0;
-  private musicT = 0;
-  /**
-   * The arena's drawing can take its time: it isn't wanted soon — the battle's not about to be built
-   * (the countdown's last seconds, Start now) and there's none on to watch.
-   */
-  private arenaGentle() {
-    return !this.warmLater && !this.watchLater && !this.net?.room?.waiting && !(this.clockRaf && this.clockEnd - performance.now() < 15000);
-  }
-
-  /** The players whose hero pictures are being drawn ahead (see preparePlayers), by key. */
-  private sheetsAhead = new Set<string>();
-
-  /**
-   * Each player's hero in their colour (and its faces), drawn in the lobby as soon as they're in a
-   * square — ahead of the arena's pictures, a step a frame (see BattleScene.sheetJobs) — not as the
-   * countdown runs out, when the battle's built (it only has to put them up then).
-   */
-  private preparePlayers(r: RoomState) {
-    const menu = this.host.game.scene.getScene('Menu');
-    if (!menu?.sys.isActive() || this.inBattle || this.warmed) return;
-    const jobs: (() => void)[] = [];
-    for (const p of r.players) {
-      if (p.slot < 0 || !p.connected) continue;
-      const wear = p.wear ?? '';
-      const id = `${p.hero}|${p.slot}|${wear}`;
-      if (this.sheetsAhead.has(id)) continue;
-      this.sheetsAhead.add(id);
-      jobs.push(...BattleScene.sheetJobs(menu, p.hero, p.slot, wear));
-    }
-    if (!jobs.length) return;
-    this.arenaJobs.unshift(...jobs);
-    this.runArenaJobs();
-  }
-
-  /** Stop drawing the arena ahead (left the room; or the battle's being built: it draws what's left). */
+  /** Stop drawing ahead (left the room; or the battle's being built: it draws what's left). */
   private stopArena() {
-    cancelAnimationFrame(this.arenaRaf);
-    this.arenaRaf = 0;
-    this.arenaJobs = [];
-    this.sheetsAhead.clear();
-    this.watchLater = false;
+    cancelAnimationFrame(this.sheetRaf);
+    this.sheetRaf = 0;
+    this.sheetJobs = [];
     this.warmLater = false;
   }
 
@@ -750,10 +697,9 @@ export class BattleUI {
     const g = this.host.game;
     if (!this.net || g.scene.isActive('Battle')) return;
     this.warmed = true;
-    // (the arena's pictures not all drawn yet — a quick Start now — it's built once they are, the
-    // drawing going on a job a frame as the countdown runs: built straight away, the battle drew what
-    // was left as it was built, in one frame of up to a second at 4x slow CPU, the clock stuck)
-    if (this.arenaJobs.length) {
+    // (the players' heroes not all drawn yet — the countdown's held for them in a moment — it's built
+    // once they are: built straight away, it drew them itself, a whole sheet a frame, in the lobby)
+    if (this.sheetRaf || (this.net.room && this.missingSheets(this.net.room).length)) {
       this.warmLater = true;
       return;
     }
@@ -818,10 +764,21 @@ export class BattleUI {
 
   private watch(on: boolean) {
     const g = this.host.game;
-    // (joined while a battle's on: the live window waits for the arena's pictures, drawn a job a frame,
-    // rather than having them all drawn in the one frame it opens with)
-    this.watchLater = on && !this.spectating && this.arenaJobs.length > 0;
-    if (this.watchLater) return;
+    if (on && !this.spectating && this.net && this.net.room) {
+      // (joined while a battle's on: its players' heroes drawn first, behind a small loading card,
+      // rather than all in the frames the live window opens with)
+      if (this.watchLoading) return;
+      const jobs = this.missingSheets(this.net.room, true);
+      if (jobs.length) {
+        this.watchLoading = true;
+        const steps: Step[] = jobs.map((run, i) => ({ name: `hero ${i}`, run, own: isSliceJob(run) }));
+        void loadArt(steps).then(() => {
+          this.watchLoading = false;
+          if (this.lobby?.classList.contains('watching')) this.watch(true);
+        });
+        return;
+      }
+    }
     if (on && !this.spectating && this.net) {
       this.spectating = true;
       this.watchRate(true);

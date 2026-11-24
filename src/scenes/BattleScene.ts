@@ -5,7 +5,7 @@ import { sfx } from '../core/sfx';
 import { characterById } from '../data/characters';
 import { ART_RES, CARRY_SWING, CHAR_H, CHAR_W, WALK_FRAMES, bodyLift, carryHand, gearUp } from '../gfx/draw';
 import { recolorForSlot, slotRecolors } from '../gfx/recolor';
-import { HERO_SHEET_M, addCanvas, ensureLook, frameGrid, hires, lookJobs, makeCarrySheet, makeHeroSheet, ownFrame, playerSheetSteps } from '../gfx/textures';
+import { HERO_SHEET_M, addCanvas, ensureLook, frameGrid, hires, isSliceJob, makeCarrySheet, makeHeroSheet, missingLookSteps, ownFrame, playerSheetSteps, type Step } from '../gfx/textures';
 import { wardrobe } from '../core/wardrobe';
 import { PRIZE_COLOR, drawBombBall, drawChute, drawFireball, drawPrize } from '../gfx/prizes';
 import { PLOP_FRAMES, PLOP_H, PLOP_W, drawPlop } from '../gfx/plops';
@@ -303,29 +303,30 @@ function plopSheetJobs(scene: Phaser.Scene, kind: 'small' | 'medium' | 'large'):
 
 /**
  * The battle's own pictures not drawn yet — the arena's ground, clouds and trees, its look, and the
- * still pictures above — a job each. The lobby draws them a job a frame while you wait (see BattleUI):
- * the arena used to be drawn all at once as the countdown ran out, in one frame of 1.3-1.6 s on a 4x
- * slowed CPU (~75 pictures drawn and sent to the graphics chip), the countdown's clock stuck meanwhile.
- * The battle itself then only puts them up; anything not drawn yet it still draws as before.
+ * still pictures above — as loading-card steps (a Plop sheet's shares each in a frame of its own: see
+ * plopSheetJobs), drawn behind the card as you enter the room (see BattleUI.open): the lobby itself
+ * draws nothing. The battle then only puts them up; anything not drawn yet it still draws as before.
  */
-export function battleArtJobs(scene: Phaser.Scene): (() => void)[] {
-  const jobs: (() => void)[] = [];
+export function battleArtSteps(scene: Phaser.Scene): Step[] {
+  const steps: Step[] = [];
   // the arena's ground (as the battle draws it: not cut short at the bottom), clouds and trees: a view
   // of it is made only to work them out, nothing of it stays up
   const before = new Set(scene.children.list);
   const view = new LevelView(scene, buildArena(), { lazyNear: -1e9, lazySpan: [0, 0], ahead: false, keep: true, only: [-1e9, -1e9] });
   for (const o of scene.children.list.filter((c) => !before.has(c))) o.destroy();
-  jobs.push(...view.paintJobs().map((j) => () => void j()), ...view.laterJobs());
-  // (its look's hills and ground a slice a job: run as quiet jobs, see asQuietJob)
-  jobs.push(...lookJobs(scene, BATTLE_LOOKS[0], false, true));
+  steps.push(...view.paintJobs().map((j, i) => ({ name: `arena ground ${i}`, run: () => void j() })), ...view.laterSteps());
+  steps.push(...missingLookSteps(scene, BATTLE_LOOKS[0]));
   for (const [key, make] of battleItemMakers(scene))
     if (!scene.textures.exists(key))
-      if (key.startsWith('bplop-')) jobs.push(...plopSheetJobs(scene, key.slice(6) as 'small' | 'medium' | 'large'));
+      if (key.startsWith('bplop-')) steps.push(...plopSheetJobs(scene, key.slice(6) as 'small' | 'medium' | 'large').map((run, i) => ({ name: `${key} ${i}`, run, own: isSliceJob(run) })));
       else
-        jobs.push(() => {
-          if (!scene.textures.exists(key)) make();
+        steps.push({
+          name: key,
+          run: () => {
+            if (!scene.textures.exists(key)) make();
+          },
         });
-  return jobs;
+  return steps;
 }
 
 export interface BattleHud {
