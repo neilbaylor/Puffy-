@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.407)
+## Where things stand (v0.408)
 Live site: https://playpuffy.world (device check: /?bench, reports: /?bench=list signed in as a tester).
 
 ### Main game
@@ -32,6 +32,7 @@ Live site: https://playpuffy.world (device check: /?bench, reports: /?bench=list
   Home screen (yellow).
 - Start screen: drone fly-over behind, logo hop, hero cards (pick = hop / backflip), Play, Part picker once a
   level is beaten, mute (top-left), full screen + **Battle** buttons (top-right, same height, side by side).
+- v0.408: owner: Part 5 fly-over rose straight up at the end -> flyPath [252,b11.5][150,b11.5][95,b12.5][55,b14.5][24,b17.5] (camTop now falls from u 0.28 to 0.86 while camX moves, like Part 6; scratchpad/fly.cjs logs the camera path). Kai easier: dodgeCool 0.9->1.2, dodge chance 60%->45% (hp 3 kept). First Kai (76,51)->(76,47), its nuggies moved down with it.
 - v0.407: owner: on a 120 Hz desktop everything ran too fast (most obvious running in Part 1). Cause: Phaser 4 TimeStep.stepLimitFPS calls back with the accumulated delta then keeps delta %= limitRate (leftover counted twice): with our limit 80 fps at 120 Hz, 2 of 3 frames ran, game time ~1.17x real, uneven. Fix: no Phaser fps.limit; core/frames.ts gateFrames wraps game.loop.step: runs when t - last >= (every - 0.5) * refresh (every = round(hz/60 - 0.1)); setSlowFrames(on) for light-mode battle watching (~40 fps; was the same buggy limit via _limitRate in battleUi.watchRate). Fake-120/144 Hz harness (scratchpad/ff2.cjs, rAF patched): deltas now exactly 16.7 ms. 90 Hz: no gate (every frame, time-based) - unaffected.
 - v0.406: owner: full mode halfway to light (agent claude/full-half). main.ts dpr cap big ? 1.375 : 1.5 (was 1.75 : 2; HOME_RES 1.25 kept); every `LIGHT ? a : b` resolution -> full (a+b)/2 (TERRAIN 1.125, FIELD 1.625, PLOP 2, Hoops ARENA 1.125 KING/PARADE 1.875, Wrestle ARENA 1.125 Q 3 RES 1.625, BOAT6 1.35, Battle PLOP 1/1.375/1.625, CLOUD 1.125, Storm CLOUD 0.875, BLOOPS 1.25, SAND 2.125, football bits). Soft shapes kept on in full (owner saw on/off ropes). Light byte-identical. A/B: gameplay median -27..-43%, memory -10..-14%. Screens: scratchpad/shots/half. Football/volley not auto-tested. Also: worker-paint study (scratchpad/wk): NOT worth it under identical pixels (curved clip() aliased on any OffscreenCanvas; 229/301 textures clip; safe art ~10% of visible painting).
 - v0.405: owner asked for a synced loading indicator for an early Start now (agent, claude/battle-ready). Protocol (additive): hello.ready?, {t:'ready', r:prep}, RoomState.prep? (bumped when players' slot/hero/wear change) and waiting?. Server holdForReady: before the last START_NOW_SECS, holds (timer pinned) while connected playing opted-in clients' ready != prep, READY_HOLD_MS 7 s cap, once per countdown. Lobby shows a small 'Getting everyone ready…' card, clock stands at 4, drawing at full speed. Tests: tproto ready/readyold/readyold-mixed/readycap/readyprep. A/B early Start now (g11/runs/hr1): full max 212->161, >50 32->17; light >50 28->8; ~2.2 s hold.

@@ -410,3 +410,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.405: Battle waits a moment ('Getting everyone ready…') if someone's game is still loading, so it starts smoothly for all.
 - v0.406: Full mode runs noticeably smoother (a touch less sharp, halfway to light mode).
 - v0.407: Fixed the game running too fast on 120 Hz screens.
+- v0.408: Part 5: smoother fly-over ending; Kai fish a bit easier and turns up a touch sooner.
