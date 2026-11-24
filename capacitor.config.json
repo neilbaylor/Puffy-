@@ -1,0 +1,11 @@
+{
+  "appId": "world.playpuffy.app",
+  "appName": "Puffy!",
+  "webDir": "dist-app",
+  "android": {
+    "backgroundColor": "#5fc4ff"
+  },
+  "ios": {
+    "backgroundColor": "#5fc4ff"
+  }
+}

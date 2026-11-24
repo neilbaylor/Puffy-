@@ -28,15 +28,17 @@ const preloadGame: Plugin = {
 
 // `npm run build` -> normal multi-file build in dist/
 // `npm run build:single` -> one self-contained HTML file (easy to share / host anywhere)
+// `vite build --mode app` -> the build packed into the Android/iOS app (dist-app/, see capacitor.config.json):
+//   no offline helper (the app has every file already); accounts and battles go to the website's server
 export default defineConfig(({ mode }) => ({
   base: './',
-  plugins: mode === 'single' ? [viteSingleFile()] : [preloadGame, offline()],
+  plugins: mode === 'single' ? [viteSingleFile()] : mode === 'app' ? [preloadGame] : [preloadGame, offline()],
   // Phaser without the Matter physics engine (the game only uses Arcade physics): ~110 kB less
   // code for phones to download and parse at start-up (by its path: Phaser 4's package doesn't
   // let it be imported by name)
   resolve: { alias: [{ find: /^phaser$/, replacement: fileURLToPath(new URL('./node_modules/phaser/dist/phaser-arcade-physics.js', import.meta.url)) }] },
   build: {
-    outDir: mode === 'single' ? 'dist-single' : 'dist',
+    outDir: mode === 'single' ? 'dist-single' : mode === 'app' ? 'dist-app' : 'dist',
     chunkSizeWarningLimit: 2000,
   },
 }));

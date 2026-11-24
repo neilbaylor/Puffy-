@@ -8,6 +8,7 @@ import { characterById } from '../data/characters';
 import type { Session } from '../core/session';
 import { lives, loseLife, resetLives } from '../core/lives';
 import { sfx } from '../core/sfx';
+import { buzz } from '../core/native';
 import { LIGHT } from '../core/light';
 import type { Enemy } from '../entities/enemies/Enemy';
 import { bank } from '../core/bank';
@@ -1583,6 +1584,8 @@ export class GameScene extends Phaser.Scene {
     if (!onScreen) k *= offScreen;
     if (k < 0.05) return;
     this.cameras.main.shake(ms * (0.6 + 0.4 * k), intensity * k);
+    // (and in the app, the tablet itself: a slam's 0.02 at full strength; a little 0.004 bump, nothing)
+    buzz((intensity * k) / 0.02);
   }
 
   spawnShockwave(x: number, groundY: number, dir: number, speed: number) {

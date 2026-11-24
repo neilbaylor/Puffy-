@@ -6,6 +6,7 @@
  */
 import { unpackPlayer, type ClientMsg, type RoomState, type ServerMsg, type SnapChair, type SnapEnemy, type SnapHazard, type SnapPlayer, type SnapPrize, type SnapRocket } from '../shared/battle/protocol';
 import { wardrobe } from '../core/wardrobe';
+import { IS_APP, wsBase } from '../core/native';
 import type { BEvent } from '../shared/battle/sim';
 
 export interface Snapshot {
@@ -28,6 +29,7 @@ export type NetStatus = 'connecting' | 'online' | 'full' | 'offline';
 export function battleUrl() {
   const q = new URLSearchParams(location.search).get('server');
   if (q) return q;
+  if (IS_APP) return `${wsBase()}/battle`; // (the app: the website's battle server)
   if (import.meta.env.DEV) return `ws://${location.hostname}:8080/battle`;
   if (!/^https?:$/.test(location.protocol)) return null; // a saved file: no server
   return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/battle`;
