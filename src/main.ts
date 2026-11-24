@@ -14,6 +14,7 @@ import { BENCH, LIGHT, LIGHT_AUTO, LIGHT_KEY } from './core/light';
 import { diag, showDiag } from './core/diag';
 import { trackBossArt } from './gfx/textures';
 import { refreshMs } from './core/refresh';
+import { gateFrames } from './core/frames';
 import { trimRenderTargets } from './core/renderTargets';
 import { fixArcadeGroupWalk } from './core/physicsFix';
 import { installUprightUploads } from './core/uprightUploads';
@@ -129,7 +130,6 @@ const size = () => {
  * screens we measure the refresh rate first (core/refresh) and draw on every 2nd refresh,
  * so motion stays perfectly even (and saves battery).
  */
-/** Phaser draws once the frame times it has added up reach 1000 / limit ms. */
 /**
  * Pictures are drawn in runs, and Phaser can put pictures from up to 16 different textures in one
  * run: each pixel then works out which of them it's from, comparing its texture's number with
@@ -144,13 +144,6 @@ const size = () => {
 function oneTexturePerBatch(game: Phaser.Game) {
   const nodes = (game.renderer as unknown as { renderNodes?: { setMaxParallelTextureUnits?(n: number): void } }).renderNodes;
   nodes?.setMaxParallelTextureUnits?.(1);
-}
-
-function fpsLimitFor(refreshMs: number) {
-  const hz = 1000 / refreshMs;
-  const every = Math.max(1, Math.round(hz / 60 - 0.1)); // 60Hz → 1, 120Hz → 2, 90Hz → 1 (can't divide evenly)
-  // trigger half a refresh early so timing jitter never makes us skip an extra frame
-  return every > 1 ? 1000 / ((every - 0.5) * refreshMs) : 0;
 }
 
 /**
@@ -212,12 +205,15 @@ function start(refreshMs: number) {
     // still — nuggies, sleeping bad guys. Checking each one directly finds the same overlaps,
     // for a fraction of the cost. Nothing here searches the tree: no overlapRect / overlapCirc.)
     physics: { default: 'arcade', arcade: { gravity: { x: 0, y: 1600 }, debug: false, useTree: false } },
-    fps: { target: 60, limit: fpsLimitFor(refreshMs), smoothStep: true },
+    fps: { target: 60, smoothStep: true },
     // (Phaser's own sound system isn't used: the music and sound effects have their own audio
     // context, see core/sfx. Without this it made a second one at start-up, for nothing.)
     audio: { noAudio: true },
     scene: [BootScene, MenuScene, GameScene, HoopsScene, BattleScene, WrestleScene, FishingScene],
   });
+
+  // (every other screen frame on 120 / 144 Hz screens: see core/frames)
+  gateFrames(game, refreshMs);
 
   const resize = () => {
     const s = size();

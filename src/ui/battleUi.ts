@@ -18,6 +18,7 @@ import { loadArt } from './artLoader';
 import { BattleNet, battleUrl, type NetStatus } from '../net/battleNet';
 import { BattleScene, battleArtJobs, freeBattleArt, type BattleHud } from '../scenes/BattleScene';
 import { LIGHT } from '../core/light';
+import { setSlowFrames } from '../core/frames';
 
 /** The results card's Leave button ignores taps this long after it shows (mashed shoot taps). */
 const RESULTS_GUARD_MS = 1500;
@@ -837,25 +838,12 @@ export class BattleUI {
   }
 
   /**
-   * Light mode: watching from the lobby, the game draws 30 times a second, not 60 (the live window is
-   * all that moves; on an older device it took twice the time a frame of playing does). Phaser picks
-   * its frame-rate limit when its loop starts, so the loop is put to sleep and woken with the new one.
+   * Light mode: watching from the lobby, the game runs about 40 frames a second, not 60 (the live
+   * window is all that moves; on an older device it took twice the time a frame of playing does).
    */
   private watchRate(on: boolean) {
-    if (!LIGHT) return;
-    const loop = this.host.game.loop as unknown as { fpsLimit: number; hasFpsLimit: boolean; _limitRate: number; sleep(): void; wake(seamless?: boolean): void };
-    if (on && this.fpsBefore === null) this.fpsBefore = loop.fpsLimit;
-    // (drawn once 25 ms have added up: every 2nd refresh at 60 Hz, every 4th at 120 Hz)
-    const limit = on ? 40 : this.fpsBefore ?? loop.fpsLimit;
-    if (!on) this.fpsBefore = null;
-    if (loop.fpsLimit === limit) return;
-    loop.fpsLimit = limit;
-    loop.hasFpsLimit = limit > 0;
-    loop._limitRate = limit > 0 ? 1000 / limit : 0;
-    loop.sleep();
-    loop.wake(true);
+    if (LIGHT) setSlowFrames(on);
   }
-  private fpsBefore: number | null = null;
 
   private placePreview() {
     const box = this.lobby?.querySelector<HTMLElement>('.bl-preview');
