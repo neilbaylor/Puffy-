@@ -45,7 +45,7 @@ const MAX_OWED = 8;
  */
 const LET_GO = 15;
 /**
- * Buttons waiting this long are tidied up as they come in, not only at the next tick (a flood of them in
+ * More buttons than this waiting: they're tidied up as they come in, not only at the next tick (a flood of them in
  * one go — thousands — took the tick a third of a second to tidy, holding up every room).
  */
 const QUEUE_TIDY = 64;
@@ -67,9 +67,9 @@ interface Client {
   lastSeq: number;
   /**
    * The last of their buttons played, as the snapshots tell everyone. (Kept through a rejoin until their
-   * next buttons are played: lastSeq starts again from 0 then, and a 0 in the snapshots had their phone
-   * play its last 3 seconds of buttons over again — their hero leapt ahead and back — and the others saw
-   * them lurch.)
+   * next buttons are played: lastSeq starts again from 0 then, and for a snapshot or two the snapshots
+   * said 0 — their phone counted none of its buttons as played and went over every one it had kept
+   * again, and the others' clock for them jumped back and forth.)
    */
   ack: number;
   lastBtn: number;
