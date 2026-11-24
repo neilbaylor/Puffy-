@@ -388,3 +388,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.383: Boss 6: nicer rock, paper, scissors hands for the heroes and King Bob.
 - v0.384: Boss 6: Play again after the ending works; Big Muscles' fist arm joined up; King Bob leaps out of his bowl to throw paper.
 - v0.385: Fishing plays quicker: 5 rounds, 5 bites, King Bob catches at most 4; the bobber comes in on every bite; thrown-back fish just splash away.
+- v0.386: Fishing 2's ending no longer stutters while drawing its pictures (drawn behind the loading card).
