@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.396)
+## Where things stand (v0.397)
 Live site: https://playpuffy.world (device check: /?bench, reports: /?bench=list signed in as a tester).
 
 ### Main game
@@ -32,6 +32,7 @@ Live site: https://playpuffy.world (device check: /?bench, reports: /?bench=list
   Home screen (yellow).
 - Start screen: drone fly-over behind, logo hop, hero cards (pick = hop / backflip), Play, Part picker once a
   level is beaten, mute (top-left), full screen + **Battle** buttons (top-right, same height, side by side).
+- v0.397: Android app merged (agent, branch claude/app-wrap). Capacitor 8 project in android/ (id world.playpuffy.app, 'Puffy!', sensorLandscape, immersive, isGame + game_mode_config, 60 Hz preferred mode, renderer priority IMPORTANT, keep screen on, media without gesture). src/core/native.ts: IS_APP (window.Capacitor.isNativePlatform), apiBase/wsBase -> https://playpuffy.world (VITE_APP_SERVER for tests), buzz() haptics (GameScene.shakeFrom, Player hurt), Android back button. Self-update: @capgo/capacitor-updater self-hosted, manifest (delta) mode; npm run build runs scripts/app-update.mjs -> dist/app/latest.json {version,minNative,files[path,sha256,size]}; core/appUpdate.ts checks 5 s after start screen, downloads changed files only, switches on next launch (puffy.update.next/tried), notifyAppReady rollback; core/updatePick.ts NEEDS_NATIVE=1 (raise with NATIVE_VERSION = versionCode in android/app/build.gradle). Server.mjs appCors: https://localhost + capacitor://localhost on /api,/app only. Website: offline.ts skips SW in app only. Build APK: ANDROID_HOME=scratchpad/android-sdk GRADLE_USER_HOME=scratchpad/gradle-home npx cap sync android && cd android && ./gradlew assembleDebug (JDK 21). Debug APK v0.397 13.6 MB. Store TODO: release keystore + bundleRelease, versionName, iOS on a Mac, extra permissions from updater (WAKE_LOCK, BOOT_COMPLETED, FOREGROUND_SERVICE). Needs device testing: update swap, haptics, back, music autoplay, immersive, 60 Hz.
 - v0.396: owner: hidden light/full switch: long press 1.2 s on the start screen's .version label (ui.ts versionSwitch) stores puffy.light '1'/'0' + lightRetried (a hand pick, like ?lite/?full) and reloads; label darkens while held, shows 'Light mode…'/'Full mode…'. For the Android app (no address bar) and the web. Tested mouse + touch (short press does nothing).
 - v0.395: music re-encoded to how core/music plays it (it decodes at RATE 32000 and mixes to mono; KEEP 2 decoded, ~19 MB each): ffmpeg -ac 1 -ar 32000 -c:a aac -b:a 56k; 10.6 -> 6.2 MB, dist 14 -> 8.9 MB. Re-encoded from the old 96k AAC (2nd generation); owner will send Suno originals for new songs: encode those once the same way. Owner OK'd mono; keep KEEP=2 (owner asked; switching menu<->level would re-decode). Flagged: Suno free-plan songs not licensed for commercial use (check before stores).
 - v0.394: delete card text 'Root Beer, Nuggies' capitalised (owner).
