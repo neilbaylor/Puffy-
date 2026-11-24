@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.403)
+## Where things stand (v0.404)
 Live site: https://playpuffy.world (device check: /?bench, reports: /?bench=list signed in as a tester).
 
 ### Main game
@@ -32,6 +32,7 @@ Live site: https://playpuffy.world (device check: /?bench, reports: /?bench=list
   Home screen (yellow).
 - Start screen: drone fly-over behind, logo hop, hero cards (pick = hop / backflip), Play, Part picker once a
   level is beaten, mute (top-left), full screen + **Battle** buttons (top-right, same height, side by side).
+- v0.404: owner: entering a Battle room slow ~2 s on the medium tablet (the LOBBY, pre-battle). Agent (claude/perf-lobby, battleUi.ts only): entry card draws only bad guys (players' heroes are drawn in their colours in the lobby by preparePlayers); SETTLE_MS 1.8 s with no arena drawing and no battle-song decode; then gentle (a free frame after each job, up to 3x its time / 250 ms) unless arenaGentle() false (countdown < 15 s, Start now warm-up, watching); lobby squares keep one canvas + last 6 looks (ImageData). Lead re-measure g11/abl.sh lead1: card full 2.47->1.01 s, light 2.18->0.78; first 3 s p50 full cold 64->46, warm 70->45. Cost: arena ready ~5 s later; an early Start now (3.5 s countdown) is bumpier (drawing finishes then). Tools: scratchpad/g11 (lob.cjs, abl.sh, absum.cjs, abh.sh, hsum.cjs, srv.sh).
 - v0.403: owner: the app's loading-screen fade-in (v0.401) didn't work well: removed (html.in-app script + #boot animation). Splash stays plain blue (app 1.1), loading screen appears at once.
 - v0.402: owner felt the APK slightly slower than Chrome on their 90 Hz tablet. A/B build 'Puffy! B': gradle buildType b (initWith release, debuggable false, debug-signed, applicationIdSuffix .b, src/b/res strings), BuildConfig.LOCK_60 false (MainActivity skips preferSixtyHz). ./gradlew assembleB -> downloads/puffy-test-b.apk, served at /dl/puffy-test-b.apk (server.mjs APKS set). Waiting on owner: which feels better, and light/full label in app vs Chrome. Likely: 90 Hz tablet -> Chrome drew up to 90 fps, the 60 Hz lock caps 60.
 - v0.401: owner wanted no shift splash -> loading. Android 12+ splash can only show an icon in a ~160-192 dp circle, so PUFFY can't match; instead index.html head script adds html.in-app (window.Capacitor.isNativePlatform) and #boot fades in 0.25 s (animation fill 'backwards', so the .out fade still works) on the plain #5fc4ff. Web unchanged. Reaches the installed app by self-update.

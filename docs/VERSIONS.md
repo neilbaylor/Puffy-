@@ -406,3 +406,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.401: In the app, the loading screen fades in smoothly.
 - v0.402: 'Puffy! B' test app to compare against the first one.
 - v0.403: App loading screen fade-in taken out.
+- v0.404: Entering a Battle room is smoother and its loading card is shorter.
