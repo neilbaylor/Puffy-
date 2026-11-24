@@ -20,7 +20,7 @@ import { Player, WATER_G } from '../entities/Player';
 import { Rocket } from '../entities/Rocket';
 import { SoccerMatch, pitchArt } from '../entities/Soccer';
 import { HockeyMatch, rinkArt } from '../entities/Hockey';
-import { VolleyMatch, sandArt } from '../entities/Volley';
+import { VolleyMatch, courtBitsArt, sandArt } from '../entities/Volley';
 import { BaseballGame } from '../entities/Baseball';
 import { TennisMatch, courtArt } from '../entities/Tennis';
 import { FootballGame } from '../entities/Football';
@@ -162,10 +162,63 @@ export function fieldArtSteps(scene: Phaser.Scene, data: LevelData): Step[] {
       : s.type === 'hockey' ? rinkArt(scene, w(FIELD_W.hockey))
       : s.type === 'tennis' ? courtArt(scene, w(FIELD_W.tennis))
       : s.type === 'volley' ? sandArt(scene, w(FIELD_W.volley))
+      : s.type === 'puddle' ? puddleArt(scene, s.x * TILE, (s.x + w(4)) * TILE)
+      : s.type === 'chase' ? bigRockArt(scene)
       : null;
     if (job) out.push({ name: `${s.type} field`, run: job });
+    // (and a beach-volleyball court's boards and referee's chair)
+    const bits = s.type === 'volley' ? courtBitsArt(scene, w(FIELD_W.volley)) : null;
+    if (bits) out.push({ name: 'volley court bits', run: bits });
   }
   return out;
+}
+
+/** The boulder chase's rock, as a job that draws it if it isn't there — null if it is (a loading-card step, as the fields are). */
+function bigRockArt(scene: Phaser.Scene): (() => void) | null {
+  if (scene.textures.exists('bigrock')) return null;
+  return () => {
+    if (!scene.textures.exists('bigrock'))
+      addCanvas(
+        scene,
+        'bigrock',
+        hires(42, 42, 12, (ctx) => {
+          drawRock(ctx);
+          // smeared with poo, like everything else round here
+          ctx.fillStyle = POO.base;
+          for (const [x, y, rx, ry] of [[14, 12, 5, 3], [29, 27, 6, 3.4], [21, 32, 3.4, 2.2], [32, 13, 2.6, 2]] as const) {
+            ctx.beginPath();
+            ctx.ellipse(x, y, rx, ry, 0.5, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }),
+      );
+  };
+}
+
+/** The picture of a poo puddle's body (x0…x1), as a job that draws it if it isn't there — null if it is (a loading-card step, as the fields are). */
+function puddleArt(scene: Phaser.Scene, x0: number, x1: number): (() => void) | null {
+  const w = x1 - x0 + 4;
+  const R = 2;
+  const key = `puddle-body-${Math.round(w)}`;
+  if (scene.textures.exists(key)) return null;
+  return () => {
+    if (scene.textures.exists(key)) return;
+    const c = document.createElement('canvas');
+    c.width = Math.ceil(w * R);
+    c.height = 100 * R;
+    const ctx = c.getContext('2d')!;
+    ctx.scale(R, R);
+    ctx.fillStyle = POO.base;
+    ctx.fillRect(0, 0, w, 89);
+    ctx.fillStyle = POO_DARK.base;
+    ctx.fillRect(0, 89, w, 11);
+    // (the same bands as before: from 19 below the top, 14 of them, 5 tall, darker each time)
+    for (let k = 0; k < 14; k++) {
+      ctx.globalAlpha = 0.07 + k * 0.066;
+      ctx.fillRect(0, 19 + k * 5, w, 5);
+    }
+    scene.textures.addCanvas(key, upright(c));
+  };
 }
 
 export class GameScene extends Phaser.Scene {
@@ -627,8 +680,8 @@ export class GameScene extends Phaser.Scene {
 
     // (restarting at a checkpoint past where a boulder chase starts: that rock's been and gone)
     for (const c of this.chases) if (start.x > c.x0) c.started = true;
-    // (the rock's picture drawn now, while the level starts: drawn when the chase began, it was a
-    // stutter just as the rock burst in)
+    // (the rock's picture drawn behind the level's loading card, see fieldArtSteps, or now if not yet:
+    // drawn when the chase began, it was a stutter just as the rock burst in)
     if (this.chases.some((c) => !c.started)) this.makeBigRock();
 
     // ── The hero (single player for now; the code supports more later) ──
@@ -1687,23 +1740,8 @@ export class GameScene extends Phaser.Scene {
     const w = x1 - x0 + 4;
     const R = 2;
     const key = `puddle-body-${Math.round(w)}`;
-    if (!this.textures.exists(key)) {
-      const c = document.createElement('canvas');
-      c.width = Math.ceil(w * R);
-      c.height = 100 * R;
-      const ctx = c.getContext('2d')!;
-      ctx.scale(R, R);
-      ctx.fillStyle = POO.base;
-      ctx.fillRect(0, 0, w, 89);
-      ctx.fillStyle = POO_DARK.base;
-      ctx.fillRect(0, 89, w, 11);
-      // (the same bands as before: from 19 below the top, 14 of them, 5 tall, darker each time)
-      for (let k = 0; k < 14; k++) {
-        ctx.globalAlpha = 0.07 + k * 0.066;
-        ctx.fillRect(0, 19 + k * 5, w, 5);
-      }
-      this.textures.addCanvas(key, upright(c));
-    }
+    // (drawn behind the level's loading card, see fieldArtSteps; here if not yet)
+    puddleArt(this, x0, x1)?.();
     this.still(this.add.image(x0 - 2, y + 3, key).setOrigin(0, 0).setScale(1 / R).setDepth(DEPTH.players + 0.59));
     this.still(this.add.rectangle(x0 - 2, y + 102, w, this.level.heightPx + 40 - (y + 100), hexOf(POO_DARK.base)).setOrigin(0, 0).setDepth(DEPTH.players + 0.59));
   }
@@ -2007,21 +2045,7 @@ export class GameScene extends Phaser.Scene {
 
   /** The boulder chase's rock (drawn once, at the level's start). */
   private makeBigRock() {
-    if (!this.textures.exists('bigrock'))
-      addCanvas(
-        this,
-        'bigrock',
-        hires(42, 42, 12, (ctx) => {
-          drawRock(ctx);
-          // smeared with poo, like everything else round here
-          ctx.fillStyle = POO.base;
-          for (const [x, y, rx, ry] of [[14, 12, 5, 3], [29, 27, 6, 3.4], [21, 32, 3.4, 2.2], [32, 13, 2.6, 2]] as const) {
-            ctx.beginPath();
-            ctx.ellipse(x, y, rx, ry, 0.5, 0, Math.PI * 2);
-            ctx.fill();
-          }
-        }),
-      );
+    bigRockArt(this)?.();
   }
 
   private startChase(c: { x0: number; x1: number; speed: number }, hero: Player) {

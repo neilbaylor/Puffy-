@@ -45,6 +45,21 @@ export function sandArt(scene: Phaser.Scene, widthTiles: number): (() => void) |
   };
 }
 
+/**
+ * The court's banner boards and the referee's chair, as a job that draws them if they aren't there —
+ * null if they are (with sandArt, a loading-card step: drawn as the level was set up, they and the
+ * sand were a good part of Part 3's first frame).
+ */
+export function courtBitsArt(scene: Phaser.Scene, widthTiles: number): (() => void) | null {
+  const bw = Math.round((widthTiles * TILE) / 2 - 46);
+  const bkey = `volleyboard-${bw}`;
+  if (scene.textures.exists(bkey) && scene.textures.exists('refchair')) return null;
+  return () => {
+    if (!scene.textures.exists(bkey)) addCanvas(scene, bkey, hires(bw, 22, 3, (ctx) => drawCourtBoard(ctx, bw, 16, 'PLOP BEACH TOUR')), undefined, { release: true });
+    if (!scene.textures.exists('refchair')) addCanvas(scene, 'refchair', hires(24, 52, 3, (ctx) => drawRefChair(ctx, 12, 50)));
+  };
+}
+
 export class VolleyMatch {
   readonly ball: Phaser.Physics.Arcade.Image;
   private team: VolleyPlop[] = [];
@@ -81,9 +96,8 @@ export class VolleyMatch {
     gs.still(gs.add.image(this.left - SAND.END, ground, skey).setOrigin(0, SAND.UP / (SAND.UP + SAND.DOWN)).setScale(1 / SAND_RES).setDepth(DEPTH.tiles + 0.5));
     const bw = Math.round(half - 46);
     const bkey = `volleyboard-${bw}`;
-    if (!gs.textures.exists(bkey)) addCanvas(gs, bkey, hires(bw, 22, 3, (ctx) => drawCourtBoard(ctx, bw, 16, 'PLOP BEACH TOUR')), undefined, { release: true });
+    courtBitsArt(gs, widthTiles)?.();
     for (const x0 of [this.left + 10, cx + 36]) gs.still(gs.add.image(x0, ground - 2, bkey).setOrigin(0, 1).setScale(1 / 3).setDepth(DEPTH.decor - 1));
-    if (!gs.textures.exists('refchair')) addCanvas(gs, 'refchair', hires(24, 52, 3, (ctx) => drawRefChair(ctx, 12, 50)));
     const chairX = cx + 20;
     const chairY = ground;
     gs.still(gs.add.image(chairX, chairY, 'refchair').setOrigin(0.5, 50 / 52).setScale(1 / 3).setDepth(DEPTH.decor - 1));
