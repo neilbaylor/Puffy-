@@ -408,3 +408,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.403: App loading screen fade-in taken out.
 - v0.404: Entering a Battle room is smoother and its loading card is shorter.
 - v0.405: Battle waits a moment ('Getting everyone ready…') if someone's game is still loading, so it starts smoothly for all.
+- v0.406: Full mode runs noticeably smoother (a touch less sharp, halfway to light mode).
