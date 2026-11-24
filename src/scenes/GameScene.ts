@@ -437,12 +437,23 @@ export class GameScene extends Phaser.Scene {
     }, data.water !== undefined ? { surface: data.water, width: widthPx, dark: data.dark } : undefined);
     this.applyTheme();
     this.fx = new Fx(this, LIGHT);
-    // (the words that pop up most, made now rather than on the first bad guy)
-    this.fx.warmText([
+    // (the words that pop up most, made ahead rather than on the first bad guy: one a frame once the
+    // level's up — all three in its first frame were ~10% of that frame, 25-35 ms at 4× slow CPU)
+    const words: [string, string, number][] = [
       [this.levelId === 3 || this.levelId === 4 ? 'SPLAT!' : 'POP!', '#ffffff', 15],
       ['+1 AURA', '#6ff0d8', 17],
       ['NOM!', '#ffd27a', 13],
-    ]);
+    ];
+    // (not in the frame the level's set up in: that one runs the update loop too)
+    let skip = true;
+    const warmWords = () => {
+      if (skip) return void (skip = false);
+      const w = words.shift();
+      if (w) this.fx.warmText([w]);
+      else this.events.off(Phaser.Scenes.Events.POST_UPDATE, warmWords);
+    };
+    this.events.on(Phaser.Scenes.Events.POST_UPDATE, warmWords);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.events.off(Phaser.Scenes.Events.POST_UPDATE, warmWords));
 
     this.gPlayers = this.add.group();
     this.gEnemies = this.add.group();

@@ -4,7 +4,7 @@ import { CHARACTERS, characterById, type CharacterDef } from '../data/characters
 import type { Session } from '../core/session';
 import { fadeOutMusic, playLevelClear, playLevelMusic, playLevelSong, playMenuMusic, preloadHoopsMusic, preloadLevelMusic, primeMusic, setMusicMuted, stopMusic } from '../core/music';
 import { isMuted, setMuted, sfx, unlockAudio } from '../core/sfx';
-import { drawHeroCard, drawPortrait, renderPoseSet } from '../gfx/draw';
+import { drawHeroCard, drawPortrait, portraitKept, renderPoseSet } from '../gfx/draw';
 import { NEUTRAL_FACE, type Face } from '../gfx/face';
 import { BattleUI } from './battleUi';
 import { loadArt, loadArtQueue } from './artLoader';
@@ -1488,7 +1488,9 @@ export class UI {
     }
     // (and the level's soccer pitches, rinks and courts: see fieldArtSteps)
     const fields = build ? fieldArtSteps(scene, build()) : [];
-    return loadArt([...gameArtJobs(scene, { heroes, level }), ...ground, ...fields, ...this.bossArtSteps(heroes[0], level, boss)]);
+    // (and the HUD's portrait of the hero, for a level)
+    const hud = level !== null ? this.hudSteps(heroes[0], level) : [];
+    return loadArt([...gameArtJobs(scene, { heroes, level }), ...ground, ...fields, ...hud, ...this.bossArtSteps(heroes[0], level, boss)]);
   }
 
   /**
@@ -1584,26 +1586,39 @@ export class UI {
     else this.touch.hide();
   }
 
-  /** The HUD portrait's hero, in what it shows them wearing. */
-  private hudLook() {
-    const hero = characterById(this.session.players[0]?.characterId ?? 'puffy');
+  /** The HUD portrait's hero, in what it shows them wearing (in the level being played, or the one given). */
+  private hudLook(heroId = this.session.players[0]?.characterId, level = (this.gameScene as { levelId?: number } | null)?.levelId) {
+    const hero = characterById(heroId ?? 'puffy');
     // (the sunglasses if they're on, and under the sea the dive gear — no party hat or skateboard up there)
     const glasses = wardrobe.wearKey.split(',').filter((w) => w === 'frogskins');
-    const wear = (swimLevel((this.gameScene as { levelId?: number } | null)?.levelId) ? [...glasses, 'scuba'] : glasses).join(',');
+    const wear = (swimLevel(level) ? [...glasses, 'scuba'] : glasses).join(',');
     return { hero, wear };
   }
 
   /**
-   * The HUD portrait's two standing frames drawn ahead, while the level is being set up (they're
-   * kept: see drawPortrait), so the HUD coming in at "GO!" doesn't stutter drawing them.
+   * The HUD portrait's two standing frames drawn ahead (they're kept: see drawPortrait), so the HUD
+   * coming in at "GO!" doesn't stutter drawing them. Done behind the level's loading card (see
+   * hudSteps); here again as the level starts, which is then only a copy of what's kept.
    */
-  private warmHud() {
-    const { hero, wear } = this.hudLook();
+  private warmHud(heroId?: string, level?: number) {
+    const { hero, wear } = this.hudLook(heroId, level);
     const cv = this.hud.querySelector('canvas')!;
     const scratch = document.createElement('canvas');
     scratch.width = cv.width;
     scratch.height = cv.height;
     for (const pose of ['idle0', 'idle1'] as const) drawPortrait(scratch, hero, pose, undefined, 'idle0', wear);
+  }
+
+  /**
+   * The same, as a loading-card step, if they aren't kept yet. Left to the level's first frame (the
+   * 'game-start' it sends as it's set up), drawing them was about a quarter of that frame: ~60-95 ms
+   * at 4× slow CPU, the first time a hero plays a Part (or a sea Part, in the dive gear).
+   */
+  private hudSteps(heroId: string | undefined, level: number): Step[] {
+    const { hero, wear } = this.hudLook(heroId, level);
+    const cv = this.hud.querySelector('canvas')!;
+    if ((['idle0', 'idle1'] as const).every((pose) => portraitKept(cv.width, cv.height, hero, pose, undefined, 'idle0', wear))) return [];
+    return [{ name: 'hud portrait', run: () => this.warmHud(heroId, level) }];
   }
 
   /** The HUD's numbers and stamina bar, looked up once (it's sent every frame the stamina moves). */

@@ -30,8 +30,28 @@ const DEEP_FILL = new Map<string, number>();
 /** Each level's terrain pieces (outline + bounds), worked out once (see LevelView.pieces). */
 const PIECES = new Map<string, { outline: Pt[]; x0: number; y0: number; x1: number; y1: number }[]>();
 
+/**
+ * localTop's answers, by outline and column range: the outlines are a level's pieces, kept for good
+ * (see levelPieces), and each of its chunks asks about the same range every time the level is put
+ * up. Going round a long piece's whole outline for every chunk of it was ~15% of a checkpoint
+ * restart's frame (Part 6), and the level's own first frame asked again what the start screen's
+ * fly-over of it had already worked out.
+ */
+const LOCAL_TOPS = new WeakMap<Pt[], Map<string, number>>();
+
 /** Highest point (smallest y) of a closed outline within the column range x0..x1. */
 function localTop(outline: Pt[], x0: number, x1: number) {
+  let known = LOCAL_TOPS.get(outline);
+  if (!known) LOCAL_TOPS.set(outline, (known = new Map()));
+  const k = `${x0}|${x1}`;
+  const had = known.get(k);
+  if (had !== undefined) return had;
+  const top = findTop(outline, x0, x1);
+  known.set(k, top);
+  return top;
+}
+
+function findTop(outline: Pt[], x0: number, x1: number) {
   let top = Infinity;
   for (let i = 0; i < outline.length; i++) {
     const [ax, ay] = outline[i];

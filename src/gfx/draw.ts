@@ -675,8 +675,16 @@ const portraitBox = new Map<string, [number, number, number, number]>();
  */
 const portraitCache = new Map<string, HTMLCanvasElement>();
 
+const portraitKey = (w: number, h: number, ch: CharacterDef, pose: Pose, f: Face | undefined, boxPose: Pose, wear: string, layer: Layer) =>
+  `${ch.id}|${ch.colors.main}|${pose}|${boxPose}|${f ? `${f.lookX},${f.lookY},${f.blink ? 1 : 0},${f.mouth}` : '-'}|${w}x${h}|${wear}|${layer}`;
+
+/** Whether drawPortrait has this one kept already (so drawing it now would cost next to nothing). */
+export function portraitKept(w: number, h: number, ch: CharacterDef, pose: Pose = 'idle0', f?: Face, boxPose: Pose = pose, wear: string = wardrobe.wearKey, layer: Layer = 'all') {
+  return portraitCache.has(portraitKey(w, h, ch, pose, f, boxPose, wear, layer));
+}
+
 export function drawPortrait(target: HTMLCanvasElement, ch: CharacterDef, pose: Pose = 'idle0', f?: Face, boxPose: Pose = pose, wear: string = wardrobe.wearKey, layer: Layer = 'all') {
-  const key = `${ch.id}|${ch.colors.main}|${pose}|${boxPose}|${f ? `${f.lookX},${f.lookY},${f.blink ? 1 : 0},${f.mouth}` : '-'}|${target.width}x${target.height}|${wear}|${layer}`;
+  const key = portraitKey(target.width, target.height, ch, pose, f, boxPose, wear, layer);
   let done = portraitCache.get(key);
   if (!done) {
     done = canvas(target.width, target.height).c;
