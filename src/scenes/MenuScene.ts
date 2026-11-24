@@ -362,6 +362,11 @@ export class MenuScene extends Phaser.Scene {
   /** The Parts' fly-overs kept hidden (see World). */
   private worlds = new Map<number, World>();
 
+  /** Its sky shows clouds (their pictures are a level's sky's too: see Background.paintFirstClouds). */
+  get skyClouds() {
+    return this.bg?.hasClouds ?? false;
+  }
+
   /** This Part's trees and cloud platforms the start screen hasn't drawn yet (see LevelView.laterSteps). */
   laterSteps(id: number): { name: string; run: () => void }[] {
     return this.levelId === id && this.level ? this.level.laterSteps() : [];

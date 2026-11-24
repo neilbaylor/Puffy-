@@ -11,7 +11,8 @@ import { loadArt, loadArtQueue } from './artLoader';
 import { MenuScene } from '../scenes/MenuScene';
 import { LIGHT } from '../core/light';
 import { BG_LAYER_IDS, HOME_LO, asBossArt, asQuietJob, bgKey, disownBossArt, dropHeroSheets, freeBossArtExcept, gameArtJobs, homeKeepKeys, isSliceJob, lookJobs, missingLookSteps, ownFrame, seaWear, swimLevel, type Step } from '../gfx/textures';
-import { themesFor } from '../world/theme';
+import { themeClock, themeMix, themesFor } from '../world/theme';
+import { Background } from '../world/Background';
 import { SHOP, wardrobe } from '../core/wardrobe';
 import { groundPaintJobs } from '../world/LevelView';
 import { gamepadSources } from '../input/gamepad';
@@ -1490,7 +1491,15 @@ export class UI {
     const fields = build ? fieldArtSteps(scene, build()) : [];
     // (and the HUD's portrait of the hero, for a level)
     const hud = level !== null ? this.hudSteps(heroes[0], level) : [];
-    return loadArt([...gameArtJobs(scene, { heroes, level }), ...ground, ...fields, ...hud, ...this.bossArtSteps(heroes[0], level, boss)]);
+    // (and the level's clouds in their first shapes, from the start screen while its own sky has none
+    // — a Part under the sea: see Background.paintFirstClouds)
+    const sky: Step[] = [];
+    const menu = this.game.scene.getScene('Menu') as MenuScene;
+    if (level !== null && build && !boss && this.game.scene.isActive('Menu') && !menu.skyClouds && !this.game.scene.isActive('Game') && !this.game.scene.isActive('Battle')) {
+      const data = build();
+      if (data.water === undefined) sky.push({ name: 'clouds', run: () => Background.paintFirstClouds(this.game.textures, themeMix(themeClock.t, themesFor(level)), !!data.vertical) });
+    }
+    return loadArt([...gameArtJobs(scene, { heroes, level }), ...ground, ...fields, ...hud, ...sky, ...this.bossArtSteps(heroes[0], level, boss)]);
   }
 
   /**

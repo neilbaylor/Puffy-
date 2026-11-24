@@ -39,6 +39,11 @@ const CLOUD_RES = LIGHT ? 1 : 1.25;
 // (every 1.5 s, was 0.45 s: each new picture is drawn and sent to the graphics chip, ~20 a second
 // across the sky before; and they change shape that much slower, so each step is as small as ever)
 const CLOUD_EVERY = 1.5;
+/**
+ * A sky's clock at its first update (s), when it draws its clouds' first shapes: the frame a level's
+ * set up in always takes longer than the 1/30 s an update's step is capped at (see GameScene.update).
+ */
+const FIRST_STEP = 1 / 30;
 /** How fast the clouds change shape (1 = as they first did). */
 const MORPH_RATE = 0.45 / CLOUD_EVERY;
 /** A cloud's outline is worked out at this many angles round it (the sines and cosines once, here). */
@@ -54,7 +59,11 @@ const SIL_SIN = Float32Array.from({ length: SIL_N }, (_, k) => Math.sin((k / SIL
  * in a level, the most of any one kind). The box is kept with the picture, as clouds' pictures
  * are shared by the scenes that show the same sky: whichever drew it last says what's in it.
  */
-type CloudTex = Phaser.Textures.CanvasTexture & { box?: { x: number; y: number; w: number; h: number } };
+type CloudTex = Phaser.Textures.CanvasTexture & { box?: { x: number; y: number; w: number; h: number }; drawn?: string };
+/** The clouds' colours (see Background.setTheme). */
+type CloudCol = { fill: number; shade: number; ink: number };
+/** What a cloud's picture was last drawn as: its shape's time and its colours (see Background.paintCloud). */
+const drawnAs = (c: CloudCol, at: number) => `${at}|${c.fill},${c.shade},${c.ink}`;
 type CroppedCopy = Phaser.GameObjects.Image & { box?: CloudTex['box'] };
 
 /** Note round what was just drawn in a cloud's picture: its outline (as drawn, and lifted for the lit top), plus the ink line and a pixel or two. */
@@ -180,7 +189,7 @@ export class Background {
   // living clouds: redrawn every frame from slowly breathing puffs
   private bands: CloudBand[] = [];
   private seeds: Seed[] = [];
-  private cloudCol = { fill: 0xffffff, shade: 0xe3dcf7, ink: 0x9486c8 };
+  private cloudCol: CloudCol = { fill: 0xffffff, shade: 0xe3dcf7, ink: 0x9486c8 };
   private t = 0;
   private cloudScroll = 0;
   private showB = false;
@@ -208,12 +217,7 @@ export class Background {
     }
     this.add('far', BG_LAYERS.far.h, 0.08, 0.04, 0.3, 0, DEPTH.far);
     // two bands of living clouds: small far ones up high, big slow ones lower down
-    if (!sea) {
-      this.bands.push(this.makeBand(5, 7, 0.16, 0.08, 0.02, CLOUD_W, [0.75, 1.25], [34, 150], DEPTH.clouds, 1));
-      this.bands.push(this.makeBand(9, 4, 0.28, 0.14, 0.2, 1400, [1.3, 1.8], [40, 110], DEPTH.hills - 1, 0.9));
-    }
-    // (a climb: nearer clouds spread all the way down the screen, passing quicker as you go up)
-    if (vertical) this.bands.push(this.makeBand(13, 6, 0.22, 0.45, 0, 1100, [0.9, 1.4], [0, 640], DEPTH.clouds, 0.85));
+    if (!sea) this.bands = Background.cloudBands(scene.textures, vertical);
     // dandelion-puff seeds drifting across on the breeze
     const r = rng(77);
     for (let i = 0; i < 14; i++) {
@@ -371,6 +375,11 @@ export class Background {
     return this.scene.game.renderer.type === Phaser.WEBGL;
   }
 
+  /** It has clouds (not under the sea). */
+  get hasClouds() {
+    return this.bands.length > 0;
+  }
+
   /** Show look `a`, with look `b` faded in on top by `w`. */
   setTheme(m: ThemeMix) {
     if (m.a !== this.themeA) ensureLook(this.scene, m.a, this.home);
@@ -397,17 +406,44 @@ export class Background {
     this.wB = m.w;
     for (const l of this.layers) for (const t of l.b) for (let i = 0; i < t.n; i++) t.imgs[i].setVisible(showB).setAlpha(m.w);
     this.fill.setFillStyle(mixSea(m));
+    this.cloudCol = Background.cloudColours(m);
+  }
+
+  /** The clouds' colours in look `a` with `b` faded in by `w`. */
+  private static cloudColours(m: ThemeMix): CloudCol {
     const pa = PALETTES[m.a];
     const pb = PALETTES[m.b];
     const w = m.b === m.a ? 0 : m.w;
-    this.cloudCol = {
+    return {
       fill: lerpRgb(hex(pa.cloud.base), hex(pb.cloud.base), w),
       shade: lerpRgb(hex(pa.cloud.shade), hex(pb.cloud.shade), w),
       ink: lerpRgb(hex(pa.farInk), hex(pb.farInk), w),
     };
   }
 
-  private makeBand(seed: number, n: number, fx: number, fy: number, anchor: number, width: number, size: [number, number], ys: [number, number], depth: number, alpha: number): CloudBand {
+  /** A sky's bands of clouds: small far ones up high, big slow ones lower down (and on a climb, nearer ones all the way down). */
+  private static cloudBands(T: Phaser.Textures.TextureManager, vertical: boolean): CloudBand[] {
+    const bands = [
+      Background.makeBand(T, 5, 7, 0.16, 0.08, 0.02, CLOUD_W, [0.75, 1.25], [34, 150], DEPTH.clouds, 1),
+      Background.makeBand(T, 9, 4, 0.28, 0.14, 0.2, 1400, [1.3, 1.8], [40, 110], DEPTH.hills - 1, 0.9),
+    ];
+    // (a climb: nearer clouds spread all the way down the screen, passing quicker as you go up)
+    if (vertical) bands.push(Background.makeBand(T, 13, 6, 0.22, 0.45, 0, 1100, [0.9, 1.4], [0, 640], DEPTH.clouds, 0.85));
+    return bands;
+  }
+
+  /**
+   * A sky's clouds drawn ahead in their first shapes, in the colours of `m` (behind a level's loading
+   * card): its first frame drew them all (~11 pictures drawn and sent to the graphics chip, about a
+   * tenth of that frame at 4x slow CPU); it now shows them as they are if they're still so (see
+   * drawClouds). Not while the start screen shows clouds: they're its pictures too, on show.
+   */
+  static paintFirstClouds(T: Phaser.Textures.TextureManager, m: ThemeMix, vertical: boolean) {
+    const col = Background.cloudColours(m);
+    for (const band of Background.cloudBands(T, vertical)) for (const c of band.clouds) if ((c.tex as CloudTex).drawn !== drawnAs(col, FIRST_STEP)) Background.paintCloud(c, col, FIRST_STEP);
+  }
+
+  private static makeBand(T: Phaser.Textures.TextureManager, seed: number, n: number, fx: number, fy: number, anchor: number, width: number, size: [number, number], ys: [number, number], depth: number, alpha: number): CloudBand {
     const r = rng(seed);
     const base: [number, number, number][] = [
       [-30, 6, 17],
@@ -422,7 +458,6 @@ export class Background {
       const cs = size[0] + r() * (size[1] - size[0]);
       // (each cloud's own picture, shared by every scene that shows this sky)
       const key = `bgcloud-${seed}-${i}`;
-      const T = this.scene.textures;
       const tex = liveCanvas(T, key, Math.ceil(CB.w * cs * CLOUD_RES), Math.ceil(CB.h * cs * CLOUD_RES));
       clouds.push({ x: (i / n) * width + r() * 90, y: ys[0] + r() * (ys[1] - ys[0]), s: cs, drift: (r() - 0.5) * 18, bob: r() * 6.28, lumps, tex, imgs: [], next: -1 - r() * CLOUD_EVERY });
     }
@@ -430,13 +465,13 @@ export class Background {
   }
 
   /** The puffs of a cloud right now: each one slowly swells, shrinks and wanders, so the cloud keeps changing shape. */
-  private lumpsNow(c: Cloud) {
-    const t = this.t * MORPH_RATE;
+  private static lumpsNow(c: Cloud, at: number) {
+    const t = at * MORPH_RATE;
     return c.lumps.map((l) => [l.x + Math.sin(t * l.w * 0.7 + l.ph) * 9, l.y + Math.cos(t * l.w + l.ph) * 4, l.r * (1 + 0.3 * Math.sin(t * l.w + l.ph * 1.7))] as const);
   }
 
   /** Outline of a cloud: the union of its puffs, flat-ish underneath (x, y pairs, in one reused array). */
-  private silhouette(c: Cloud, lumps: readonly (readonly [number, number, number])[]): Float32Array {
+  private static silhouette(c: Cloud, lumps: readonly (readonly [number, number, number])[]): Float32Array {
     const pts = SIL;
     for (let k = 0; k < SIL_N; k++) {
       const ca = SIL_COS[k];
@@ -459,16 +494,17 @@ export class Background {
    * times a second, not every frame: they change shape slowly, and as pictures they're cheap
    * to show — drawn as shapes every frame they were most of the game's drawing work.)
    */
-  private paintCloud(c: Cloud, hi: number) {
-    const { fill, shade, ink } = this.cloudCol;
+  private static paintCloud(c: Cloud, cc: CloudCol, at: number) {
+    const { fill, shade, ink } = cc;
+    const hi = lerpRgb(fill, 0xffffff, 0.65);
     const ctx = c.tex.getContext();
     const col = (n: number, a = 1) => `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, c.tex.width, c.tex.height);
     const k = CLOUD_RES;
     ctx.setTransform(k, 0, 0, k, -CB.x0 * c.s * k, -CB.y0 * c.s * k);
-    const lumps = this.lumpsNow(c);
-    const pts = this.silhouette(c, lumps);
+    const lumps = Background.lumpsNow(c, at);
+    const pts = Background.silhouette(c, lumps);
     /** The outline, scaled (sx, sy) and lifted (dy). */
     const path = (sx: number, sy: number, dy: number) => {
       ctx.beginPath();
@@ -496,12 +532,13 @@ export class Background {
     ctx.stroke();
     c.tex.refresh();
     setCloudCrop(c, pts);
+    // (see drawClouds)
+    (c.tex as CloudTex).drawn = drawnAs(cc, at);
   }
 
   private drawClouds(view: View, camUp: number, dt: number) {
     this.t += dt;
     this.cloudScroll += 5 * dt;
-    const hi = lerpRgb(this.cloudCol.fill, 0xffffff, 0.65);
     for (const band of this.bands) {
       const ox = view.left - 2;
       const oy = view.top + view.height * band.anchor + camUp * band.fy;
@@ -512,7 +549,10 @@ export class Background {
         // a new shape now and then (each cloud on its own beat, so they don't all redraw at once);
         // only while it's on screen (a cloud off to the side keeps its last shape till it's back)
         if (this.t >= c.next && x < view.width + 120) {
-          this.paintCloud(c, hi);
+          // (a picture already holding just this — the same shape in the same colours, e.g. a first
+          // shape drawn ahead behind the loading card, or by the start screen's sky of the same look —
+          // is shown as it is)
+          if ((c.tex as CloudTex).drawn !== drawnAs(this.cloudCol, this.t)) Background.paintCloud(c, this.cloudCol, this.t);
           // (light mode: still shapes — a new one a few times a second is a steady trickle of
           // pictures to make and send to the graphics chip)
           // (the next one on its own beat, not 1.5 s from now: they all get their first picture in
