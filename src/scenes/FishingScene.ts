@@ -613,32 +613,34 @@ export class FishingScene extends Phaser.Scene {
       );
       addCanvas(this, 'f6-kingbob', c, (t) => KING_LOOKS.forEach(([name], i) => t.add(name, 0, g.x(i), g.y(i), fw, fh)), { release: true });
     });
-    if (this.v6)
-      sheet('f6-kingrps', () => {
-        const { w, h } = FISH_SIZE.kingbob;
-        const res = 2;
-        const fw = Math.round((w + KING_RPS_PAD * 2) * res);
-        const fh = Math.round(h * res);
-        const g = frameGrid(KING_RPS.length, fw, fh);
-        const c = hires(g.w, g.h, 1, (ctx) =>
-          KING_RPS.forEach(([, f, rps], i) => {
-            kingBobLook.rps = rps;
-            try {
-              ctx.save();
-              ctx.beginPath();
-              ctx.rect(g.x(i), g.y(i), fw, fh);
-              ctx.clip();
-              ctx.translate(g.x(i), g.y(i));
-              ctx.scale(res, res);
-              drawFish(ctx, KING_RPS_PAD, 0, 'kingbob', f);
-              ctx.restore();
-            } finally {
-              kingBobLook.rps = '';
-            }
-          }),
-        );
-        addCanvas(this, 'f6-kingrps', c, (t) => KING_RPS.forEach(([name], i) => t.add(name, 0, g.x(i), g.y(i), fw, fh)), { release: true });
-      });
+    // (not `if (this.v6)`: drawn from the Bosses menu, before the scene's started, that's still the
+    // last visit's — false the first time — so this was left to the scene's first frame, a ~0.2 s
+    // frame at 4x slow CPU just as the contest came up; these are Boss 6's pictures whatever it says)
+    sheet('f6-kingrps', () => {
+      const { w, h } = FISH_SIZE.kingbob;
+      const res = 2;
+      const fw = Math.round((w + KING_RPS_PAD * 2) * res);
+      const fh = Math.round(h * res);
+      const g = frameGrid(KING_RPS.length, fw, fh);
+      const c = hires(g.w, g.h, 1, (ctx) =>
+        KING_RPS.forEach(([, f, rps], i) => {
+          kingBobLook.rps = rps;
+          try {
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(g.x(i), g.y(i), fw, fh);
+            ctx.clip();
+            ctx.translate(g.x(i), g.y(i));
+            ctx.scale(res, res);
+            drawFish(ctx, KING_RPS_PAD, 0, 'kingbob', f);
+            ctx.restore();
+          } finally {
+            kingBobLook.rps = '';
+          }
+        }),
+      );
+      addCanvas(this, 'f6-kingrps', c, (t) => KING_RPS.forEach(([name], i) => t.add(name, 0, g.x(i), g.y(i), fw, fh)), { release: true });
+    });
     for (const c of CATCHES) sheet(`fl-fish-${c.kind}`, () => makeFishFrames(this, `fl-fish-${c.kind}`, c.kind, ['sw0', 'sw2', 'sw4'], fishRes(c)));
     if (ch) sheet(`char-${ch.id}-cast`, () => makeCastSheet(this, ch));
     // the ending's: the hero's rock, paper, scissors frames and the Land of the Bloops. Made as they
