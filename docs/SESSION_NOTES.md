@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.390)
+## Where things stand (v0.391)
 Live site: https://playpuffy.world (device check: /?bench, reports: /?bench=list signed in as a tester).
 
 ### Main game
@@ -32,6 +32,7 @@ Live site: https://playpuffy.world (device check: /?bench, reports: /?bench=list
   Home screen (yellow).
 - Start screen: drone fly-over behind, logo hop, hero cards (pick = hop / backflip), Play, Part picker once a
   level is beaten, mute (top-left), full screen + **Battle** buttons (top-right, same height, side by side).
+- v0.391: owner: Delete account a real button (btn btn-alt, red text, Sign out's size) in the card grid's left column under the hero; Done row moves to the right column (under the table). Sure card: line break after 'saved to it:', 'It can't be undone.' its own paragraph (.acct-sure-last).
 - v0.390: account deletion (for app stores). Player card: small underlined 'Delete account' bottom-left (ui.ts showAccount, .acct-del), opens .acct-sure card over it (Keep it green / Delete red .btn-del; tap outside = keep; error shown if offline). account.deleteAccount() -> DELETE /api/me (server/users.ts Store.remove: items, sessions, user; deleted_names keeps sha('deleted:'+lower name)). restore() re-register sends restore:true -> 410 for deleted names (clears saved creds); manual register of the name works and clears it. Device-local progress is kept (like Sign out). Screens: shots-acctdel/ (main checkout, untracked).
 - v0.389: owner: a giant jumping off screen rumbled too much. GameScene.shakeFrom gains an offScreen factor (default 0.35, unchanged for boulder/fish chase); Enemy.ts landings/charge stop/walker thud pass OFF_SCREEN_THUD 0.13 (giant slam just off screen ~0.0055 -> ~0.002 intensity); skip threshold 0.1 -> 0.05 (no change for old callers). On screen unchanged.
 - v0.388: perf round G10 (ff from claude/perf-g10; last of the owner's 3-round series G8-G10). textures.ts: chase art 3 steps, playerSheetSteps for dive-gear sheets, goats 2 steps; LevelView drawLater (light groundPaintJobs view puts trees/cloud platforms/piers up undrawn, drawn as card steps); Background.paintFirstClouds card step (light, start screen sky cloudless) + drawClouds skips a redraw when clock/colours unchanged (static paint helpers). Lead re-measure (g9/abrun.sh lead10): card max frame full P6 ~790->~330, light P1 ~325->~205, P3 ~345->~220, P6 ~450->~250; light P1 first ~170->~140; card ~2-5% longer full. G10 measured, not changed: restart remainder spread thin (view ~21%, shutdown ~10%); boss->home full Boss 4 has a ~407 ms frame with no uploads (Wrestle shutdown / start screen rebuild?) - worth a trace next time; entering bosses longest frames 200-370 ms mostly behind the card; football team sheets ~240-320 ms card steps left. Tools: scratchpad/g10 (ctrace.cjs + ctsum.py: card frame traces).
