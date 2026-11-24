@@ -4,7 +4,8 @@ import { LIGHT } from '../core/light';
 
 /**
  * Boss 6's new ending (the launch to the Land of the Bloops): a stand-in Land of the Bloops (a plain
- * sunny land of hills and puff trees, till the land's own art is made). Drawn on first use.
+ * sunny land of hills and puff trees, till the land's own art is made). Drawn with the contest's other
+ * pictures (FishingScene.artSteps6: behind its loading card), or else when it's first needed.
  */
 
 const INK = '#3a2418';

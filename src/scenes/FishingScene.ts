@@ -641,6 +641,11 @@ export class FishingScene extends Phaser.Scene {
       });
     for (const c of CATCHES) sheet(`fl-fish-${c.kind}`, () => makeFishFrames(this, `fl-fish-${c.kind}`, c.kind, ['sw0', 'sw2', 'sw4'], fishRes(c)));
     if (ch) sheet(`char-${ch.id}-cast`, () => makeCastSheet(this, ch));
+    // the ending's: the hero's rock, paper, scissors frames and the Land of the Bloops. Made as they
+    // were needed, each held up a frame of the ending (the land a big picture to draw and send to the
+    // graphics chip: ~0.2 s at 4x slow CPU in full mode, against ~0.07 s frames round it).
+    if (ch) sheet(`char-${ch.id}-rps`, () => void makeRpsSheet(this, ch));
+    sheet('bl-land', () => bloopsLand(this));
     return steps;
   }
 
