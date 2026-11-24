@@ -16,13 +16,6 @@
     <link rel="icon" type="image/png" href="icon-192.png" />
     <meta name="apple-mobile-web-app-title" content="Puffy!" />
     <script>
-      // Inside the Android/iOS app (its native side puts window.Capacitor in the page first): html.in-app,
-      // so the loading screen fades in on the system splash's plain blue rather than appearing at once.
-      try {
-        if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) document.documentElement.classList.add('in-app');
-      } catch (e) {}
-    </script>
-    <script>
       // Older Safari (16 and before; every iPhone/iPad browser is Safari underneath) paints a word's
       // outline over its letters: html.no-po switches to outlines it draws right (ui/oldSafari*.css).
       (function () {
