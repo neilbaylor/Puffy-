@@ -411,3 +411,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.406: Full mode runs noticeably smoother (a touch less sharp, halfway to light mode).
 - v0.407: Fixed the game running too fast on 120 Hz screens.
 - v0.408: Part 5: smoother fly-over ending; Kai fish a bit easier and turns up a touch sooner.
+- v0.409: Battle lobby much smoother (pictures drawn on entering and at the first battle); start screen and lobby lighter in full mode.
