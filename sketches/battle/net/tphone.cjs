@@ -19,8 +19,11 @@ const INSTRUMENT = () => {
   window.__btn = 0;
   s.buttons = () => window.__btn;
   const pe = s.playEvents.bind(s);
+  // (events shown and heard, per frame: not those caught up quietly)
+  let loud = 0;
   s.playEvents = (evs, ...r) => {
     for (const e of evs) m.ev.push([performance.now(), e.k, e.id ?? null]);
+    if (!r[0]) loud += evs.filter((e) => e.k !== 'jump').length;
     return pe(evs, ...r);
   };
   // (effects started, per frame)
@@ -34,8 +37,8 @@ const INSTRUMENT = () => {
     const o = {};
     for (const [id, w] of s.views) if (id !== s.net.myId) o[id] = [Math.round(w.sprite.x), Math.round(w.sprite.y), w.sprite.visible ? 1 : 0];
     const lost = document.querySelector('.bhud-lost');
-    m.frames.push([performance.now(), v ? Math.round(v.sprite.x * 10) / 10 : null, v ? Math.round(v.sprite.y * 10) / 10 : null, o, s.me ? s.me.respawn : 0, lost && !lost.hidden ? 1 : 0, Math.round(Math.hypot(s.fix.x, s.fix.y)), nfx]);
-    nfx = 0;
+    m.frames.push([performance.now(), v ? Math.round(v.sprite.x * 10) / 10 : null, v ? Math.round(v.sprite.y * 10) / 10 : null, o, s.me ? s.me.respawn : 0, lost && !lost.hidden ? 1 : 0, Math.round(Math.hypot(s.fix.x, s.fix.y)), nfx, loud]);
+    nfx = loud = 0;
     if (m.frames.length > 4000) m.frames.splice(0, 1000);
   });
 };
@@ -133,7 +136,7 @@ const INSTRUMENT = () => {
       for (let i = 1; i < fr.length; i++) jump = Math.max(jump, Math.hypot(fr[i][1] - fr[i - 1][1], fr[i][2] - fr[i - 1][2]));
       const lost = m.frames.filter((f) => f[0] >= t0 && f[0] <= t0 + ms && f[5]).length;
       const all = m.frames.filter((f) => f[0] >= t0 && f[0] <= t0 + ms);
-      return { frames: fr.length, jump: Math.round(jump), fix: Math.max(0, ...fr.map((f) => f[6])), lost, fx: m.fx, fxMax: Math.max(0, ...all.map((f) => f[7])) };
+      return { frames: fr.length, jump: Math.round(jump), fix: Math.max(0, ...fr.map((f) => f[6])), lost, fx: m.fx, fxMax: Math.max(0, ...all.map((f) => f[7])), loudMax: Math.max(0, ...all.map((f) => f[8])) };
     }, [t0, ms]);
   const bNow = () => B.evaluate(() => performance.now());
   const aNow = () => A.evaluate(() => performance.now());
@@ -162,7 +165,7 @@ const INSTRUMENT = () => {
     });
     await sleep(2500);
     const back = await aAfter(ta, 2500);
-    report('hide', away.moved < 150 && away.shots === 0, `tab away 4 s: B saw A move ${away.moved} px and fire ${away.shots} shots (from 0.7 s on); back: A's own hero fix max ${back.fix} px, explosions in 2.5 s ${back.fx - fx0}, most effects in one frame ${back.fxMax}, lost-card frames ${back.lost}`);
+    report('hide', away.moved < 150 && away.shots === 0, `tab away 4 s: B saw A move ${away.moved} px and fire ${away.shots} shots (from 0.7 s on); back: A's own hero fix max ${back.fix} px, explosions in 2.5 s ${back.fx - fx0}, most effects in one frame ${back.fxMax}, most events shown in one frame ${back.loudMax}, lost-card frames ${back.lost}`);
   }
 
   if (ONLY.includes('freeze')) {
@@ -192,7 +195,7 @@ const INSTRUMENT = () => {
     console.log('  (' + nHeld + ' messages handed over at once on waking)');
     await sleep(3000);
     const back = await aAfter(ta, 3000);
-    report('freeze', away.moved < 150 && away.shots === 0, `page frozen 5 s: B saw A move ${away.moved} px and fire ${away.shots} shots; back: A's hero fix max ${back.fix} px, explosions in 3 s ${back.fx - fx0}, most effects in one frame ${back.fxMax}, lost-card frames ${back.lost}`);
+    report('freeze', away.moved < 150 && away.shots === 0, `page frozen 5 s: B saw A move ${away.moved} px and fire ${away.shots} shots; back: A's hero fix max ${back.fix} px, explosions in 3 s ${back.fx - fx0}, most effects in one frame ${back.fxMax}, most events shown in one frame ${back.loudMax}, lost-card frames ${back.lost}`);
   }
 
   if (ONLY.includes('drop')) {
