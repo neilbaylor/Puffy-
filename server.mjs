@@ -9,6 +9,7 @@
 // their name and never change: the browser keeps those for a year without asking.
 import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
+import { createReadStream } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 import { brotliCompress, constants as zlibConst, gzipSync } from 'node:zlib';
@@ -105,8 +106,26 @@ function appCors(req, res) {
   return true;
 }
 
+/**
+ * The Android test app (downloads/puffy-test.apk, made by `npm run app:android`), for the owner's own
+ * devices: kept out of dist on purpose, so it's never in the website's offline copy nor the app's updates.
+ */
+const APK = resolve('downloads/puffy-test.apk');
+function sendApk(req, res) {
+  if (req.method !== 'GET' || (req.url ?? '').split('?')[0] !== '/dl/puffy-test.apk') return false;
+  stat(APK).then(
+    (st) => {
+      res.writeHead(200, { 'Content-Type': 'application/vnd.android.package-archive', 'Content-Length': st.size, 'Content-Disposition': 'attachment; filename="puffy-test.apk"', 'Cache-Control': 'no-cache' });
+      createReadStream(APK).pipe(res);
+    },
+    () => res.writeHead(404, { 'Content-Type': 'text/plain' }).end('Not found'),
+  );
+  return true;
+}
+
 const server = createServer(async (req, res) => {
   try {
+    if (sendApk(req, res)) return;
     if (appCors(req, res)) return;
     if (userApi && (await userApi(req, res))) return;
     const url = new URL(req.url ?? '/', 'http://x');
