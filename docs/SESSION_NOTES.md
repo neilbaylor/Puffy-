@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.401)
+## Where things stand (v0.402)
 Live site: https://playpuffy.world (device check: /?bench, reports: /?bench=list signed in as a tester).
 
 ### Main game
@@ -32,6 +32,7 @@ Live site: https://playpuffy.world (device check: /?bench, reports: /?bench=list
   Home screen (yellow).
 - Start screen: drone fly-over behind, logo hop, hero cards (pick = hop / backflip), Play, Part picker once a
   level is beaten, mute (top-left), full screen + **Battle** buttons (top-right, same height, side by side).
+- v0.402: owner felt the APK slightly slower than Chrome on their 90 Hz tablet. A/B build 'Puffy! B': gradle buildType b (initWith release, debuggable false, debug-signed, applicationIdSuffix .b, src/b/res strings), BuildConfig.LOCK_60 false (MainActivity skips preferSixtyHz). ./gradlew assembleB -> downloads/puffy-test-b.apk, served at /dl/puffy-test-b.apk (server.mjs APKS set). Waiting on owner: which feels better, and light/full label in app vs Chrome. Likely: 90 Hz tablet -> Chrome drew up to 90 fps, the 60 Hz lock caps 60.
 - v0.401: owner wanted no shift splash -> loading. Android 12+ splash can only show an icon in a ~160-192 dp circle, so PUFFY can't match; instead index.html head script adds html.in-app (window.Capacitor.isNativePlatform) and #boot fades in 0.25 s (animation fill 'backwards', so the .out fade still works) on the plain #5fc4ff. Web unchanged. Reaches the installed app by self-update.
 - v0.400: app 1.1 (NATIVE_VERSION/versionCode 2): Android splash shows no icon (styles.xml windowSplashScreenAnimatedIcon @drawable/splash_none, transparent), plain #5FC4FF into the loading screen. Owner keeps the current icon (public/icon-512 based adaptive icon). New APK at /dl/puffy-test.apk (contains v0.400). Debug keystore is ~/.android/debug.keystore: if lost, the owner must uninstall before installing a new debug APK.
 - v0.399: owner's test APK on the live site: https://playpuffy.world/dl/puffy-test.apk (server.mjs sendApk streams downloads/puffy-test.apk, committed; kept out of dist so not in the SW offline copy or app/latest.json). The APK inside is v0.398, so it self-updates to v0.399+ on its second launch. To refresh: rebuild (see v0.397 note), cp android/app/build/outputs/apk/debug/app-debug.apk downloads/puffy-test.apk (each copy adds ~14 MB to git history: update rarely).
