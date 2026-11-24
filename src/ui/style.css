@@ -2520,6 +2520,25 @@ kbd {
 /* the last seconds: the clock pushes in, lobby rumbling around it */
 .bl-clock.hot { transform: scale(1.12); transition: transform 0.3s cubic-bezier(0.2, 1.6, 0.4, 1); }
 
+/* the countdown held before its last seconds while someone's game draws the battle's pictures: a little
+   card (as the levels' loading card) where "Battle starts in" was, the clock standing still beside it */
+.bl-readying { display: none; }
+.bl-clock.readying .bl-clock-label { display: none; }
+.bl-clock.readying .bl-readying {
+  display: block;
+  background: var(--paper);
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+  box-shadow: 0 4px 0 var(--ink);
+  padding: 7px 14px 8px;
+  font: 400 clamp(16px, 4vh, 22px) / 1 var(--display);
+  color: var(--ink);
+  white-space: nowrap;
+}
+.bl-readying i { font-style: normal; animation: bl-dot 1.2s infinite; }
+.bl-readying i:nth-child(2) { animation-delay: 0.2s; }
+.bl-readying i:nth-child(3) { animation-delay: 0.4s; }
+
 /* "Start now", beside the clock: skips to the last few seconds */
 .bl-startnow {
   font-size: clamp(15px, 3.6vh, 20px);

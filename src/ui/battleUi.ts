@@ -249,6 +249,8 @@ export class BattleUI {
         full: 'The arena is full (4 players). Try again in a bit!',
         offline: '',
       }[s];
+    // (a new connection: the server waits to hear we're ready again)
+    if (s !== 'online') this.readySent = -1;
     el.textContent = s === 'full' ? '' : msg;
     el.hidden = !msg || s === 'full';
     this.lobby!.classList.toggle('waiting', s !== 'online');
@@ -356,6 +358,7 @@ export class BattleUI {
       <div class="bl-foot">
         <div class="bl-clock" hidden>
           <span class="bl-clock-label">Battle starts in</span>
+          <span class="bl-readying">Getting everyone ready<i>.</i><i>.</i><i>.</i></span>
           <span class="bl-clock-face"><b>15</b></span>
           <button class="btn btn-go bl-startnow" data-act="startnow">Start now</button>
         </div>
@@ -553,8 +556,11 @@ export class BattleUI {
     lobby.querySelector<HTMLElement>('.bl-waitmsg')!.hidden = !(r.phase === 'lobby' && players <= 1);
     lobby.querySelector<HTMLElement>('.bl-clock')!.hidden = !counting;
     this.canStartNow = counting && !spectator;
+    // (the countdown held before its last seconds: someone's game is still getting the battle's pictures ready)
+    lobby.querySelector('.bl-clock')!.classList.toggle('readying', counting && (r.waiting ?? 0) > 0);
     if (counting) this.runClock(r.timer, phaseChanged);
     else this.stopClock();
+    this.sayReady();
     // (the countdown stopped without a battle: drop the warmed-up arena)
     if (!counting && !watching && this.warmed) this.coolDown();
   }
@@ -577,6 +583,8 @@ export class BattleUI {
     const tick = () => {
       const lobby = this.lobby;
       if (!lobby?.isConnected) return this.stopClock();
+      // (held by the server till everyone's ready: the clock stands still)
+      if (this.net?.room?.waiting) this.clockEnd = performance.now() + START_NOW_SECS * 1000;
       const left = Math.max(0, (this.clockEnd - performance.now()) / 1000);
       const sec = Math.max(1, Math.ceil(left));
       const clock = lobby.querySelector<HTMLElement>('.bl-clock')!;
@@ -663,8 +671,27 @@ export class BattleUI {
         this.watchLater = false;
         if (this.lobby?.classList.contains('watching')) this.watch(true);
       }
+      if (!this.arenaJobs.length) this.sayReady();
     };
     this.arenaRaf = requestAnimationFrame(step);
+  }
+
+  /** The room's `prep` we last told the server we're ready for (-1: not yet on this connection). */
+  private readySent = -1;
+  /**
+   * Tell the server once everything for the next battle is drawn here — the arena's pictures, every
+   * player's hero in their colours (see preparePlayers), and the arena itself if it's being built ahead
+   * — for the players as they are now (the room's `prep`). It holds the countdown before its last
+   * seconds till everyone has (a few seconds at most), so nobody's battle starts with drawing left to do.
+   */
+  private sayReady() {
+    const r = this.net?.room;
+    if (!r || r.prep === undefined || r.prep === this.readySent || this.inBattle) return;
+    if (r.phase !== 'lobby' && r.phase !== 'countdown') return;
+    if (this.arenaJobs.length || this.warmLater) return;
+    if (this.warmed && !this.host.game.scene.isActive('Battle')) return;
+    this.readySent = r.prep;
+    this.net!.ready(r.prep);
   }
 
   /** The next arena job waits till then, and this many frames (see runArenaJobs). */
@@ -678,7 +705,7 @@ export class BattleUI {
    * (the countdown's last seconds, Start now) and there's none on to watch.
    */
   private arenaGentle() {
-    return !this.warmLater && !this.watchLater && !(this.clockRaf && this.clockEnd - performance.now() < 15000);
+    return !this.warmLater && !this.watchLater && !this.net?.room?.waiting && !(this.clockRaf && this.clockEnd - performance.now() < 15000);
   }
 
   /** The players whose hero pictures are being drawn ahead (see preparePlayers), by key. */
@@ -739,6 +766,8 @@ export class BattleUI {
     if (!this.net || !this.warmed || g.scene.isActive('Battle')) return;
     this.stopArena();
     g.scene.start('Battle', { net: this.net, spectate: true, warm: true });
+    // (ready once it's built: its first frame is the long one)
+    g.scene.getScene('Battle').events.once('create', () => this.sayReady());
   }
   private coolDown() {
     this.warmed = false;

@@ -13,7 +13,7 @@ function client(code, name, opts = {}) {
   const c = { ws, name, id: null, room: null, snaps: [], welcomes: 0, closed: false, closeCode: 0, token: opts.token ?? name + Math.random() };
   c.send = (m) => ws.readyState === 1 && ws.send(typeof m === 'string' ? m : JSON.stringify(m));
   c.open = new Promise((r) => ws.on('open', r));
-  ws.on('open', () => opts.hello !== false && c.send({ t: 'hello', name, hero: opts.hero || 'puffy', token: c.token }));
+  ws.on('open', () => opts.hello !== false && c.send({ t: 'hello', name, hero: opts.hero || 'puffy', token: c.token, ...(opts.ready ? { ready: true } : {}) }));
   ws.on('message', (d) => {
     const m = JSON.parse(d);
     if (m.t === 'welcome') (c.id = m.id), c.welcomes++;
@@ -73,7 +73,116 @@ const report = (name, ok, msg) => {
 };
 const close = (cs) => cs.forEach((c) => c.ws.close());
 
+/** Players (opts each) in a fresh room, in the countdown; logs every room state each gets (with the time). */
+async function countdown(optsList) {
+  const code = room();
+  const cs = [];
+  for (let i = 0; i < optsList.length; i++) {
+    const c = client(code, 'R' + i, optsList[i]);
+    c.rooms = [];
+    c.onmsg = (m) => m.t === 'room' && c.rooms.push({ at: Date.now(), ...m.room });
+    cs.push(c);
+    await until(() => c.id);
+  }
+  await until(() => cs.every((c) => c.room?.phase === 'countdown'));
+  return { code, cs };
+}
+/** `c` says it's ready (for the room as it last saw it), once, or every time `prep` changes. */
+const sayReady = (c) => c.room && c.room.prep !== undefined && c.send({ t: 'ready', r: c.room.prep });
+const autoReady = (c, delayMs = 0) => {
+  let said = -1;
+  const iv = setInterval(() => {
+    if (c.room && c.room.prep !== said && c.room.phase === 'countdown') setTimeout(() => sayReady(c), delayMs), (said = c.room.prep);
+  }, 20);
+  return () => clearInterval(iv);
+};
+const heldMs = (c) => {
+  const w = c.rooms.filter((r) => r.waiting > 0);
+  return w.length ? { first: w[0].at, n: Math.max(...w.map((r) => r.waiting)) } : null;
+};
+
 const TESTS = {
+  // ready: two games that say when they're ready — Start now waits (the room says how many it's waiting
+  // for) until both have, then the last seconds run as usual
+  async ready() {
+    const { cs } = await countdown([{ ready: true }, { ready: true }]);
+    const [a, b] = cs;
+    const t0 = Date.now();
+    a.send({ t: 'start' });
+    const held = await until(() => a.room?.waiting === 2, 3000);
+    await sleep(1500);
+    const stillCounting = a.room.phase === 'countdown' && a.room.timer === 4;
+    sayReady(a);
+    await until(() => a.room?.waiting === 1, 2000);
+    const one = a.room.waiting;
+    const t1 = Date.now();
+    sayReady(b);
+    await until(() => a.room?.phase === 'battle', 8000);
+    const after = Date.now() - t1;
+    report('ready', held && stillCounting && one === 1 && a.room.phase === 'battle' && after > 3000 && after < 4500 && !('waiting' in a.room),
+      `held for 2 (${held}), clock stood at ${a.room ? 4 : '?'} while held (${stillCounting}), then 1 after A said ready (${one}); battle ${after} ms after the last said ready (3.5 s expected); ${Date.now() - t0} ms in all`);
+    close(cs);
+  },
+  // an older game (no ready in its hello) is never waited for; the new one beside it is
+  async readyold() {
+    {
+      const { cs } = await countdown([{}, {}]);
+      const t0 = Date.now();
+      cs[0].send({ t: 'start' });
+      await until(() => cs[0].room?.phase === 'battle', 8000);
+      const ms = Date.now() - t0;
+      report('readyold', cs[0].room.phase === 'battle' && ms < 4500 && !cs.some((c) => heldMs(c)), `two older games: battle ${ms} ms after Start now, never held (${!cs.some((c) => heldMs(c))})`);
+      close(cs);
+    }
+    {
+      const { cs } = await countdown([{}, { ready: true }]);
+      const stop = autoReady(cs[1], 1000);
+      const t0 = Date.now();
+      cs[0].send({ t: 'start' });
+      await until(() => cs[0].room?.phase === 'battle', 10000);
+      const ms = Date.now() - t0;
+      const h = heldMs(cs[0]);
+      report('readyold-mixed', cs[0].room.phase === 'battle' && h && h.n === 1 && ms > 4300 && ms < 6000, `an older game and a new one (ready 1 s in): held for ${h ? h.n : 0}; battle ${ms} ms after Start now`);
+      stop();
+      close(cs);
+    }
+  },
+  // a game that never says it's ready: held at most ~7 s, then the battle starts anyway
+  async readycap() {
+    const { cs } = await countdown([{ ready: true }, { ready: true }]);
+    const stop = autoReady(cs[0]);
+    const t0 = Date.now();
+    cs[0].send({ t: 'start' });
+    await until(() => cs[0].room?.phase === 'battle', 15000);
+    const ms = Date.now() - t0;
+    const h = heldMs(cs[0]);
+    const ws = [...new Set(cs[0].rooms.filter((r) => r.waiting).map((r) => r.waiting))];
+    const freed = cs[0].rooms.find((r) => r.phase === 'countdown' && !r.waiting && h && r.at > h.first);
+    report('readycap', cs[0].room.phase === 'battle' && h && h.n >= 1 && ms > 10000 && ms < 11800 && !!freed, `held for ${h ? h.n : 0} (one never ready; waiting max); battle ${ms} ms after Start now (7 s cap + 3.5 s); the hold lifted for everyone (${!!freed}); waiting went ${ws.join(',')}`);
+    stop();
+    close(cs);
+  },
+  // a new player mid-countdown: everyone has a new hero to draw, so says ready again; one that drops
+  // while it's waited for isn't waited for any more
+  async readyprep() {
+    const { code, cs } = await countdown([{ ready: true }, { ready: true }]);
+    const stops = cs.map((c) => autoReady(c));
+    await sleep(300);
+    const p0 = cs[0].room.prep;
+    const c = client(code, 'Late', { ready: true });
+    await until(() => c.id && cs[0].room.prep !== p0, 3000);
+    const bumped = cs[0].room.prep !== p0;
+    cs[0].send({ t: 'start' });
+    await until(() => cs[0].room?.waiting === 1, 3000);
+    const waitingLate = cs[0].room.waiting === 1;
+    const t1 = Date.now();
+    c.ws.terminate();
+    await until(() => cs[0].room?.phase === 'battle', 8000);
+    const ms = Date.now() - t1;
+    report('readyprep', bumped && waitingLate && cs[0].room.phase === 'battle' && ms < 4500, `prep ${p0} -> ${cs[0].room.prep} when a player came in (${bumped}); held for the newcomer (${waitingLate}); it dropped: battle ${ms} ms later`);
+    stops.forEach((s) => s());
+    close(cs);
+  },
   // a player whose buttons stop coming (a tab put away, a phone frozen) but whose connection stays open
   async silent() {
     const { cs } = await battle(2);

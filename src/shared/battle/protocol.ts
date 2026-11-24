@@ -15,12 +15,15 @@ export type Phase = 'lobby' | 'countdown' | 'battle' | 'results';
 
 // ── game → server ──
 export type ClientMsg =
-  | { t: 'hello'; name: string; hero: string; token: string; wear?: string }
+  /** `ready`: this game says when it has its battle pictures drawn (see `ready` below); one that doesn't is never waited for. */
+  | { t: 'hello'; name: string; hero: string; token: string; wear?: string; ready?: boolean }
   | { t: 'hero'; hero: string }
   | { t: 'name'; name: string }
   /** Buttons for one tick (seq counts up by one per tick). */
   | { t: 'in'; s: number; b: number }
   | { t: 'start' }
+  /** Everything for the next battle is drawn, for the players as the room's `prep` numbered them. */
+  | { t: 'ready'; r: number }
   /** Leaving on purpose (Back, or closing the page): free my spot now. */
   | { t: 'leave' }
   | { t: 'ping'; c: number };
@@ -46,6 +49,10 @@ export interface RoomState {
   timer: number;
   /** Results: the winner's id (null for a draw). */
   winner: string | null;
+  /** Counts up each time the players' pictures change (who's in, their hero, what they've got on): see `ready`. */
+  prep?: number;
+  /** The countdown's held before its last seconds: this many players' games are still drawing the battle's pictures. */
+  waiting?: number;
 }
 
 /** A player in a snapshot: their full movement state (so the game can pick up from it exactly). */

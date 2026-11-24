@@ -137,7 +137,8 @@ export class BattleNet {
     this.heardAt = performance.now();
     ws.onopen = () => {
       this.retry = 0;
-      this.send({ t: 'hello', name: this.name, hero: this.hero, token: token(), wear: wardrobe.wearKey });
+      // (`ready`: this game tells the server once it has the battle's pictures drawn — see BattleUI.sayReady)
+      this.send({ t: 'hello', name: this.name, hero: this.hero, token: token(), wear: wardrobe.wearKey, ready: true });
       clearInterval(this.pingTimer);
       this.pingTimer = window.setInterval(() => this.send({ t: 'ping', c: performance.now() }), 2000);
     };
@@ -217,6 +218,11 @@ export class BattleNet {
   setName(name: string) {
     this.name = name;
     this.send({ t: 'name', name });
+  }
+
+  /** The battle's pictures are drawn, for the players as the room numbered them (its `prep`). */
+  ready(prep: number) {
+    this.send({ t: 'ready', r: prep });
   }
 
   start() {

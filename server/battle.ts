@@ -19,6 +19,11 @@ import { MAX_BATTLERS, START_NOW_SECS, WEAPON_CODE, packPlayer, type ClientMsg, 
 /** Once two or more friends are in, the next battle counts down from this on its own. */
 const AUTO_COUNTDOWN_SECS = Number(process.env.BATTLE_COUNTDOWN) > 0 ? Number(process.env.BATTLE_COUNTDOWN) : 25;
 const RESULTS_SECS = 8;
+/**
+ * The countdown waits before its last seconds (START_NOW_SECS: the rumble, then the curtain) while a
+ * player's game is still drawing the battle's pictures (see Client.ready) — this long at most.
+ */
+const READY_HOLD_MS = 7000;
 /** A dropped player keeps their place this long (phones drop the connection when backgrounded). */
 const REJOIN_SECS = 30;
 /** …but in the lobby a dropped player's square empties sooner. */
@@ -79,6 +84,12 @@ interface Client {
   kos: number;
   deaths: number;
   droppedAt: number;
+  /**
+   * Their game says when it has the battle's pictures drawn (said so in its hello): `ready` is the room's
+   * `prep` it last said that for. Games that don't say (older ones) are never waited for.
+   */
+  readyCap: boolean;
+  ready: number;
 }
 
 const ARENA = buildArena();
@@ -172,6 +183,13 @@ class Room {
   sim: BattleSim | null = null;
   private nextId = 1;
   private lastCountdownSecond = -1;
+  /** The players' pictures as they are (who's in, hero, what they've got on), and its number (`prep`). */
+  private prepKey = '';
+  private prep = 0;
+  /** The countdown held before its last seconds (see READY_HOLD_MS): since when, how many it's waiting for, and whether it's done with that for this countdown. */
+  private holdSince = 0;
+  private waiting = 0;
+  private held = false;
 
   // ── people coming and going ──
 
@@ -188,6 +206,9 @@ class Room {
         c.lastSeq = 0;
         c.queue = [];
         c.wear = wearOk(msg.wear ?? (msg as { hat?: string }).hat);
+        // (a reloaded page has its pictures to draw again: it says so once it has)
+        c.readyCap = msg.ready === true;
+        c.ready = -1;
         this.send(c, { t: 'welcome', id: c.id });
         this.broadcastRoom();
         return c;
@@ -217,6 +238,8 @@ class Room {
       kos: 0,
       deaths: 0,
       droppedAt: 0,
+      readyCap: msg.ready === true,
+      ready: -1,
     };
     this.clients.set(c.id, c);
     this.send(c, { t: 'welcome', id: c.id });
@@ -299,6 +322,9 @@ class Room {
         return;
       case 'ping':
         if (typeof msg.c === 'number') this.send(c, { t: 'pong', c: msg.c });
+        return;
+      case 'ready':
+        if (typeof msg.r === 'number') c.ready = msg.r;
         return;
     }
   }
@@ -383,6 +409,8 @@ class Room {
           this.phase = 'countdown';
           this.timer = AUTO_COUNTDOWN_SECS;
           this.lastCountdownSecond = -1;
+          this.holdSince = this.waiting = 0;
+          this.held = false;
           this.broadcastRoom();
         }
         break;
@@ -390,9 +418,11 @@ class Room {
         // someone left and it's just one again: back to waiting
         if (ready < 2) {
           this.phase = 'lobby';
+          this.waiting = 0;
           this.broadcastRoom();
           break;
         }
+        if (this.timer - DT <= START_NOW_SECS && this.holdForReady(now)) break;
         this.timer -= DT;
         const sec = Math.ceil(this.timer);
         if (sec !== this.lastCountdownSecond) {
@@ -477,13 +507,47 @@ class Room {
     }
   }
 
+  /**
+   * Before the countdown's last seconds: held (true) while a playing player's game is still drawing the
+   * battle's pictures — up to READY_HOLD_MS, once per countdown. Everyone's told how many it's waiting
+   * for (`waiting`), so their lobby says so and the clock stands still.
+   */
+  private holdForReady(now: number) {
+    if (this.held) return false;
+    let n = 0;
+    for (const c of this.clients.values()) if (c.ws && c.slot >= 0 && c.readyCap && c.ready !== this.prep) n++;
+    if (n > 0 && !this.holdSince) this.holdSince = now;
+    if (n === 0 || now - this.holdSince > READY_HOLD_MS) {
+      this.held = true;
+      if (this.waiting) {
+        this.waiting = 0;
+        this.broadcastRoom();
+      }
+      return false;
+    }
+    this.timer = START_NOW_SECS;
+    if (n !== this.waiting) {
+      this.waiting = n;
+      this.broadcastRoom();
+    }
+    return true;
+  }
+
   // ── sending ──
 
   roomState(): RoomState {
     const players: RoomPlayer[] = [...this.clients.values()]
       .sort((a, b) => a.slot - b.slot)
       .map((c) => ({ id: c.id, name: c.name, hero: c.hero, wear: c.wear, slot: c.slot, connected: !!c.ws, playing: c.playing, kos: c.kos, deaths: c.deaths }));
-    return { phase: this.phase, players, timer: Math.max(0, Math.ceil(this.timer)), winner: this.winner };
+    // (a new number whenever the players' pictures change: the games draw them, then say they're ready again)
+    const key = players.filter((p) => p.slot >= 0 && p.connected).map((p) => `${p.slot}|${p.hero}|${p.wear}`).join(',');
+    if (key !== this.prepKey) {
+      this.prepKey = key;
+      this.prep++;
+    }
+    const room: RoomState = { phase: this.phase, players, timer: Math.max(0, Math.ceil(this.timer)), winner: this.winner, prep: this.prep };
+    if (this.waiting > 0 && this.phase === 'countdown') room.waiting = this.waiting;
+    return room;
   }
 
   broadcastRoom() {
