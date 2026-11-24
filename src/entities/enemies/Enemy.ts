@@ -12,6 +12,8 @@ import { hexCss, roundRectPath, smallTex } from '../../gfx/smallTex';
 
 /** The pips pictures' resolution. */
 const PIP_RES = 3;
+/** How much of a heavy bad guy's landing is felt when he's off screen (a giant out of sight: a faint rumble). */
+const OFF_SCREEN_THUD = 0.13;
 
 export type DeathKind = 'stomp' | 'blast' | 'fall';
 
@@ -390,7 +392,7 @@ export class BigPuff extends Walker {
     if (!b.blocked.down) this.fallVy = Math.max(this.fallVy, b.velocity.y);
     else {
       if (this.fallVy > 340 && this.awake) {
-        this.gs.shakeFrom(this.x, b.bottom, 130, 0.0045);
+        this.gs.shakeFrom(this.x, b.bottom, 130, 0.0045, OFF_SCREEN_THUD);
         this.gs.fx.dust(b.left + 4, b.bottom, 3);
         this.gs.fx.dust(b.right - 4, b.bottom, 3);
       }
@@ -545,7 +547,7 @@ export class Giant extends Enemy {
           this.timer = 0.6;
           this.chargeCooldown = 3.8 + Math.random() * 1.6;
           b.setVelocityX(0);
-          this.gs.shakeFrom(this.x, b.bottom, 140, 0.006);
+          this.gs.shakeFrom(this.x, b.bottom, 140, 0.006, OFF_SCREEN_THUD);
         }
         break;
       }
@@ -623,7 +625,7 @@ export class Giant extends Enemy {
     this.mode = 'walk';
     this.timer = 1.1 + Math.random() * 0.8;
     b.setVelocityX(0);
-    this.gs.shakeFrom(this.x, b.bottom, slam ? 320 : 200, slam ? 0.02 : 0.01);
+    this.gs.shakeFrom(this.x, b.bottom, slam ? 320 : 200, slam ? 0.02 : 0.01, OFF_SCREEN_THUD);
     this.gs.fx.dust(b.left + 10, b.bottom, slam ? 14 : 8);
     this.gs.fx.dust(b.right - 10, b.bottom, slam ? 14 : 8);
     if (slam) this.gs.fx.shockwave(this.x, b.bottom, 70);

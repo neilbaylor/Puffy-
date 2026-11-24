@@ -1570,17 +1570,18 @@ export class GameScene extends Phaser.Scene {
   /**
    * Shake the camera for something heavy happening at (x, y): full strength
    * when it's right there on screen, weaker the further it is from you, and
-   * hardly at all once it's well off screen.
+   * hardly at all once it's well off screen. `offScreen`: how much of it is felt from off screen
+   * (a giant stomping about out of sight shakes only a little: the owner found it too much).
    */
-  shakeFrom(x: number, y: number, ms: number, intensity: number) {
+  shakeFrom(x: number, y: number, ms: number, intensity: number, offScreen = 0.35) {
     const p = this.players.find((q) => q.alive) ?? this.players[0];
     const view = this.cameras.main.worldView;
     const onScreen = x > view.x - 20 && x < view.right + 20 && y > view.y - 40 && y < view.bottom + 60;
     const d = p ? Math.hypot(p.x - x, (p.y - y) * 0.7) : 0;
     // full strength anywhere near you (most of the screen), fading gently further out
     let k = d < 400 ? 1 : Phaser.Math.Clamp(1 - (d - 400) / 1100, 0.3, 1);
-    if (!onScreen) k *= 0.35;
-    if (k < 0.1) return;
+    if (!onScreen) k *= offScreen;
+    if (k < 0.05) return;
     this.cameras.main.shake(ms * (0.6 + 0.4 * k), intensity * k);
   }
 
