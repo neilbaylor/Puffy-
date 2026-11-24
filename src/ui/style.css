@@ -2713,9 +2713,9 @@ kbd {
   white-space: nowrap;
   color: #a3402c;
 }
-/* (Done at the right edge, Delete account level with it: both centred on the same line) */
+/* (Done at the right edge, Delete account's words on the same baseline as Done's) */
 .acct-card .acct-del + .acct-done-row { grid-column: 2; justify-content: flex-end; }
-.acct-card .acct-del, .acct-card .acct-del + .acct-done-row { align-self: center; }
+.acct-card .acct-del, .acct-card .acct-del + .acct-done-row { align-self: baseline; }
 @media (max-height: 500px) { .acct-card .acct-del { padding: 6px 11px 5px; font-size: 14px; } }
 /* its "are you sure?" card, over the account card */
 .acct-sure {
