@@ -397,3 +397,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.392: Player card buttons lined up.
 - v0.393: Player card button words lined up.
 - v0.394: Root Beer and Nuggies capitalised on the delete card.
+- v0.395: The music downloads 40% smaller (sounds the same in the game).

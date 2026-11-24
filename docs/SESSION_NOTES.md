@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.394)
+## Where things stand (v0.395)
 Live site: https://playpuffy.world (device check: /?bench, reports: /?bench=list signed in as a tester).
 
 ### Main game
@@ -32,6 +32,7 @@ Live site: https://playpuffy.world (device check: /?bench, reports: /?bench=list
   Home screen (yellow).
 - Start screen: drone fly-over behind, logo hop, hero cards (pick = hop / backflip), Play, Part picker once a
   level is beaten, mute (top-left), full screen + **Battle** buttons (top-right, same height, side by side).
+- v0.395: music re-encoded to how core/music plays it (it decodes at RATE 32000 and mixes to mono; KEEP 2 decoded, ~19 MB each): ffmpeg -ac 1 -ar 32000 -c:a aac -b:a 56k; 10.6 -> 6.2 MB, dist 14 -> 8.9 MB. Re-encoded from the old 96k AAC (2nd generation); owner will send Suno originals for new songs: encode those once the same way. Owner OK'd mono; keep KEEP=2 (owner asked; switching menu<->level would re-decode). Flagged: Suno free-plan songs not licensed for commercial use (check before stores).
 - v0.394: delete card text 'Root Beer, Nuggies' capitalised (owner).
 - v0.393: owner meant baseline: Delete account + Done row align-self baseline (text baselines level).
 - v0.392: owner: player card Done row justify-content flex-end (right edge); Delete account + Done row align-self center (.results:not(.gameover) align-items flex-start was winning over the grid's center).
