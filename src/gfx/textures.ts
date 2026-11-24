@@ -611,55 +611,42 @@ export const PACK_KINDS = ['stone', 'slinger', 'kai', 'zippy'] as const;
 /**
  * Part 6, the chase: the gang's sheets (game faces), the Fat Fish that falls from the sky (its swim
  * frames, a little lower resolution: it's big), the warning sign, the danger column, the target on the
- * surface, the streaks behind it as it drops, and the wake behind the gang — as loading-card steps,
- * each sheet a step of its own (only what's missing). In one step it was the longest frame behind
- * Part 6's loading card (~900 ms at 4x slow CPU full, ~500 light), the bar stuck: drawing and sending
- * to the graphics chip seven sheets and a dozen pictures. The same pictures, drawn the same way.
+ * surface, the streaks behind it as it drops, and the wake behind the gang — as three loading-card
+ * steps (only what's missing). In one step it was the longest frame behind Part 6's loading card
+ * (~500-900 ms at 4x slow CPU), the bar stuck: drawing and sending to the graphics chip seven sheets
+ * and a dozen pictures. The same pictures, drawn the same way.
  */
 function chaseSteps(scene: Phaser.Scene): Step[] {
   const T = scene.textures;
   const st = STYLES[ART_STYLE];
   const res = LIGHT ? 1.5 : 2.5;
-  const out: Step[] = [];
-  for (const k of PACK_KINDS)
-    if (!T.exists(`fish6-${k}`))
-      out.push({
-        name: `the chase ${k}`,
-        run: () => {
-          if (!T.exists(`fish6-${k}`)) sheet(scene, `fish6-${k}`, FISH_SIZE[k].w, FISH_SIZE[k].h, CHASE_FRAMES, (ctx, f) => drawFish(ctx, 0, 0, k, f, st), res);
-        },
-      });
-  if (!T.exists('fish6-fat'))
-    out.push({
-      name: 'the chase fat fish',
+  const pack = (k: (typeof PACK_KINDS)[number]) => {
+    if (!T.exists(`fish6-${k}`)) sheet(scene, `fish6-${k}`, FISH_SIZE[k].w, FISH_SIZE[k].h, CHASE_FRAMES, (ctx, f) => drawFish(ctx, 0, 0, k, f, st), res);
+  };
+  // (two of the gang a step: a step is also a frame more of the start screen behind the card)
+  return [
+    { name: 'the chase 1', run: () => (['stone', 'slinger'] as const).forEach(pack) },
+    { name: 'the chase 2', run: () => (['kai', 'zippy'] as const).forEach(pack) },
+    {
+      name: 'the chase 3',
       run: () => {
         if (!T.exists('fish6-fat')) sheet(scene, 'fish6-fat', FISH_SIZE.fat.w, FISH_SIZE.fat.h, SWIM_FRAMES.filter((_, i) => i % 2 === 0), (ctx, f) => drawFish(ctx, 0, 0, 'fat', f, st), LIGHT ? 1.2 : 1.8);
+        if (!T.exists('chase-sign')) addCanvas(scene, 'chase-sign', hires(SIGN.w, SIGN.h, 3, (ctx) => drawFallSign(ctx)));
+        if (!T.exists('chase-col')) addCanvas(scene, 'chase-col', hires(COLUMN.w, COLUMN.h, 1, (ctx) => drawDangerColumn(ctx)));
+        if (!T.exists('chase-target')) addCanvas(scene, 'chase-target', hires(TARGET.w, TARGET.h, 2, (ctx) => drawSurfaceTarget(ctx)));
+        if (!T.exists('chase-streaks')) addCanvas(scene, 'chase-streaks', hires(STREAKS.w, STREAKS.h, 1.5, (ctx) => drawFallStreaks(ctx)));
+        if (!T.exists('chase-wake')) addCanvas(scene, 'chase-wake', hires(WAKE.w, WAKE.h, 1.5, (ctx) => drawPackWake(ctx)));
+        if (!T.exists('chase-edge')) addCanvas(scene, 'chase-edge', hires(EDGE.w, EDGE.h, 1, (ctx) => drawEdgeGlow(ctx)));
+        if (!T.exists('chase-shadow')) addCanvas(scene, 'chase-shadow', hires(SHADOW.w, SHADOW.h, 1, (ctx) => drawBedShadow(ctx)));
+        if (!T.exists('chase-badge')) addCanvas(scene, 'chase-badge', hires(BADGE.w, BADGE.h, 2, (ctx) => drawBehindBadge(ctx)));
+        // the pier's Ferris wheel: the wheel (it turns), its stand, the gondolas
+        const fr = LIGHT ? 1.25 : 2;
+        if (!T.exists('ferris-wheel')) addCanvas(scene, 'ferris-wheel', hires(FERRIS_SIZE, FERRIS_SIZE, fr, (ctx) => drawFerrisWheel(ctx)), undefined, { release: true });
+        if (!T.exists('ferris-stand')) addCanvas(scene, 'ferris-stand', hires(FERRIS_STAND.w, FERRIS_STAND.h, fr, (ctx) => drawFerrisStand(ctx)), undefined, { release: true });
+        if (!T.exists('ferris-car')) sheet(scene, 'ferris-car', GONDOLA.w, GONDOLA.h, GONDOLA_FRAMES, (ctx, f) => drawGondola(ctx, f), fr);
       },
-    });
-  out.push({
-    name: 'the chase bits',
-    run: () => {
-      if (!T.exists('chase-sign')) addCanvas(scene, 'chase-sign', hires(SIGN.w, SIGN.h, 3, (ctx) => drawFallSign(ctx)));
-      if (!T.exists('chase-col')) addCanvas(scene, 'chase-col', hires(COLUMN.w, COLUMN.h, 1, (ctx) => drawDangerColumn(ctx)));
-      if (!T.exists('chase-target')) addCanvas(scene, 'chase-target', hires(TARGET.w, TARGET.h, 2, (ctx) => drawSurfaceTarget(ctx)));
-      if (!T.exists('chase-streaks')) addCanvas(scene, 'chase-streaks', hires(STREAKS.w, STREAKS.h, 1.5, (ctx) => drawFallStreaks(ctx)));
-      if (!T.exists('chase-wake')) addCanvas(scene, 'chase-wake', hires(WAKE.w, WAKE.h, 1.5, (ctx) => drawPackWake(ctx)));
-      if (!T.exists('chase-edge')) addCanvas(scene, 'chase-edge', hires(EDGE.w, EDGE.h, 1, (ctx) => drawEdgeGlow(ctx)));
-      if (!T.exists('chase-shadow')) addCanvas(scene, 'chase-shadow', hires(SHADOW.w, SHADOW.h, 1, (ctx) => drawBedShadow(ctx)));
-      if (!T.exists('chase-badge')) addCanvas(scene, 'chase-badge', hires(BADGE.w, BADGE.h, 2, (ctx) => drawBehindBadge(ctx)));
     },
-  });
-  // the pier's Ferris wheel: the wheel (it turns), its stand, the gondolas
-  const fr = LIGHT ? 1.25 : 2;
-  out.push({
-    name: 'the chase ferris wheel',
-    run: () => {
-      if (!T.exists('ferris-wheel')) addCanvas(scene, 'ferris-wheel', hires(FERRIS_SIZE, FERRIS_SIZE, fr, (ctx) => drawFerrisWheel(ctx)), undefined, { release: true });
-      if (!T.exists('ferris-stand')) addCanvas(scene, 'ferris-stand', hires(FERRIS_STAND.w, FERRIS_STAND.h, fr, (ctx) => drawFerrisStand(ctx)), undefined, { release: true });
-      if (!T.exists('ferris-car')) sheet(scene, 'ferris-car', GONDOLA.w, GONDOLA.h, GONDOLA_FRAMES, (ctx, f) => drawGondola(ctx, f), fr);
-    },
-  });
-  return out;
+  ];
 }
 
 /** The orange fish's bubble shot (b0, b1), as `fish-bubble`. */
@@ -1250,7 +1237,7 @@ export function gameArtJobs(scene: Phaser.Scene, opts: { heroes: readonly string
     });
   if (want.includes('chase') && !BADDIE_KEYS.chase.every((k) => T.exists(k))) out.push(...chaseSteps(scene));
   // (Part 6's underwater football: the field, the stands, the posts and the board, then each team's sheet)
-  if (want.includes('football')) out.push(...footballJobs(scene));
+  if (want.includes('football')) for (const [name, run] of footballJobs(scene)) out.push({ name, run });
   if (want.includes('fish'))
     for (const k of want.includes('kai') ? (['badguy', 'badguybig', 'kai'] as const) : (['badguy', 'badguybig'] as const)) if (!T.exists(`fish-${k}`)) out.push({ name: `fish ${k}`, run: () => { makeFish(scene, k); makeFishBubble(scene); } });
   // (the two big sheets spread over a few frames each: see sheetSteps)
@@ -1259,18 +1246,27 @@ export function gameArtJobs(scene: Phaser.Scene, opts: { heroes: readonly string
     if (want.includes(b.name) && !BADDIE_KEYS[b.name].every((k) => T.exists(k)))
       if (b.name === 'giant') out.push(...sheetSteps(scene, 'giant', 'giant', GIANT_W, GIANT_H, GIANT_FRAMES, (ctx, f) => drawGiant(ctx, 0, 0, f, st), 2.5));
       else if (b.name === 'bigpuff') out.push(...sheetSteps(scene, 'bigpuff', 'bigpuff', BIGPUFF_W, BIGPUFF_H, BIGPUFF_FRAMES, (ctx, f) => drawBigPuff(ctx, 0, 0, f, st)));
-      // (the goats, plain and covered in poo: as one step, a frame of ~400-540 ms at 4x slow CPU
-      // behind Parts 2-4's loading card)
+      // (the goats, plain and covered in poo, a step each: as one step, a frame of ~400-540 ms at 4x
+      // slow CPU behind Parts 2-4's loading card. Not in thirds as the heroes are: each step is a
+      // frame more of the start screen behind the card, and a goat sheet alone is about what the
+      // card's other steps take)
       else if (b.name === 'goat')
         out.push(
-          ...sheetSteps(scene, 'goat', 'goat', GOAT_W, GOAT_H, GOAT_FRAMES, (ctx, f) => drawGoat(ctx, 0, 0, f, st)),
-          ...sheetSteps(scene, 'goat poo', 'goat-poo', GOAT_W, GOAT_H, GOAT_FRAMES, (ctx, f) => {
-            drawGoat(ctx, 0, 0, f, st);
-            drawPooOnGoat(ctx, f);
-          }),
           {
-            name: 'spit',
+            name: 'goat',
             run: () => {
+              if (!T.exists('goat')) sheet(scene, 'goat', GOAT_W, GOAT_H, GOAT_FRAMES, (ctx, f) => drawGoat(ctx, 0, 0, f, st));
+            },
+          },
+          {
+            name: 'goat poo',
+            run: () => {
+              // (Plop Invasion's goats: covered in poo)
+              if (!T.exists('goat-poo'))
+                sheet(scene, 'goat-poo', GOAT_W, GOAT_H, GOAT_FRAMES, (ctx, f) => {
+                  drawGoat(ctx, 0, 0, f, st);
+                  drawPooOnGoat(ctx, f);
+                });
               if (!T.exists('spit')) addCanvas(scene, 'spit', hires(36, 14, ART_RES, (ctx) => drawSpit(ctx, 24, 7, st)));
             },
           },
@@ -1501,19 +1497,18 @@ export function makeBallPlayer(scene: Phaser.Scene, r: BBPlayer) {
  * field (released once uploaded: nothing reads them back), a sheet a team for the players (the
  * numbers are decals on top), the ball's spin. Lower resolutions in light mode.
  */
-function footballJobs(scene: Phaser.Scene): Step[] {
+function footballJobs(scene: Phaser.Scene): [string, () => void][] {
   const T = scene.textures;
   const w = FB_FIELD_TILES * TILE;
   const W = w + FIELD.END * 2;
   const rel = { release: true };
-  const jobs: Step[] = [];
-  const job = (key: string, name: string, run: () => void) => !T.exists(key) && jobs.push({ name, run });
+  const jobs: [string, () => void][] = [];
+  const job = (key: string, name: string, run: () => void) => !T.exists(key) && jobs.push([name, run]);
   job('fb-front', 'football field', () => addCanvas(scene, 'fb-front', hires(W, FIELD.UP + FIELD.DOWN, LIGHT ? 1.25 : 2, (ctx) => drawFieldFront(ctx, w)), undefined, rel));
   job('fb-stands', 'football stands', () => addCanvas(scene, 'fb-stands', hires(W, FIELD.STANDS_UP, LIGHT ? 1 : 1.5, (ctx) => drawFieldStands(ctx, w)), undefined, rel));
   for (const team of ['snappers', 'stallions'] as const) {
     job(`fb-post-${team}`, `goalpost ${team}`, () => addCanvas(scene, `fb-post-${team}`, hires(POST.W, POST.H, LIGHT ? 1.25 : 2, (ctx) => drawGoalpost(ctx, team)), undefined, rel));
-    // (a team's sheet over a few frames: in one step, ~240-320 ms at 4x slow CPU behind Part 6's card)
-    if (!T.exists(`fb-${team}`)) jobs.push(...sheetSteps(scene, `football ${team}`, `fb-${team}`, FB_W, FB_H, FB_FRAMES, (ctx, f) => drawFootballer(ctx, team, f), LIGHT ? 1.3 : 2));
+    job(`fb-${team}`, `football ${team}`, () => sheet(scene, `fb-${team}`, FB_W, FB_H, FB_FRAMES, (ctx, f) => drawFootballer(ctx, team, f), LIGHT ? 1.3 : 2));
   }
   job('fb-board', 'scoreboard', () => addCanvas(scene, 'fb-board', hires(BOARD.W, BOARD.H, LIGHT ? 1.25 : 2, (ctx) => drawScoreboard(ctx)), undefined, rel));
   job('fb-ball', 'football', () => {
@@ -1526,5 +1521,5 @@ function footballJobs(scene: Phaser.Scene): Step[] {
 
 /** The football's pictures, drawn now (if the level's loading somehow didn't). */
 export function makeFootballArt(scene: Phaser.Scene) {
-  for (const step of footballJobs(scene)) step.run();
+  for (const [, run] of footballJobs(scene)) run();
 }
