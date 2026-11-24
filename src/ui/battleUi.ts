@@ -95,30 +95,33 @@ function slotPortrait(target: HTMLCanvasElement, hero: string, slot: number, pos
 
 /**
  * A hero standing in a lobby square, in the slot's colour: drawn like the start screen's cards
- * (feet on the bottom edge, each hero at their own size — Big Muscles the biggest).
+ * (feet on the bottom edge, each hero at their own size — Big Muscles the biggest). Drawn on `tmp` (a
+ * square's own canvas whose pixels are kept in memory: see liveSlot), its pixels given back.
  */
-function slotCard(target: HTMLCanvasElement, hero: string, slot: number, pose: 'idle0' | 'idle1', faceKey: string | null, wear = '') {
-  const tmp = document.createElement('canvas');
-  tmp.width = target.width;
-  tmp.height = target.height;
+function slotCard(tmp: HTMLCanvasElement, hero: string, slot: number, pose: 'idle0' | 'idle1', faceKey: string | null, wear = ''): ImageData {
   const ch = characterById(hero);
   const face = faceKey ? faceFromKey(faceKey) : undefined;
   drawHeroCard(tmp, ch, pose, face, wear, 'body');
-  const ctx = target.getContext('2d')!;
   if (!gearOf(wear).eyes) {
-    // (the pixels recoloured where they are and put straight in: the same picture, without a copy of the
-    // canvas made to recolour and then drawn over — this runs a few times a second for each square)
-    ctx.clearRect(0, 0, target.width, target.height);
-    if (!slotRecolors(slot)) return void ctx.drawImage(tmp, 0, 0);
+    // (the pixels recoloured where they are: the same picture, without a copy of the canvas made to
+    // recolour and then drawn over)
     const img = tmp.getContext('2d')!.getImageData(0, 0, tmp.width, tmp.height);
-    recolorPixels(img.data, slot);
-    return void ctx.putImageData(img, 0, 0);
+    if (slotRecolors(slot)) recolorPixels(img.data, slot);
+    return img;
   }
   const out = recolorForSlot(tmp, slot);
   drawHeroCard(out, ch, pose, face, wear, 'eyes');
-  ctx.clearRect(0, 0, target.width, target.height);
-  ctx.drawImage(out, 0, 0);
+  return out.getContext('2d')!.getImageData(0, 0, out.width, out.height);
 }
+
+/**
+ * The lobby's first moments: nothing drawn ahead for the battle (its arena, the players' sheets) nor its
+ * song decoded, while the lobby itself comes up and settles — unless the battle's coming soon.
+ */
+const SETTLE_MS = 1800;
+
+/** How many of its hero's looks (pose and face) a lobby square keeps drawn (see liveSlot). */
+const SLOT_LOOKS = 6;
 
 export class BattleUI {
   private net: BattleNet | null = null;
@@ -140,10 +143,11 @@ export class BattleUI {
       this.host.game.events.once('assets-ready', () => this.open(code));
       return;
     }
-    // the battle's art (every hero — anyone can pick any — and the bad guys), drawn first if it isn't yet
-    // (the last boss's arena let go first)
+    // the battle's bad guys, drawn first if they aren't yet (the last boss's arena let go first). Not every
+    // hero's sheets, as before (2.5-3 s of this card at 4x slow CPU, the first time in): the players'
+    // heroes, in their colours, are drawn in the lobby (preparePlayers), the others were never shown
     freeBossArtExcept(this.host.game);
-    const jobs = gameArtJobs(this.host.game.scene.getScene('Menu'), { heroes: CHARACTERS.map((c) => c.id), level: 'battle' });
+    const jobs = gameArtJobs(this.host.game.scene.getScene('Menu'), { heroes: [], level: 'battle' });
     if (jobs.length) {
       void loadArt(jobs).then(() => this.open(code));
       return;
@@ -154,11 +158,14 @@ export class BattleUI {
     const name = storedName();
     this.lastPhase = '';
     this.showLobby();
+    this.openedAt = performance.now();
     this.drawArena();
     if (!url) return this.status('offline', 'Online battles work on the game’s web address (not a saved copy).');
     this.status('connecting');
     playMenuMusic(); // (the start screen's song carries on in the lobby)
-    preloadBattleMusic();
+    // (the battle's song decoded once the lobby has settled, as its drawing is: see arenaGentle)
+    clearTimeout(this.musicT);
+    this.musicT = window.setTimeout(preloadBattleMusic, SETTLE_MS);
     this.net = new BattleNet(url, name, this.host.hero());
     this.net.onStatus = (s) => this.status(s);
     this.net.onRoom = (r) => this.room(r);
@@ -175,6 +182,7 @@ export class BattleUI {
   private changeRoom() {
     window.removeEventListener('pagehide', this.onPageHide);
     clearTimeout(this.retryT);
+    clearTimeout(this.musicT);
     this.stopClock();
     this.watch(false);
     this.net?.close();
@@ -192,6 +200,7 @@ export class BattleUI {
   leave() {
     window.removeEventListener('pagehide', this.onPageHide);
     clearTimeout(this.retryT);
+    clearTimeout(this.musicT);
     this.stopClock();
     this.watch(false);
     this.net?.close();
@@ -452,11 +461,28 @@ export class BattleUI {
     let pose: 'idle0' | 'idle1' = 'idle0';
     let shown = '';
     let t = Math.random() * 0.6;
+    // (the hero's drawn on this, then recoloured: one canvas kept for the square, its pixels in memory —
+    // they're read back to recolour: a new canvas each time, on the graphics chip, was a wait for the
+    // chip a few times a second for each square)
+    const tmp = document.createElement('canvas');
+    tmp.width = cv.width;
+    tmp.height = cv.height;
+    tmp.getContext('2d', { willReadFrequently: true });
+    // (and the last few looks kept as they were drawn: the hero breathes between the same two poses,
+    // mostly with the same face — each drawn afresh, the squares took ~a fifth of the lobby's time on
+    // a 4x slow CPU, more than the arena's pictures drawn meanwhile)
+    const looks = new Map<string, ImageData>();
     const draw = () => {
       const k = `${pose}|${face.key}`;
       if (k === shown) return;
       shown = k;
-      slotCard(cv, hero, slot, pose, face.key, wear);
+      let img = looks.get(k);
+      if (!img) {
+        img = slotCard(tmp, hero, slot, pose, face.key, wear);
+        if (looks.size >= SLOT_LOOKS) looks.delete(looks.keys().next().value!);
+        looks.set(k, img);
+      }
+      cv.getContext('2d')!.putImageData(img, 0, 0);
     };
     draw();
     const iv = window.setInterval(() => {
@@ -604,6 +630,15 @@ export class BattleUI {
     const step = () => {
       this.arenaRaf = 0;
       const t0 = performance.now();
+      // (none in the lobby's first moments, and then each leaves the frames after it free, the bigger
+      // the longer, as the start screen's quiet jobs do — unless the arena's wanted soon: one after
+      // another from the start, they were every frame of the lobby's first seconds, each a long one
+      // on a tablet)
+      if ((t0 - this.openedAt < SETTLE_MS || t0 < this.arenaNext || this.arenaSkip > 0) && this.arenaGentle()) {
+        this.arenaSkip--;
+        this.arenaRaf = requestAnimationFrame(step);
+        return;
+      }
       do {
         const job = this.arenaJobs.shift();
         if (!job) break;
@@ -618,6 +653,10 @@ export class BattleUI {
         // (a job whose drawing the browser paints at the end of this frame: nothing more in it)
         if (isSliceJob(job)) break;
       } while (this.arenaJobs.length && performance.now() - t0 < 4);
+      const took = performance.now() - t0;
+      // (and at least a frame: much of a picture's cost is the browser painting it at the frame's end)
+      this.arenaNext = performance.now() + Math.min(250, took * 3);
+      this.arenaSkip = 1;
       if (this.arenaJobs.length) this.arenaRaf = requestAnimationFrame(step);
       else if (this.warmLater) this.buildWarm();
       else if (this.watchLater) {
@@ -626,6 +665,20 @@ export class BattleUI {
       }
     };
     this.arenaRaf = requestAnimationFrame(step);
+  }
+
+  /** The next arena job waits till then, and this many frames (see runArenaJobs). */
+  private arenaNext = 0;
+  private arenaSkip = 0;
+  /** When the room was opened (the lobby's first moments: see runArenaJobs). */
+  private openedAt = 0;
+  private musicT = 0;
+  /**
+   * The arena's drawing can take its time: it isn't wanted soon — the battle's not about to be built
+   * (the countdown's last seconds, Start now) and there's none on to watch.
+   */
+  private arenaGentle() {
+    return !this.warmLater && !this.watchLater && !(this.clockRaf && this.clockEnd - performance.now() < 15000);
   }
 
   /** The players whose hero pictures are being drawn ahead (see preparePlayers), by key. */
