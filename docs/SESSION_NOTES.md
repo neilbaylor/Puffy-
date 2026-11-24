@@ -18,7 +18,7 @@ makes them, checks them, and ships a new version (+0.01) to Railway. `docs/VERSI
 - Taste: cute, polished hand-drawn look; things should feel juicy but not overwhelming (they asked to tone
   down: halo glow, screen shakes, number of falling things). They like small celebrations and animation.
 
-## Where things stand (v0.392)
+## Where things stand (v0.393)
 Live site: https://playpuffy.world (device check: /?bench, reports: /?bench=list signed in as a tester).
 
 ### Main game
@@ -32,6 +32,7 @@ Live site: https://playpuffy.world (device check: /?bench, reports: /?bench=list
   Home screen (yellow).
 - Start screen: drone fly-over behind, logo hop, hero cards (pick = hop / backflip), Play, Part picker once a
   level is beaten, mute (top-left), full screen + **Battle** buttons (top-right, same height, side by side).
+- v0.393: owner meant baseline: Delete account + Done row align-self baseline (text baselines level).
 - v0.392: owner: player card Done row justify-content flex-end (right edge); Delete account + Done row align-self center (.results:not(.gameover) align-items flex-start was winning over the grid's center).
 - v0.391: owner: Delete account a real button (btn btn-alt, red text, Sign out's size) in the card grid's left column under the hero; Done row moves to the right column (under the table). Sure card: line break after 'saved to it:', 'It can't be undone.' its own paragraph (.acct-sure-last).
 - v0.390: account deletion (for app stores). Player card: small underlined 'Delete account' bottom-left (ui.ts showAccount, .acct-del), opens .acct-sure card over it (Keep it green / Delete red .btn-del; tap outside = keep; error shown if offline). account.deleteAccount() -> DELETE /api/me (server/users.ts Store.remove: items, sessions, user; deleted_names keeps sha('deleted:'+lower name)). restore() re-register sends restore:true -> 410 for deleted names (clears saved creds); manual register of the name works and clears it. Device-local progress is kept (like Sign out). Screens: shots-acctdel/ (main checkout, untracked).

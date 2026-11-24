@@ -395,3 +395,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.390: You can delete your account from your player card (it asks first).
 - v0.391: Delete account is a proper button now.
 - v0.392: Player card buttons lined up.
+- v0.393: Player card button words lined up.
