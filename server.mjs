@@ -88,8 +88,26 @@ function alreadyHas(inm, hash) {
   return null;
 }
 
+/**
+ * The Android/iOS app's page (the game's files inside the app, at the device's own address) — the
+ * only other site whose pages may use the accounts API (/api) and read the app's update list
+ * (/app/latest.json, see scripts/app-update.mjs). The website itself is the same site: it needs none of this.
+ */
+const APP_ORIGINS = new Set(['https://localhost', 'capacitor://localhost']);
+function appCors(req, res) {
+  const origin = req.headers.origin;
+  if (!origin || !APP_ORIGINS.has(origin) || !/^\/(api|app)\//.test(req.url ?? '')) return false;
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Vary', 'Origin');
+  if (req.method !== 'OPTIONS') return false;
+  // (the app's "may I?" before a sign-in or a save: it sends JSON and its sign-in token)
+  res.writeHead(204, { 'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE', 'Access-Control-Allow-Headers': 'Authorization, Content-Type', 'Access-Control-Max-Age': '600' }).end();
+  return true;
+}
+
 const server = createServer(async (req, res) => {
   try {
+    if (appCors(req, res)) return;
     if (userApi && (await userApi(req, res))) return;
     const url = new URL(req.url ?? '/', 'http://x');
     let decoded;
@@ -117,7 +135,8 @@ const server = createServer(async (req, res) => {
       // with the server on every use: a 304 when it hasn't changed
       'Cache-Control': path.includes('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache',
       // (gzip, brotli or neither, depending on what the browser takes)
-      ...(f.gz ? { Vary: 'Accept-Encoding' } : {}),
+      // (and Origin for the app's update list: see appCors)
+      ...(f.gz ? { Vary: res.hasHeader('Vary') ? 'Origin, Accept-Encoding' : 'Accept-Encoding' } : {}),
     };
     const has = alreadyHas(req.headers['if-none-match'], f.hash);
     if (has) return void res.writeHead(304, { ...headers, ETag: has }).end();

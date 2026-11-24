@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { DEPTH, GRAVITY, MAX_FALL_SPEED } from '../config';
 import type { CharacterDef } from '../data/characters';
 import { sfx } from '../core/sfx';
+import { buzz } from '../core/native';
 import { ART_RES, WALK_FRAMES, bodyLift } from '../gfx/draw';
 import { wardrobe } from '../core/wardrobe';
 import { FaceClock } from '../gfx/face';
@@ -621,6 +622,7 @@ export class Player {
     // (and in the water: pushed away through it, hardly up)
     this.body.setVelocity(away * 240 * k, this.chute ? -60 : this.swimming ? -120 : -360 * (0.5 + 0.5 * k));
     this.scene.cameras.main.shake(120, 0.004);
+    buzz(0.5);
   }
 
   /** Out of aura and hit (or fell): faint, then the level restarts at the last checkpoint. */
@@ -631,6 +633,7 @@ export class Player {
     this.body.setVelocity(0, 0);
     this.body.enable = false;
     sfx.die();
+    if (!fell) buzz(0.8);
     // (the plain sheet's: a face frame — a blink, a smile — is on another sheet without one)
     this.view.setTexture(this.key, 'hurt').setAlpha(1);
     this.meter.hide();

@@ -1,5 +1,6 @@
 import { progress } from '../level/levels';
 import { bank } from './bank';
+import { apiBase } from './native';
 import { wardrobe } from './wardrobe';
 
 /**
@@ -64,7 +65,7 @@ function saveToken(t: string | null) {
 
 async function api(method: string, path: string, body?: unknown): Promise<{ ok: boolean; status: number; data: Record<string, unknown> }> {
   try {
-    const r = await fetch(path, {
+    const r = await fetch(apiBase() + path, {
       method,
       headers: { ...(body ? { 'Content-Type': 'application/json' } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       body: body ? JSON.stringify(body) : undefined,
