@@ -24,6 +24,9 @@ export interface Snapshot {
 
 export type NetStatus = 'connecting' | 'online' | 'full' | 'offline';
 
+/** The server closes a connection with this when another one came in with its ticket (see token). */
+const TAKEN = 4000;
+
 /** Where the battle server is: the same site, or ?server=wss://… to point somewhere else. */
 export function battleUrl() {
   const q = new URLSearchParams(location.search).get('server');
@@ -33,10 +36,10 @@ export function battleUrl() {
   return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/battle`;
 }
 
-/** This browser tab's ticket back into the room after a dropped connection. */
-function token() {
+/** This browser tab's ticket back into the room after a dropped connection (`fresh`: a new one). */
+function token(fresh = false) {
   try {
-    let t = sessionStorage.getItem('puffy.battle.token');
+    let t = fresh ? null : sessionStorage.getItem('puffy.battle.token');
     if (!t) {
       t = Math.random().toString(36).slice(2) + Date.now().toString(36);
       sessionStorage.setItem('puffy.battle.token', t);
@@ -124,8 +127,13 @@ export class BattleNet {
         }
       }
     };
-    ws.onclose = () => {
-      if (this.ws === ws) this.lost();
+    ws.onclose = (e) => {
+      if (this.ws !== ws) return;
+      // another tab came in with this tab's ticket and took our place (a duplicated tab copies it): this
+      // tab gets a ticket of its own and comes back as someone new (with the same ticket, the two tabs
+      // took the place from each other, over and over)
+      if (e.code === TAKEN) token(true);
+      this.lost();
     };
     ws.onerror = () => {};
   }

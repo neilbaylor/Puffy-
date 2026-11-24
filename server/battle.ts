@@ -37,6 +37,20 @@ const MAX_WAIT = 4;
 const CUSHION = 1;
 /** (and no more than this many waited ticks are owed at once) */
 const MAX_OWED = 8;
+/**
+ * No buttons at all from a player for this many ticks (half a second), though their connection's still
+ * open: they let go of everything. (Going on with their last buttons for good, a player whose phone went
+ * to its home screen, or whose tab was put away, ran on and fired away in the arena — for as long as the
+ * connection lasted, up to a minute.) A late burst still gets played when it comes, as before.
+ */
+const LET_GO = 15;
+/**
+ * Buttons waiting this long are tidied up as they come in, not only at the next tick (a flood of them in
+ * one go — thousands — took the tick a third of a second to tidy, holding up every room).
+ */
+const QUEUE_TIDY = 64;
+/** The close code that tells a game its place was taken by another tab with its ticket (see BattleNet). */
+const TAKEN = 4000;
 
 interface Client {
   id: string;
@@ -51,6 +65,13 @@ interface Client {
   /** Buttons waiting to be used, one per tick: [seq, buttons]. */
   queue: [number, number][];
   lastSeq: number;
+  /**
+   * The last of their buttons played, as the snapshots tell everyone. (Kept through a rejoin until their
+   * next buttons are played: lastSeq starts again from 0 then, and a 0 in the snapshots had their phone
+   * play its last 3 seconds of buttons over again — their hero leapt ahead and back — and the others saw
+   * them lurch.)
+   */
+  ack: number;
   lastBtn: number;
   /** Ticks this player waited for their buttons (made up when they come); and how many in a row just now. */
   owed: number;
@@ -78,7 +99,8 @@ const wearOk = (w: unknown) =>
         .join(',')
     : '';
 const cleanName = (n: unknown, slot: number) => {
-  const s = String(n ?? '').replace(/[^\p{L}\p{N} _'!.-]/gu, '').trim().slice(0, 10);
+  // (a string, or nothing: String() of some objects throws)
+  const s = (typeof n === 'string' ? n : '').replace(/[^\p{L}\p{N} _'!.-]/gu, '').trim().slice(0, 10);
   return s || (slot >= 0 ? `Player ${slot + 1}` : 'Fan');
 };
 /** How often each connection is checked for still being there (see the heartbeat in attachBattle). */
@@ -157,7 +179,9 @@ class Room {
     // rejoining (same tab, same token): take your place back
     for (const c of this.clients.values())
       if (c.token && c.token === msg.token) {
-        c.ws?.close();
+        // (the other connection, if it's still open, is told why: two tabs with the same ticket — a
+        // duplicated tab copies it — took the place from each other over and over, a few times a second)
+        c.ws?.close(TAKEN, 'taken');
         c.ws = ws;
         c.droppedAt = 0;
         // (a reloaded page counts its buttons from 1 again: anything up to the old count was being ignored)
@@ -177,7 +201,7 @@ class Room {
     const slot = this.freeSlot();
     const c: Client = {
       id: `p${this.nextId++}`,
-      token: String(msg.token ?? '').slice(0, 64),
+      token: typeof msg.token === 'string' ? msg.token.slice(0, 64) : '',
       ws,
       name: cleanName(msg.name, slot),
       hero: heroOk(msg.hero),
@@ -186,6 +210,7 @@ class Room {
       playing: false,
       queue: [],
       lastSeq: 0,
+      ack: 0,
       lastBtn: 0,
       owed: 0,
       waited: 0,
@@ -244,6 +269,7 @@ class Room {
         if (this.phase !== 'battle' || !c.playing) return;
         if (typeof msg.s !== 'number' || typeof msg.b !== 'number' || msg.s <= c.lastSeq) return;
         c.queue.push([msg.s, msg.b & 63]);
+        if (c.queue.length > QUEUE_TIDY) compactQueue(c.queue, c.lastBtn, 2, MAX_QUEUE, MAX_QUEUE * 2, BTN.jump);
         return;
       case 'hero':
         if (this.phase === 'battle' && c.playing) return;
@@ -272,7 +298,7 @@ class Room {
         }
         return;
       case 'ping':
-        this.send(c, { t: 'pong', c: msg.c });
+        if (typeof msg.c === 'number') this.send(c, { t: 'pong', c: msg.c });
         return;
     }
   }
@@ -289,7 +315,7 @@ class Room {
     for (const c of this.clients.values()) {
       c.playing = !!c.ws && c.slot >= 0;
       c.queue = [];
-      c.lastSeq = 0;
+      c.lastSeq = c.ack = 0;
       c.lastBtn = 0;
       c.owed = c.waited = 0;
       c.kos = 0;
@@ -390,7 +416,7 @@ class Room {
           const steps: number[] = [];
           const take = () => {
             const [seq, b] = c.queue.shift()!;
-            c.lastSeq = seq;
+            c.lastSeq = c.ack = seq;
             c.lastBtn = b;
             steps.push(b);
           };
@@ -406,12 +432,16 @@ class Room {
             // their buttons are late: wait for them
             c.waited++;
             c.owed = Math.min(MAX_OWED, c.owed + 1);
-          } else steps.push(c.lastBtn);
+          } else {
+            // (still nothing: they go on with their last buttons — for a while)
+            if (++c.waited >= LET_GO) c.lastBtn = 0;
+            steps.push(c.lastBtn);
+          }
           inputs.set(c.id, steps);
         }
         const events = sim.step(inputs);
         const players: PackedPlayer[] = [];
-        for (const p of sim.players.values()) players.push(packPlayer(p, this.clients.get(p.id)?.lastSeq ?? 0));
+        for (const p of sim.players.values()) players.push(packPlayer(p, this.clients.get(p.id)?.ack ?? 0));
         const r1 = (v: number) => Math.round(v * 10) / 10;
         const rockets = sim.rockets.map((r) => ({ id: r.id, owner: r.owner, kind: r.kind, x: r1(r.x), y: r1(r.y), dir: r.dir }));
         const prizes = sim.prizes.map((z): SnapPrize => [z.id, z.kind, r1(z.x), r1(z.y), z.landed ? r1(z.age) : -1]);
@@ -523,11 +553,16 @@ export function attachBattle(server: Server) {
         return;
       }
       if (!msg || typeof msg !== 'object') return;
-      if (msg.t === 'hello') {
-        if (!me) me = room.hello(ws, msg);
-        return;
+      // (one odd message mustn't throw out of here: it's logged and ignored)
+      try {
+        if (msg.t === 'hello') {
+          if (!me) me = room.hello(ws, msg);
+          return;
+        }
+        if (me && me.ws === ws) room.message(me, msg);
+      } catch (e) {
+        console.error('Battle message failed:', e);
       }
-      if (me && me.ws === ws) room.message(me, msg);
     }));
     ws.on('close', () => {
       if (me && me.ws === ws) room.dropped(me);
