@@ -100,7 +100,7 @@ export class BattleNet {
     const now = performance.now();
     // (the page was asleep — put away, frozen, its timers slowed right down: the connection gets a fresh
     // few seconds to show it's there, rather than being judged on time it couldn't have answered in)
-    const asleep = now - this.lastCheck > 4000;
+    const asleep = now - this.lastCheck > 3000;
     this.lastCheck = now;
     if (asleep) this.heardAt = now;
     const ws = this.ws;
