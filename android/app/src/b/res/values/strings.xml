@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!-- "Puffy! B": the side-by-side test build (see build.gradle) -->
+<resources>
+    <string name="app_name">Puffy! B</string>
+    <string name="title_activity_main">Puffy! B</string>
+    <string name="package_name">world.playpuffy.app.b</string>
+</resources>

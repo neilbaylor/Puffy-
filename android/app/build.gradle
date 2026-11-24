@@ -15,16 +15,32 @@ android {
         versionCode NATIVE_VERSION
         versionName "1.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        // (asks a 90/120 Hz screen for 60 Hz: see MainActivity.preferSixtyHz)
+        buildConfigField "boolean", "LOCK_60", "true"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    buildFeatures {
+        buildConfig = true
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+        // "Puffy! B", a side-by-side test build for the owner's tablet (./gradlew assembleB): a
+        // release-like build (no WebView debugging, no debug logging) with the 60 Hz lock off, signed
+        // with the debug key, installed next to the normal one (its own id and name: src/b/res)
+        b {
+            initWith release
+            debuggable false
+            signingConfig signingConfigs.debug
+            applicationIdSuffix ".b"
+            matchingFallbacks = ['release']
+            buildConfigField "boolean", "LOCK_60", "false"
         }
     }
 }

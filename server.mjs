@@ -110,12 +110,15 @@ function appCors(req, res) {
  * The Android test app (downloads/puffy-test.apk, made by `npm run app:android`), for the owner's own
  * devices: kept out of dist on purpose, so it's never in the website's offline copy nor the app's updates.
  */
-const APK = resolve('downloads/puffy-test.apk');
+// (and puffy-test-b.apk: "Puffy! B", the side-by-side test build — see android/app/build.gradle)
+const APKS = new Set(['puffy-test.apk', 'puffy-test-b.apk']);
 function sendApk(req, res) {
-  if (req.method !== 'GET' || (req.url ?? '').split('?')[0] !== '/dl/puffy-test.apk') return false;
+  const m = /^\/dl\/([\w.-]+)$/.exec((req.url ?? '').split('?')[0]);
+  if (req.method !== 'GET' || !m || !APKS.has(m[1])) return false;
+  const APK = resolve('downloads', m[1]);
   stat(APK).then(
     (st) => {
-      res.writeHead(200, { 'Content-Type': 'application/vnd.android.package-archive', 'Content-Length': st.size, 'Content-Disposition': 'attachment; filename="puffy-test.apk"', 'Cache-Control': 'no-cache' });
+      res.writeHead(200, { 'Content-Type': 'application/vnd.android.package-archive', 'Content-Length': st.size, 'Content-Disposition': `attachment; filename="${m[1]}"`, 'Cache-Control': 'no-cache' });
       createReadStream(APK).pipe(res);
     },
     () => res.writeHead(404, { 'Content-Type': 'text/plain' }).end('Not found'),
