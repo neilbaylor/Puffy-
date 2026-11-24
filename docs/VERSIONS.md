@@ -391,3 +391,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.386: Fishing 2's ending no longer stutters while drawing its pictures (drawn behind the loading card).
 - v0.387: Smoother level starts, checkpoint restarts and start-up (about 40% shorter first frames).
 - v0.388: The loading card no longer freezes up while it prepares a level; light mode's Play tap and first frame are smoother.
+- v0.389: A giant stomping about off screen only rumbles the screen faintly now.
