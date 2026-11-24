@@ -622,8 +622,16 @@ html:has(body.booting) body { background: #5fc4ff; }
   font: 800 11px/1 var(--body);
   letter-spacing: 0.06em;
   color: #3a241899;
-  pointer-events: none;
+  /* (pressable — a long press switches light / full mode — with a bigger area to press than the words) */
+  padding: 8px 10px;
+  margin: -8px -10px;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: none;
+  transition: color 1.2s linear;
 }
+.version.holding { color: #3a2418; }
 .hud-row {
   display: flex;
   align-items: center;

@@ -638,6 +638,7 @@ export class UI {
       cards.appendChild(card);
     });
     el.querySelector('[data-act=play]')!.addEventListener('click', () => this.play());
+    this.versionSwitch(el.querySelector<HTMLElement>('.version')!);
     // the picked hero now and then blinks, glances around, smiles or chatters
     new FaceLife(
       (f) => {
@@ -1090,6 +1091,39 @@ export class UI {
     } catch {
       /* not supported (e.g. iPhone Safari) */
     }
+  }
+
+  /**
+   * Hidden: a long press (1.2 s) on the version label switches light / full mode, as if picked by hand
+   * (like the ?lite / ?full links, which the app has no address bar for), then starts the game again.
+   */
+  private versionSwitch(v: HTMLElement) {
+    let timer = 0;
+    const stop = () => {
+      clearTimeout(timer);
+      timer = 0;
+      v.classList.remove('holding');
+    };
+    v.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      stop();
+      v.classList.add('holding');
+      timer = window.setTimeout(() => {
+        timer = 0;
+        try {
+          localStorage.setItem('puffy.light', LIGHT ? '0' : '1');
+          localStorage.setItem('puffy.lightRetried', '1');
+        } catch {
+          return stop(); // (private mode: nowhere to keep the choice)
+        }
+        v.classList.remove('holding');
+        v.textContent = LIGHT ? 'Full mode…' : 'Light mode…';
+        sfx.select();
+        setTimeout(() => location.reload(), 500);
+      }, 1200);
+    });
+    for (const ev of ['pointerup', 'pointercancel', 'pointerleave'] as const) v.addEventListener(ev, stop);
+    v.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
   /** ' · light' on the version label in light mode. */
