@@ -401,3 +401,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.396: Hidden: hold the version number on the start screen to switch light / full mode.
 - v0.397: Android test app (updates itself from the website); the website itself is unchanged.
 - v0.398: Battle copes much better with phones: going to the home screen, switching wifi/mobile data, losing signal, duplicated tabs.
+- v0.399: Android test app downloadable from the site for testing.
