@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { setHomeBusy } from '../core/frames';
 import { MIN_VIEW_W, TILE, VIEW_H } from '../config';
 import { BG_LAYER_IDS, HOME_SKY_SEP, asQuietJob, bgKey, ensureLook, ensureSeaArt, freeLooksExcept, isSliceJob, lookJobs } from '../gfx/textures';
 import { buildLevel1 } from '../level/level1';
@@ -609,6 +610,9 @@ export class MenuScene extends Phaser.Scene {
 
   update(_t: number, deltaMs: number) {
     const dt = Math.min(deltaMs / 1000, 1 / 30);
+    // (full mode's start screen runs 30 frames a second, but at full speed for a moment after a tap
+    // and while a Part's scenery is being put up: see core/frames)
+    setHomeBusy(!!this.building || !!this.pendingWorld || performance.now() - this.lastInput < 2000);
     // one quiet-moment job at a time (straight away, not after the rest of the game's art:
     // a click on another Part is the very next thing people do)
     const now = performance.now();

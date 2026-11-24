@@ -18,7 +18,7 @@ import { loadArt } from './artLoader';
 import { BattleNet, battleUrl, type NetStatus } from '../net/battleNet';
 import { BattleScene, battleArtSteps, freeBattleArt, type BattleHud } from '../scenes/BattleScene';
 import { LIGHT } from '../core/light';
-import { setSlowFrames } from '../core/frames';
+import { setFullSpeed, setLobbyFrames, setSlowFrames } from '../core/frames';
 
 /** The results card's Leave button ignores taps this long after it shows (mashed shoot taps). */
 const RESULTS_GUARD_MS = 1500;
@@ -216,8 +216,16 @@ export class BattleUI {
    * window when watching). The countdown's rumble still shakes it.
    */
   private homeStill(on: boolean) {
+    // (and drawn fewer times a second: light mode's scenery stands still there, about 9 a second is
+    // plenty; full mode's glides on at 30)
+    setLobbyFrames(on ? (LIGHT ? 9 : 30) : 0);
+    setFullSpeed(false);
     if (!LIGHT) return;
-    (this.host.game.scene.getScene('Menu') as unknown as { setStill?: (on: boolean) => void } | null)?.setStill?.(on);
+    const menu = this.host.game.scene.getScene('Menu') as unknown as ({ setStill?: (on: boolean) => void } & Phaser.Scene) | null;
+    menu?.setStill?.(on);
+    // (the start screen just started again — back from a battle — and not made yet: its create lets
+    // go of `still`, so it's said again once it's made)
+    if (menu && menu.sys.settings.status !== 5 /* Phaser.Scenes.RUNNING */) menu.events.once('create', () => menu.setStill?.(on && !!this.lobby?.isConnected && !this.inBattle));
   }
 
   /**
@@ -600,7 +608,11 @@ export class BattleUI {
       const k = Math.max(0, Math.min(1, (4 - left) / 4));
       const a = k * k * 7;
       lobby.style.transform = a > 0.2 ? `translate(${(Math.random() - 0.5) * a}px, ${(Math.random() - 0.5) * a}px)` : '';
-      if (a > 0.2) this.host.game.scene.getScene('Menu')?.cameras?.main?.shake(80, 0.0012 + k * k * 0.006, true);
+      if (a > 0.2) {
+        // (the rumble shakes the scenery behind too: full speed again from here, the curtain next)
+        setFullSpeed(true);
+        this.host.game.scene.getScene('Menu')?.cameras?.main?.shake(80, 0.0012 + k * k * 0.006, true);
+      }
       this.clockRaf = requestAnimationFrame(tick);
     };
     this.clockRaf = requestAnimationFrame(tick);
@@ -781,6 +793,7 @@ export class BattleUI {
     }
     if (on && !this.spectating && this.net) {
       this.spectating = true;
+      setFullSpeed(true);
       this.watchRate(true);
       g.scene.start('Battle', { net: this.net, spectate: true });
       window.addEventListener('resize', this.onResize);
@@ -791,6 +804,7 @@ export class BattleUI {
       this.watchRate(false);
       window.removeEventListener('resize', this.onResize);
       if (!this.inBattle) g.scene.stop('Battle');
+      setFullSpeed(false);
     }
   }
 
@@ -820,6 +834,8 @@ export class BattleUI {
       window.removeEventListener('resize', this.onResize);
     }
     this.inBattle = true;
+    // (the curtain: the start screen slides away over the arena)
+    setFullSpeed(true);
     this.stopClock();
     this.stopArena();
     const g = this.host.game;

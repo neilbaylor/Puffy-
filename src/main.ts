@@ -14,7 +14,7 @@ import { BENCH, LIGHT, LIGHT_AUTO, LIGHT_KEY } from './core/light';
 import { diag, showDiag } from './core/diag';
 import { trackBossArt } from './gfx/textures';
 import { refreshMs } from './core/refresh';
-import { gateFrames } from './core/frames';
+import { gateFrames, setHomeFrames } from './core/frames';
 import { trimRenderTargets } from './core/renderTargets';
 import { fixArcadeGroupWalk } from './core/physicsFix';
 import { installUprightUploads } from './core/uprightUploads';
@@ -214,6 +214,8 @@ function start(refreshMs: number) {
 
   // (every other screen frame on 120 / 144 Hz screens: see core/frames)
   gateFrames(game, refreshMs);
+  // (the start screen's up first)
+  setHomeFrames(LIGHT ? 0 : 30);
 
   const resize = () => {
     const s = size();
@@ -241,6 +243,8 @@ function start(refreshMs: number) {
     if (home === on) return;
     home = on;
     resize();
+    // (and in full mode it runs 30 frames a second: its scenery glides slowly — see core/frames)
+    setHomeFrames(on && !LIGHT ? 30 : 0);
   };
   game.events.once(Phaser.Core.Events.READY, () => {
     const g = (game.renderer as unknown as { gl?: WebGLRenderingContext }).gl;
