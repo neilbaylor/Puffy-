@@ -25,6 +25,17 @@ export interface Snapshot {
 
 export type NetStatus = 'connecting' | 'online' | 'full' | 'offline';
 
+/** The server closes a connection with this when another one came in with its ticket (see token). */
+const TAKEN = 4000;
+/**
+ * Nothing at all from the server for this long (ms) — not even the answer to a ping, sent every 2 s —
+ * though the connection says it's open (or still opening): it's gone without saying so, and is made
+ * again (see check).
+ */
+const SILENT_MS = 6000;
+/** Trying again after a dropped connection: quickly at first, then every this-many ms at most. */
+const RETRY_MAX = 2000;
+
 /** Where the battle server is: the same site, or ?server=wss://… to point somewhere else. */
 export function battleUrl() {
   const q = new URLSearchParams(location.search).get('server');
@@ -35,10 +46,10 @@ export function battleUrl() {
   return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/battle`;
 }
 
-/** This browser tab's ticket back into the room after a dropped connection. */
-function token() {
+/** This browser tab's ticket back into the room after a dropped connection (`fresh`: a new one). */
+function token(fresh = false) {
   try {
-    let t = sessionStorage.getItem('puffy.battle.token');
+    let t = fresh ? null : sessionStorage.getItem('puffy.battle.token');
     if (!t) {
       t = Math.random().toString(36).slice(2) + Date.now().toString(36);
       sessionStorage.setItem('puffy.battle.token', t);
@@ -63,7 +74,12 @@ export class BattleNet {
   private ws: WebSocket | null = null;
   private closed = false;
   private retry = 0;
+  private retryT = 0;
   private pingTimer = 0;
+  /** When the server was last heard from (or the connection was begun). */
+  private heardAt = 0;
+  private checkT = 0;
+  private lastCheck = 0;
 
   constructor(
     private url: string,
@@ -71,7 +87,37 @@ export class BattleNet {
     public hero: string,
   ) {
     this.connect();
+    this.lastCheck = performance.now();
+    this.checkT = window.setInterval(() => this.check(), 1000);
+    window.addEventListener('online', this.wake);
+    document.addEventListener('visibilitychange', this.wake);
   }
+
+  /**
+   * Once a second: is the connection still really there? A phone that changed networks (wifi to mobile
+   * data), or a connection that died while the phone was asleep, can look open for minutes while nothing
+   * gets through either way: the battle showed 'Lost the connection — reconnecting…' and never did.
+   */
+  private check() {
+    const now = performance.now();
+    // (the page was asleep — put away, frozen, its timers slowed right down: the connection gets a fresh
+    // few seconds to show it's there, rather than being judged on time it couldn't have answered in)
+    const asleep = now - this.lastCheck > 3000;
+    this.lastCheck = now;
+    if (asleep) this.heardAt = now;
+    const ws = this.ws;
+    if (!ws || this.closed || now - this.heardAt < SILENT_MS) return;
+    this.ws = null;
+    ws.close();
+    this.lost();
+  }
+
+  /** Back online, or back from the background, and waiting to try again: try now. */
+  private wake = () => {
+    if (this.closed || this.ws || document.hidden) return;
+    clearTimeout(this.retryT);
+    this.connect();
+  };
 
   private setStatus(s: NetStatus) {
     this.status = s;
@@ -88,6 +134,7 @@ export class BattleNet {
       return this.lost();
     }
     this.ws = ws;
+    this.heardAt = performance.now();
     ws.onopen = () => {
       this.retry = 0;
       this.send({ t: 'hello', name: this.name, hero: this.hero, token: token(), wear: wardrobe.wearKey });
@@ -95,6 +142,7 @@ export class BattleNet {
       this.pingTimer = window.setInterval(() => this.send({ t: 'ping', c: performance.now() }), 2000);
     };
     ws.onmessage = (e) => {
+      this.heardAt = performance.now();
       let m: ServerMsg;
       try {
         m = JSON.parse(e.data);
@@ -126,8 +174,13 @@ export class BattleNet {
         }
       }
     };
-    ws.onclose = () => {
-      if (this.ws === ws) this.lost();
+    ws.onclose = (e) => {
+      if (this.ws !== ws) return;
+      // another tab came in with this tab's ticket and took our place (a duplicated tab copies it): this
+      // tab gets a ticket of its own and comes back as someone new (with the same ticket, the two tabs
+      // took the place from each other, over and over)
+      if (e.code === TAKEN) token(true);
+      this.lost();
     };
     ws.onerror = () => {};
   }
@@ -135,14 +188,17 @@ export class BattleNet {
   /** When the last snapshot of the battle came in (performance.now()): none for a while and it's stuck. */
   lastSnapAt = 0;
 
-  /** Connection dropped: try again (quickly at first, then backing off). */
+  /** Connection dropped: try again (quickly at first, then backing off a little). */
   private lost() {
     clearInterval(this.pingTimer);
     this.ws = null;
     if (this.closed) return;
     this.setStatus('offline');
-    const wait = Math.min(5000, 400 * 2 ** this.retry++);
-    window.setTimeout(() => this.connect(), wait);
+    // (at most every 2 s: waiting up to 5 s, a server back after a restart, or a phone back in signal, sat
+    // there 'reconnecting' for up to 5 s more)
+    const wait = Math.min(RETRY_MAX, 400 * 2 ** this.retry++);
+    clearTimeout(this.retryT);
+    this.retryT = window.setTimeout(() => this.connect(), wait);
   }
 
   send(m: ClientMsg) {
@@ -172,6 +228,10 @@ export class BattleNet {
     if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify({ t: 'leave' }));
     this.closed = true;
     clearInterval(this.pingTimer);
+    clearInterval(this.checkT);
+    clearTimeout(this.retryT);
+    window.removeEventListener('online', this.wake);
+    document.removeEventListener('visibilitychange', this.wake);
     this.ws?.close();
     this.ws = null;
   }
