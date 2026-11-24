@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android's own splash shows no picture: just the game's sky blue, straight into the game's loading
+     screen (the same blue, with the PUFFY logo), so the logo isn't shown twice in two places. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@android:color/transparent" />
+</shape>

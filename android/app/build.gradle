@@ -3,7 +3,7 @@ apply plugin: 'com.android.application'
 // The app shell's own version (its native side: Capacitor, plugins, this project). Raise it with every
 // store release that changes the native side; the game's updates (src/core/appUpdate.ts) say the
 // oldest shell they run in (NEEDS_NATIVE, src/core/updatePick.ts) and older shells skip them.
-def NATIVE_VERSION = 1
+def NATIVE_VERSION = 2
 
 android {
     namespace = "world.playpuffy.app"
@@ -13,7 +13,7 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode NATIVE_VERSION
-        versionName "1.0"
+        versionName "1.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
