@@ -115,21 +115,26 @@ const TRIM = 0.014;
 const DOCK_X = -2700;
 const DOCK_TOP = WATER - 58;
 const HOST_X = DOCK_X + 470;
-const ROUNDS = 6;
+const ROUNDS = 5;
 /** Your turn: the bites in a row (hit them all and the fish is yours), and the cast's power (always the same). */
-const BITES = 6;
+const BITES = 5;
 const HERO_CAST = 0.7;
 /** King Bob lands about this share of his casts. */
 const KING_CATCH = 0.51;
+/** …but never more than this many in the contest's rounds (sudden death aside: the owner's rule, both contests). */
+const KING_MAX = 4;
 /** A hero's size here: world px per art unit. */
 const HERO_K = 2.38;
 /** How long the BITE button can be hit for (ms). */
 const BITE_MS = 589;
 /**
- * Boss 6, the rematch, is a bit harder than Boss 5, in just these two ways (the owner's numbers: tune
- * them here). King Bob lands a bit more of his casts (Boss 5: KING_CATCH, 51%)…
+ * Boss 6, the rematch, differs from Boss 5 in just these two ways (the owner's numbers: tune them
+ * here). King Bob lands about as many of his casts (Boss 5: KING_CATCH, 51%; this was 57%, the owner
+ * asked for "a few less")…
  */
-const KING_CATCH6 = 0.57;
+const KING_CATCH6 = 0.5;
+/** (in sudden death, his old odds: it's still a coin toss who takes it, as it always was) */
+const KING_CATCH6_SD = 0.57;
 /** …and the BITE! button stays up a bit shorter (Boss 5: BITE_MS, 589 ms). */
 const BITE_MS6 = 530;
 
@@ -142,8 +147,9 @@ interface Rules {
   bites: number;
   /** how long the BITE! button stays up (ms) */
   biteMs: number;
-  /** King Bob lands about this share of his casts */
+  /** King Bob lands about this share of his casts (in the rounds; in sudden death, kingCatchSD) */
   kingCatch: number;
+  kingCatchSD: number;
   /** the boat's roll (radians, the biggest) and bob (px) in the swell */
   rock: number;
   bob: number;
@@ -152,8 +158,8 @@ interface Rules {
   /** a lightning flash every so often, just weather (ms between them: least, most; 0: no storm) — never while a bite's coming or up */
   lightning: readonly [number, number];
 }
-const RULES5: Rules = { bites: BITES, biteMs: BITE_MS, kingCatch: KING_CATCH, rock: 0.018, bob: 3.2, swell: 2.5, lightning: [0, 0] };
-const RULES6: Rules = { bites: BITES, biteMs: BITE_MS6, kingCatch: KING_CATCH6, rock: 0.03, bob: 6, swell: 4, lightning: [7000, 13000] };
+const RULES5: Rules = { bites: BITES, biteMs: BITE_MS, kingCatch: KING_CATCH, kingCatchSD: KING_CATCH, rock: 0.018, bob: 3.2, swell: 2.5, lightning: [0, 0] };
+const RULES6: Rules = { bites: BITES, biteMs: BITE_MS6, kingCatch: KING_CATCH6, kingCatchSD: KING_CATCH6_SD, rock: 0.03, bob: 6, swell: 4, lightning: [7000, 13000] };
 /** A key pressed sooner than this after BITE! shows wasn't a reaction (mashing): a miss. */
 const BITE_REACT_MS = 120;
 /** How far past the BITE! button's edge a tap still hits it (px): its cyan ring (~17) and a fingertip of slop. */
@@ -251,10 +257,10 @@ interface Rod {
 
 /**
  * King Bob's fishing contest: the World 3 boss. Out on his boat, the REEL ROYAL, you take turns:
- * six rounds, then sudden death. Your turn: the cast is automatic (the same long one every time), the
+ * five rounds, then sudden death. Your turn: the cast is automatic (the same long one every time), the
  * lure flying out over the sea on its line, then reeling in while a fish comes to the hook and bites
- * six times: each time a round BITE! button pops up and fades fast. Hit all six and it's yours; five,
- * a 50% chance; four, 20%; fewer and it gets away. Hooked, it's a fight, a leap, and up it comes.
+ * five times: each time a round BITE! button pops up and fades fast. Hit all five and it's yours; four,
+ * a 50% chance; three, 20%; fewer and it gets away. Hooked, it's a fight, a leap, and up it comes.
  * King Bob's turn is quicker (about five seconds): he casts, reels like mad, and lands about half.
  *
  * Boss 6, Part 6's boss (the scene's level 6): King Bob's rematch, the same contest on a bigger boat
@@ -1791,7 +1797,7 @@ export class FishingScene extends Phaser.Scene {
 
     for (let round = 1; ; round++) {
       this.renderBoard(round);
-      await this.callout(round > ROUNDS ? `SUDDEN DEATH<small>Round ${round}</small>` : `ROUND ${round}<small>of ${ROUNDS}</small>`, 'turn', 1100);
+      await this.callout(round > ROUNDS ? `SUDDEN DEATH<small>Round ${round}</small>` : `ROUND ${round}<small>of ${ROUNDS}</small>`, 'turn', 900);
       this.score.hero.push(await this.heroTurn(round));
       this.renderBoard(round);
       if (this.decided(round, 'hero')) break;
@@ -1860,7 +1866,7 @@ export class FishingScene extends Phaser.Scene {
     await this.iwait(700);
   }
 
-  /** Is it over, after `who` has gone in this round? (Out of reach in the six, or sudden death settled.) */
+  /** Is it over, after `who` has gone in this round? (Out of reach in the five, or sudden death settled.) */
   private decided(round: number, who: Who) {
     const y = this.total('hero');
     const k = this.total('king');
@@ -1936,7 +1942,7 @@ export class FishingScene extends Phaser.Scene {
     this.cam.y = WATER - 120 - this.lift * 0.6;
     this.arm = -0.85;
     this.hangLure('hero');
-    await this.callout('YOUR CAST', 'you', 900);
+    await this.callout('YOUR CAST', 'you', 700);
     // the cast is automatic, the same good long one every time; it's all in the bites
     await this.heroCast(HERO_CAST);
     this.callout(`HOOK IT!<small>${this.R.bites} bites — get them all</small>`, 'good', 1300);
@@ -1949,15 +1955,16 @@ export class FishingScene extends Phaser.Scene {
     const endX = bx(BOAT.motor) + 80;
     // (a random wait before each bite)
     const BITES = this.R.bites;
-    const gaps = Array.from({ length: BITES }, () => 1100 + Math.random() * 700);
+    const gaps = Array.from({ length: BITES }, () => 850 + Math.random() * 550);
     const total = gaps.reduce((a, b) => a + b, 0) + 900;
     const t0 = this.clock;
-    // (the bites come while the bobber's still well out: it's wound only about halfway in through them,
-    // and the rest of the way quickly at the end)
-    const outU = 0.5;
+    // (the bobber comes in a step towards the boat with every bite — a clear pull each time, hit or
+    // miss — two thirds of the way in over the bites, and the rest of the way quickly at the end)
+    const outU = 0.66;
+    let step = 0;
     const reelTo = () => {
-      const u = Math.min(1, (this.clock - t0) / total);
-      L.x = startX + (endX - startX) * u * outU;
+      const target = startX + (endX - startX) * outU * (step / BITES);
+      L.x += (target - L.x) * 0.16;
     };
     const reelFor = async (ms: number) => {
       const end = this.clock + ms;
@@ -2003,10 +2010,10 @@ export class FishingScene extends Phaser.Scene {
         L.dip = 5;
         fish.x += fromLeft ? 6 : -6;
         this.ripple(L.x, WATER, 0.5);
-        await this.wait(150);
+        await this.wait(130);
         L.dip = 0;
         fish.x -= fromLeft ? 6 : -6;
-        await this.wait(170 + Math.random() * 120);
+        await this.wait(140 + Math.random() * 100);
       }
       // (and should a flash be showing, the bite waits for it to go: the button's never hidden by it)
       while (this.storm?.flashing) await this.wait(16);
@@ -2031,11 +2038,15 @@ export class FishingScene extends Phaser.Scene {
       }
       L.dip = 0;
       r.bend = 0;
+      // (the pull: a step in towards the boat, the reel whirring)
+      step++;
+      r.reelRate = 3;
+      this.time.delayedCall(320, () => (r.reelRate = 0.9));
       // (it backs off a little before it comes in again)
       if (i < BITES - 1) this.tweens.add({ targets: fish, x: fish.x + (fromLeft ? -50 : 50), y: fish.y + 22, duration: 300, ease: 'Sine.easeOut' });
       await reelFor(260);
     }
-    // all six: it's yours; five: a coin toss; four: a long shot; fewer, it gets away
+    // all of them: it's yours; one short: a coin toss; two short: a long shot; fewer, it gets away
     const forced = (window as unknown as { __fishOdds?: number }).__fishOdds;
     const chance = forced ?? (hits >= BITES ? 1 : hits === BITES - 1 ? 0.5 : hits === BITES - 2 ? 0.2 : 0);
     if (Math.random() < chance) {
@@ -2374,8 +2385,8 @@ export class FishingScene extends Phaser.Scene {
   /**
    * Back it goes: the hero swings the rod up and back, then flicks it forward; the fish comes off the
    * hook and sails out over the side, turning over in the air (a little one spins, the Fat Fish
-   * flops), lands with a splash as big as it is, and swims off — with a happy leap on its way.
-   * Everything scales with the fish: how far and high it goes, how fast it turns, the splash.
+   * flops), and lands with a splash as big as it is — gone. Everything scales with the fish: how far
+   * and high it goes, how fast it turns, the splash.
    */
   private async tossBack(fish: Phaser.GameObjects.Sprite, c: Catch) {
     const r = this.rod.hero;
@@ -2459,83 +2470,16 @@ export class FishingScene extends Phaser.Scene {
       this.time.delayedCall(160, () => this.ripple(p.x, WATER, 1.6 * m));
     }
     fish.setDepth(5.55);
-    // under it goes, turning to swim away from the boat
-    const under = { x: p.x, y: p.y, r: rot };
-    const rTo = Math.round(rot / (Math.PI * 2)) * Math.PI * 2;
+    // under the splash it goes, and that's that (no swimming off: the owner wants the contest moving)
+    fish.setDepth(5.55);
+    this.bubbles(p.x, WATER + 30, Math.round(4 + 2 * m));
     await this.tw({
-      targets: under,
-      x: p.x + 90 / Math.sqrt(m),
+      targets: fish,
       y: WATER + 60 + dd,
-      r: rTo,
-      duration: 480,
+      alpha: 0,
+      duration: 260,
       ease: 'Quad.easeOut',
-      onUpdate: () => {
-        fish.setPosition(under.x, under.y).setRotation(under.r).setAlpha(Math.max(0.85, fish.alpha - 0.01));
-        fish.setFrame(['sw0', 'sw2', 'sw4'][Math.floor(this.clock / 90) % 3]);
-      },
     });
-    this.camK = 3;
-    fish.setFlipX(false).setRotation(0);
-    this.bubbles(fish.x, fish.y, Math.round(4 + 2 * m));
-    // ── 5. off it swims, faster and faster — then a happy leap, and away ──
-    const sp = 300 / Math.pow(m, 0.3);
-    const swimZ = Math.max(0.72, 1.2 * fitZ + 0.1);
-    let x = fish.x;
-    t0 = this.clock;
-    let last = this.clock;
-    while (this.clock - t0 < 420) {
-      const dt = (this.clock - last) / 1000;
-      last = this.clock;
-      x += sp * dt * (0.5 + (this.clock - t0) / 840);
-      fish.setPosition(x, WATER + 60 + dd + Math.sin(this.clock / 120) * 4).setRotation(Math.sin(this.clock / 70) * 0.12);
-      fish.setFrame(['sw0', 'sw2', 'sw4'][Math.floor(this.clock / 55) % 3]);
-      if (Math.random() < 0.2) this.bubbles(fish.x - dims.w * 0.4, fish.y, 1);
-      this.cam = { x: x - 140, y: WATER - 60, zoom: swimZ };
-      await this.wait(16);
-    }
-    // the leap: up out of the water and over, nose first (a little one higher, the Fat Fish a heave)
-    const lx0 = fish.x;
-    const ly0 = fish.y;
-    const up = 40 + 60 / m + dd;
-    const along = 170 / Math.sqrt(m);
-    sfx.splash();
-    this.splash(lx0 + along * 0.15, WATER, Math.round(5 + 3 * m), 0.5 + 0.25 * m);
-    fish.setDepth(8);
-    this.heroPose = 'j0';
-    this.tweens.add({ targets: this, heroHop: 16, duration: 200, ease: 'Quad.easeOut', yoyo: true, repeat: 1, repeatDelay: 60 });
-    const lp = { t: 0 };
-    await this.tw({
-      targets: lp,
-      t: 1,
-      duration: 560 + 120 * m,
-      ease: 'Linear',
-      onUpdate: () => {
-        const t = lp.t;
-        fish.setPosition(lx0 + along * t, ly0 - Math.sin(t * Math.PI) * (up + (ly0 - WATER)));
-        fish.setRotation(-(0.9 - t * 1.8) * 0.75);
-        fish.setFrame(['sw0', 'sw2', 'sw4'][Math.floor(t * 10) % 3]);
-        if (t > 0.45 && t < 0.5 && Math.random() < 0.5) this.sparkle(fish.x, fish.y - dims.h * 0.3, 2);
-        this.cam = { x: fish.x - 140, y: Math.min(WATER - 60, fish.y + 50), zoom: swimZ };
-      },
-    });
-    sfx.splash();
-    this.splash(fish.x, WATER, Math.round(6 + 4 * m), 0.5 + 0.3 * m);
-    fish.setDepth(5.55).setRotation(0);
-    this.heroPose = null;
-    // (and away, fading into the deep)
-    t0 = this.clock;
-    last = this.clock;
-    x = fish.x;
-    while (this.clock - t0 < 520) {
-      const dt = (this.clock - last) / 1000;
-      last = this.clock;
-      const u = (this.clock - t0) / 520;
-      x += sp * 1.4 * dt;
-      fish.setPosition(x, WATER + 60 + dd + u * 50).setAlpha(0.85 * (1 - u));
-      this.cam = { x: x - 160, y: WATER - 60, zoom: swimZ };
-      fish.setFrame(['sw0', 'sw2', 'sw4'][Math.floor(this.clock / 50) % 3]);
-      await this.wait(16);
-    }
     fish.destroy();
   }
 
@@ -2624,7 +2568,7 @@ export class FishingScene extends Phaser.Scene {
     this.shotBoat(1.15);
     this.cam.x = bx(BOAT.king) + 180;
     this.hangLure('king');
-    await this.callout("KING BOB'S CAST", 'king', 800);
+    await this.callout("KING BOB'S CAST", 'king', 650);
     // his cast: back, and a flick
     await this.to(r, 'a', -2.7, 330);
     sfx.whoosh();
@@ -2664,10 +2608,13 @@ export class FishingScene extends Phaser.Scene {
     this.to(r, 'a', -0.75, 300);
     // reeling like mad: a couple of nibbles, and — maybe
     r.reelRate = 2.6;
-    const got = Math.random() < this.R.kingCatch;
+    // (never more than KING_MAX in the rounds proper; sudden death as it always was, his old odds, no cap)
+    const sd = this.score.king.length >= ROUNDS;
+    const capped = !sd && this.total('king') >= KING_MAX;
+    const got = !capped && Math.random() < (sd ? this.R.kingCatchSD : this.R.kingCatch);
     const x0 = L.x;
     const xEnd = bx(BOAT.motor) + 70;
-    const dur = 2400;
+    const dur = 1900;
     const t0 = this.clock;
     let nib = 0;
     let fish: Phaser.GameObjects.Sprite | null = null;
@@ -2740,10 +2687,10 @@ export class FishingScene extends Phaser.Scene {
       void this.kingSays(['HA HA! Another one!', 'Too easy!', 'The King always delivers!', 'Look at THIS beauty!'][Math.floor(Math.random() * 4)], 1500);
       const lb = Math.round((c.lb[0] + Math.random() * (c.lb[1] - c.lb[0])) * 10) / 10;
       this.logCatch('king', c.name, lb);
-      await this.callout(`KING BOB CAUGHT<small>a ${c.name} · ${lb.toFixed(1)} lb</small>`, 'king', 1400);
+      await this.callout(`KING BOB CAUGHT<small>a ${c.name} · ${lb.toFixed(1)} lb</small>`, 'king', 1150);
     } else {
       sfx.groan();
-      await this.callout('NOTHING<small>for King Bob</small>', 'good', 1100);
+      await this.callout('NOTHING<small>for King Bob</small>', 'good', 900);
     }
     this.to(r, 'a', -1.1, 300);
     this.hangLure('king');
