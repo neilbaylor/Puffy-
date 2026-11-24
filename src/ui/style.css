@@ -2702,23 +2702,19 @@ kbd {
   .acct-card .stat-list dd { font-size: 22px; }
 }
 
-/* Delete account: small and quiet, in the card's bottom-left corner (level with Done) */
+/* Delete account: a real button, Sign out's size, under the hero (left column); Done moves over
+   under the table (right column) */
 .acct-card .acct-del {
-  position: absolute;
-  left: 16px;
-  bottom: 22px;
-  padding: 6px 2px;
-  border: 0;
-  background: none;
-  font: 800 clamp(12px, 2vmin, 14px) / 1 Nunito, sans-serif;
-  color: #8a7d6c;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  cursor: pointer;
+  grid-column: 1;
+  justify-self: center;
+  margin-top: 18px;
+  font-size: clamp(14px, 2.4vmin, 18px);
+  padding: 7px 14px 6px;
+  white-space: nowrap;
+  color: #a3402c;
 }
-.acct-card .acct-del:hover { color: #b8452e; }
-/* (phones: a touch smaller, clear of Done) */
-@media (max-height: 500px) { .acct-card .acct-del { bottom: 16px; left: 12px; font-size: 11px; } }
+.acct-card .acct-del + .acct-done-row { grid-column: 2; }
+@media (max-height: 500px) { .acct-card .acct-del { padding: 6px 11px 5px; font-size: 14px; } }
 /* its "are you sure?" card, over the account card */
 .acct-sure {
   position: absolute;
@@ -2736,6 +2732,8 @@ kbd {
 @keyframes acct-sure-pop { from { transform: scale(0.85); } }
 .acct-sure-msg { margin: 0; font: 600 clamp(15px, 2.6vmin, 18px) / 1.4 Nunito, sans-serif; }
 .acct-sure-msg b { font-weight: 900; }
+/* (a blank line's space before it) */
+.acct-sure-last { margin-top: 0.6em; }
 .acct-sure-row { justify-content: center; gap: 14px; margin-top: 8px; }
 .btn-del { background: linear-gradient(180deg, #ff8a7a, #e4523f); }
 

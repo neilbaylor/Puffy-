@@ -815,10 +815,10 @@ export class UI {
             <dt>Current level</dt><dd>${esc(levelInfo(latestLevel()).button ?? levelInfo(latestLevel()).part)}</dd>
           </dl>
         </div>
+        <button class="btn btn-alt acct-del" data-act="del">Delete account</button>
         <div class="row acct-done-row">
           <button class="btn btn-go" data-act="back">Done</button>
         </div>
-        <button class="acct-del" data-act="del">Delete account</button>
       </div>
     </div>`)
       : h(`<div class="screen modal acct">
@@ -855,7 +855,8 @@ export class UI {
       const sure = h(`<div class="acct-sure" role="alertdialog" aria-modal="true" aria-labelledby="acct-sure-t">
         <div class="panel acct-sure-panel">
           <h2 id="acct-sure-t">Delete account?</h2>
-          <p class="acct-sure-msg">This deletes <b>${esc(u.name)}</b> and everything saved to it: root beer, nuggies, Shop things and your level.<br><b>It can’t be undone.</b></p>
+          <p class="acct-sure-msg">This deletes <b>${esc(u.name)}</b> and everything saved to it:<br>root beer, nuggies, Shop things and your level.</p>
+          <p class="acct-sure-msg acct-sure-last"><b>It can’t be undone.</b></p>
           <p class="acct-err" hidden></p>
           <div class="row acct-sure-row">
             <button class="btn btn-go" data-act="keep">Keep it</button>
