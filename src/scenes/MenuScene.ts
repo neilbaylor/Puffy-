@@ -324,7 +324,10 @@ export class MenuScene extends Phaser.Scene {
       () => {
         const view = new LevelView(scene, data, { lazyNear: x0, lazySpan: [-1e9, -1e9], ahead: false, trim: true, skipAbove: MenuScene.skipAboveOf(scene.scale, data), only: [-1e9, -1e9] });
         tidy();
-        for (const job of [...view.pendingJobs(x0 - span[0], x0 + span[1]), ...view.laterJobs(only ?? [-Infinity, Infinity])])
+        // (as far either side as the fly-over's first frame draws, see LevelView.animate — 400 past its
+        // view — and as the other Parts' fly-overs are built ahead: the ground between was drawn in that
+        // first frame, still under the loading screen, ~350 ms at 4× slow CPU)
+        for (const job of [...view.pendingJobs(x0 - span[0] - 400, x0 + span[1] + 400), ...view.laterJobs(only ?? [-Infinity, Infinity])])
           jobs.push(() => {
             job();
             tidy();
