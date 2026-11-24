@@ -436,6 +436,11 @@ class Room {
             // (still nothing: they go on with their last buttons — for a while)
             if (++c.waited >= LET_GO) c.lastBtn = 0;
             steps.push(c.lastBtn);
+            // (…and these ticks are owed too: their real buttons for them still come, and are still all
+            // played. Not owed, they stayed queued for good — after a phone's hiccup of a third of a second
+            // or more, up to 5 ticks, about 170 ms later than before for the rest of the battle: the others
+            // saw them later, and their shots landed later)
+            c.owed = Math.min(MAX_OWED, c.owed + 1);
           }
           inputs.set(c.id, steps);
         }
