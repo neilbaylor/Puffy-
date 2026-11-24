@@ -134,13 +134,21 @@ export function levelPieces(d: LevelData, kind: TerrainKind): { outline: Pt[]; x
 
 /**
  * A level's ground pictures not drawn yet, as jobs (drawn ahead, behind a loading card, so its
- * opening fly-over doesn't have to): a view of the level is made only to work them out.
+ * opening fly-over doesn't have to): a view of the level is made only to work them out. Its trees,
+ * cloud platforms and piers not drawn yet are jobs too (null: no ground picture), all of them left
+ * out of the view (`only`, a stretch nothing is in): made with them, it drew them all as it was
+ * made — light mode's Play tap, before the loading card even showed, a frame of ~400 ms at 4x slow
+ * CPU (the start screen's own lower-resolution view isn't the level's, so this one is made then).
  */
 export function groundPaintJobs(scene: Phaser.Scene, data: LevelData): (() => string | null)[] {
   const before = new Set(scene.children.list);
-  const view = new LevelView(scene, data, { lazyNear: -1e9, lazySpan: [0, 0], ahead: false, trim: true });
+  const view = new LevelView(scene, data, { lazyNear: -1e9, lazySpan: [0, 0], ahead: false, trim: true, only: [Infinity, -Infinity] });
   for (const o of scene.children.list.filter((c) => !before.has(c))) o.destroy();
-  return view.paintJobs();
+  const props = view.laterJobs().map((job) => () => {
+    job();
+    return null;
+  });
+  return [...view.paintJobs(), ...props];
 }
 
 /**
