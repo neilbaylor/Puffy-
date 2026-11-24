@@ -139,9 +139,10 @@ export const account = {
     const c = savedCreds();
     if (!c) return;
     let r = await api('POST', '/api/login', c);
-    if (!r.ok && r.data.unknown) r = await api('POST', '/api/register', c);
+    if (!r.ok && r.data.unknown) r = await api('POST', '/api/register', { ...c, restore: true });
     if (!r.ok) {
-      if (r.status === 401) saveCreds(null); // (the password changed somewhere else)
+      // (the password changed somewhere else; or the player was deleted on another device)
+      if (r.status === 401 || r.status === 410) saveCreds(null);
       emit();
       return;
     }
@@ -167,6 +168,19 @@ export const account = {
   save() {
     if (!token) return;
     push().catch(() => {});
+  },
+  /**
+   * Delete the player on the server for good (it, its progress and what it bought), then sign out
+   * here. This device's own progress stays (playing never needs an account). An error if the
+   * server couldn't be reached.
+   */
+  async deleteAccount(): Promise<string | null> {
+    if (!token) return 'Not signed in.';
+    const r = await api('DELETE', '/api/me');
+    if (!r.ok && r.status !== 401) return r.status === 0 ? 'Can’t reach the server. Try again when you’re online.' : String(r.data.error ?? 'Something went wrong.');
+    saveCreds(null);
+    signedOut();
+    return null;
   },
   async signOut() {
     if (token) await api('POST', '/api/logout');

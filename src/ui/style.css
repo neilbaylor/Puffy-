@@ -2702,6 +2702,43 @@ kbd {
   .acct-card .stat-list dd { font-size: 22px; }
 }
 
+/* Delete account: small and quiet, in the card's bottom-left corner (level with Done) */
+.acct-card .acct-del {
+  position: absolute;
+  left: 16px;
+  bottom: 22px;
+  padding: 6px 2px;
+  border: 0;
+  background: none;
+  font: 800 clamp(12px, 2vmin, 14px) / 1 Nunito, sans-serif;
+  color: #8a7d6c;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.acct-card .acct-del:hover { color: #b8452e; }
+/* (phones: a touch smaller, clear of Done) */
+@media (max-height: 500px) { .acct-card .acct-del { bottom: 16px; left: 12px; font-size: 11px; } }
+/* its "are you sure?" card, over the account card */
+.acct-sure {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: #3a241899;
+  animation: acct-sure-in 0.16s ease-out;
+}
+@keyframes acct-sure-in { from { opacity: 0; } }
+.acct-sure-panel { max-width: min(100%, 420px); text-align: center; animation: acct-sure-pop 0.2s cubic-bezier(0.3, 1.5, 0.5, 1); }
+@keyframes acct-sure-pop { from { transform: scale(0.85); } }
+.acct-sure-msg { margin: 0; font: 600 clamp(15px, 2.6vmin, 18px) / 1.4 Nunito, sans-serif; }
+.acct-sure-msg b { font-weight: 900; }
+.acct-sure-row { justify-content: center; gap: 14px; margin-top: 8px; }
+.btn-del { background: linear-gradient(180deg, #ff8a7a, #e4523f); }
+
 /* ── Queen Plop's ring (WrestleScene) ── */
 .wrestle {
   position: absolute;

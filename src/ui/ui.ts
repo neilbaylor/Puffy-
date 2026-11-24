@@ -818,6 +818,7 @@ export class UI {
         <div class="row acct-done-row">
           <button class="btn btn-go" data-act="back">Done</button>
         </div>
+        <button class="acct-del" data-act="del">Delete account</button>
       </div>
     </div>`)
       : h(`<div class="screen modal acct">
@@ -846,6 +847,49 @@ export class UI {
       sfx.back();
       await account.signOut();
       this.showStart();
+    });
+    // Delete account: an "are you sure?" card over this one (Keep it is the big, easy choice)
+    el.querySelector('[data-act=del]')?.addEventListener('click', () => {
+      if (!u || el.querySelector('.acct-sure')) return;
+      sfx.select();
+      const sure = h(`<div class="acct-sure" role="alertdialog" aria-modal="true" aria-labelledby="acct-sure-t">
+        <div class="panel acct-sure-panel">
+          <h2 id="acct-sure-t">Delete account?</h2>
+          <p class="acct-sure-msg">This deletes <b>${esc(u.name)}</b> and everything saved to it: root beer, nuggies, Shop things and your level.<br><b>It can’t be undone.</b></p>
+          <p class="acct-err" hidden></p>
+          <div class="row acct-sure-row">
+            <button class="btn btn-go" data-act="keep">Keep it</button>
+            <button class="btn btn-del" data-act="yes">Delete</button>
+          </div>
+        </div>
+      </div>`);
+      el.appendChild(sure);
+      const keep = sure.querySelector<HTMLButtonElement>('[data-act=keep]')!;
+      const yes = sure.querySelector<HTMLButtonElement>('[data-act=yes]')!;
+      const err = sure.querySelector<HTMLElement>('.acct-err')!;
+      keep.focus();
+      const close = () => {
+        sfx.back();
+        sure.remove();
+      };
+      keep.addEventListener('click', close);
+      // (a tap on the dimmed space around it: the same as Keep it)
+      sure.addEventListener('click', (e) => {
+        if (e.target === sure && !yes.disabled) close();
+      });
+      yes.addEventListener('click', async () => {
+        keep.disabled = yes.disabled = true;
+        const fail = await account.deleteAccount();
+        if (fail) {
+          keep.disabled = yes.disabled = false;
+          err.textContent = fail;
+          err.hidden = false;
+          sfx.bump();
+          return;
+        }
+        sfx.back();
+        this.showStart();
+      });
     });
     const name = el.querySelector<HTMLInputElement>('input[name=name]');
     const pw = el.querySelector<HTMLInputElement>('input[name=pw]');

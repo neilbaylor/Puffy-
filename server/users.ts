@@ -14,6 +14,7 @@
  *   GET  /api/me        (Authorization: Bearer token) → { user }
  *   PUT  /api/progress  (Bearer) { rootbeer, nuggies, kills, level, spent?, items?, wear? } → { user }
  *   POST /api/logout    (Bearer)                      → 204
+ *   DELETE /api/me      (Bearer)                      → 204 (the player and everything saved to it, gone for good)
  *   POST /api/bench     { report }                    → 201 { id } (a device check, from the hidden ?bench page)
  *   GET  /api/bench     (Bearer, a tester)            → { reports: [{ id, at, ua, name, feel, report }] }, newest first
  * where user = { name, rootbeer, nuggies, kills, level, spent, items, wear } (root beer is every bottle
@@ -22,6 +23,11 @@
  *
  * What's been bought is a row each in user_items (user, item, equipped: whether it's on), so a
  * player keeps it whatever browser they play on. Things are never taken away once bought.
+ *
+ * Deleting a player (DELETE /api/me, the account card's Delete account) removes its row, what it bought
+ * and its sessions. Only a hash of the name is kept (deleted_names), so that another device still
+ * signed in as it doesn't quietly make the player again (the game's own sign-back-in, `restore: true`
+ * on /api/register, is refused for it); making a player with that name by hand still works.
  *
  * Device checks (the hidden ?bench page, see src/bench): a row each in bench_reports — the device's
  * scores as the page sent them (JSON, up to 32 KB), the name the owner gave the device, how they
@@ -88,6 +94,12 @@ interface Store {
   addSession(tokenHash: string, userId: number): void;
   session(tokenHash: string): number | undefined;
   dropSession(tokenHash: string): void;
+  /** Delete the player: its row, what it bought, its sessions (and note the name as deleted). */
+  remove(id: number): void;
+  /** Whether a player with this name was deleted (and not made again since). */
+  wasDeleted(name: string): boolean;
+  /** A player with this name made again by hand: no longer counts as deleted. */
+  undelete(name: string): void;
   /** Keep a device check (the oldest go past BENCH_KEEP); its id. */
   addBench(b: Omit<BenchRow, 'id' | 'at'>): number;
   /** Every device check kept, newest first. */
@@ -133,6 +145,10 @@ async function openSqlite(file: string): Promise<Store> {
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+    CREATE TABLE IF NOT EXISTS deleted_names (
+      name_hash TEXT PRIMARY KEY,
+      at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
     CREATE TABLE IF NOT EXISTS bench_reports (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
@@ -166,6 +182,12 @@ async function openSqlite(file: string): Promise<Store> {
     addSession: db.prepare('INSERT INTO sessions (token_hash, user_id) VALUES (?, ?)'),
     session: db.prepare('SELECT user_id FROM sessions WHERE token_hash = ?'),
     dropSession: db.prepare('DELETE FROM sessions WHERE token_hash = ?'),
+    dropItems: db.prepare('DELETE FROM user_items WHERE user_id = ?'),
+    dropSessions: db.prepare('DELETE FROM sessions WHERE user_id = ?'),
+    dropUser: db.prepare('DELETE FROM users WHERE id = ?'),
+    addDeleted: db.prepare('INSERT OR REPLACE INTO deleted_names (name_hash) VALUES (?)'),
+    isDeleted: db.prepare('SELECT 1 AS y FROM deleted_names WHERE name_hash = ?'),
+    undelete: db.prepare('DELETE FROM deleted_names WHERE name_hash = ?'),
     addBench: db.prepare('INSERT INTO bench_reports (ua, name, feel, report) VALUES (?, ?, ?, ?)'),
     trimBench: db.prepare(`DELETE FROM bench_reports WHERE id NOT IN (SELECT id FROM bench_reports ORDER BY id DESC LIMIT ${BENCH_KEEP})`),
     benches: db.prepare('SELECT id, at, ua, name, feel, report FROM bench_reports ORDER BY id DESC'),
@@ -194,6 +216,22 @@ async function openSqlite(file: string): Promise<Store> {
     addSession: (t, id) => void q.addSession.run(t, id),
     session: (t) => (q.session.get(t) as { user_id: number } | undefined)?.user_id,
     dropSession: (t) => void q.dropSession.run(t),
+    remove: (id) => {
+      const u = q.byId.get(id) as { name: string } | undefined;
+      db.exec('BEGIN');
+      try {
+        q.dropItems.run(id);
+        q.dropSessions.run(id);
+        q.dropUser.run(id);
+        if (u) q.addDeleted.run(nameHash(u.name));
+        db.exec('COMMIT');
+      } catch (e) {
+        db.exec('ROLLBACK');
+        throw e;
+      }
+    },
+    wasDeleted: (name) => !!q.isDeleted.get(nameHash(name)),
+    undelete: (name) => void q.undelete.run(nameHash(name)),
     addBench: (b) => {
       const id = Number(q.addBench.run(b.ua, b.name, b.feel, b.report).lastInsertRowid);
       q.trimBench.run();
@@ -206,10 +244,11 @@ async function openSqlite(file: string): Promise<Store> {
 /** The fallback: everything in one small JSON file, written (atomically) on every change. */
 function openJson(file: string): Store {
   type Row = Omit<UserRow, 'items' | 'wear'> & { gear?: { item: string; equipped: boolean }[]; items?: string; hat?: string };
-  type Data = { next: number; users: Row[]; sessions: Record<string, number>; bench?: BenchRow[] };
+  type Data = { next: number; users: Row[]; sessions: Record<string, number>; bench?: BenchRow[]; deleted?: string[] };
   let data: Data = { next: 1, users: [], sessions: {} };
   if (existsSync(file)) data = JSON.parse(readFileSync(file, 'utf8')) as Data;
   const bench = (data.bench ??= []);
+  const deleted = (data.deleted ??= []);
   for (const u of data.users) {
     u.kills ??= 0;
     u.spent ??= 0;
@@ -260,6 +299,19 @@ function openJson(file: string): Store {
       delete data.sessions[t];
       save();
     },
+    remove: (id) => {
+      const u = data.users.find((x) => x.id === id);
+      data.users = data.users.filter((x) => x.id !== id);
+      for (const [t, uid] of Object.entries(data.sessions)) if (uid === id) delete data.sessions[t];
+      if (u && !deleted.includes(nameHash(u.name))) deleted.push(nameHash(u.name));
+      save();
+    },
+    wasDeleted: (name) => deleted.includes(nameHash(name)),
+    undelete: (name) => {
+      const i = deleted.indexOf(nameHash(name));
+      if (i >= 0) deleted.splice(i, 1);
+      save();
+    },
     addBench: (b) => {
       const id = (bench[bench.length - 1]?.id ?? 0) + 1;
       bench.push({ id, at: new Date().toISOString().slice(0, 19) + 'Z', ...b });
@@ -286,6 +338,8 @@ export async function openStore(file = dbPath()): Promise<Store> {
 /** Names: 2–16 letters, numbers, spaces, - or _ (the game itself caps them at 10). */
 const NAME_RE = /^[A-Za-z0-9 _-]{2,16}$/;
 const sha = (s: string) => createHash('sha256').update(s).digest('hex');
+/** A deleted player's name, kept only as this (names match whatever their case). */
+const nameHash = (name: string) => sha('deleted:' + name.trim().toLowerCase());
 const pub = (u: UserRow): PublicUser => ({ name: u.name, rootbeer: u.rootbeer, nuggies: u.nuggies, kills: u.kills, level: u.level, spent: u.spent ?? 0, items: u.items ?? '', wear: u.wear ?? '' });
 /** Shop ids (lower case, digits, dashes), comma separated: anything else is dropped. */
 const ids = (v: unknown, max: number) =>
@@ -394,6 +448,9 @@ export async function createUserApi() {
         if (password.length < 4 || password.length > 64) return void send(res, 400, { error: 'Passwords are 4–64 characters.' }), true;
         if (route === 'POST /api/register') {
           if (store.byName(name)) return void send(res, 409, { error: 'That name is taken.' }), true;
+          // (a device still signed in as a deleted player: not made again behind its back)
+          if (body.restore === true && store.wasDeleted(name)) return void send(res, 410, { error: 'That player was deleted.', deleted: true }), true;
+          store.undelete(name);
           const salt = randomBytes(16);
           const u = store.create(name, await hashPassword(password, salt), salt.toString('hex'));
           return void send(res, 201, { token: newSession(u), user: pub(u) }), true;
@@ -450,6 +507,13 @@ export async function createUserApi() {
         if (!isTesterName(u.name)) return void send(res, 403, { error: 'Testers only.' }), true;
         const reports = store.benches().map((b) => ({ ...b, report: JSON.parse(b.report) as unknown }));
         return void send(res, 200, { reports }), true;
+      }
+      if (route === 'DELETE /api/me') {
+        const u = userFrom(req);
+        if (!u) return void send(res, 401, { error: 'Not signed in.' }), true;
+        store.remove(u.id);
+        console.log('A player was deleted.');
+        return void send(res, 204), true;
       }
       if (route === 'POST /api/logout') {
         const m = /^Bearer (.+)$/.exec(req.headers.authorization ?? '');
