@@ -855,7 +855,7 @@ export class UI {
       const sure = h(`<div class="acct-sure" role="alertdialog" aria-modal="true" aria-labelledby="acct-sure-t">
         <div class="panel acct-sure-panel">
           <h2 id="acct-sure-t">Delete account?</h2>
-          <p class="acct-sure-msg">This deletes <b>${esc(u.name)}</b> and everything saved to it:<br>root beer, nuggies, Shop things and your level.</p>
+          <p class="acct-sure-msg">This deletes <b>${esc(u.name)}</b> and everything saved to it:<br>Root Beer, Nuggies, Shop things and your level.</p>
           <p class="acct-sure-msg acct-sure-last"><b>It can’t be undone.</b></p>
           <p class="acct-err" hidden></p>
           <div class="row acct-sure-row">
