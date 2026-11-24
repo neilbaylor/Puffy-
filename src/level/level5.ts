@@ -63,11 +63,15 @@ export function buildLevel5(): LevelData {
   };
 
   // the fly-over (from the gate back to the pier): one smooth glide along the level at a single depth in
-  // open water (the surface just in view above, the sea bed below), then up to the hero on the pier
+  // open water (the surface just in view above, the sea bed below), then a gentle climb up to the hero
+  // on the pier while still gliding along, like Part 6's (it used to go along, then rise straight up
+  // over the hero at the very end)
   L.flyPath = [
     [252, b(11.5)],
-    [137, b(11.5)],
-    [22, b(11.5)],
+    [150, b(11.5)],
+    [95, b(12.5)],
+    [55, b(14.5)],
+    [24, b(17.5)],
   ];
 
   // ── The pier, open water ─────────────────────────────────────
@@ -112,10 +116,11 @@ export function buildLevel5(): LevelData {
   L.spawn('bigfish', 78, 57);
   L.spawn('fish', 73, 46);
   L.spawn('bigfish', 70, 39);
-  L.spawn('kai', 76, 51);
+  // (a little lower than he was: met a touch sooner on the way up, the first time you see him)
+  L.spawn('kai', 76, 47);
   // (wherever Kai is, nuggies are too: always there, not left to chance)
-  L.auraArc(74.6, 3, 48, 0.8, true);
-  L.aura(75, 42);
+  L.auraArc(74.6, 3, 44, 0.8, true);
+  L.aura(75, 38);
 
   // ── A reef wall; checkpoint ──────────────────────────────────
   L.ground(85, 101, b(3));

@@ -191,9 +191,10 @@ export class BadFish extends Enemy {
       for (const rk of this.gs.liveRockets) {
         const ahead = (this.x - rk.x) * rk.dir;
         if (ahead < 0 || ahead > 300 || Math.abs(rk.y - this.y) > this.displayHeight * 0.6 + 14) continue;
-        this.dodgeCool = 0.9;
-        // (he sees most of them coming — and two rockets close together, he can't dodge both)
-        if (Math.random() < 0.4) break;
+        // (a little easier to hit than he was: he dodged 6 in 10, with 0.9 s between dodges)
+        this.dodgeCool = 1.2;
+        // (he sees about half of them coming — and two rockets close together, he can't dodge both)
+        if (Math.random() < 0.55) break;
         let d = rk.y > this.y ? -1 : 1;
         if (!rockFree(d)) d = -d;
         const water = level.data.water ?? -1e9;
