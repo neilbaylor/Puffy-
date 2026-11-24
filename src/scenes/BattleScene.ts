@@ -38,6 +38,8 @@ const INTERP_MAX = 7;
 const EXTRAP_TICKS = 3;
 /** (ms per tick) */
 const TICK_MS = DT * 1000;
+/** Snapshots that came in together, more than this many ticks older than the newest: a backlog, played quietly (see update). */
+const BACKLOG_TICKS = 10;
 /**
  * Your hero's corrections (the server saw it a little differently): further off than this and it just
  * jumps there (a respawn, a real teleport); up to this it glides there — small ones fade out in a few
@@ -947,8 +949,11 @@ export class BattleScene extends Phaser.Scene {
     // ── new snapshots from the server ──
     if (this.net.inbox.length) {
       const fresh = this.net.inbox.splice(0);
+      const newest = fresh[fresh.length - 1].tick;
       for (const s of fresh) {
-        this.playEvents(s.events);
+        // (a backlog — the tab was put away, the phone froze a moment — isn't all shown and heard at once
+        // now: two seconds of blasts, pops and shots went off together, wherever everyone is now)
+        this.playEvents(s.events, newest - s.tick > BACKLOG_TICKS);
         this.snaps.push(s);
         this.noteLateness(s);
       }
@@ -1200,7 +1205,10 @@ export class BattleScene extends Phaser.Scene {
     }
     const before = this.me && this.me.respawn <= 0 ? { x: this.me.x, y: this.me.y } : null;
     const me: BPlayer = { ...mine, lastHitBy: null };
-    this.pending = this.pending.filter(([q]) => q > mine.ack);
+    // (an ack past anything sent from here is from before this page was loaded — it rejoined the battle
+    // after a reload, counting from 1 again: none of these buttons has been played yet)
+    const ack = mine.ack > this.seq ? 0 : mine.ack;
+    this.pending = this.pending.filter(([q]) => q > ack);
     const max = characterById(me.hero).maxRockets + (me.power === POWER.rapid ? 3 : 0);
     const mineInFlight = s.rockets.filter((r) => r.owner === me.id).length;
     for (const [, b, ok] of this.pending)
@@ -2042,9 +2050,14 @@ export class BattleScene extends Phaser.Scene {
   }
 
   /** Sounds and effects for what just happened in the match. */
-  private playEvents(events: BEvent[]) {
+  private playEvents(events: BEvent[], quiet = false) {
     const myId = this.net.myId;
     for (const e of events) {
+      // (catching up: only what's needed later — everyone's chair-carrying frames)
+      if (quiet) {
+        if (e.k === 'chair') for (const v of this.views.values()) this.carryTextureFor(v.hero, v.slot);
+        continue;
+      }
       switch (e.k) {
         case 'jump':
           if (e.id !== myId) {
