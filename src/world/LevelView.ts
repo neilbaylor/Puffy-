@@ -135,14 +135,14 @@ export function levelPieces(d: LevelData, kind: TerrainKind): { outline: Pt[]; x
 /**
  * A level's ground pictures not drawn yet, as jobs (drawn ahead, behind a loading card, so its
  * opening fly-over doesn't have to): a view of the level is made only to work them out. Its trees,
- * cloud platforms and piers not drawn yet are jobs too (null: no ground picture), all of them left
- * out of the view (`only`, a stretch nothing is in): made with them, it drew them all as it was
- * made — light mode's Play tap, before the loading card even showed, a frame of ~400 ms at 4x slow
- * CPU (the start screen's own lower-resolution view isn't the level's, so this one is made then).
+ * cloud platforms and piers not drawn yet are jobs too (null: no ground picture): made drawing them,
+ * the view drew them all as it was made — in light mode in Play's tap, before the loading card even
+ * showed, a frame of ~300 ms at 4x slow CPU (the start screen's own lower-resolution view isn't the
+ * level's, so this one is made then).
  */
 export function groundPaintJobs(scene: Phaser.Scene, data: LevelData): (() => string | null)[] {
   const before = new Set(scene.children.list);
-  const view = new LevelView(scene, data, { lazyNear: -1e9, lazySpan: [0, 0], ahead: false, trim: true, only: [Infinity, -Infinity] });
+  const view = new LevelView(scene, data, { lazyNear: -1e9, lazySpan: [0, 0], ahead: false, trim: true, drawLater: true });
   for (const o of scene.children.list.filter((c) => !before.has(c))) o.destroy();
   const props = view.laterJobs().map((job) => () => {
     job();
@@ -198,9 +198,11 @@ export class LevelView {
     /** lo: the start screen's picture of another Part (its ground at TERRAIN_LO_RES, under `terrainlo-` keys a level never uses). */
     /** skipAbove: lazy views — ground pictures wholly above this height are never put up (a climb's start-screen glide never goes that high). */
     /** only: the start screen — trees and cloud platforms wholly outside this stretch (x0…x1) aren't put up (see `onlySpan`). */
-    opts?: { lazyNear?: number; keep?: boolean; free?: boolean; lazySpan?: [number, number]; ahead?: boolean; cull?: boolean; trim?: boolean; lo?: boolean; skipAbove?: number; only?: [number, number] },
+    /** drawLater: trees, cloud platforms and piers aren't drawn as the view's made, but left as jobs (see `drawLater`). */
+    opts?: { lazyNear?: number; keep?: boolean; free?: boolean; lazySpan?: [number, number]; ahead?: boolean; cull?: boolean; trim?: boolean; lo?: boolean; skipAbove?: number; only?: [number, number]; drawLater?: boolean },
   ) {
     this.onlySpan = opts?.only ?? null;
+    this.drawLater = opts?.drawLater ?? false;
     this.skipAbove = opts?.lazyNear !== undefined ? (opts?.skipAbove ?? -Infinity) : -Infinity;
     // (only when its resolution differs from a level's: otherwise the same pictures are shared)
     this.lo = !!opts?.lo && HOME_LO && TERRAIN_LO_RES !== TERRAIN_RES;
@@ -262,6 +264,15 @@ export class LevelView {
   private later: { key: string; draw: () => void; x0: number; x1: number }[] = [];
   private outside(x0: number, x1: number) {
     return !!this.onlySpan && (x1 < this.onlySpan[0] || x0 > this.onlySpan[1]);
+  }
+
+  /** A view only made to work out what's to draw (see groundPaintJobs): its pictures aren't drawn as it's made, but left as jobs (see `later`). */
+  private readonly drawLater: boolean;
+  /** A tree's, cloud platform's or pier's picture (x0…x1 its stretch), drawn now if it isn't yet (or left for later: see drawLater). */
+  private drawNow(key: string, draw: () => void, x0: number, x1: number) {
+    if (this.scene.textures.exists(key)) return;
+    if (this.drawLater) this.later.push({ key, draw, x0, x1 });
+    else draw();
   }
 
   /** The start screen: the pictures left out (see `onlySpan`) not drawn yet, a job each. */
@@ -768,7 +779,7 @@ export class LevelView {
             this.later.push({ key, draw, x0: x * TILE, x1: x * TILE + w });
             continue;
           }
-          if (!this.scene.textures.exists(key)) draw();
+          this.drawNow(key, draw, x * TILE, x * TILE + w);
           this.scene.add
             .image(x * TILE, y * TILE - 6 - head, key)
             .setOrigin(0, 0)
@@ -781,7 +792,7 @@ export class LevelView {
           this.later.push({ key, draw, x0: x * TILE - 12, x1: x * TILE + w + 12 });
           continue;
         }
-        if (!this.scene.textures.exists(key)) draw();
+        this.drawNow(key, draw, x * TILE - 12, x * TILE + w + 12);
         this.scene.add
           .image(x * TILE - 12, y * TILE - 8, key)
           .setOrigin(0, 0)
@@ -869,7 +880,7 @@ export class LevelView {
           this.later.push({ key, draw, x0: tx - 48, x1: tx + 48 });
           return;
         }
-        if (!this.scene.textures.exists(key)) draw();
+        this.drawNow(key, draw, tx - 48, tx + 48);
         const img = this.scene.add
           .image(s.x * TILE + TILE / 2, (s.y + 1) * TILE + 4, key)
           .setOrigin(0.5, 1)
