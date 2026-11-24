@@ -112,7 +112,7 @@ const SWELLS = (horizon: number) =>
       ]) as readonly (readonly [number, number, number, number, number, number])[];
 const SWELL_W = 1024;
 /** Picture resolution of the clouds (they're big and soft: a little under the screen's in light mode). */
-const CLOUD_RES = LIGHT ? 0.75 : 1;
+const CLOUD_RES = LIGHT ? 0.75 : 0.875;
 /** The near swell's tile (drawn at 2x, as Boss 5's). */
 const WAVE_RES = 2;
 /** How many splashes can be going at once, and how many start a second. */

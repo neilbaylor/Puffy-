@@ -118,13 +118,13 @@ const KING_SPOTS = [
 const depthK = (y: number, baseY: number) => (y - 120) / (baseY - 120);
 
 /** The arena's big pictures per stage unit: lower in light mode (drawn at 1x on an older device). */
-const ARENA_RES = LIGHT ? 1 : 1.25;
+const ARENA_RES = LIGHT ? 1 : 1.125;
 /**
  * The King's pictures' resolution, and the Plops' in the parade at the end (light mode, drawn at 1x
  * on an older device: half the resolution, a quarter of the memory).
  */
-const KING_RES = LIGHT ? 1.25 : 2.5;
-const PARADE_RES = LIGHT ? 1.25 : 2.5;
+const KING_RES = LIGHT ? 1.25 : 1.875;
+const PARADE_RES = LIGHT ? 1.25 : 1.875;
 /** The poses the Plop family's parade strikes (see plopInvasion): only those are drawn. */
 const PARADE_FRAMES: readonly PlopFrame[] = ['idle', 'run0', 'run1', 'yell0', 'yell1'];
 /** Stage (1280 × 720) → arena texture coordinates. */

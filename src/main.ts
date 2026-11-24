@@ -36,7 +36,8 @@ installInput();
  * Each scene then zooms its camera so exactly VIEW_H world pixels are visible
  * vertically; the visible width follows the screen's aspect ratio.
  */
-// Cap the render resolution: full 2x on phones, 1.75x on big tablet screens (keeps Android tablets smooth);
+// Cap the render resolution: full 1.5x on phones, 1.375x on big tablet screens (halfway to light mode's 1x:
+// was 2x and 1.75x; keeps phones and Android tablets smooth);
 // light mode (older devices: see core/light) draws at 1x everywhere.
 const resCap = LIGHT ? 1 : 0;
 // The start screen always draws at no more than 1.25x: its scenery is soft (a little less sharpness
@@ -112,7 +113,7 @@ function viewSize() {
 const dpr = () => {
   const { w: vw, h: vh } = viewSize();
   const big = Math.min(vw, vh) >= 700;
-  let r = Math.min(window.devicePixelRatio || 1, big ? 1.75 : 2);
+  let r = Math.min(window.devicePixelRatio || 1, big ? 1.375 : 1.5);
   if (resCap) r = Math.min(r, resCap);
   return home ? Math.min(r, HOME_RES) : r;
 };

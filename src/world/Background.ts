@@ -35,7 +35,7 @@ interface Cloud {
 
 /** A cloud's picture: this box (in cloud units, × its size) and resolution; how often it's redrawn (s). */
 const CB = { x0: -92, y0: -62, w: 184, h: 80 };
-const CLOUD_RES = LIGHT ? 1 : 1.25;
+const CLOUD_RES = LIGHT ? 1 : 1.125;
 // (every 1.5 s, was 0.45 s: each new picture is drawn and sent to the graphics chip, ~20 a second
 // across the sky before; and they change shape that much slower, so each step is as small as ever)
 const CLOUD_EVERY = 1.5;

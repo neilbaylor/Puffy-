@@ -11,7 +11,8 @@ import type { Player } from './Player';
 import { softEllipse, type SoftShapes } from '../gfx/softShapes';
 
 /** The court's sand band's resolution (light mode: the fields' lower one). */
-const SAND_RES = LIGHT ? FIELD_RES : 3;
+// (full: halfway between light's 1.25 and the 3 it was)
+const SAND_RES = LIGHT ? FIELD_RES : 2.125;
 
 /** They spot you once you're this close to one of them. */
 const SPOT = 330;

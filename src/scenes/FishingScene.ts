@@ -169,7 +169,7 @@ const ROD_LEN = 178;
 const ROD_BUTT = 34;
 const KING_ROD_LEN = 150;
 /** The Reel Royal II's picture resolution (she's big: a little less in light mode). */
-const BOAT6_RES = LIGHT ? 1.2 : 1.5;
+const BOAT6_RES = LIGHT ? 1.2 : 1.35;
 /**
  * King Bob's looks for Boss 6 (one sheet, `f6-kingbob`): [frame, his frame drawn, the look]. m: cross;
  * a: cross, his crown knocked askew; f: and his fins up, ready for a fight.

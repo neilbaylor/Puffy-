@@ -33,7 +33,7 @@ const rr = (x: number, y: number, w: number, h: number, r: number) => (c: Canvas
 const circ = (x: number, y: number, r: number) => (c: CanvasRenderingContext2D) => c.arc(x, y, r, 0, Math.PI * 2);
 
 /** 'bl-land''s resolution (its picture is 1280 × 720 times this). */
-export const BLOOPS_RES = LIGHT ? 1 : 1.5;
+export const BLOOPS_RES = LIGHT ? 1 : 1.25;
 
 export function bloopsLand(scene: Phaser.Scene) {
   if (scene.textures.exists('bl-land')) return;

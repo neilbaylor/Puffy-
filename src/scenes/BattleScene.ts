@@ -168,7 +168,7 @@ const PLOP_ART: Record<EnemyKind, { kind: 'small' | 'medium' | 'large'; scale: n
  * ones are drawn at 0.4 of their art's size, the big ones at 1.6), so the small and middle ones' sheets
  * aren't several times sharper than the screen. (Light mode, drawn at 1x: 1.25, the small ones 1.)
  */
-const PLOP_RES: Record<'small' | 'medium' | 'large', number> = LIGHT ? { small: 1, medium: 1.25, large: 1.25 } : { small: 1, medium: 1.5, large: 2 };
+const PLOP_RES: Record<'small' | 'medium' | 'large', number> = LIGHT ? { small: 1, medium: 1.25, large: 1.25 } : { small: 1, medium: 1.375, large: 1.625 };
 
 /** How each kind of bad guy is drawn: texture, scale, feet origin, gun size. */
 const ENEMY_ART: Record<EnemyKind, { tex: string; scale: number; ox: number; oy: number; gun: number }> = {

@@ -63,9 +63,9 @@ export const PROP_RES = 2;
 /** The tall kelp bends smoothly (a Rope) where the renderer can draw one: WebGL. */
 export const kelpBends = (scene: Phaser.Scene) => scene.game.renderer.type === Phaser.WEBGL;
 /** The ground (by far the biggest pictures): lower in light mode. */
-// (1.25 in full mode, 1 in light: the ground is the biggest picture by far, and at these the
+// (1.125 in full mode — halfway to light's, it was 1.25 — and 1 in light: the ground is the biggest picture by far, and at these the
 // difference from 2 can't really be seen at play size — a level's ground ~60% smaller)
-export const TERRAIN_RES = LIGHT ? 1 : 1.25;
+export const TERRAIN_RES = LIGHT ? 1 : 1.125;
 // (1 in both modes: skies and hills are soft shapes; at 1 the start screen and the levels share them)
 export const BG_RES = 1;
 /**
@@ -88,7 +88,7 @@ export const HOME_BG_RES = BG_RES;
 /** The start screen keeps separate (lower-resolution) skies for the other Parts only if they differ from a level's. */
 export const HOME_SKY_SEP = HOME_LO && HOME_BG_RES !== BG_RES;
 /** The minigames' fields (the pitch, the rink, the ballpark, the courts, the sand): like the ground, lower in light mode. */
-export const FIELD_RES = LIGHT ? 1.25 : 2;
+export const FIELD_RES = LIGHT ? 1.25 : 1.625;
 
 /**
  * Register a drawn canvas as a (static) texture. Uses a plain image texture —
@@ -586,7 +586,7 @@ function baddiePieces(scene: Phaser.Scene): { name: string; run: () => void }[] 
  * Plops in the game: drawn this many times their art size (shown smaller), with room either side for
  * the arms. (Light mode, drawn at 1x on an older device: 1.5, about a third of the memory.)
  */
-export const PLOP_RES = LIGHT ? 1.5 : 2.5;
+export const PLOP_RES = LIGHT ? 1.5 : 2;
 export const PLOP_PAD = 16;
 /** Headroom over the art (the big Plops' swirl tip pokes up past the art's own frame). */
 export const PLOP_TOP = 22;
@@ -619,7 +619,7 @@ export const PACK_KINDS = ['stone', 'slinger', 'kai', 'zippy'] as const;
 function chaseSteps(scene: Phaser.Scene): Step[] {
   const T = scene.textures;
   const st = STYLES[ART_STYLE];
-  const res = LIGHT ? 1.5 : 2.5;
+  const res = LIGHT ? 1.5 : 2;
   const pack = (k: (typeof PACK_KINDS)[number]) => {
     if (!T.exists(`fish6-${k}`)) sheet(scene, `fish6-${k}`, FISH_SIZE[k].w, FISH_SIZE[k].h, CHASE_FRAMES, (ctx, f) => drawFish(ctx, 0, 0, k, f, st), res);
   };
@@ -630,7 +630,7 @@ function chaseSteps(scene: Phaser.Scene): Step[] {
     {
       name: 'the chase 3',
       run: () => {
-        if (!T.exists('fish6-fat')) sheet(scene, 'fish6-fat', FISH_SIZE.fat.w, FISH_SIZE.fat.h, SWIM_FRAMES.filter((_, i) => i % 2 === 0), (ctx, f) => drawFish(ctx, 0, 0, 'fat', f, st), LIGHT ? 1.2 : 1.8);
+        if (!T.exists('fish6-fat')) sheet(scene, 'fish6-fat', FISH_SIZE.fat.w, FISH_SIZE.fat.h, SWIM_FRAMES.filter((_, i) => i % 2 === 0), (ctx, f) => drawFish(ctx, 0, 0, 'fat', f, st), LIGHT ? 1.2 : 1.5);
         if (!T.exists('chase-sign')) addCanvas(scene, 'chase-sign', hires(SIGN.w, SIGN.h, 3, (ctx) => drawFallSign(ctx)));
         if (!T.exists('chase-col')) addCanvas(scene, 'chase-col', hires(COLUMN.w, COLUMN.h, 1, (ctx) => drawDangerColumn(ctx)));
         if (!T.exists('chase-target')) addCanvas(scene, 'chase-target', hires(TARGET.w, TARGET.h, 2, (ctx) => drawSurfaceTarget(ctx)));
@@ -640,7 +640,7 @@ function chaseSteps(scene: Phaser.Scene): Step[] {
         if (!T.exists('chase-shadow')) addCanvas(scene, 'chase-shadow', hires(SHADOW.w, SHADOW.h, 1, (ctx) => drawBedShadow(ctx)));
         if (!T.exists('chase-badge')) addCanvas(scene, 'chase-badge', hires(BADGE.w, BADGE.h, 2, (ctx) => drawBehindBadge(ctx)));
         // the pier's Ferris wheel: the wheel (it turns), its stand, the gondolas
-        const fr = LIGHT ? 1.25 : 2;
+        const fr = LIGHT ? 1.25 : 1.625;
         if (!T.exists('ferris-wheel')) addCanvas(scene, 'ferris-wheel', hires(FERRIS_SIZE, FERRIS_SIZE, fr, (ctx) => drawFerrisWheel(ctx)), undefined, { release: true });
         if (!T.exists('ferris-stand')) addCanvas(scene, 'ferris-stand', hires(FERRIS_STAND.w, FERRIS_STAND.h, fr, (ctx) => drawFerrisStand(ctx)), undefined, { release: true });
         if (!T.exists('ferris-car')) sheet(scene, 'ferris-car', GONDOLA.w, GONDOLA.h, GONDOLA_FRAMES, (ctx, f) => drawGondola(ctx, f), fr);
@@ -1504,16 +1504,16 @@ function footballJobs(scene: Phaser.Scene): [string, () => void][] {
   const rel = { release: true };
   const jobs: [string, () => void][] = [];
   const job = (key: string, name: string, run: () => void) => !T.exists(key) && jobs.push([name, run]);
-  job('fb-front', 'football field', () => addCanvas(scene, 'fb-front', hires(W, FIELD.UP + FIELD.DOWN, LIGHT ? 1.25 : 2, (ctx) => drawFieldFront(ctx, w)), undefined, rel));
-  job('fb-stands', 'football stands', () => addCanvas(scene, 'fb-stands', hires(W, FIELD.STANDS_UP, LIGHT ? 1 : 1.5, (ctx) => drawFieldStands(ctx, w)), undefined, rel));
+  job('fb-front', 'football field', () => addCanvas(scene, 'fb-front', hires(W, FIELD.UP + FIELD.DOWN, LIGHT ? 1.25 : 1.625, (ctx) => drawFieldFront(ctx, w)), undefined, rel));
+  job('fb-stands', 'football stands', () => addCanvas(scene, 'fb-stands', hires(W, FIELD.STANDS_UP, LIGHT ? 1 : 1.25, (ctx) => drawFieldStands(ctx, w)), undefined, rel));
   for (const team of ['snappers', 'stallions'] as const) {
-    job(`fb-post-${team}`, `goalpost ${team}`, () => addCanvas(scene, `fb-post-${team}`, hires(POST.W, POST.H, LIGHT ? 1.25 : 2, (ctx) => drawGoalpost(ctx, team)), undefined, rel));
-    job(`fb-${team}`, `football ${team}`, () => sheet(scene, `fb-${team}`, FB_W, FB_H, FB_FRAMES, (ctx, f) => drawFootballer(ctx, team, f), LIGHT ? 1.3 : 2));
+    job(`fb-post-${team}`, `goalpost ${team}`, () => addCanvas(scene, `fb-post-${team}`, hires(POST.W, POST.H, LIGHT ? 1.25 : 1.625, (ctx) => drawGoalpost(ctx, team)), undefined, rel));
+    job(`fb-${team}`, `football ${team}`, () => sheet(scene, `fb-${team}`, FB_W, FB_H, FB_FRAMES, (ctx, f) => drawFootballer(ctx, team, f), LIGHT ? 1.3 : 1.65));
   }
-  job('fb-board', 'scoreboard', () => addCanvas(scene, 'fb-board', hires(BOARD.W, BOARD.H, LIGHT ? 1.25 : 2, (ctx) => drawScoreboard(ctx)), undefined, rel));
+  job('fb-board', 'scoreboard', () => addCanvas(scene, 'fb-board', hires(BOARD.W, BOARD.H, LIGHT ? 1.25 : 1.625, (ctx) => drawScoreboard(ctx)), undefined, rel));
   job('fb-ball', 'football', () => {
-    sheet(scene, 'fb-ball', FBALL_W, FBALL_H, FBALL_FRAMES, (ctx, f) => drawFootball(ctx, f), LIGHT ? 2 : 3);
-    sheet(scene, 'fb-num', NUM_W, NUM_H, NUM_FRAMES, (ctx, f) => drawJerseyNumber(ctx, f), LIGHT ? 2 : 3);
+    sheet(scene, 'fb-ball', FBALL_W, FBALL_H, FBALL_FRAMES, (ctx, f) => drawFootball(ctx, f), LIGHT ? 2 : 2.5);
+    sheet(scene, 'fb-num', NUM_W, NUM_H, NUM_FRAMES, (ctx, f) => drawJerseyNumber(ctx, f), LIGHT ? 2 : 2.5);
     addCanvas(scene, 'fb-shadow', hires(FB_SHADOW.W, FB_SHADOW.H, 1, (ctx) => drawBallShadow(ctx)), undefined, rel);
   });
   return jobs;
