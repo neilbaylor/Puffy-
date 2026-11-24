@@ -1584,7 +1584,7 @@ export class GameScene extends Phaser.Scene {
     if (!onScreen) k *= offScreen;
     if (k < 0.05) return;
     this.cameras.main.shake(ms * (0.6 + 0.4 * k), intensity * k);
-    // (and in the app, the tablet itself: a slam's 0.02 at full strength; a little 0.004 bump, nothing)
+    // (and in the app, the tablet itself: a giant's slam, 0.02, at full strength; under 0.004, nothing)
     buzz((intensity * k) / 0.02);
   }
 

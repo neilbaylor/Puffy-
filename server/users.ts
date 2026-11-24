@@ -413,13 +413,6 @@ const FEELS = new Set(['great', 'ok', 'struggles']);
 /** A device check's report: 32 KB at most (they're ~3 KB). */
 const BENCH_MAX = 32 * 1024;
 
-/**
- * The Android/iOS app's pages (Capacitor: the game's files inside the app, at the phone's own
- * address) — the only other sites allowed to use the API from a page (CORS). The website itself
- * is the same site: it needs none of this.
- */
-const APP_ORIGINS = new Set(['https://localhost', 'capacitor://localhost']);
-
 /** Make the /api handler (returns true if it handled the request). */
 export async function createUserApi() {
   const store = await openStore();
@@ -440,16 +433,6 @@ export async function createUserApi() {
   return async function handle(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
     const url = new URL(req.url ?? '/', 'http://x');
     if (!url.pathname.startsWith('/api/')) return false;
-    const origin = req.headers.origin;
-    if (origin && APP_ORIGINS.has(origin)) {
-      res.setHeader('Access-Control-Allow-Origin', origin);
-      res.setHeader('Vary', 'Origin');
-      // (the app's "may I?" before a sign-in or a save: it sends JSON and its sign-in token)
-      if (req.method === 'OPTIONS') {
-        res.writeHead(204, { 'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE', 'Access-Control-Allow-Headers': 'Authorization, Content-Type', 'Access-Control-Max-Age': '600' });
-        return void res.end(), true;
-      }
-    }
     const route = `${req.method} ${url.pathname}`;
     try {
       if (route === 'POST /api/register' || route === 'POST /api/login') {

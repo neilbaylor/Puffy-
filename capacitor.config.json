@@ -1,11 +1,23 @@
 {
   "appId": "world.playpuffy.app",
   "appName": "Puffy!",
-  "webDir": "dist-app",
+  "webDir": "dist",
   "android": {
     "backgroundColor": "#5fc4ff"
   },
   "ios": {
     "backgroundColor": "#5fc4ff"
+  },
+  "plugins": {
+    "CapacitorUpdater": {
+      "autoUpdate": false,
+      "appReadyTimeout": 30000,
+      "autoDeleteFailed": true,
+      "autoDeletePrevious": true,
+      "resetWhenUpdate": true,
+      "updateUrl": "",
+      "channelUrl": "",
+      "statsUrl": ""
+    }
   }
 }

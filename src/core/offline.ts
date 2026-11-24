@@ -8,9 +8,12 @@
  * anyway, but a level has the device to itself).
  *
  * Only in the real (built) game: not on the dev server, nor in the single-file build (which can't
- * have one), nor the Android/iOS app (its files are inside it already), nor a saved copy of the page. Anything going wrong here just means no offline copy.
+ * have one), nor the Android/iOS app (its files are inside it, and it updates itself: core/appUpdate),
+ * nor a saved copy of the page. Anything going wrong here just means no offline copy.
  */
-const ON = import.meta.env.PROD && import.meta.env.MODE !== 'single' && import.meta.env.MODE !== 'app';
+import { IS_APP } from './native';
+
+const ON = import.meta.env.PROD && import.meta.env.MODE !== 'single' && !IS_APP;
 /** How long after the start screen appears. */
 const AFTER_MS = 3000;
 

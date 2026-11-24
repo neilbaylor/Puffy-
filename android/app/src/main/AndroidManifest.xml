@@ -3,6 +3,8 @@
 
     <application
         android:allowBackup="true"
+        android:appCategory="game"
+        android:isGame="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
@@ -15,6 +17,12 @@
         <property
             android:name="android.window.PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY"
             android:value="true" />
+
+        <!-- a game, to Android's Game Mode / Game Dashboard and makers' game boosters: the player
+             can pick performance or battery-saving for it -->
+        <meta-data
+            android:name="android.game_mode_config"
+            android:resource="@xml/game_mode_config" />
 
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
