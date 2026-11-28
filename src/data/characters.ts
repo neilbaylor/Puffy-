@@ -107,10 +107,10 @@ export const CHARACTERS: CharacterDef[] = [
     hitW: 32,
     hitH: 58,
     muzzleY: 23,
-    walkSpeed: 150,
-    runSpeed: 315,
-    accel: 1150,
-    airAccel: 850,
+    walkSpeed: 158, // (a bit quicker than he was, 150 / 315: still the slowest, not by as much)
+    runSpeed: 332,
+    accel: 1260,
+    airAccel: 920,
     jump: 585,
     staminaSecs: 2.9, // (a bit more than Puffy: he's slow, so he needs it)
     refillSecs: 2.2,
