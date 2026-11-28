@@ -11,6 +11,7 @@ import { sfx } from '../core/sfx';
 import { buzz } from '../core/native';
 import { LIGHT } from '../core/light';
 import { G12 } from '../core/screen';
+import { playEnd, playFrame, playRetry, playStart } from '../core/playLog';
 import type { Enemy } from '../entities/enemies/Enemy';
 import { bank } from '../core/bank';
 import { createBadGuy } from '../entities/enemies/Plops';
@@ -358,6 +359,8 @@ export class GameScene extends Phaser.Scene {
   aura = 0;
   private startCheckpoint = -1;
   private retry = false;
+  /** Restarting at a checkpoint after a faint (not leaving the level). */
+  private restarting = false;
   /** Which level is being played (1-based). */
   levelId = 1;
   private data0: GameData = { session: { players: [] } };
@@ -385,6 +388,7 @@ export class GameScene extends Phaser.Scene {
     this.startCheckpoint = data.checkpoint ?? -1;
     this.lastCheckpoint = this.startCheckpoint;
     this.retry = !!data.retry;
+    this.restarting = false;
     if (!this.retry) {
       run.startedAt = Date.now();
       run.faints = 0;
@@ -763,6 +767,9 @@ export class GameScene extends Phaser.Scene {
     if (!this.retry) this.startIntro(start.x);
     // (back at the start of an under-the-sea level: straight off the pier again)
     else if (data.water !== undefined) for (const p of this.players) if (!p.swimming) this.diveIn(p, 700);
+    // (testers' devices, see core/playLog: a faint's restart carries on the level's recording; leaving ends it)
+    if (this.retry) playRetry(this.levelId);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.restarting || playEnd('left'));
     this.cameras.main.fadeIn(this.retry ? 250 : 400, 255, 248, 236);
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.players.forEach((p) => p.destroy()));
@@ -1001,6 +1008,7 @@ export class GameScene extends Phaser.Scene {
     const dt = Math.min(deltaMs / 1000, 1 / 30);
     if (this.intro) return this.updateIntro(dt);
     if (this.cutscene) return this.updateCutscene(dt);
+    playFrame(deltaMs);
 
     this.updatePuddles(dt);
     this.updateDrips(dt);
@@ -1138,6 +1146,8 @@ export class GameScene extends Phaser.Scene {
     this.updateCamera(0);
     for (const p of this.players) p.spawnProtection();
     this.game.events.emit('level-intro-end');
+    // (testers' devices: how smoothly this level plays, see core/playLog)
+    playStart(this.levelId);
     const line = levelInfo(this.levelId).speech;
     const speak = () => {
       if (line && this.players[0]) this.time.delayedCall(350, () => this.say(this.players[0], line));
@@ -2362,9 +2372,10 @@ export class GameScene extends Phaser.Scene {
         return;
       }
       this.cameras.main.fadeOut(300, 255, 248, 236);
-      this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () =>
-        this.scene.restart({ session: this.session, checkpoint: this.lastCheckpoint, retry: true, level: this.levelId } satisfies GameData),
-      );
+      this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+        this.restarting = true;
+        this.scene.restart({ session: this.session, checkpoint: this.lastCheckpoint, retry: true, level: this.levelId } satisfies GameData);
+      });
     });
   }
 

@@ -652,7 +652,10 @@ async function listPage() {
     msg.textContent = `The server said ${res.status}.`;
     return;
   }
-  const { reports } = (await res.json()) as { reports: Stored[] };
+  const all = (await res.json()) as { reports: Stored[] };
+  // (the game's own level recordings — testers' devices, see core/playLog — in a table of their own)
+  const plays = all.reports.filter((r) => r.feel === 'play');
+  const reports = all.reports.filter((r) => r.feel !== 'play');
   msg.className = 'msg soft';
   msg.textContent = `${reports.length} report${reports.length === 1 ? '' : 's'}, newest first. Times in ms: lower is faster (q: the quick check, f: the full one).`;
   const out = inner.querySelector<HTMLElement>('[data-el=out]')!;
@@ -668,7 +671,37 @@ async function listPage() {
         }).join('')}</tr>`,
     )
     .join('');
-  out.innerHTML = `<p><button class="alt" data-act="csv">Copy all (CSV)</button></p><div class="scroll"><table><tr>${head}</tr>${body}</table></div>`;
+  type P = { part?: number; mode?: string; g12?: boolean; frames?: number; secs?: number; median?: number; p90?: number; p99?: number; over33?: number; over50?: number; window?: string; dpr?: number; hz?: number; v?: string; why?: string; faints?: number };
+  const PCOLS: [string, (s: Stored, r: P) => string][] = [
+    ['When', (s) => new Date(s.at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })],
+    ['Part', (_, r) => na(r.part)],
+    ['Mode', (_, r) => na(r.mode)],
+    ['G12', (_, r) => (r.g12 ? 'on' : 'off')],
+    ['Median ms', (_, r) => na(r.median)],
+    ['p90', (_, r) => na(r.p90)],
+    ['p99', (_, r) => na(r.p99)],
+    ['>33 ms %', (_, r) => na(r.over33)],
+    ['>50 ms %', (_, r) => na(r.over50)],
+    ['Frames', (_, r) => na(r.frames)],
+    ['Secs', (_, r) => na(r.secs)],
+    ['Faints', (_, r) => na(r.faints)],
+    ['Ended', (_, r) => na(r.why)],
+    ['Window', (_, r) => `${na(r.window)} @${na(r.dpr)}`],
+    ['Hz', (_, r) => na(r.hz)],
+    ['Version', (_, r) => na(r.v)],
+    ['User agent', (s) => s.ua],
+  ];
+  const playTable = plays.length
+    ? `<h2>Level recordings (${plays.length})</h2><p class="msg soft">How smoothly each level played on testers' devices: each game frame's time, lower is smoother.</p><p><button class="alt" data-act="pcsv">Copy recordings (CSV)</button></p><div class="scroll"><table><tr>${PCOLS.map(([h]) => `<th>${esc(h)}</th>`).join('')}</tr>${plays
+        .map((s) => `<tr>${PCOLS.map(([h, f]) => (h === 'User agent' ? `<td class="long" title="${esc(f(s, s.report as P))}">${esc(f(s, s.report as P))}</td>` : `<td>${esc(f(s, s.report as P))}</td>`)).join('')}</tr>`)
+        .join('')}</table></div><h2>Device checks</h2>`
+    : '';
+  out.innerHTML = `${playTable}<p><button class="alt" data-act="csv">Copy all (CSV)</button></p><div class="scroll"><table><tr>${head}</tr>${body}</table></div>`;
+  out.querySelector<HTMLButtonElement>('[data-act=pcsv]')?.addEventListener('click', async () => {
+    const cell = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+    const csv = [PCOLS.map(([h]) => cell(h)).join(','), ...plays.map((s) => PCOLS.map(([, f]) => cell(f(s, s.report as P))).join(','))].join('\n');
+    msg.textContent = (await copyText(csv)) ? 'Recordings copied as CSV.' : "Couldn't copy here.";
+  });
   out.querySelector<HTMLButtonElement>('[data-act=csv]')!.onclick = async () => {
     const cell = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
     const csv = [COLUMNS.map(([h]) => cell(h)).join(','), ...reports.map((s) => COLUMNS.map(([, f]) => cell(f(s))).join(','))].join('\n');

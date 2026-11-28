@@ -409,7 +409,8 @@ function addressOf(req: IncomingMessage) {
 }
 
 /** How the owner says the game plays on a device (the ?bench page's three choices). */
-const FEELS = new Set(['great', 'ok', 'struggles']);
+// (and 'play': a tester's level summary from the game itself, see src/core/playLog)
+const FEELS = new Set(['great', 'ok', 'struggles', 'play']);
 /** A device check's report: 32 KB at most (they're ~3 KB). */
 const BENCH_MAX = 32 * 1024;
 
