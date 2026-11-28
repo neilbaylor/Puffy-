@@ -799,8 +799,9 @@ export class Background {
     for (let x = x0; x < x1; ) {
       const s = Math.floor((x - this.stripX0) / SW);
       const next = Math.min(x1, this.stripX0 + (s + 1) * SW);
-      // (outside the stretches: not cut; cut heights a hair higher, in whole px, so neighbours join up)
-      const c = s < 0 || s >= this.stripN ? Infinity : Math.floor(cut[s]);
+      // (outside the stretches: not cut; cut a little higher, to a step of 8 px, so neighbours join up:
+      // each stretch is a few more shapes to draw)
+      const c = s < 0 || s >= this.stripN ? Infinity : Math.floor(cut[s] / 8) * 8;
       if (c < Infinity) any = true;
       if (c < low) low = c;
       if (cs.length && cs[cs.length - 1] === c) xs[xs.length - 1] = next;

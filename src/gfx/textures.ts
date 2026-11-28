@@ -995,14 +995,16 @@ function measurePieces(key: string, c: HTMLCanvasElement) {
     }
     // each pixel column's solid band: its lowest run of wholly solid pixels (from the foot of the
     // picture up: the hills and the cloud seas are solid from their outline down)
+    // (a wholly solid pixel: its alpha byte all ones — compared as the 32-bit integer `&` gives)
+    const AS = A | 0;
     const sTop = new Int32Array(W).fill(H);
     const sBot = new Int32Array(W).fill(-1);
     for (let x = 0; x < W; x++) {
       let y = H - 1;
-      while (y >= 0 && (px[y * W + x] & A) !== A) y--;
+      while (y >= 0 && (px[y * W + x] & A) !== AS) y--;
       if (y < 0) continue;
       sBot[x] = y;
-      while (y >= 0 && (px[y * W + x] & A) === A) y--;
+      while (y >= 0 && (px[y * W + x] & A) === AS) y--;
       sTop[x] = y + 1;
     }
     // (the foot of the picture: its 2 see-through rows, below what was drawn — see hiresPadV)
