@@ -39,6 +39,83 @@ const PIECES = new Map<string, { outline: Pt[]; x0: number; y0: number; x1: numb
  */
 const LOCAL_TOPS = new WeakMap<Pt[], Map<string, number>>();
 
+/**
+ * A terrain chunk's picture is shown as a few side-by-side pieces, each cut down to the rows its own
+ * columns have anything in (see chunkPieces): the most pieces a chunk's picture is cut into.
+ */
+const CHUNK_PIECES = 6;
+/** The width of the columns a chunk's picture is measured in (world px). */
+const PIECE_COL = 32;
+/**
+ * How far a chunk's drawing reaches past its piece's outline (world px): across, and above the top /
+ * below the underside — the moss puffs (~21), the dandelion stalks (~25) and the hanging roots (~25)
+ * stand out the furthest; plus the outline's wobble and its ink. Kept well clear of those.
+ */
+const PIECE_REACH_X = 28;
+const PIECE_REACH_Y = 40;
+/** Each terrain picture's pieces (picture pixels), by key: the shapes never change (see chunkPieces). */
+const CHUNK_CUTS = new Map<string, { x: number; y: number; w: number; h: number }[]>();
+
+/**
+ * A terrain chunk's picture (its top-left at world left, top; w × h world px; drawn at res) as up to
+ * CHUNK_PIECES side-by-side pieces, each only as tall as the ground in its own columns reaches. A
+ * chunk's picture is a box round everything in it: a step, a slope or a pillar in it left most of the
+ * box see-through, and the graphics chip blended every pixel of it all the same, every frame — the
+ * ground's pictures were the dearest thing in most frames of a level (and up to 70% of the screen,
+ * mostly nothing, under the sea in Part 5). Each column's rows come from the piece's outline (all the
+ * chunk's drawing is the outline's: its fill, moss, roots and stalks), with room to spare: the same
+ * pixels, in the same places, less of nothing.
+ */
+function chunkPieces(key: string, outline: Pt[], left: number, top: number, w: number, h: number, res: number) {
+  const had = CHUNK_CUTS.get(key);
+  if (had) return had;
+  const W = Math.round(w * res);
+  const H = Math.round(h * res);
+  const n = Math.max(1, Math.ceil(w / PIECE_COL));
+  // each column's highest and lowest point of the outline, within reach of it
+  const lo = new Array<number>(n).fill(Infinity);
+  const hi = new Array<number>(n).fill(-Infinity);
+  for (let i = 0; i < outline.length; i++) {
+    const [ax, ay] = outline[i];
+    const [bx, by] = outline[(i + 1) % outline.length];
+    const k0 = Math.max(0, Math.floor((Math.min(ax, bx) - PIECE_REACH_X - left) / PIECE_COL));
+    const k1 = Math.min(n - 1, Math.floor((Math.max(ax, bx) + PIECE_REACH_X - left) / PIECE_COL));
+    for (let k = k0; k <= k1; k++) {
+      lo[k] = Math.min(lo[k], ay, by);
+      hi[k] = Math.max(hi[k], ay, by);
+    }
+  }
+  // (column edges in picture pixels, shared by neighbours: no gap or overlap between pieces)
+  const edge = (k: number) => Math.min(W, Math.round(k * PIECE_COL * res));
+  let cuts = lo.map((l, k) => {
+    const y0 = Math.max(0, Math.floor((l - PIECE_REACH_Y - top) * res));
+    const y1 = Math.min(H, Math.ceil((hi[k] + PIECE_REACH_Y - top) * res));
+    return { x0: edge(k), x1: edge(k + 1), y0: Math.min(y0, y1), y1: Math.max(y0, y1) };
+  });
+  // join neighbours, the pair that adds the fewest pixels each time, down to CHUNK_PIECES
+  const area = (c: (typeof cuts)[number]) => (c.x1 - c.x0) * (c.y1 - c.y0);
+  const join = (a: (typeof cuts)[number], b: (typeof cuts)[number]) => {
+    if (a.y1 <= a.y0) return { x0: a.x0, x1: b.x1, y0: b.y0, y1: b.y1 };
+    if (b.y1 <= b.y0) return { x0: a.x0, x1: b.x1, y0: a.y0, y1: a.y1 };
+    return { x0: a.x0, x1: b.x1, y0: Math.min(a.y0, b.y0), y1: Math.max(a.y1, b.y1) };
+  };
+  while (cuts.length > CHUNK_PIECES) {
+    let best = 0;
+    let cost = Infinity;
+    for (let i = 0; i + 1 < cuts.length; i++) {
+      const c = area(join(cuts[i], cuts[i + 1])) - area(cuts[i]) - area(cuts[i + 1]);
+      if (c < cost) {
+        cost = c;
+        best = i;
+      }
+    }
+    cuts = [...cuts.slice(0, best), join(cuts[best], cuts[best + 1]), ...cuts.slice(best + 2)];
+  }
+  const out = cuts.filter((c) => c.y1 > c.y0 && c.x1 > c.x0).map((c) => ({ x: c.x0, y: c.y0, w: c.x1 - c.x0, h: c.y1 - c.y0 }));
+  CHUNK_CUTS.set(key, out);
+  return out;
+}
+
 /** Highest point (smallest y) of a closed outline within the column range x0..x1. */
 function localTop(outline: Pt[], x0: number, x1: number) {
   let known = LOCAL_TOPS.get(outline);
@@ -184,7 +261,11 @@ export class LevelView {
    */
   private readonly trim: boolean;
   /** Each scenery picture's box (from when it was put up) and each deep-rock strip's, and whether it's being skipped now. */
-  private boxes: { o: Phaser.GameObjects.GameObject; x0: number; x1: number; y0: number; y1: number; off: boolean }[] = [];
+  private boxes: { o: Phaser.GameObjects.GameObject; more?: Phaser.GameObjects.GameObject[]; x0: number; x1: number; y0: number; y1: number; off: boolean }[] = [];
+  /** A terrain chunk's other pieces, by its first (they share its box: see cull). */
+  private chunkMates = new WeakMap<Phaser.GameObjects.GameObject, Phaser.GameObjects.GameObject[]>();
+  /** …and those other pieces (boxed with the first). */
+  private chunkMate = new WeakSet<Phaser.GameObjects.GameObject>();
   /** How many of `scenery` have a box so far. */
   private boxed = 0;
 
@@ -418,8 +499,10 @@ export class LevelView {
     // (new pictures since last time: terrain drawn lazily, trench decor)
     for (; this.boxed < this.scenery.length; this.boxed++) {
       const o = this.scenery[this.boxed];
+      // (a terrain chunk's pieces all have its box: one for them all)
+      if (this.chunkMate.has(o)) continue;
       const b = o.getBounds();
-      this.boxes.push({ o, x0: b.x, x1: b.right, y0: b.y, y1: b.bottom, off: false });
+      this.boxes.push({ o, more: this.chunkMates.get(o), x0: b.x, x1: b.right, y0: b.y, y1: b.bottom, off: false });
     }
     // the view as the camera will draw it (centerOn has set the scroll; the zoom shrinks or grows
     // it), grown so a tilted view's corners, a shake and the plants' sway are still covered
@@ -441,6 +524,7 @@ export class LevelView {
       bx.off = off;
       if (off) bx.o.cameraFilter |= id;
       else bx.o.cameraFilter &= ~id;
+      if (bx.more) for (const o of bx.more) o.cameraFilter = bx.o.cameraFilter;
     }
   }
 
@@ -718,15 +802,26 @@ export class LevelView {
           const make = () => {
           paint();
           const fillCol = last ? DEEP_FILL.get(key) : undefined;
-          const chunk = this.scene.add
-            .image(cx0 - PAD, ty0, key)
-            .setOrigin(0, 0)
-            .setScale(1 / res)
-            .setDepth(DEPTH.tiles);
-          // (drawn later, in lazy mode: it joins the colour grade too)
-          if (this.scenery) {
-            this.scenery.push(chunk);
-            if (this.tint !== 0xffffff) chunk.setTint(this.tint);
+          // (in pieces: see chunkPieces)
+          const fr = this.scene.textures.getFrame(key);
+          const mates: Phaser.GameObjects.Image[] = [];
+          for (const c of chunkPieces(key, outline, cx0 - PAD, ty0, fr.width / res, fr.height / res, res)) {
+            const chunk = this.scene.add
+              .image(cx0 - PAD, ty0, key)
+              .setOrigin(0, 0)
+              .setScale(1 / res)
+              .setDepth(DEPTH.tiles)
+              .setCrop(c.x, c.y, c.w, c.h);
+            mates.push(chunk);
+            // (drawn later, in lazy mode: it joins the colour grade too)
+            if (this.scenery) {
+              this.scenery.push(chunk);
+              if (this.tint !== 0xffffff) chunk.setTint(this.tint);
+            }
+          }
+          if (mates.length > 1) {
+            this.chunkMates.set(mates[0], mates.slice(1));
+            for (const m of mates.slice(1)) this.chunkMate.add(m);
           }
           if (last && cut < y1 + PAD && fillCol !== undefined) {
             // the deep rock: from just above the cut down to the bottom of the level, with
