@@ -10,6 +10,8 @@ import { drawPine } from '../gfx/mountain';
 import type { Cell, LevelData } from '../level/builder';
 import type { GroundCover } from './Background';
 import { ONE_WAY_TILES, SOLID_TILES } from '../level/tiles';
+import { LIGHT } from '../core/light';
+import { phoneScreen } from '../core/screen';
 
 const PAD = 34; // room around each terrain piece for grass blades / roots
 /** Terrain pieces are cut into chunks no wider than this (world px), to stay under mobile texture limits. */
@@ -67,10 +69,13 @@ const CHUNK_CUTS = new Map<string, { x: number; y: number; w: number; h: number 
  * pixels, in the same places, less of nothing.
  */
 function chunkPieces(key: string, outline: Pt[], left: number, top: number, w: number, h: number, res: number) {
-  const had = CHUNK_CUTS.get(key);
-  if (had) return had;
   const W = Math.round(w * res);
   const H = Math.round(h * res);
+  // (full mode on a phone only: on tablets and in light mode the pieces measured no better — the
+  // whole picture, as before)
+  if (LIGHT || !phoneScreen()) return [{ x: 0, y: 0, w: W, h: H }];
+  const had = CHUNK_CUTS.get(key);
+  if (had) return had;
   const n = Math.max(1, Math.ceil(w / PIECE_COL));
   // each column's highest and lowest point of the outline, within reach of it
   const lo = new Array<number>(n).fill(Infinity);
