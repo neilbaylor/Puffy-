@@ -398,8 +398,16 @@ export class Background {
     return this.bands.length > 0;
   }
 
+  /** The look setTheme last showed. */
+  private lastMix: ThemeMix | null = null;
+
   /** Show look `a`, with look `b` faded in on top by `w`. */
   setTheme(m: ThemeMix) {
+    // (the same as last time — most frames: a look holds for a while between fades, and light mode
+    // has only the one — there's nothing to do: update shows the second look's pictures as they are)
+    const last = this.lastMix;
+    if (last && last.a === m.a && last.b === m.b && last.w === m.w) return;
+    this.lastMix = { a: m.a, b: m.b, w: m.w };
     if (m.a !== this.themeA) ensureLook(this.scene, m.a, this.home);
     if (m.b !== this.themeB && m.w > 0.001) ensureLook(this.scene, m.b, this.home);
     if (m.a !== this.themeA) {

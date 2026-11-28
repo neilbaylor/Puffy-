@@ -261,7 +261,11 @@ export class LevelView {
    */
   private readonly trim: boolean;
   /** Each scenery picture's box (from when it was put up) and each deep-rock strip's, and whether it's being skipped now. */
-  private boxes: { o: Phaser.GameObjects.GameObject; x0: number; x1: number; y0: number; y1: number; off: boolean }[] = [];
+  private boxes: { o: Phaser.GameObjects.GameObject; more?: Phaser.GameObjects.GameObject[]; x0: number; x1: number; y0: number; y1: number; off: boolean }[] = [];
+  /** A terrain chunk's other pieces, by its first (they share its box: see cull). */
+  private chunkMates = new WeakMap<Phaser.GameObjects.GameObject, Phaser.GameObjects.GameObject[]>();
+  /** …and those other pieces (boxed with the first). */
+  private chunkMate = new WeakSet<Phaser.GameObjects.GameObject>();
   /** How many of `scenery` have a box so far. */
   private boxed = 0;
 
@@ -495,8 +499,10 @@ export class LevelView {
     // (new pictures since last time: terrain drawn lazily, trench decor)
     for (; this.boxed < this.scenery.length; this.boxed++) {
       const o = this.scenery[this.boxed];
+      // (a terrain chunk's pieces all have its box: one for them all)
+      if (this.chunkMate.has(o)) continue;
       const b = o.getBounds();
-      this.boxes.push({ o, x0: b.x, x1: b.right, y0: b.y, y1: b.bottom, off: false });
+      this.boxes.push({ o, more: this.chunkMates.get(o), x0: b.x, x1: b.right, y0: b.y, y1: b.bottom, off: false });
     }
     // the view as the camera will draw it (centerOn has set the scroll; the zoom shrinks or grows
     // it), grown so a tilted view's corners, a shake and the plants' sway are still covered
@@ -518,6 +524,7 @@ export class LevelView {
       bx.off = off;
       if (off) bx.o.cameraFilter |= id;
       else bx.o.cameraFilter &= ~id;
+      if (bx.more) for (const o of bx.more) o.cameraFilter = bx.o.cameraFilter;
     }
   }
 
@@ -797,6 +804,7 @@ export class LevelView {
           const fillCol = last ? DEEP_FILL.get(key) : undefined;
           // (in pieces: see chunkPieces)
           const fr = this.scene.textures.getFrame(key);
+          const mates: Phaser.GameObjects.Image[] = [];
           for (const c of chunkPieces(key, outline, cx0 - PAD, ty0, fr.width / res, fr.height / res, res)) {
             const chunk = this.scene.add
               .image(cx0 - PAD, ty0, key)
@@ -804,11 +812,16 @@ export class LevelView {
               .setScale(1 / res)
               .setDepth(DEPTH.tiles)
               .setCrop(c.x, c.y, c.w, c.h);
+            mates.push(chunk);
             // (drawn later, in lazy mode: it joins the colour grade too)
             if (this.scenery) {
               this.scenery.push(chunk);
               if (this.tint !== 0xffffff) chunk.setTint(this.tint);
             }
+          }
+          if (mates.length > 1) {
+            this.chunkMates.set(mates[0], mates.slice(1));
+            for (const m of mates.slice(1)) this.chunkMate.add(m);
           }
           if (last && cut < y1 + PAD && fillCol !== undefined) {
             // the deep rock: from just above the cut down to the bottom of the level, with
