@@ -582,6 +582,7 @@ export class LevelView {
   get cover(): GroundCover {
     return {
       at: (x0, x1) => this.groundHides(x0, x1),
+      runs: (x0, x1, out) => this.groundRuns(x0, x1, out),
       on: () => {
         const cam = this.scene.cameras.main;
         const r = (cam as unknown as { rotation: number }).rotation;
@@ -589,6 +590,74 @@ export class LevelView {
         return low + 16 <= this.heightPx + TRIM_KEEP;
       },
     };
+  }
+
+  /**
+   * Each tile column's stretches of solid ground or rock (top and bottom cell rows, a pair each, one
+   * kind each: where they meet, each has its own inked outline), worked out once from the level's cells.
+   */
+  private solidRunCols: Int32Array[] | null = null;
+  private findSolidRuns() {
+    const W = this.data.width;
+    const H = this.data.height;
+    const cols: Int32Array[] = [];
+    for (let x = 0; x < W; x++) {
+      const r: number[] = [];
+      for (let y = 0; y < H; ) {
+        const kind = this.cell(x, y);
+        if (kind !== 'ground' && kind !== 'rock') {
+          y++;
+          continue;
+        }
+        const y0 = y;
+        while (y < H && this.cell(x, y) === kind) y++;
+        r.push(y0, y);
+      }
+      cols.push(Int32Array.from(r));
+    }
+    return cols;
+  }
+  /** (scratch for groundRuns) */
+  private runA: number[] = [];
+  private runB: number[] = [];
+
+  /**
+   * Where the ground's solid all across x0…x1 (world px; see GroundCover.runs): the stretches of cells
+   * solid in every tile column there and a column's worth either side (as groundHides), less the margin
+   * at both ends (its rounded corners, wobbly inked outline, the blending at its edge); one reaching the
+   * level's bottom goes on down to where the ground's pictures stop (see TRIM_KEEP).
+   */
+  groundRuns(x0: number, x1: number, out: number[]) {
+    out.length = 0;
+    if (!(x1 >= x0)) return;
+    const cols = (this.solidRunCols ??= this.findSolidRuns());
+    const c0 = Math.floor((x0 - GROUND_HIDE_X) / TILE);
+    const c1 = Math.floor((x1 + GROUND_HIDE_X) / TILE);
+    if (c0 < 0 || c1 >= cols.length) return;
+    // (the cell rows solid in every column so far, intersected column by column)
+    let cur = this.runA;
+    let next = this.runB;
+    cur.length = 0;
+    for (const v of cols[c0]) cur.push(v);
+    for (let c = c0 + 1; c <= c1 && cur.length; c++) {
+      const r = cols[c];
+      next.length = 0;
+      for (let i = 0; i < cur.length; i += 2)
+        for (let j = 0; j < r.length; j += 2) {
+          const a = Math.max(cur[i], r[j]);
+          const b = Math.min(cur[i + 1], r[j + 1]);
+          if (b > a) next.push(a, b);
+        }
+      const t = cur;
+      cur = next;
+      next = t;
+    }
+    const H = this.data.height;
+    for (let i = 0; i < cur.length; i += 2) {
+      const top = cur[i] * TILE + GROUND_HIDE_Y;
+      const bottom = cur[i + 1] >= H ? this.heightPx + TRIM_KEEP : cur[i + 1] * TILE - GROUND_HIDE_Y;
+      if (bottom > top) out.push(top, bottom);
+    }
   }
 
   private findSolidTops() {
