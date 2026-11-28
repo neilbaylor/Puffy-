@@ -28,6 +28,9 @@ if (typeof window !== 'undefined') {
   window.addEventListener(
     'keydown',
     (e) => {
+      // (typing in a box — a name, a password, a room code — is the phone's own keyboard, not a real one)
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
       if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'Space', 'KeyA', 'KeyD', 'KeyW', 'KeyF', 'KeyJ', 'ShiftLeft', 'ShiftRight', 'Enter'].includes(e.code)) setTouchMode(false);
     },
     { capture: true },

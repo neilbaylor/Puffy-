@@ -22,6 +22,7 @@ import { skipClearCameraFills } from './core/fadeFix';
 import { roundTextureIds } from './core/texIdFix';
 import { warmBatchShaders } from './core/shaderWarm';
 import { freeSwappedRenderTextures } from './core/dynamicTextureFix';
+import { playFlush } from './core/playLog';
 
 // (before any scene: see physicsFix)
 fixArcadeGroupWalk();
@@ -316,6 +317,8 @@ function start(refreshMs: number) {
   // handy for debugging from the console
   (window as unknown as { game: Phaser.Game; refreshHz: number }).game = game;
   (window as unknown as { refreshHz: number }).refreshHz = Math.round(1000 / refreshMs);
+  // (a tester's level recording the last visit didn't get to send: now, once the start's settled — core/playLog)
+  setTimeout(() => void playFlush().catch(() => {}), 8000);
 }
 
 void refreshMs.then(start);

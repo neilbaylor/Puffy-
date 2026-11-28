@@ -16,6 +16,7 @@
  */
 import { fullBench, quickBench, timeLayers, type BenchScores } from '../core/bench';
 import { refreshMs } from '../core/refresh';
+import { playFlush, playLast } from '../core/playLog';
 
 type Main = typeof import('../main');
 type GameLike = {
@@ -636,6 +637,8 @@ async function listPage() {
   panel.classList.add('wide');
   inner.innerHTML = `<h1>Puffy device reports</h1><p class="msg" data-el="msg">Loading…</p><div data-el="out"></div>`;
   const msg = inner.querySelector<HTMLElement>('[data-el=msg]')!;
+  // (a level recording the game didn't get to send: now, so it's in the list below)
+  await playFlush().catch(() => {});
   let res: Response;
   try {
     res = await authed('/api/bench');
@@ -654,7 +657,16 @@ async function listPage() {
   }
   const all = (await res.json()) as { reports: Stored[] };
   // (the game's own level recordings — testers' devices, see core/playLog — in a table of their own)
-  const plays = all.reports.filter((r) => r.feel === 'play');
+  // (one row a recording: a copy sent again after a page cut it off — see playLog — counts once)
+  const seen = new Set<string>();
+  const plays = all.reports.filter((r) => {
+    if (r.feel !== 'play') return false;
+    const id = (r.report as { rid?: string }).rid;
+    if (!id) return true;
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
   const reports = all.reports.filter((r) => r.feel !== 'play');
   msg.className = 'msg soft';
   msg.textContent = `${reports.length} report${reports.length === 1 ? '' : 's'}, newest first. Times in ms: lower is faster (q: the quick check, f: the full one).`;
@@ -691,11 +703,15 @@ async function listPage() {
     ['Version', (_, r) => na(r.v)],
     ['User agent', (s) => s.ua],
   ];
+  const last = playLast();
+  const lastLine = `<p class="msg soft">This device's last level: ${
+    last ? `Part ${esc(String(last.part))}, ${esc(new Date(last.at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }))}${last.frames ? `, ${esc(String(last.frames))} frames` : ''}: ${esc(last.sent)}.` : 'none played since the recorder came in (v0.411).'
+  }</p>`;
   const playTable = plays.length
-    ? `<h2>Level recordings (${plays.length})</h2><p class="msg soft">How smoothly each level played on testers' devices: each game frame's time, lower is smoother.</p><p><button class="alt" data-act="pcsv">Copy recordings (CSV)</button></p><div class="scroll"><table><tr>${PCOLS.map(([h]) => `<th>${esc(h)}</th>`).join('')}</tr>${plays
+    ? `<h2>Level recordings (${plays.length})</h2>${lastLine}<p class="msg soft">How smoothly each level played on testers' devices: each game frame's time, lower is smoother.</p><p><button class="alt" data-act="pcsv">Copy recordings (CSV)</button></p><div class="scroll"><table><tr>${PCOLS.map(([h]) => `<th>${esc(h)}</th>`).join('')}</tr>${plays
         .map((s) => `<tr>${PCOLS.map(([h, f]) => (h === 'User agent' ? `<td class="long" title="${esc(f(s, s.report as P))}">${esc(f(s, s.report as P))}</td>` : `<td>${esc(f(s, s.report as P))}</td>`)).join('')}</tr>`)
         .join('')}</table></div><h2>Device checks</h2>`
-    : '';
+    : `<h2>Level recordings</h2>${lastLine}<h2>Device checks</h2>`;
   out.innerHTML = `${playTable}<p><button class="alt" data-act="csv">Copy all (CSV)</button></p><div class="scroll"><table><tr>${head}</tr>${body}</table></div>`;
   out.querySelector<HTMLButtonElement>('[data-act=pcsv]')?.addEventListener('click', async () => {
     const cell = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
