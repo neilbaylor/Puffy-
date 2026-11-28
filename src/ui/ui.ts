@@ -10,6 +10,7 @@ import { BattleUI } from './battleUi';
 import { loadArt, loadArtQueue } from './artLoader';
 import { MenuScene } from '../scenes/MenuScene';
 import { LIGHT } from '../core/light';
+import { G12 } from '../core/screen';
 import { BG_LAYER_IDS, HOME_LO, asBossArt, asQuietJob, bgKey, disownBossArt, dropHeroSheets, freeBossArtExcept, gameArtJobs, homeKeepKeys, isSliceJob, lookJobs, missingLookSteps, ownFrame, seaWear, swimLevel, type Step } from '../gfx/textures';
 import { themeClock, themeMix, themesFor } from '../world/theme';
 import { Background } from '../world/Background';
@@ -1128,7 +1129,8 @@ export class UI {
 
   /** ' · light' on the version label in light mode. */
   private lowRes() {
-    return LIGHT ? ' · light' : '';
+    // (and ' · g12' when perf round G12's drawing savings are switched on for testing: see core/screen)
+    return LIGHT ? ' · light' : G12 ? ' · g12' : '';
   }
 
   private play() {

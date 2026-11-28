@@ -10,7 +10,7 @@ import { lives, loseLife, resetLives } from '../core/lives';
 import { sfx } from '../core/sfx';
 import { buzz } from '../core/native';
 import { LIGHT } from '../core/light';
-import { phoneScreen } from '../core/screen';
+import { G12 } from '../core/screen';
 import type { Enemy } from '../entities/enemies/Enemy';
 import { bank } from '../core/bank';
 import { createBadGuy } from '../entities/enemies/Plops';
@@ -485,9 +485,8 @@ export class GameScene extends Phaser.Scene {
     const clouds = this.retry ? this.bg?.cloudClock : undefined;
     this.bg = new Background(this, (data.bgBottom ?? heightPx) - VIEW_H, false, !!data.vertical, data.water !== undefined);
     this.bg.hideUnder(this.level.cover);
-    // (full mode on a phone only: at light mode's resolution the pixels saved weren't worth the working
-    // out — measured a touch slower there — and on tablets it measured no better: see core/screen)
-    this.bg.coverLayers(!LIGHT && phoneScreen());
+    // (only when switched on, and never in light mode — measured a touch slower there: see core/screen)
+    this.bg.coverLayers(!LIGHT && G12);
     if (clouds) this.bg.carryOn(clouds);
     this.amb = new Ambience(this, this.levelId, (x, y, max) => {
       for (let d = 0; d <= max; d += 6) if (this.level.isSolidAt(x, y + d)) return Math.floor((y + d) / TILE) * TILE;
