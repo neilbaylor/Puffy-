@@ -139,12 +139,6 @@ interface Tile {
 export interface GroundCover {
   at: (x0: number, x1: number) => number;
   on: () => boolean;
-  /**
-   * Where the ground's solid all across x0…x1 higher up too (a floating island, a ledge, the rock
-   * between the trenches): its solid stretches there, as top, bottom pairs (world px) into `out`
-   * (cleared first). Optional.
-   */
-  runs?: (x0: number, x1: number, out: number[]) => void;
 }
 
 interface Layer {
@@ -693,8 +687,6 @@ export class Background {
   private bandBot: Float64Array[] = [];
   /** Per stretch, from how high everything in front of each layer (and of the sky: [0]) hides it, all the way down the view. */
   private hidden: Float64Array[] = [];
-  /** (the ground's solid stretches in a stretch of the view: see GroundCover.runs) */
-  private runsAt: number[] = [];
   /** The sky's, this frame (null: not cut). */
   private skyCut: Float64Array | null = null;
 
@@ -764,20 +756,15 @@ export class Background {
       }
     }
     // for each layer (and the sky), from how high what's in front hides it, down past the view's bottom
-    // (and the cloud sea in front, index L: only the ground's in front of it)
-    const runs = this.runsAt;
-    const groundRuns = this.cover?.runs;
-    for (let s = 0; s < n; s++) {
-      let g = Infinity;
-      runs.length = 0;
-      if (groundOn) {
-        g = this.cover!.at(sx0 + s * SW, sx0 + (s + 1) * SW);
-        groundRuns?.(sx0 + s * SW, sx0 + (s + 1) * SW, runs);
-      }
-      for (let target = 0; target <= L; target++) {
-        let cur = Math.min(bottom, g);
-        // (bands in front, and the ground's solid stretches, reaching down to where it's hidden so far
-        // hide it from their tops)
+    for (let target = 0; target < L; target++) {
+      const out = this.hidden[target];
+      for (let s = 0; s < n; s++) {
+        let cur = bottom;
+        if (groundOn) {
+          const g = this.cover!.at(sx0 + s * SW, sx0 + (s + 1) * SW);
+          if (g < cur) cur = g;
+        }
+        // (bands in front reaching down to where it's hidden so far hide it from their tops)
         for (let more = true; more; ) {
           more = false;
           for (let f = target; f < L; f++)
@@ -785,13 +772,8 @@ export class Background {
               cur = this.bandTop[f][s];
               more = true;
             }
-          for (let i = 0; i < runs.length; i += 2)
-            if (runs[i] < cur && runs[i + 1] >= cur) {
-              cur = runs[i];
-              more = true;
-            }
         }
-        this.hidden[target][s] = cur < bottom ? cur : Infinity;
+        out[s] = cur < bottom ? cur : Infinity;
       }
     }
     return this.hidden;
@@ -878,7 +860,7 @@ export class Background {
       const a = this.row(l.a, l.keyA, n, l.depth);
       const b = this.row(l.b, l.keyB, n, l.depth);
       const rowOn = l.rowOn;
-      const front = fronts ? fronts[li + 1] : null;
+      const front = fronts && li < this.layers.length - 1 ? fronts[li + 1] : null;
       const right = view.left + view.width;
       for (let i = 0; i < a.length; i++) {
         // (a hair of overlap so no seam shows between neighbours)
