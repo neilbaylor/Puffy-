@@ -237,13 +237,21 @@ function closeFrame(now: number) {
       worst.sort((a, b) => b.ms - a.ms);
       if (worst.length > WORST) worst.length = WORST;
     }
-    // (every 5 s or so: the summary so far, kept in case the page goes without a word)
-    if (gaps.length % 300 === 0) keep(PENDING, summary('cut off'));
+    // (every 10 s or so: the summary so far, kept in case the page goes without a word — made when
+    // the device is idle between frames, not inside one: it sorts every frame time so far)
+    if (gaps.length % 600 === 0) whenIdle(() => on && keep(PENDING, summary('cut off')));
   }
   counted = false;
   cur = new Map();
   glCur = { uploads: 0, uploadMs: 0, uploadPx: 0, draws: 0 };
 }
+
+/** Run soon, in a gap between frames where the browser has one (Safari hasn't: a short wait instead). */
+const whenIdle = (fn: () => void) => {
+  const ric = (window as unknown as { requestIdleCallback?: (f: () => void, o: { timeout: number }) => void }).requestIdleCallback;
+  if (ric) ric(fn, { timeout: 3000 });
+  else setTimeout(fn, 50);
+};
 
 // ── the browser's profiler (Chrome) ──
 
