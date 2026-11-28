@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { DEPTH } from '../config';
-import { BG_LAYERS, LAYER_PIECES, bgKey, bgPieces, bgRes, ensureLook, skyColours } from '../gfx/textures';
+import { BG_LAYERS, LAYER_PIECES, bgKey, bgPieces, bgRes, bgSolid, ensureLook, skyColours } from '../gfx/textures';
 import { rng } from '../gfx/draw';
 import { liveCanvas } from '../gfx/liveCanvas';
 import { LIGHT } from '../core/light';
@@ -169,6 +169,10 @@ interface Layer {
   drift: number;
   offset: number;
   h: number;
+  /** This frame: its row's first picture's left edge, how many pictures it has, and whether it's in view (see update). */
+  x0: number;
+  n: number;
+  rowOn: boolean;
 }
 
 /**
@@ -285,14 +289,28 @@ export class Background {
     const y = view.top - 2;
     const W = view.width + 4;
     const H = view.height + 4;
+    // (the stretches across it where what's in front is solid from some height down: see coverLayers)
+    const runs = this.skyRuns(x, x + W);
     let c0 = colour(0);
     for (let i = 1; i < ts.length; i++) {
       if (ts[i] <= ts[i - 1]) continue;
       const c1 = colour(ts[i]);
       const y0 = y + ts[i - 1] * H;
       const y1 = y + ts[i] * H;
-      g.fillGradientStyle(c0, c0, c1, c1, 1);
-      g.fillRect(x, y0, W, y1 - y0);
+      if (!runs || y1 <= runs.low) {
+        g.fillGradientStyle(c0, c0, c1, c1, 1);
+        g.fillRect(x, y0, W, y1 - y0);
+      } else
+        for (let r = 0; r < runs.n; r++) {
+          // (down to where it's hidden, shaded to the colour there: the same shading, cut short)
+          const xa = runs.x[r];
+          const xb = runs.x[r + 1];
+          const yb = Math.min(y1, runs.cut[r]);
+          if (yb <= y0) continue;
+          const cb = yb < y1 ? colour((yb - y) / H) : c1;
+          g.fillGradientStyle(c0, c0, cb, cb, 1);
+          g.fillRect(xa, y0, xb - xa, yb - y0);
+        }
       c0 = c1;
     }
   }
@@ -302,7 +320,7 @@ export class Background {
 
   private add(id: LayerId, h: number, fx: number, fy: number, anchor: number, drift: number, depth: number) {
     const key = bgKey(id, 'puff', this.home);
-    this.layers.push({ id, a: [], b: [], keyA: key, keyB: key, depth, w: BG_LAYERS[id].w, y: 0, fx, fy, anchor, drift, offset: 0, h: h + 4 / this.res });
+    this.layers.push({ id, a: [], b: [], keyA: key, keyB: key, depth, w: BG_LAYERS[id].w, y: 0, fx, fy, anchor, drift, offset: 0, h: h + 4 / this.res, x0: 0, n: 0, rowOn: false });
   }
 
   /** Make sure a row has `n` pictures (they're only ever added: a handful at most). */
@@ -353,13 +371,13 @@ export class Background {
   private cover: GroundCover | null = null;
 
   /** Show a piece of a layer's picture (see hideUnder): `ground` is the ground's cover where it is (null: none). */
-  private showPiece(img: Phaser.GameObjects.Image, b: Tile['boxes'][number], x: number, y: number, ground: { x0: number; x1: number } | null) {
+  private showPiece(img: Phaser.GameObjects.Image, b: Tile['boxes'][number], x: number, y: number, ground: { x0: number; x1: number } | null, front: Float64Array | null) {
     let h = b.h;
-    if (ground) {
-      const at = this.cover!.at(Math.max(x + b.x / this.res, ground.x0), Math.min(x + (b.x + b.w) / this.res, ground.x1));
-      // (the rows above that height; a piece wholly under it isn't drawn)
-      if (at < Infinity) h = Math.min(h, Math.ceil((at - y) * this.res) - b.top);
-    }
+    let at = Infinity;
+    if (ground) at = this.cover!.at(Math.max(x + b.x / this.res, ground.x0), Math.min(x + (b.x + b.w) / this.res, ground.x1));
+    if (front) at = Math.min(at, this.hiddenFrom(front, x + b.x / this.res, x + (b.x + b.w) / this.res));
+    // (the rows above that height; a piece wholly under it isn't drawn)
+    if (at < Infinity) h = Math.min(h, Math.ceil((at - y) * this.res) - b.top);
     if (h <= 0) {
       img.setVisible(false);
       return;
@@ -636,6 +654,168 @@ export class Background {
     }
   }
 
+  /**
+   * The game: each background layer — and the sky — is also cut short where the layers in front of it
+   * are solid all the way down (the hills hide the far scenery, the cloud sea in front hides both; and
+   * the sky is behind them all), as the ground already hides them (see hideUnder). The graphics chip
+   * blends every pixel of every picture, so on a slow one the drawing time goes with the pixels drawn:
+   * the sky alone was drawn over the whole screen, and the half of it or so under the hills, the cloud
+   * sea and the ground painted over. What's on screen stays the same: only pixels something solid in
+   * front paints over are left out. (Not the start screen: its scenery fades between Parts.)
+   */
+  coverLayers(on: boolean) {
+    this.layerCover = on;
+  }
+  private layerCover = false;
+  /** (this frame's stretches, see findCovers: their left edges, how many, and how wide) */
+  private stripX0 = 0;
+  private stripN = 0;
+  /** (this frame's view, across: what's outside it doesn't matter) */
+  private viewX0 = 0;
+  private viewX1 = 0;
+  private static readonly STRIP = 16;
+  /** Per stretch, each layer's solid band this frame (world y, top and bottom; top ≥ bottom: none). */
+  private bandTop: Float64Array[] = [];
+  private bandBot: Float64Array[] = [];
+  /** Per stretch, from how high everything in front of each layer (and of the sky: [0]) hides it, all the way down the view. */
+  private hidden: Float64Array[] = [];
+  /** The sky's, this frame (null: not cut). */
+  private skyCut: Float64Array | null = null;
+
+  /**
+   * Where the layers in front, and the ground, hide what's behind them this frame: across the view in
+   * stretches STRIP world px wide, for the sky (index 0) and each layer (index 1 + its own): the height
+   * from which they're solid all the way down past the view's bottom (Infinity: they aren't).
+   */
+  private findCovers(view: View, groundOn: boolean): Float64Array[] {
+    const cam = this.scene.cameras.main;
+    // the view as the camera shows it (turned, maybe), and a shake's worth more below
+    const r = (cam as unknown as { rotation: number }).rotation;
+    const hw = (cam.width / cam.zoom / 2) * Math.abs(Math.cos(r)) + (cam.height / cam.zoom / 2) * Math.abs(Math.sin(r));
+    const hh = (cam.height / cam.zoom / 2) * Math.abs(Math.cos(r)) + (cam.width / cam.zoom / 2) * Math.abs(Math.sin(r));
+    const cx = cam.scrollX + cam.width / 2;
+    const cy = cam.scrollY + cam.height / 2;
+    const bottom = Math.max(cy + hh, view.top + view.height) + 24;
+    const SW = Background.STRIP;
+    const sx0 = Math.floor((Math.min(cx - hw, view.left) - 16) / SW) * SW;
+    const n = Math.ceil((Math.max(cx + hw, view.left + view.width) + 16 - sx0) / SW);
+    this.stripX0 = sx0;
+    this.stripN = n;
+    this.viewX0 = cx - hw - 1;
+    this.viewX1 = cx + hw + 1;
+    const L = this.layers.length;
+    const grow = (arr: Float64Array[], k: number) => {
+      for (let i = 0; i < k; i++) if (!arr[i] || arr[i].length < n) arr[i] = new Float64Array(Math.max(n, 96));
+    };
+    grow(this.bandTop, L);
+    grow(this.bandBot, L);
+    grow(this.hidden, L + 1);
+    // each layer's solid band in each stretch: what all its columns there share
+    const right = view.left + view.width;
+    for (let li = 0; li < L; li++) {
+      const l = this.layers[li];
+      const top = this.bandTop[li];
+      const bot = this.bandBot[li];
+      const solid = bgSolid(l.keyA);
+      // (its pictures shown: see update)
+      let shown = 0;
+      while (shown < l.n && l.x0 + shown * l.w - 0.3 * shown < right) shown++;
+      const rowEnd = l.x0 + (shown - 1) * l.w - 0.3 * (shown - 1) + l.w;
+      const near = li === L - 1;
+      for (let s = 0; s < n; s++) {
+        top[s] = Infinity;
+        bot[s] = -Infinity;
+        const a = Math.max(sx0 + s * SW, cx - hw - 2);
+        const b = Math.min(sx0 + (s + 1) * SW, cx + hw + 2);
+        if (!solid || !l.rowOn || !shown || b <= a || a < l.x0 || b > rowEnd) continue;
+        let t = -Infinity;
+        let e = Infinity;
+        const colW = solid.col / this.res;
+        for (let i = 0; i < shown && t < e; i++) {
+          const x = l.x0 + i * l.w - 0.3 * i;
+          const k0 = Math.max(0, Math.floor((a - x) / colW));
+          const k1 = Math.min(solid.top.length - 1, Math.floor((b - x) / colW));
+          for (let k = k0; k <= k1; k++) {
+            t = Math.max(t, l.y + solid.top[k] / this.res);
+            // (the cloud sea in front runs on into the plain fill under it: see `fill`)
+            e = Math.min(e, near && solid.toEnd[k] ? Infinity : l.y + solid.bottom[k] / this.res);
+          }
+        }
+        if (t < e) {
+          top[s] = t;
+          bot[s] = e;
+        }
+      }
+    }
+    // for each layer (and the sky), from how high what's in front hides it, down past the view's bottom
+    for (let target = 0; target < L; target++) {
+      const out = this.hidden[target];
+      for (let s = 0; s < n; s++) {
+        let cur = bottom;
+        if (groundOn) {
+          const g = this.cover!.at(sx0 + s * SW, sx0 + (s + 1) * SW);
+          if (g < cur) cur = g;
+        }
+        // (bands in front reaching down to where it's hidden so far hide it from their tops)
+        for (let more = true; more; ) {
+          more = false;
+          for (let f = target; f < L; f++)
+            if (this.bandTop[f][s] < cur && this.bandBot[f][s] >= cur) {
+              cur = this.bandTop[f][s];
+              more = true;
+            }
+        }
+        out[s] = cur < bottom ? cur : Infinity;
+      }
+    }
+    return this.hidden;
+  }
+
+  /** From how high everything in front hides all of x0…x1 (see findCovers): Infinity if any of it isn't. */
+  private hiddenFrom(front: Float64Array, x0: number, x1: number) {
+    const SW = Background.STRIP;
+    x0 = Math.max(x0, this.viewX0);
+    x1 = Math.min(x1, this.viewX1);
+    if (x1 < x0) return Infinity;
+    const s0 = Math.floor((x0 - this.stripX0) / SW);
+    const s1 = Math.floor((x1 - this.stripX0) / SW);
+    // (the part outside the stretches is outside the view)
+    let at = -Infinity;
+    for (let s = Math.max(0, s0); s <= Math.min(this.stripN - 1, s1); s++) if (front[s] > at) at = front[s];
+    return at === -Infinity ? Infinity : at;
+  }
+
+  /** The sky's stretches this frame (see drawSkyBands): their edges (x, n + 1 of them), each one's cut, and the lowest. Null: not cut anywhere. */
+  private skyRuns(x0: number, x1: number): { n: number; x: number[]; cut: number[]; low: number } | null {
+    const cut = this.skyCut;
+    if (!cut) return null;
+    const SW = Background.STRIP;
+    const xs = this.runX;
+    const cs = this.runCut;
+    xs.length = 0;
+    cs.length = 0;
+    let low = Infinity;
+    let any = false;
+    for (let x = x0; x < x1; ) {
+      const s = Math.floor((x - this.stripX0) / SW);
+      const next = Math.min(x1, this.stripX0 + (s + 1) * SW);
+      // (outside the stretches: not cut; cut heights a hair higher, in whole px, so neighbours join up)
+      const c = s < 0 || s >= this.stripN ? Infinity : Math.floor(cut[s]);
+      if (c < Infinity) any = true;
+      if (c < low) low = c;
+      if (cs.length && cs[cs.length - 1] === c) xs[xs.length - 1] = next;
+      else {
+        if (!xs.length) xs.push(x);
+        xs.push(next);
+        cs.push(c);
+      }
+      x = next;
+    }
+    return any ? { n: cs.length, x: xs, cut: cs, low } : null;
+  }
+  private runX: number[] = [];
+  private runCut: number[] = [];
+
   update(view: View, dt: number) {
     for (const sky of [this.skyA, this.skyB]) sky.setPosition(view.left - 2, view.top - 2).setDisplaySize(view.width + 4, view.height + 4);
     const camUp = this.lowestViewTop - view.top; // how far the camera is above its lowest point
@@ -645,11 +825,6 @@ export class Background {
       const k = Math.max(0, Math.min(1, camUp / Math.max(1, this.lowestViewTop)));
       tint = lerpRgb(0xffffff, 0xc89a66, k * 0.55);
       this.skyA.setTint(tint);
-    }
-    if (this.skyBands) {
-      this.skyA.setVisible(false);
-      this.skyB.setVisible(false);
-      this.drawSkyBands(this.skyBands, view, tint);
     }
     this.drawClouds(view, camUp, dt);
     this.drawSeeds(view, dt);
@@ -661,13 +836,22 @@ export class Background {
       l.y = view.top + view.height * l.anchor + camUp * l.fy;
       // the row scrolls by (camera × parallax + drift), wrapping every picture-width
       const shift = view.left * l.fx + l.offset;
-      const x0 = view.left - 2 - (((shift % l.w) + l.w) % l.w);
-      const n = Math.ceil((view.width + 4 + l.w) / l.w) + 1;
-      const a = this.row(l.a, l.keyA, n, l.depth);
-      const b = this.row(l.b, l.keyB, n, l.depth);
+      l.x0 = view.left - 2 - (((shift % l.w) + l.w) % l.w);
+      l.n = Math.ceil((view.width + 4 + l.w) / l.w) + 1;
       // (and none of the row while it's wholly above or below the view: up a climb, or high over the
       // ground, the far layers are a long way down, and were drawn there every frame all the same)
-      const rowOn = l.y < view.top + view.height + 8 && l.y + l.h > view.top - 8;
+      l.rowOn = l.y < view.top + view.height + 8 && l.y + l.h > view.top - 8;
+    }
+    // (where the layers in front hide each one: see coverLayers)
+    const fronts = this.layerCover ? this.findCovers(view, ground !== null) : null;
+    for (let li = 0; li < this.layers.length; li++) {
+      const l = this.layers[li];
+      const x0 = l.x0;
+      const n = l.n;
+      const a = this.row(l.a, l.keyA, n, l.depth);
+      const b = this.row(l.b, l.keyB, n, l.depth);
+      const rowOn = l.rowOn;
+      const front = fronts && li < this.layers.length - 1 ? fronts[li + 1] : null;
       const right = view.left + view.width;
       for (let i = 0; i < a.length; i++) {
         // (a hair of overlap so no seam shows between neighbours)
@@ -681,9 +865,15 @@ export class Background {
             const img = t.imgs[j];
             img.setVisible(show).setPosition(x, l.y);
             if (t === b[i]) img.setAlpha(this.wB);
-            if (show) this.showPiece(img, t.boxes[j], x, l.y, ground);
+            if (show) this.showPiece(img, t.boxes[j], x, l.y, ground, front);
           }
       }
+    }
+    if (this.skyBands) {
+      this.skyA.setVisible(false);
+      this.skyB.setVisible(false);
+      this.skyCut = fronts ? fronts[0] : null;
+      this.drawSkyBands(this.skyBands, view, tint);
     }
     // solid fill under the nearest layer so the bottom of the screen is always covered
     const near = this.layers[this.layers.length - 1];

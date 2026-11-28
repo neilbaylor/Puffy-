@@ -484,6 +484,7 @@ export class GameScene extends Phaser.Scene {
     const clouds = this.retry ? this.bg?.cloudClock : undefined;
     this.bg = new Background(this, (data.bgBottom ?? heightPx) - VIEW_H, false, !!data.vertical, data.water !== undefined);
     this.bg.hideUnder(this.level.cover);
+    this.bg.coverLayers(true);
     if (clouds) this.bg.carryOn(clouds);
     this.amb = new Ambience(this, this.levelId, (x, y, max) => {
       for (let d = 0; d <= max; d += 6) if (this.level.isSolidAt(x, y + d)) return Math.floor((y + d) / TILE) * TILE;

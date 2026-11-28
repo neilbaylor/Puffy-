@@ -927,6 +927,23 @@ const NO_PIECES = (() => {
     return false;
   }
 })();
+/** Each background layer's solid band, by key (see bgSolid). */
+const layerSolid = new Map<string, LayerSolid>();
+/**
+ * Where a background layer's picture is solid (nothing of what's behind it shows through), in columns
+ * `col` pixels wide: column k from row `top[k]` down to row `bottom[k]` (picture pixels, edges of rows;
+ * top ≥ bottom: nowhere). `toEnd[k]`: it's solid all the way to the foot of the picture there.
+ */
+export type LayerSolid = { col: number; top: Float32Array; bottom: Float32Array; toEnd: Uint8Array };
+/**
+ * A background layer's solid band (see LayerSolid), or undefined if it wasn't measured: the hills hide
+ * the far scenery and the sky where they're solid, and the cloud sea in front hides both (see
+ * Background.coverLayers).
+ */
+export function bgSolid(key: string): LayerSolid | undefined {
+  return layerSolid.get(key);
+}
+
 /** How many pieces a layer's picture is cut into, at most (see measurePieces). */
 export const LAYER_PIECES = 8;
 
@@ -955,6 +972,7 @@ export function bgPieces(key: string): readonly LayerPiece[] | undefined {
  */
 function measurePieces(key: string, c: HTMLCanvasElement) {
   layerPieces.delete(key);
+  layerSolid.delete(key);
   try {
     const W = c.width;
     const H = c.height;
@@ -974,6 +992,40 @@ function measurePieces(key: string, c: HTMLCanvasElement) {
           first[x] = y;
           left--;
         }
+    }
+    // each pixel column's solid band: its lowest run of wholly solid pixels (from the foot of the
+    // picture up: the hills and the cloud seas are solid from their outline down)
+    const sTop = new Int32Array(W).fill(H);
+    const sBot = new Int32Array(W).fill(-1);
+    for (let x = 0; x < W; x++) {
+      let y = H - 1;
+      while (y >= 0 && (px[y * W + x] & A) !== A) y--;
+      if (y < 0) continue;
+      sBot[x] = y;
+      while (y >= 0 && (px[y * W + x] & A) === A) y--;
+      sTop[x] = y + 1;
+    }
+    // (the foot of the picture: its 2 see-through rows, below what was drawn — see hiresPadV)
+    const foot = H - 3;
+    // each 32-pixel column's: the band all its own pixel columns and the one either side share (the
+    // graphics chip blends a pixel from its neighbours, across and up and down: a row's kept clear of
+    // the band's ends — the band is solid to the pixel inside them)
+    {
+      const top = new Float32Array(cols);
+      const bottom = new Float32Array(cols);
+      const toEnd = new Uint8Array(cols);
+      for (let k = 0; k < cols; k++) {
+        let t = 0;
+        let b = H;
+        for (let x = Math.max(0, k * COL - 1); x < Math.min(W, (k + 1) * COL + 1); x++) {
+          t = Math.max(t, sTop[x]);
+          b = Math.min(b, sBot[x]);
+        }
+        top[k] = t + 1;
+        bottom[k] = b;
+        toEnd[k] = b >= foot && top[k] < bottom[k] ? 1 : 0;
+      }
+      layerSolid.set(key, { col: COL, top, bottom, toEnd });
     }
     // each 32-pixel column's top: its own pixel columns and the one either side of it (the graphics
     // chip blends a pixel from its neighbours, across as well as up and down), 2 rows of margin; a
