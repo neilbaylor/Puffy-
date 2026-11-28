@@ -413,3 +413,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.408: Part 5: smoother fly-over ending; Kai fish a bit easier and turns up a touch sooner.
 - v0.409: Battle lobby much smoother (pictures drawn on entering and at the first battle); start screen and lobby lighter in full mode.
 - v0.410: A hidden test switch (?g12=1) for some level drawing savings; off by default.
+- v0.411: A hidden recorder testers can use to measure how smoothly each Part plays on their own device.
