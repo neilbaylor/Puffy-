@@ -16,7 +16,7 @@
  */
 import { fullBench, quickBench, timeLayers, type BenchScores } from '../core/bench';
 import { refreshMs } from '../core/refresh';
-import { playFlush, playLast } from '../core/playLog';
+import { markTester, playFlush, playLast } from '../core/playLog';
 
 type Main = typeof import('../main');
 type GameLike = {
@@ -53,6 +53,11 @@ html.benching, html.benching body { touch-action: auto; user-select: text; -webk
 #bench .scroll table { width: auto; min-width: 100%; }
 #bench .scroll th { position: sticky; top: 0; background: #fff3d6; white-space: nowrap; }
 #bench .scroll td { white-space: nowrap; }
+#bench .play-row { cursor: pointer; }
+#bench .play-detail { white-space: normal; max-width: 1100px; }
+#bench .play-detail h3 { margin: 12px 0 4px; font-size: 15px; }
+#bench .play-detail table { margin-bottom: 6px; }
+#bench .play-detail td { font-size: 13px; }
 #bench .scroll td.long { max-width: 220px; overflow: hidden; text-overflow: ellipsis; font-size: 13px; color: var(--ink-soft); }
 #bench .scroll td.dev, #bench .scroll th:first-child { position: sticky; left: 0; z-index: 1; background: #fff; font-weight: 800; box-shadow: 1px 0 0 #3a241822; }
 #bench .scroll th:first-child { z-index: 2; background: #fff3d6; }
@@ -655,6 +660,8 @@ async function listPage() {
     msg.textContent = `The server said ${res.status}.`;
     return;
   }
+  // (a tester's device: the game may use the browser's profiler from its next start — core/playLog)
+  markTester(true);
   const all = (await res.json()) as { reports: Stored[] };
   // (the game's own level recordings — testers' devices, see core/playLog — in a table of their own)
   // (one row a recording: a copy sent again after a page cut it off — see playLog — counts once)
@@ -683,40 +690,112 @@ async function listPage() {
         }).join('')}</tr>`,
     )
     .join('');
-  type P = { part?: number; mode?: string; g12?: boolean; frames?: number; secs?: number; median?: number; p90?: number; p99?: number; over33?: number; over50?: number; window?: string; dpr?: number; hz?: number; v?: string; why?: string; faints?: number };
+  type Fn = { fn: string; pct: number; msf?: number };
+  type Tally = { samples: number; busyPct: number; self: Fn[]; total: Fn[] };
+  type P = {
+    what?: string; part?: number; mode?: string; g12?: boolean; frames?: number; secs?: number; median?: number; p90?: number; p99?: number; worstMs?: number;
+    over33?: number; over50?: number; window?: string; dpr?: number; hz?: number; v?: string; why?: string; faints?: number; heapMb?: number | null;
+    parts?: { part: string; msPerFrame: number; callsPerFrame: number; maxMs: number }[];
+    gpu?: { uploads: number; uploadMs: number; uploadMpx: number; drawsPerFrame: number };
+    worst?: { ms: number; at: number; top: [string, number][]; uploads: number; uploadMs: number; draws: number }[];
+    profile?: { whole: Tally; slow: Tally | null } | null;
+    profWhy?: string;
+  };
+  // (each frame's time, split: the scenes' game logic, the engine round it — physics, tweens, timers —
+  // and drawing; see core/playLog)
+  const sum = (r: P, test: (k: string) => boolean) => (r.parts ? Math.round(r.parts.filter((x) => test(x.part)).reduce((a, x) => a + x.msPerFrame, 0) * 100) / 100 : undefined);
+  const logic = (r: P) => sum(r, (k) => k.endsWith(': logic'));
+  const engine = (r: P) => (r.parts ? Math.round(((sum(r, (k) => k.endsWith(': update')) ?? 0) - (logic(r) ?? 0)) * 100) / 100 : undefined);
+  const draw = (r: P) => sum(r, (k) => k.endsWith(': draw') || k.startsWith('draw: '));
+  const fnList = (l: Fn[] | undefined, k = 8) => (l ?? []).slice(0, k).map((f) => `${f.fn} ${f.msf !== undefined ? `${f.msf} ms` : `${f.pct}%`}`).join(' · ');
   const PCOLS: [string, (s: Stored, r: P) => string][] = [
     ['When', (s) => new Date(s.at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })],
-    ['Part', (_, r) => na(r.part)],
+    ['What', (_, r) => r.what ?? (r.part !== undefined ? `Part ${r.part}` : 'n/a')],
     ['Mode', (_, r) => na(r.mode)],
     ['G12', (_, r) => (r.g12 ? 'on' : 'off')],
     ['Median ms', (_, r) => na(r.median)],
     ['p90', (_, r) => na(r.p90)],
     ['p99', (_, r) => na(r.p99)],
+    ['Worst ms', (_, r) => na(r.worstMs)],
     ['>33 ms %', (_, r) => na(r.over33)],
     ['>50 ms %', (_, r) => na(r.over50)],
+    ['Logic ms', (_, r) => na(logic(r))],
+    ['Engine ms', (_, r) => na(engine(r))],
+    ['Draw ms', (_, r) => na(draw(r))],
+    ['Uploads', (_, r) => (r.gpu ? `${r.gpu.uploads} (${r.gpu.uploadMs} ms, ${r.gpu.uploadMpx} Mpx)` : 'n/a')],
+    ['Draw calls', (_, r) => na(r.gpu?.drawsPerFrame)],
+    ['Profile', (_, r) => (r.profile ? `yes (${r.profile.whole.samples} samples)` : r.profWhy || 'n/a')],
     ['Frames', (_, r) => na(r.frames)],
     ['Secs', (_, r) => na(r.secs)],
     ['Faints', (_, r) => na(r.faints)],
     ['Ended', (_, r) => na(r.why)],
     ['Window', (_, r) => `${na(r.window)} @${na(r.dpr)}`],
     ['Hz', (_, r) => na(r.hz)],
+    ['Heap MB', (_, r) => na(r.heapMb)],
     ['Version', (_, r) => na(r.v)],
     ['User agent', (s) => s.ua],
   ];
+  // (the CSV also carries the details, a cell each)
+  const DETAIL: [string, (r: P) => string][] = [
+    ['Parts (ms a frame)', (r) => (r.parts ?? []).map((x) => `${x.part} ${x.msPerFrame} (max ${x.maxMs})`).join(' · ')],
+    ['Slowest frames', (r) => (r.worst ?? []).map((w) => `${w.ms} ms at ${w.at}s [${w.top.map(([k, v]) => `${k} ${v}`).join(', ')}${w.uploads ? `, ${w.uploads} uploads ${w.uploadMs} ms` : ''}]`).join(' · ')],
+    ['Functions: own time', (r) => fnList(r.profile?.whole.self, 25)],
+    ['Functions: with calls', (r) => fnList(r.profile?.whole.total, 25)],
+    ['Functions: in slow frames', (r) => fnList(r.profile?.slow?.self, 15)],
+  ];
+  const details = (r: P) => {
+    const parts = r.parts?.length
+      ? `<h3>Where each frame's time went</h3><table><tr><th>Part</th><th>ms a frame</th><th>calls a frame</th><th>its slowest frame, ms</th></tr>${r.parts
+          .map((x) => `<tr><td>${esc(x.part)}</td><td class="n">${x.msPerFrame}</td><td class="n">${x.callsPerFrame}</td><td class="n">${x.maxMs}</td></tr>`)
+          .join('')}</table><p class="msg soft">“update” holds “logic” (the game's own code) and the engine round it (physics, tweens, timers). Draw calls a frame: ${na(r.gpu?.drawsPerFrame)}. Pictures sent to the graphics chip: ${r.gpu ? `${r.gpu.uploads}, ${r.gpu.uploadMs} ms, ${r.gpu.uploadMpx} million pixels` : 'n/a'}.</p>`
+      : '<p class="msg soft">No breakdown (recorded before v0.414).</p>';
+    const worst = r.worst?.length
+      ? `<h3>Slowest frames</h3><table><tr><th>ms</th><th>at</th><th>what took the time</th><th>uploads</th><th>draw calls</th></tr>${r.worst
+          .map((w) => `<tr><td class="n">${w.ms}</td><td class="n">${w.at} s</td><td>${esc(w.top.map(([k, v]) => `${k} ${v}`).join(', '))}</td><td class="n">${w.uploads ? `${w.uploads} (${w.uploadMs} ms)` : 0}</td><td class="n">${w.draws}</td></tr>`)
+          .join('')}</table>`
+      : '';
+    const fnTable = (title: string, l: Fn[] | undefined) =>
+      l?.length
+        ? `<h3>${esc(title)}</h3><table><tr><th>Function</th><th>ms a frame</th><th>% of the time</th></tr>${l.map((f) => `<tr><td>${esc(f.fn)}</td><td class="n">${na(f.msf)}</td><td class="n">${f.pct}</td></tr>`).join('')}</table>`
+        : '';
+    const prof = r.profile
+      ? `<p class="msg soft">The browser's profiler: ${r.profile.whole.samples} samples, busy in ${r.profile.whole.busyPct}% of them. Names are as the browser saw them (file:line:column for the short ones).</p>${fnTable('Functions: own time', r.profile.whole.self)}${fnTable('Functions: with what they call', r.profile.whole.total)}${
+          r.profile.slow ? fnTable(`Functions in the slow frames (${r.profile.slow.samples} samples; ms a slow frame)`, r.profile.slow.self) : ''
+        }`
+      : `<p class="msg soft">No function profile: ${esc(r.profWhy || 'recorded before v0.414')}.</p>`;
+    return `<div class="play-detail">${parts}${worst}${prof}</div>`;
+  };
   const last = playLast();
-  const lastLine = `<p class="msg soft">This device's last level: ${
-    last ? `Part ${esc(String(last.part))}, ${esc(new Date(last.at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }))}${last.frames ? `, ${esc(String(last.frames))} frames` : ''}: ${esc(last.sent)}.` : 'none played since the recorder came in (v0.411).'
+  const lastLine = `<p class="msg soft">This device's last recording: ${
+    last
+      ? `${esc(last.what ?? `Part ${last.part}`)}, ${esc(new Date(last.at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }))}${last.frames ? `, ${esc(String(last.frames))} frames` : ''}: ${esc(last.sent)}.`
+      : 'none since the recorder came in (v0.411).'
   }</p>`;
   const playTable = plays.length
-    ? `<h2>Level recordings (${plays.length})</h2>${lastLine}<p class="msg soft">How smoothly each level played on testers' devices: each game frame's time, lower is smoother.</p><p><button class="alt" data-act="pcsv">Copy recordings (CSV)</button></p><div class="scroll"><table><tr>${PCOLS.map(([h]) => `<th>${esc(h)}</th>`).join('')}</tr>${plays
-        .map((s) => `<tr>${PCOLS.map(([h, f]) => (h === 'User agent' ? `<td class="long" title="${esc(f(s, s.report as P))}">${esc(f(s, s.report as P))}</td>` : `<td>${esc(f(s, s.report as P))}</td>`)).join('')}</tr>`)
+    ? `<h2>Play recordings (${plays.length})</h2>${lastLine}<p class="msg soft">How levels, bosses and battles played on testers' devices: each game frame's time (lower is smoother) and where it went. Tap a row for its details.</p><p><button class="alt" data-act="pcsv">Copy recordings (CSV)</button> <button class="alt" data-act="pjson">Copy everything (JSON)</button></p><div class="scroll"><table class="plays"><tr>${PCOLS.map(([h]) => `<th>${esc(h)}</th>`).join('')}</tr>${plays
+        .map(
+          (s, i) =>
+            `<tr class="play-row" data-i="${i}">${PCOLS.map(([h, f]) => (h === 'User agent' ? `<td class="long" title="${esc(f(s, s.report as P))}">${esc(f(s, s.report as P))}</td>` : `<td>${esc(f(s, s.report as P))}</td>`)).join('')}</tr><tr class="play-more" data-i="${i}" hidden><td colspan="${PCOLS.length}">${details(s.report as P)}</td></tr>`,
+        )
         .join('')}</table></div><h2>Device checks</h2>`
-    : `<h2>Level recordings</h2>${lastLine}<h2>Device checks</h2>`;
+    : `<h2>Play recordings</h2>${lastLine}<h2>Device checks</h2>`;
   out.innerHTML = `${playTable}<p><button class="alt" data-act="csv">Copy all (CSV)</button></p><div class="scroll"><table><tr>${head}</tr>${body}</table></div>`;
+  for (const row of out.querySelectorAll<HTMLElement>('.play-row'))
+    row.addEventListener('click', () => {
+      const more = out.querySelector<HTMLElement>(`.play-more[data-i="${row.dataset.i}"]`);
+      if (more) more.hidden = !more.hidden;
+    });
   out.querySelector<HTMLButtonElement>('[data-act=pcsv]')?.addEventListener('click', async () => {
     const cell = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
-    const csv = [PCOLS.map(([h]) => cell(h)).join(','), ...plays.map((s) => PCOLS.map(([, f]) => cell(f(s, s.report as P))).join(','))].join('\n');
+    const csv = [
+      [...PCOLS.map(([h]) => h), ...DETAIL.map(([h]) => h)].map(cell).join(','),
+      ...plays.map((s) => [...PCOLS.map(([, f]) => f(s, s.report as P)), ...DETAIL.map(([, f]) => f(s.report as P))].map(cell).join(',')),
+    ].join('\n');
     msg.textContent = (await copyText(csv)) ? 'Recordings copied as CSV.' : "Couldn't copy here.";
+  });
+  out.querySelector<HTMLButtonElement>('[data-act=pjson]')?.addEventListener('click', async () => {
+    const json = JSON.stringify(plays.map((s) => ({ at: s.at, ua: s.ua, ...(s.report as object) })));
+    msg.textContent = (await copyText(json)) ? 'Every recording copied (JSON).' : "Couldn't copy here.";
   });
   out.querySelector<HTMLButtonElement>('[data-act=csv]')!.onclick = async () => {
     const cell = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);

@@ -1008,7 +1008,7 @@ export class GameScene extends Phaser.Scene {
     const dt = Math.min(deltaMs / 1000, 1 / 30);
     if (this.intro) return this.updateIntro(dt);
     if (this.cutscene) return this.updateCutscene(dt);
-    playFrame(deltaMs);
+    playFrame();
 
     this.updatePuddles(dt);
     this.updateDrips(dt);

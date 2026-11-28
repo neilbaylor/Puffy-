@@ -159,6 +159,9 @@ const server = createServer(async (req, res) => {
       // (gzip, brotli or neither, depending on what the browser takes)
       // (and Origin for the app's update list: see appCors)
       ...(f.gz ? { Vary: res.hasHeader('Vary') ? 'Origin, Accept-Encoding' : 'Accept-Encoding' } : {}),
+      // (a tester's device — a cookie the game sets, see src/core/playLog — may use the browser's
+      // profiler for the testers' recordings; nobody else's page gets it)
+      ...(f.type.startsWith('text/html') && /(?:^|;\s*)puffy_prof=1/.test(req.headers.cookie ?? '') ? { 'Document-Policy': 'js-profiling' } : {}),
     };
     const has = alreadyHas(req.headers['if-none-match'], f.hash);
     if (has) return void res.writeHead(304, { ...headers, ETag: has }).end();

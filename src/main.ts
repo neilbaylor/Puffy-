@@ -22,7 +22,7 @@ import { skipClearCameraFills } from './core/fadeFix';
 import { roundTextureIds } from './core/texIdFix';
 import { warmBatchShaders } from './core/shaderWarm';
 import { freeSwappedRenderTextures } from './core/dynamicTextureFix';
-import { playFlush } from './core/playLog';
+import { installPlayLog, playFlush } from './core/playLog';
 
 // (before any scene: see physicsFix)
 fixArcadeGroupWalk();
@@ -319,6 +319,9 @@ function start(refreshMs: number) {
   (window as unknown as { refreshHz: number }).refreshHz = Math.round(1000 / refreshMs);
   // (a tester's level recording the last visit didn't get to send: now, once the start's settled — core/playLog)
   setTimeout(() => void playFlush().catch(() => {}), 8000);
+  // (the testers' recorder of how levels, bosses and battles play: core/playLog)
+  if (game.isBooted && game.renderer) installPlayLog(game);
+  else game.events.once('ready', () => installPlayLog(game));
 }
 
 void refreshMs.then(start);
