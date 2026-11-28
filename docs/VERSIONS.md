@@ -417,3 +417,4 @@ version commit describes the change in more detail (`git log --format=%B`).
 - v0.412: Big Muscles walks and runs a bit faster.
 - v0.413: Signing in on a phone no longer switches to keyboard controls; the hidden level recorder is sturdier.
 - v0.414: The testers' hidden recorder now shows where each frame's time goes, for every level, boss and battle.
+- v0.415: The testers' recorder is a little lighter while playing.
